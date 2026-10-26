@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from corsair.contracts import (
     DIAGNOSTIC_TRUNCATION_MARKER,
     MAX_DIAGNOSTIC_TEXT_CHARS,
+    MAX_TERMINAL_ROUNDS,
     ArtifactRef,
     Disposition,
     ExecutionStatus,
@@ -115,7 +116,9 @@ def test_terminal_formatter_revalidates_maximum_round_count_after_model_copy():
     result = _result()
 
     with pytest.raises(ValidationError, match="too_long"):
-        format_terminal_result(result.model_copy(update={"rounds": result.rounds * 17}))
+        format_terminal_result(
+            result.model_copy(update={"rounds": result.rounds * (MAX_TERMINAL_ROUNDS + 1)})
+        )
 
 
 async def test_finalization_validation_fails_explicitly_without_recording_invalid_claims():
@@ -123,7 +126,7 @@ async def test_finalization_validation_fails_explicitly_without_recording_invali
 
     from corsair.workflows.investigation import InvestigationWorkflow
 
-    result = _result().model_copy(update={"rounds": _result().rounds * 17})
+    result = _result().model_copy(update={"rounds": _result().rounds * (MAX_TERMINAL_ROUNDS + 1)})
     with pytest.raises(ApplicationError) as rejected:
         await InvestigationWorkflow()._record_result(result)
     assert rejected.value.type == "TERMINAL_PAYLOAD_INVALID"

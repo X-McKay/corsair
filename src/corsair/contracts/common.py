@@ -12,8 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$")]
 # A root run identity must leave room for the operation suffixes (".r<n>",
-# ".fix<n>") that are appended to form an EvidenceInput.operation_id, which shares
-# the 80-character Identifier bound.
+# ".fix<n>", and a ".s<n>" prefix for a later independent session) that are
+# appended to form an EvidenceInput.operation_id, which shares the 80-character
+# Identifier bound.
 MAX_ROOT_IDENTIFIER_LENGTH = 60
 MAX_DIAGNOSTIC_TEXT_CHARS = 4096
 DIAGNOSTIC_TRUNCATION_MARKER = " … [diagnostic truncated]"

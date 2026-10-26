@@ -33,6 +33,7 @@ from corsair.contracts import (
     RoleOutcome,
     Submission,
     Usage,
+    Verdict,
     digest,
 )
 from corsair.workflows.evaluation import EvaluationWorkflow
@@ -650,3 +651,146 @@ async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
     assert rejected.value.cause.type == "TERMINAL_PAYLOAD_INVALID"
     assert activities.record_inputs == []
     assert len(activities.producer_inputs) == 16
+
+
+def _two_session_budget(rounds: int = 1) -> Budget:
+    """Room for every round of both sessions: one producer and one audit call each."""
+    return Budget(
+        max_rounds=rounds,
+        max_llm_calls=4 * rounds,
+        episode_llm_calls=1,
+        max_tool_calls=4 * rounds,
+        max_output_tokens=256,
+        max_elapsed_seconds=60,
+        probe_timeout_seconds=1,
+    )
+
+
+_HELD = (RoleOutcome.HELD, RoleOutcome.HELD)
+_DEMONSTRATED = (RoleOutcome.HELD, RoleOutcome.VIOLATION)
+
+
+async def test_two_independent_clean_negative_sessions_are_exploit_not_demonstrated(
+    temporal_server, temporal_artifact_store
+):
+    workflow_id = temporal_id("two-negatives")
+    held = ActivityScenario(outcomes=(_HELD,) * 2)
+    request = investigation_request("two-negatives", budget=_two_session_budget(rounds=2))
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, activities):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=workflow_id,
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+    assert result.disposition is Disposition.INCONCLUSIVE
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert [(item.session, item.index) for item in result.rounds] == [
+        (1, 1),
+        (1, 2),
+        (2, 1),
+        (2, 2),
+    ]
+    assert [item.operation_id for item in activities.evidence_inputs] == [
+        f"{workflow_id}.r1",
+        f"{workflow_id}.r2",
+        f"{workflow_id}.s2.r1",
+        f"{workflow_id}.s2.r2",
+    ]
+    # The second session is blind: its first round carries nothing from the first.
+    first_round, carried, fresh, _ = activities.producer_inputs
+    assert first_round.previous is None and first_round.feedback is None
+    assert carried.previous is not None and carried.feedback is not None
+    assert fresh.round_index == 1
+    assert fresh.previous is None and fresh.feedback is None
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert persisted.verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+
+
+async def test_second_session_demonstration_is_exploit_demonstrated(
+    temporal_server, temporal_artifact_store
+):
+    workflow_id = temporal_id("second-demonstrates")
+    scenario = ActivityScenario(outcomes=(_HELD,), later_session_outcomes=(_DEMONSTRATED,))
+    request = investigation_request("second-demonstrates", fixed=True, budget=_two_session_budget())
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=workflow_id,
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    assert result.disposition is Disposition.SUPPORTED
+    assert result.fix_status is FixStatus.DEMONSTRATION_BLOCKED
+    assert [item.operation_id for item in acts.evidence_inputs] == [
+        f"{workflow_id}.r1",
+        f"{workflow_id}.s2.r1",
+        f"{workflow_id}.s2.fix1",
+    ]
+
+
+async def test_second_session_fault_is_error_not_a_second_clean_negative(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(
+        outcomes=(_HELD,), later_session_outcomes=((RoleOutcome.HELD, RoleOutcome.ERROR),)
+    )
+    request = investigation_request("second-faults", budget=_two_session_budget())
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("second-faults"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.ERROR
+    assert acts.call_counts["corsair.evidence"] == 2
+
+
+async def test_non_clean_first_session_does_not_start_a_second_session(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(outcomes=((RoleOutcome.VIOLATION, RoleOutcome.VIOLATION),))
+    request = investigation_request("no-second", budget=_two_session_budget())
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("no-second"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert [item.session for item in result.rounds] == [1]
+    assert acts.call_counts["corsair.produce"] == 1
+
+
+async def test_exhausted_root_budget_leaves_a_lone_clean_negative_inconclusive(
+    temporal_server, temporal_artifact_store
+):
+    """Sessions share the root budget; no admissible second session means no LNE."""
+    held = ActivityScenario(outcomes=(_HELD,) * 3)
+    request = investigation_request("lone-negative", budget=_three_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("lone-negative"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert {item.session for item in result.rounds} == {1}
+    assert all(".s" not in item.operation_id for item in acts.evidence_inputs)
