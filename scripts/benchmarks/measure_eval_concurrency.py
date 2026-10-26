@@ -42,6 +42,7 @@ from corsair.contracts import (
     AuditInput,
     AuditOutput,
     AuditResult,
+    AuditRule,
     BatchRequest,
     Budget,
     InvestigationRequest,
@@ -141,7 +142,7 @@ class SleepingInference:
         return AuditOutput(
             review=AuditResult(
                 decision=AuditDecision.ACCEPT,
-                rule="measurement-fixture",
+                rule=AuditRule.ALL,
                 reason="The paired payloads exercise the configured file-access seam",
             ),
             usage=Usage(llm_calls=1),

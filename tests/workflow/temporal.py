@@ -26,6 +26,7 @@ from corsair.contracts import (
     AuditInput,
     AuditOutput,
     AuditResult,
+    AuditRule,
     Budget,
     Case,
     EvidenceInput,
@@ -240,7 +241,7 @@ class FakeActivities:
         return AuditOutput(
             review=AuditResult(
                 decision=AuditDecision.ACCEPT,
-                rule="independent-evidence-review",
+                rule=AuditRule.ALL,
                 reason="the source-bound paired observation supports the component claim",
             ),
             usage=Usage(llm_calls=1),

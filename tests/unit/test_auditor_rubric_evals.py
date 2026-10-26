@@ -17,6 +17,7 @@ from corsair.contracts import (
     AuditInput,
     AuditOutput,
     AuditResult,
+    AuditRule,
     MatchKind,
     PythonRecipe,
 )
@@ -64,7 +65,9 @@ def _row(output: AuditOutput, oracle: dict, tmp_path: Path) -> dict:
 
 def _review(decision: str, rule: str) -> AuditOutput:
     return AuditOutput(
-        review=AuditResult(decision=AuditDecision(decision), rule=rule, reason="scripted")
+        review=AuditResult(
+            decision=AuditDecision(decision), rule=AuditRule(rule), reason="scripted"
+        )
     )
 
 

@@ -708,6 +708,8 @@ async def run_auditor(
     if isinstance(completed, Feedback):
         return AuditOutput(usage=usage, feedback=completed)
     try:
+        # The contract binds the rule to the decision, so an incoherent pair (an ACCEPT
+        # not naming ALL, or a rule outside R1 to R4 and ALL) fails here and fails closed.
         review = AuditResult.model_validate_json(completed)
     except (ValidationError, ValueError):
         return AuditOutput(

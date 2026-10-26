@@ -6,6 +6,7 @@ from .agents import AuditDecision as AuditDecision
 from .agents import AuditInput as AuditInput
 from .agents import AuditOutput as AuditOutput
 from .agents import AuditResult as AuditResult
+from .agents import AuditRule as AuditRule
 from .agents import PlanRevision as PlanRevision
 from .agents import ProducerDecision as ProducerDecision
 from .agents import ProducerInput as ProducerInput
