@@ -52,7 +52,8 @@ def build_tree(root: Path, files: int, total_bytes: int) -> Path:
         (package / f"module_{index:04d}.py").write_text(
             _module_text(index, per_file), encoding="utf-8"
         )
-    (project / "reader.py").write_text(_module_text(-1, 2048), encoding="utf-8")
+    # A distinct, non-negative index keeps the generated name valid Python.
+    (project / "reader.py").write_text(_module_text(files, 2048), encoding="utf-8")
     return project
 
 
