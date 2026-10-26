@@ -126,6 +126,7 @@ def fixture_score_row(
     store: ArtifactStore,
 ) -> dict[str, Any]:
     """Persist the output and retain errors, unknown accounting, and evaluation identity."""
+    review = output.review if isinstance(output, AuditOutput) else None
     return {
         "run_id": identity,
         "case_id": case_id,
@@ -137,6 +138,10 @@ def fixture_score_row(
         if output.feedback and output.feedback.operational
         else "COMPLETED",
         "agent": agent,
+        # The auditor's own decisive rubric id makes a rejection attributable in the
+        # report; it is model output, so it never changes the oracle pass predicate.
+        "audit_decision": None if review is None else review.decision.value,
+        "audit_rule": None if review is None else review.rule,
         "output_artifact": store.put_json(output).model_dump(mode="json"),
         "config_digest": settings.identity,
         "agent_resources_digest": digest(
