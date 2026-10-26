@@ -38,6 +38,5 @@
       ],
       "reason": "The recipe fixes records_root and permits only record_name to vary"
     }
-  },
-  "max_output_tokens": 2048
+  }
 }

@@ -5,28 +5,28 @@
       "case_id": "audit01",
       "input": "fixtures/audit01/input.json",
       "oracle": "fixtures/audit01/oracle.json",
-      "input_digest": "d48f38dc1dbd5c13fb50f5e0abcc205ec64d8b2f7f98a19f007dd8feddd92123",
+      "input_digest": "eff577454092ffa0f4df59c46122947a70824dfa551584f5ccb690de13e0afa4",
       "oracle_digest": "374257696b602b3252f2e1fb7340ecd8630e1fcf53820260d04b884bed126f4f"
     },
     {
       "case_id": "audit02",
       "input": "fixtures/audit02/input.json",
       "oracle": "fixtures/audit02/oracle.json",
-      "input_digest": "dc8fe285edf0b8de5c0b5e0e4e6a115a6e69b6d1d6f83ce8a876991b8f39ce7f",
+      "input_digest": "31fd90355153395ad64bc1c919bf10973f6b184f48e4bb3c1c9d81200dbcfdd7",
       "oracle_digest": "7db730fa160fd72c8613962722bd63d70ba5dec5627c5c93aefa3fe0a29c4424"
     },
     {
       "case_id": "audit03",
       "input": "fixtures/audit03/input.json",
       "oracle": "fixtures/audit03/oracle.json",
-      "input_digest": "6b9d32c805c482dea3c4973f3e00745e337b67a019ad9687ee71475634b86f1b",
+      "input_digest": "a436e2e34cc2e78ac6e584bff8a7e664bd1b1d821bdd3c9a2e0c8f7c207cc9c7",
       "oracle_digest": "374257696b602b3252f2e1fb7340ecd8630e1fcf53820260d04b884bed126f4f"
     },
     {
       "case_id": "audit04",
       "input": "fixtures/audit04/input.json",
       "oracle": "fixtures/audit04/oracle.json",
-      "input_digest": "0406ab74bf542ed2de3b4977594fa21a83eb1aa424001cceda3d54afe501d61e",
+      "input_digest": "6a180180198783f60f2c646e826d6e1945f2f821111ae27e960a5ec4b5871286",
       "oracle_digest": "7db730fa160fd72c8613962722bd63d70ba5dec5627c5c93aefa3fe0a29c4424"
     }
   ]

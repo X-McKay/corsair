@@ -18,11 +18,11 @@ ORIGINAL_IDENTITIES = {
         "02275f674a11f70a0cd426d67593d3e995a9fc1af9c91d55d9a889b427069eaf",
     ),
     "audit01": (
-        "d48f38dc1dbd5c13fb50f5e0abcc205ec64d8b2f7f98a19f007dd8feddd92123",
+        "eff577454092ffa0f4df59c46122947a70824dfa551584f5ccb690de13e0afa4",
         "374257696b602b3252f2e1fb7340ecd8630e1fcf53820260d04b884bed126f4f",
     ),
     "audit02": (
-        "dc8fe285edf0b8de5c0b5e0e4e6a115a6e69b6d1d6f83ce8a876991b8f39ce7f",
+        "31fd90355153395ad64bc1c919bf10973f6b184f48e4bb3c1c9d81200dbcfdd7",
         "7db730fa160fd72c8613962722bd63d70ba5dec5627c5c93aefa3fe0a29c4424",
     ),
 }
