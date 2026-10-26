@@ -23,6 +23,7 @@ from corsair.ports.sandboxing import SandboxPort, SandboxRole, SandboxUnavailabl
 from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
+ROLES: tuple[SandboxRole, ...] = ("control", "adversarial")
 
 
 class EvidenceVerifier:
@@ -43,6 +44,27 @@ class EvidenceVerifier:
             covered_lines=[],
             reason=reason,
             native_exit_code=None,
+        )
+
+    @staticmethod
+    def _error(reason: str, native_exit_code: int | None = None) -> RoleObservation:
+        return RoleObservation(
+            outcome=RoleOutcome.ERROR,
+            target_executed=False,
+            reason=reason,
+            native_exit_code=native_exit_code,
+        )
+
+    @staticmethod
+    def _bundle_matches(
+        bundle: object, *, operation_id: str, source_digest: str, submission_digest: str
+    ) -> bool:
+        return (
+            isinstance(bundle, dict)
+            and bundle.get("schema_version") == "corsair.evidence/1"
+            and bundle.get("operation_id") == operation_id
+            and bundle.get("source_digest") == source_digest
+            and bundle.get("submission_digest") == submission_digest
         )
 
     def _reconciled(self, input: EvidenceInput) -> Observation | None:
@@ -72,12 +94,11 @@ class EvidenceVerifier:
             bundle = self.store.get_json(observation.artifact)
         except Exception as exc:
             raise ValueError("committed evidence bundle cannot be read") from exc
-        if (
-            not isinstance(bundle, dict)
-            or bundle.get("schema_version") != "corsair.evidence/1"
-            or bundle.get("operation_id") != input.operation_id
-            or bundle.get("source_digest") != prepared.source.sha256
-            or bundle.get("submission_digest") != submission_digest
+        if not self._bundle_matches(
+            bundle,
+            operation_id=input.operation_id,
+            source_digest=prepared.source.sha256,
+            submission_digest=submission_digest,
         ):
             raise ValueError("committed evidence bundle is stale or forged")
         return observation
@@ -94,21 +115,18 @@ class EvidenceVerifier:
             update={"source": input.prepared.fixed_source, "fixed_source": None}
         )
 
-    def _raw_document(self, raw_ref: ArtifactRef | None) -> dict[str, Any] | None:
-        if raw_ref is None:
-            return None
+    def _cleaned_raw(
+        self, raw_ref: ArtifactRef | None, *, expected_operation: str, expected_role: str
+    ) -> dict[str, Any] | str:
+        """Return the raw receipt with confirmed identity and cleanup, or why it is rejected."""
         try:
-            raw = self.store.get_json(raw_ref)
+            raw = self.store.get_json(raw_ref) if raw_ref is not None else None
         except Exception:
-            return None
-        return raw if isinstance(raw, dict) else None
-
-    @staticmethod
-    def _raw_identity_matches(
-        raw: dict[str, Any], *, expected_operation: str, expected_role: str
-    ) -> bool:
+            raw = None
+        if not isinstance(raw, dict):
+            return "trusted raw evidence is absent"
         labels = raw.get("labels")
-        return (
+        if not (
             raw.get("schema_version") == "corsair.raw-evidence/1"
             and raw.get("operation_id") == expected_operation
             and raw.get("role") == expected_role
@@ -116,20 +134,20 @@ class EvidenceVerifier:
             and labels.get("corsair.security") == "true"
             and labels.get("corsair.operation") == expected_operation
             and labels.get("corsair.role") == expected_role
-        )
+        ):
+            return "raw evidence identity is stale or forged"
+        if raw.get("cleanup_confirmed") is not True:
+            return "container cleanup was not confirmed"
+        return raw
 
     def _physical_cleanup_confirmed(
         self, raw_ref: ArtifactRef | None, *, expected_operation: str, expected_role: str
     ) -> bool:
         """Keep resource cleanup separate from the semantic validity of a driver report."""
-        raw = self._raw_document(raw_ref)
-        return bool(
-            raw is not None
-            and self._raw_identity_matches(
-                raw, expected_operation=expected_operation, expected_role=expected_role
-            )
-            and raw.get("cleanup_confirmed") is True
+        raw = self._cleaned_raw(
+            raw_ref, expected_operation=expected_operation, expected_role=expected_role
         )
+        return not isinstance(raw, str)
 
     def _validate_raw(
         self,
@@ -142,26 +160,15 @@ class EvidenceVerifier:
         prepared: PreparedCase,
         fixed: bool,
     ) -> tuple[RoleObservation, bool]:
-        raw = self._raw_document(raw_ref)
-        if raw is None:
-            return self._invalid("trusted raw evidence is absent"), False
-        if not self._raw_identity_matches(
-            raw, expected_operation=expected_operation, expected_role=expected_role
-        ):
-            return self._invalid("raw evidence identity is stale or forged"), False
-        if raw.get("cleanup_confirmed") is not True:
-            return self._invalid("container cleanup was not confirmed"), False
+        raw = self._cleaned_raw(
+            raw_ref, expected_operation=expected_operation, expected_role=expected_role
+        )
+        if isinstance(raw, str):
+            return self._invalid(raw), False
         record = raw.get("driver")
         if not isinstance(record, dict) or record.get("schema_version") != "corsair.driver/1":
             if isinstance(raw.get("error"), str):
-                return (
-                    RoleObservation(
-                        outcome=RoleOutcome.ERROR,
-                        target_executed=False,
-                        reason="trusted sandbox execution failed",
-                    ),
-                    False,
-                )
+                return self._error("trusted sandbox execution failed"), False
             return self._invalid("trusted driver record is absent"), False
         if (
             record.get("operation_id") != expected_operation
@@ -198,11 +205,8 @@ class EvidenceVerifier:
             return self._invalid("trusted driver outcome is invalid"), False
         status = junit.get("status")
         if outcome == RoleOutcome.ERROR and status == "ERROR":
-            return RoleObservation(
-                outcome=RoleOutcome.ERROR,
-                target_executed=False,
-                reason="native target execution or observer reporting failed",
-                native_exit_code=exit_code,
+            return self._error(
+                "native target execution or observer reporting failed", exit_code
             ), False
         counts = [junit.get(name) for name in ("tests", "failures", "errors", "skipped")]
         if any(type(count) is not int or count < 0 for count in counts) or junit.get("tests") != 1:
@@ -431,16 +435,8 @@ class EvidenceVerifier:
                 # container was not independently confirmed.
                 break
 
-        roles: tuple[SandboxRole, ...] = ("control", "adversarial")
-        for role in roles:
-            observations.setdefault(
-                role,
-                RoleObservation(
-                    outcome=RoleOutcome.ERROR,
-                    target_executed=False,
-                    reason="role was not executed",
-                ),
-            )
+        for role in ROLES:
+            observations.setdefault(role, self._error("role was not executed"))
             raw_refs.setdefault(role, None)
         cleanup_confirmed = all(
             self._physical_cleanup_confirmed(
@@ -473,13 +469,16 @@ class EvidenceVerifier:
                 return None
             if Observation.model_validate(self.store.get_json(committed)) != observation:
                 return None
+            submission_digest = digest(submission)
             bundle = self.store.get_json(observation.artifact)
             if (
-                bundle.get("schema_version") != "corsair.evidence/1"
-                or bundle.get("operation_id") != observation.operation_id
-                or bundle.get("source_digest") != observation.source_digest
-                or bundle.get("submission_digest") != digest(submission)
-                or observation.submission_digest != digest(submission)
+                not self._bundle_matches(
+                    bundle,
+                    operation_id=observation.operation_id,
+                    source_digest=observation.source_digest,
+                    submission_digest=submission_digest,
+                )
+                or observation.submission_digest != submission_digest
                 or type(bundle.get("fixed")) is not bool
                 or bundle["fixed"] != expected_fixed
             ):
@@ -490,23 +489,18 @@ class EvidenceVerifier:
             self.store.get(prepared.source)
             if prepared.manifest != manifest or prepared.source.sha256 != observation.source_digest:
                 return None
-            roles: tuple[SandboxRole, ...] = ("control", "adversarial")
-            for role in roles:
-                raw = ArtifactRef.model_validate(bundle["roles"][role])
+            for role in ROLES:
+                # A valid receipt already passed the identity and cleanup checks.
                 native, valid = self._validate_raw(
-                    raw,
+                    ArtifactRef.model_validate(bundle["roles"][role]),
                     expected_operation=observation.operation_id,
                     expected_role=role,
                     expected_source=prepared.source.sha256,
-                    expected_submission=digest(submission),
+                    expected_submission=submission_digest,
                     prepared=prepared,
                     fixed=bundle["fixed"],
                 )
                 if not valid or native != getattr(observation, role):
-                    return None
-                if not self._physical_cleanup_confirmed(
-                    raw, expected_operation=observation.operation_id, expected_role=role
-                ):
                     return None
             return (
                 prepared if observation.cleanup_confirmed and observation.feedback is None else None
