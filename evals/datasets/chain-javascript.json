@@ -8,7 +8,7 @@
       "request": "datasets/chain/javascript/prototypepollution-a-v3/request.json",
       "oracle": "datasets/chain/javascript/prototypepollution-a-v3/oracle.json",
       "request_digest": "0742a78f9a5e5ff694ca5d021c5a581d66016235224af132d39fd884daad6cd9",
-      "oracle_digest": "ac99cab192df0377b95fff9b091905b799149d19a7507283c75cefef4ca601d9"
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
     }
   ]
 }

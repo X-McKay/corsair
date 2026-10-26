@@ -42,6 +42,7 @@ from corsair.contracts import (
     InvestigationResult,
     LineProvenance,
     Oracle,
+    Scope,
     Source,
     Verdict,
     digest,
@@ -223,6 +224,34 @@ def case_oracle_problems(oracle: Oracle) -> list[str]:
         problems.append(f"expected_verdict {oracle.expected_verdict.value} is forbidden")
     if not problems and not any(oracle.verdict_allowed(verdict) for verdict in Verdict):
         problems.append("no verdict satisfies the oracle")
+    return problems
+
+
+def claim_scope_problems(scope: Scope, oracle: Oracle) -> list[str]:
+    """A demonstration label the scope policy can never produce for the request's claim.
+
+    ``policies.verdicts`` reports a demonstrated component claim as EXPLOIT_DEMONSTRATED and a
+    demonstrated application claim, which every current recipe probes only at the component
+    seam, as COMPONENT_EXPLOIT_DEMONSTRATED. An oracle that scores only the other label can
+    never pass; the first live chain found exactly that mislabel.
+    """
+    reachable, unreachable = (
+        (Verdict.EXPLOIT_DEMONSTRATED, Verdict.COMPONENT_EXPLOIT_DEMONSTRATED)
+        if scope is Scope.COMPONENT
+        else (Verdict.COMPONENT_EXPLOIT_DEMONSTRATED, Verdict.EXPLOIT_DEMONSTRATED)
+    )
+    problems: list[str] = []
+    acceptable = oracle.acceptable_verdicts
+    if acceptable is not None and unreachable in acceptable and reachable not in acceptable:
+        problems.append(
+            f"acceptable_verdicts admits only {unreachable.value} but the request claims "
+            f"{scope.value} scope, which a demonstration labels {reachable.value}"
+        )
+    if oracle.expected_verdict is unreachable:
+        problems.append(
+            f"expected_verdict {unreachable.value} is unreachable for a {scope.value}-scope "
+            f"claim, which a demonstration labels {reachable.value}"
+        )
     return problems
 
 
@@ -448,6 +477,10 @@ def _validate_case_dataset(
         if request_bytes is not None:
             request = validator.request(entry, declared.request, request_bytes)
             if request is not None:
+                if oracle is not None:
+                    scope = request.case.finding.claim_scope
+                    for problem in claim_scope_problems(scope, oracle):
+                        entry.fail("oracle", problem)
                 validator.binding(entry, request, oracle)
     try:
         report.dataset_digest = digest(Dataset.model_validate(document))

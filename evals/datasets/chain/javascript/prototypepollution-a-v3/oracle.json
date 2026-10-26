@@ -1,9 +1,17 @@
 {
-  "acceptable": ["SUPPORTED"],
-  "forbidden": ["REFUTED"],
+  "acceptable": [
+    "SUPPORTED"
+  ],
+  "forbidden": [
+    "REFUTED"
+  ],
   "expected_execution": "COMPLETED",
   "expected_fix": "NOT_REQUESTED",
-  "acceptable_verdicts": ["COMPONENT_EXPLOIT_DEMONSTRATED"],
-  "expected_verdict": "COMPONENT_EXPLOIT_DEMONSTRATED",
-  "forbidden_verdicts": ["EXPLOIT_NOT_DEMONSTRATED"]
+  "acceptable_verdicts": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_verdict": "EXPLOIT_DEMONSTRATED",
+  "forbidden_verdicts": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ]
 }

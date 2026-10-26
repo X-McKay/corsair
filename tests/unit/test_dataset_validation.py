@@ -12,11 +12,12 @@ from typing import Any
 
 import pytest
 
-from corsair.contracts import Oracle, digest
+from corsair.contracts import Oracle, Scope, digest
 from corsair.entrypoints import cli
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.datasets import (
     case_oracle_problems,
+    claim_scope_problems,
     validate_dataset,
     validate_datasets,
 )
@@ -186,6 +187,32 @@ def test_an_oracle_that_forbids_its_expected_label_fails(tmp_path):
     assert "oracle: expected_verdict EXPLOIT_DEMONSTRATED is forbidden" in entry["problems"]
 
 
+def test_a_component_claim_scored_only_by_the_component_label_fails(tmp_path):
+    _copy_fixture(tmp_path, "case01")
+    _edit_json(
+        tmp_path / "fixtures/case01/request.json",
+        lambda document: document["case"]["finding"].update({"claim_scope": "component"}),
+    )
+    _edit_json(
+        tmp_path / "fixtures/case01/oracle.json",
+        lambda document: document.update(
+            {
+                "expected_verdict": "COMPONENT_EXPLOIT_DEMONSTRATED",
+                "acceptable_verdicts": ["COMPONENT_EXPLOIT_DEMONSTRATED"],
+            }
+        ),
+    )
+    path = _write_dataset(tmp_path, [_case_entry(tmp_path, "case01")])
+    entry = _entry(validate_dataset(path).as_dict(), "case01")
+
+    assert "oracle" in _failed(entry)
+    assert (
+        "oracle: expected_verdict COMPONENT_EXPLOIT_DEMONSTRATED is unreachable for a "
+        "component-scope claim, which a demonstration labels EXPLOIT_DEMONSTRATED"
+        in entry["problems"]
+    )
+
+
 @pytest.mark.parametrize(
     ("oracle", "problem"),
     [
@@ -223,6 +250,43 @@ def test_an_oracle_that_forbids_its_expected_label_fails(tmp_path):
 )
 def test_case_oracle_contradictions_are_named(oracle, problem):
     assert case_oracle_problems(Oracle.model_validate(oracle)) == [problem]
+
+
+@pytest.mark.parametrize(
+    ("scope", "oracle", "problems"),
+    [
+        (
+            Scope.COMPONENT,
+            {
+                "acceptable": ["SUPPORTED"],
+                "acceptable_verdicts": ["COMPONENT_EXPLOIT_DEMONSTRATED"],
+            },
+            [
+                "acceptable_verdicts admits only COMPONENT_EXPLOIT_DEMONSTRATED but the request "
+                "claims component scope, which a demonstration labels EXPLOIT_DEMONSTRATED"
+            ],
+        ),
+        (
+            Scope.APPLICATION,
+            {"acceptable": ["SUPPORTED"], "expected_verdict": "EXPLOIT_DEMONSTRATED"},
+            [
+                "expected_verdict EXPLOIT_DEMONSTRATED is unreachable for a application-scope "
+                "claim, which a demonstration labels COMPONENT_EXPLOIT_DEMONSTRATED"
+            ],
+        ),
+        (
+            Scope.COMPONENT,
+            {
+                "acceptable": ["SUPPORTED"],
+                "acceptable_verdicts": ["EXPLOIT_DEMONSTRATED", "COMPONENT_EXPLOIT_DEMONSTRATED"],
+            },
+            [],
+        ),
+        (Scope.APPLICATION, {"acceptable": ["SUPPORTED"]}, []),
+    ],
+)
+def test_a_demonstration_label_must_be_reachable_for_the_claimed_scope(scope, oracle, problems):
+    assert claim_scope_problems(scope, Oracle.model_validate(oracle)) == problems
 
 
 def test_a_source_tree_that_no_longer_matches_its_frozen_digest_fails(tmp_path):
