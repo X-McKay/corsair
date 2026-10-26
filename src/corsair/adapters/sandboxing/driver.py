@@ -163,6 +163,22 @@ def _coverage_lines(module_file: str) -> list[int]:
         return []
 
 
+def _child_environment() -> dict[str, str]:
+    """Return the complete, fixed environment for the pytest and coverage children."""
+    return {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": "/tmp",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "COVERAGE_FILE": str(WORK / ".coverage"),
+        # Line measurement through PEP 669 sys.monitoring. The default C tracer traces
+        # every pytest/stdlib frame before discarding it as outside --source, which
+        # roughly doubled each role's in-container time; executed lines are identical.
+        # If sys.monitoring were unavailable, coverage.py falls back to its default core.
+        "COVERAGE_CORE": "sysmon",
+    }
+
+
 def main() -> int:
     try:
         job = _safe_job(json.loads(JOB_PATH.read_text(encoding="utf-8")))
@@ -179,13 +195,7 @@ def main() -> int:
 
     WORK.mkdir(parents=True, exist_ok=True)
     TEST.write_text(textwrap.dedent(TEST_SOURCE), encoding="utf-8")
-    environment = {
-        "PATH": os.environ.get("PATH", ""),
-        "HOME": "/tmp",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONNOUSERSITE": "1",
-        "COVERAGE_FILE": str(WORK / ".coverage"),
-    }
+    environment = _child_environment()
     command = [
         sys.executable,
         "-m",
