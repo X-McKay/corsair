@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
+from google.adk.skills import Skill
 from google.adk.tools.skill_toolset import SkillToolset
 
 from corsair.agents.resources import load_agent_spec, prompt_text
@@ -19,6 +20,18 @@ def _tool_name(tool: Callable[..., Any]) -> str:
     if not isinstance(name, str) or not name:
         raise ValueError("producer source tools must have non-empty callable names")
     return name
+
+
+def producer_instruction(skills: Sequence[Skill]) -> str:
+    """Compose the producer prompt with each admitted procedure preloaded after it."""
+
+    return (
+        prompt_text("producer")
+        + "\n\n"
+        + "\n\n".join(
+            f"## Runtime procedure: {skill.name}\n{skill.instructions}" for skill in skills
+        )
+    )
 
 
 def build_producer(
@@ -57,11 +70,7 @@ def build_producer(
         name=spec.name,
         description="Proposes one declarative payload pair for trusted verification.",
         model=model,
-        instruction=prompt_text("producer")
-        + "\n\n"
-        + "\n\n".join(
-            f"## Runtime procedure: {skill.name}\n{skill.instructions}" for skill in loader.skills
-        ),
+        instruction=producer_instruction(loader.skills),
         tools=selected_tools,
         output_schema=ProducerDecision,
         disallow_transfer_to_parent=True,
