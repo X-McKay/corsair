@@ -9,7 +9,8 @@
       "claim_scope": "component"
     },
     "source": {
-      "path": "source"
+      "path": "source",
+      "expected_digest": "05cc98c1183b79e16af9bd653265f8a9cb0fbe7dee14e9cdd92d46e254976e0f"
     },
     "recipe": {
       "kind": "java.secret_disclosure/1",
@@ -28,7 +29,8 @@
       ]
     },
     "fixed_source": {
-      "path": "fixed"
+      "path": "fixed",
+      "expected_digest": "03ef31044138699d932a3ef9a44be3fc0e96f98389284de90659e2193db006f8"
     }
   },
   "budget": {

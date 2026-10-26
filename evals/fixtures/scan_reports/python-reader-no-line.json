@@ -1,0 +1,31 @@
+{
+  "schema_version": "corsair.scan_report/1",
+  "scan_completed": true,
+  "vulnerabilities_found": true,
+  "findings": [
+    {
+      "title": "read_file joins a caller-controlled path onto the configured root",
+      "description": "The read_file helper in reader.py joins the caller's path onto the root directory without a containment check, so a path with parent-directory segments can read files outside the root. The scanner reported the function but not a line.",
+      "file": "reader.py",
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read any file the process can read.",
+      "exploit_scenario": "A request passes ../ segments as the path and receives a file outside the root.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helper",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://github.com/example-org/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    }
+  ]
+}

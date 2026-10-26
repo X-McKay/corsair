@@ -248,7 +248,9 @@ async def test_rescore_keeps_an_unavailable_run_explicit(tmp_path, capsys):
     assert summary["unavailable_results"] == 1
     rows = {row["run_id"]: row for row in json.loads(output.read_text())["rows"]}
     assert rows["run-available"]["status"] == "pass"
+    assert (rows["run-available"]["family"], rows["run-available"]["split"]) == ("family01", "dev")
     assert rows["run-missing"]["status"] == "unavailable"
+    assert "family" not in rows["run-missing"]
     assert "No committed result" in rows["run-missing"]["reason"]
 
 

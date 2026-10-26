@@ -4,8 +4,9 @@ set default-list
 set positional-arguments
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Install the locked SDKs and development tools.
+# Install the locked SDKs and development tools; refuses a .venv uv would keep but cannot import.
 sync:
+    python3 scripts/check_toolchain.py --before-sync
     uv sync --locked --all-extras
 
 # Run the toolchain, lint, formatting, typing and documentation gates.
@@ -100,3 +101,19 @@ eval dataset *args:
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
+
+# Score a frozen scanner-intake dataset (evals/datasets/intake.json); no model, container or service.
+eval-intake dataset *args:
+    uv run --locked python -m corsair.evaluation.intake "$@"
+
+# Live isolated eval with .state/settings.json; record in .runs/live. Optional BASELINE report, --dry-run.
+live-agent role dataset *args:
+    uv run --locked --extra providers python scripts/live_eval.py agent "$@"
+
+# Live composed eval (needs Temporal and a worker); same record. Optional BASELINE report, --dry-run.
+live-chain dataset *args:
+    uv run --locked --extra providers python scripts/live_eval.py chain "$@"
+
+# Check that dataset families, cases and chain pairs keep one split; default evals/datasets/*.json.
+dataset-families *datasets:
+    uv run --locked python -m corsair.evaluation.families "$@"

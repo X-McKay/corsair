@@ -72,12 +72,10 @@ def test_retry_feedback_depends_on_the_audit_alone():
 
 
 def _round(index: int, observation, audit) -> RoundResult:
-    from corsair.contracts import ProducerDecision, ProducerOutput, ProducerProposal
+    from corsair.contracts import ProducerDecision, ProducerOutput
     from tests.unit.test_evidence import _submission
 
-    producer = ProducerOutput(
-        decision=ProducerDecision(root=ProducerProposal(submission=_submission()))
-    )
+    producer = ProducerOutput(decision=ProducerDecision(kind="proposal", submission=_submission()))
     return RoundResult(index=index, producer=producer, observation=observation, audit=audit)
 
 

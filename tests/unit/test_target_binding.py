@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,8 +11,20 @@ from temporalio.testing import ActivityEnvironment
 
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import Case, Finding, InvestigationRequest, PythonRecipe, Source
-from corsair.policies.target_binding import TargetBindingReason, target_binding
+from corsair.contracts import (
+    Case,
+    Finding,
+    InvestigationRequest,
+    LineProvenance,
+    PythonRecipe,
+    Source,
+)
+from corsair.policies.target_binding import (
+    TargetBindingReason,
+    bind_target_line,
+    derive_target_line,
+    target_binding,
+)
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 
@@ -178,6 +191,114 @@ def test_defaulted_parameters_need_not_be_supplied(text):
     assert _reason(text) is None
 
 
+# --- a line-less finding binds to the recipe function's first body statement ----
+
+
+def _executed_lines(text: str, function: str) -> tuple[set[int], set[int]]:
+    """Line events of ``text`` at import, and then during one call of ``function``."""
+    code = compile(text, "derived_target.py", "exec")
+    phase: set[int] = set()
+
+    def tracer(frame, event, _arg):
+        if frame.f_code.co_filename == "derived_target.py" and event == "line":
+            phase.add(frame.f_lineno)
+        return tracer
+
+    namespace: dict[str, object] = {}
+    sys.settrace(tracer)
+    try:
+        exec(code, namespace)
+        imported, phase = set(phase), set()
+        callable_ = namespace[function]
+        assert callable(callable_)
+        callable_(root="/fixtures/allowed", path="hello.txt")
+    finally:
+        sys.settrace(None)
+    return imported, phase
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (READER, 4),
+        ('def read_file(root, path):\n    """Read one file."""\n    return path\n', 3),
+        (
+            'def read_file(root, path):\n    """Read\n    one file."""\n\n    return path\n',
+            5,
+        ),
+        ("def read_file(\n    root,\n    path,\n):\n    return path\n", 5),
+        ("COUNT = 0\n\ndef read_file(root, path):\n    global COUNT\n    COUNT += 1\n", 5),
+        ("def read_file(root, path):\n    size: int\n    return path\n", 3),
+        ("def read_file(root, path):\n    pass\n", 2),
+        ("\ufeffdef read_file(root, path):\n    return path\n", 2),
+        ("def read_file(root, path):\r\n    return path\r\n", 2),
+    ],
+)
+def test_a_line_is_derived_from_a_plain_top_level_def(text, expected):
+    assert derive_target_line(_recipe(), text) == expected
+    # The derived line passes the pre-model gate and is in range.
+    assert target_binding(_finding(expected), _recipe(), text) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "from pathlib import Path\n\ndef read_file(root, path):\n    return Path(root) / path\n",
+        'def read_file(root, path):\n    """Read one file."""\n    return path\n',
+        "COUNT = 0\n\ndef read_file(root, path):\n    global COUNT\n    COUNT += 1\n",
+        "def read_file(root, path):\n    size: int\n    return path\n",
+        "def read_file(root, path):\n    pass\n",
+    ],
+)
+def test_the_derived_line_runs_on_the_call_and_not_at_import(text):
+    """Why the def line is never chosen: importing the module already executes it,
+    so its coverage would not show that the recipe call reached the function."""
+    line = derive_target_line(_recipe(), text)
+    assert line is not None
+    imported, called = _executed_lines(text, "read_file")
+    assert line not in imported
+    assert line in called
+    def_line = next(n for n, row in enumerate(text.splitlines(), 1) if "def read_file" in row)
+    assert def_line in imported
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "def read_file(root, path): return path\n",  # the body shares the def line
+        "def read_file(\n    root, path): return path\n",  # ...or the signature's last
+        'def read_file(root, path):\n    """Only a docstring."""\n',
+        "def read_file(root, path):\n    global COUNT\n",
+        "import functools\n\n@functools.cache\ndef read_file(root, path):\n    return path\n",
+        "async def read_file(root, path):\n    return path\n",
+        "if True:\n    def read_file(root, path):\n        return path\n",
+        "class Reader:\n    def read_file(self, root, path):\n        return path\n",
+        "def read_file(root, path):\n    return 1\n\ndef read_file(root, path):\n    return 2\n",
+        "def read_file(root, path):\n    return path\n\nread_file = print\n",
+        "from os import *\n\ndef read_file(root, path):\n    return path\n",
+        "def read_file(root, path):\n    return path\n\ndef __getattr__(name):\n    return 1\n",
+        "def load_file(root, path):\n    return path\n",
+        "def read_file(root, path)\n    return path\n",
+    ],
+)
+def test_a_line_is_not_derived_unless_it_is_certain(text):
+    assert derive_target_line(_recipe(), text) is None
+
+
+def test_a_module_too_deep_to_parse_derives_no_line(monkeypatch):
+    def too_deep(*_args, **_kwargs):
+        raise RecursionError
+
+    monkeypatch.setattr("corsair.policies.target_binding.ast.parse", too_deep)
+    assert derive_target_line(_recipe(), READER) is None
+
+
+def test_an_underivable_line_missing_reason_names_the_recipe_function():
+    failure = target_binding(_finding(None), _recipe(), "def read_file(root, path): pass\n")
+    assert failure is not None and failure.reason is TargetBindingReason.LINE_MISSING
+    assert "could be derived from recipe function read_file" in str(failure)
+
+
 # --- the prepare activity turns a failure into a non-retryable PREPARE_BLOCKED ----
 
 
@@ -189,7 +310,9 @@ class _Sandbox:
         return self.image_id
 
 
-def _activities(tmp_path: Path, content: str) -> tuple[Activities, InvestigationRequest]:
+def _activities(
+    tmp_path: Path, content: str, *, line: int | None = 4
+) -> tuple[Activities, InvestigationRequest]:
     project = tmp_path / "project"
     project.mkdir()
     (project / "reader.py").write_text(content, encoding="utf-8")
@@ -204,7 +327,7 @@ def _activities(tmp_path: Path, content: str) -> tuple[Activities, Investigation
     )
     case = Case(
         case_id="binding-case",
-        finding=_finding(),
+        finding=_finding(line),
         source=Source(path="project"),
         recipe=_recipe(),
     )
@@ -224,3 +347,57 @@ async def test_prepare_blocks_an_unbound_target_before_any_model_call(tmp_path):
     assert rejected.value.type == "PREPARE_BLOCKED"
     assert rejected.value.non_retryable
     assert "target_binding function_not_defined" in str(rejected.value)
+
+
+async def test_prepare_binds_a_line_less_finding_to_the_recipe_function(tmp_path):
+    activities, request = _activities(tmp_path, READER, line=None)
+    prepared = await ActivityEnvironment().run(activities.prepare, request)
+    assert prepared.finding.line == 4
+    assert prepared.line_provenance is LineProvenance.RECIPE_FUNCTION
+    # The excerpt centres on the derived line, exactly as for a declared one.
+    assert "4:     return (Path(root) / path).read_text()" in prepared.source_excerpt
+    # Everything else about the request finding is carried unchanged.
+    assert prepared.finding.model_copy(update={"line": None}) == request.case.finding
+
+
+async def test_prepare_keeps_a_declared_line_and_records_it_as_declared(tmp_path):
+    activities, request = _activities(tmp_path, READER)
+    prepared = await ActivityEnvironment().run(activities.prepare, request)
+    assert prepared.finding == request.case.finding
+    assert prepared.line_provenance is LineProvenance.DECLARED
+
+
+async def test_prepare_never_derives_a_line_from_the_finding_description(tmp_path):
+    """The description is untrusted narrative: naming another function or a line
+    in it never moves the derived line off the recipe function."""
+    content = READER + "\n\ndef load_file(root, path):\n    return path\n"
+    activities, request = _activities(tmp_path, content, line=None)
+    finding = request.case.finding.model_copy(
+        update={"description": "The bug is in load_file() at line 9 of reader.py."}
+    )
+    request = request.model_copy(
+        update={"case": request.case.model_copy(update={"finding": finding})}
+    )
+    prepared = await ActivityEnvironment().run(activities.prepare, request)
+    assert prepared.finding.line == 4
+
+
+async def test_prepare_still_blocks_a_line_less_finding_it_cannot_bind(tmp_path):
+    activities, request = _activities(
+        tmp_path, "def read_file(root, path): return path\n", line=None
+    )
+    with pytest.raises(ApplicationError) as rejected:
+        await ActivityEnvironment().run(activities.prepare, request)
+    assert rejected.value.type == "PREPARE_BLOCKED"
+    assert "target_binding line_missing" in str(rejected.value)
+
+
+def test_bind_target_line_keeps_a_declared_line_and_derives_only_a_missing_one():
+    """The one binding prepare and the intake dry run share."""
+    declared = _finding(3)
+    assert bind_target_line(declared, _recipe(), READER) == (declared, LineProvenance.DECLARED)
+    derived, provenance = bind_target_line(_finding(None), _recipe(), READER)
+    assert (derived.line, provenance) == (4, LineProvenance.RECIPE_FUNCTION)
+    one_line = "def read_file(root, path): pass\n"
+    unbound, provenance = bind_target_line(_finding(None), _recipe(), one_line)
+    assert (unbound.line, provenance) == (None, LineProvenance.DECLARED)
