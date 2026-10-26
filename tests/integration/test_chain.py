@@ -42,7 +42,11 @@ class ReferenceModel(BaseLlm):
         self.requests.append(llm_request)
         user_message = next(content for content in llm_request.contents if content.role == "user")
         if user_message.parts[0].text.startswith("Investigate this admitted work packet."):
-            packet = json.loads(user_message.parts[0].text.split("\n", maxsplit=1)[1])
+            # The packet is the JSON object after the header line; trusted code may append a
+            # data-only class reference section after it.
+            packet, _ = json.JSONDecoder().raw_decode(
+                user_message.parts[0].text.split("\n", maxsplit=1)[1]
+            )
             revision = packet["round"]["revision"]
             if not any(
                 part.function_response and part.function_response.name == "read_file"
