@@ -755,6 +755,57 @@ async def test_cancelled_episode_records_cancelled_result_before_close(
     assert persisted.execution_status is ExecutionStatus.CANCELLED
 
 
+async def _await_cancel_processed(handle) -> None:
+    """Wait until a workflow task completed after the cancel request (or the run closed)."""
+    from temporalio.api.enums.v1 import EventType
+
+    for _ in range(150):
+        events = [event.event_type async for event in handle.fetch_history_events()]
+        if EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED in events:
+            requested = events.index(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED)
+            if EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED in events[requested:]:
+                return
+        await asyncio.sleep(0.1)
+    raise AssertionError("the cancel request was never processed")
+
+
+async def test_cancel_while_recording_still_commits_and_returns_the_terminal_record(
+    temporal_server, temporal_artifact_store
+):
+    """The terminal decision was made before the cancel arrived: the workflow keeps
+    awaiting the same shielded record activity and returns the recorded result."""
+    paused = ActivityScenario(pause_record=True)
+    workflow_id = temporal_id("cancel-record")
+    async with temporal_server.worker(temporal_artifact_store, paused) as (task_queue, activities):
+        handle = await temporal_server.client.start_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("cancel-record"),
+            id=workflow_id,
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+        await asyncio.wait_for(activities.record_started.wait(), timeout=15)
+        await handle.cancel(reason="cancel while the terminal record is pending")
+        await _await_cancel_processed(handle)
+        activities.release_record.set()
+        result = await handle.result()
+
+    assert activities.call_counts["corsair.record"] == 1
+    assert result.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    record_ref = temporal_artifact_store.reconcile(f"result.{workflow_id}")
+    assert record_ref is not None and record_ref == result.result_artifact
+    persisted = InvestigationResult.model_validate(temporal_artifact_store.get_json(record_ref))
+    assert persisted.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    history = await handle.fetch_history()
+    assert any(
+        event.HasField("marker_recorded_event_attributes")
+        and b"record-survives-cancel-v1"
+        in event.marker_recorded_event_attributes.details["patch-data"].payloads[0].data
+        for event in history.events
+    )
+
+
 @pytest.mark.parametrize("phase", ["evidence", "audit"])
 async def test_failed_later_activity_preserves_completed_producer_round(
     temporal_server, temporal_artifact_store, phase
@@ -904,6 +955,91 @@ async def test_two_independent_clean_negative_sessions_are_exploit_not_demonstra
         temporal_artifact_store.get_json(result.result_artifact)
     )
     assert persisted.verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+
+
+async def test_a_repeated_pair_in_a_fresh_session_stays_inconclusive(
+    temporal_server, temporal_artifact_store
+):
+    """Both sessions end clean, but on the same exploit payload: one candidate, not two
+    independent negatives, so the case is never EXPLOIT_NOT_DEMONSTRATED."""
+    workflow_id = temporal_id("repeated-pair")
+    repeated = ActivityScenario(outcomes=(_HELD,), repeat_candidate=True)
+    request = investigation_request("repeated-pair", budget=_two_session_budget())
+    async with temporal_server.worker(temporal_artifact_store, repeated) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=workflow_id,
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert [item.operation_id for item in acts.evidence_inputs] == [
+        f"{workflow_id}.r1",
+        f"{workflow_id}.s2.r1",
+    ]
+    assert len({digest(item.submission.exploit_payload) for item in acts.evidence_inputs}) == 1
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.result_artifact is not None
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert persisted.verdict is Verdict.INCONCLUSIVE
+
+
+async def test_a_repeated_pair_schedules_a_third_session_while_reachable(
+    temporal_server, temporal_artifact_store
+):
+    """With three sessions admitted, a repeat in session 2 leaves the threshold
+    reachable, so session 3 runs; it repeats too, so the case stays INCONCLUSIVE."""
+    repeated = ActivityScenario(outcomes=(_HELD,), repeat_candidate=True, max_sessions=3)
+    budget = _two_session_budget().model_copy(update={"max_llm_calls": 6, "max_tool_calls": 6})
+    request = investigation_request("repeat-three", budget=budget)
+    async with temporal_server.worker(temporal_artifact_store, repeated) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("repeat-three"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert [item.session for item in result.rounds] == [1, 2, 3]
+    assert acts.call_counts["corsair.produce"] == 3
+    assert result.verdict is Verdict.INCONCLUSIVE
+
+
+async def test_a_held_pair_of_an_unqualified_kind_is_never_a_clean_negative(
+    temporal_server, temporal_artifact_store
+):
+    """Interim guard: the auditor rubric is qualified for the Python kinds only, so a
+    held, covered, accepted JavaScript pair is INCONCLUSIVE and starts no second
+    session; nothing counts toward EXPLOIT_NOT_DEMONSTRATED."""
+    from corsair.contracts import JavaScriptRecipe
+
+    request = investigation_request("unqualified-kind", budget=_two_session_budget())
+    case = request.case.model_copy(
+        update={
+            "finding": request.case.finding.model_copy(update={"file": "merge.js"}),
+            "recipe": JavaScriptRecipe(module_file="merge.js", function="merge"),
+        }
+    )
+    request = request.model_copy(update={"case": case})
+    held = ActivityScenario(outcomes=(_HELD,))
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("unqualified-kind"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert [item.session for item in result.rounds] == [1]
+    assert acts.call_counts["corsair.produce"] == 1
 
 
 async def test_second_session_demonstration_is_exploit_demonstrated(

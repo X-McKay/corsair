@@ -38,7 +38,7 @@ For an investigation, the native query returns its actual phase, session and rou
 
 While `investigate --wait`, `inspect --online --watch` or `eval` waits, a human terminal shows that query as a live panel on stderr (or, with `--no-animation`, one line per status change). Read it as follows:
 
-- **Session n/max and round n/max** show how much of the admitted schedule has been used. A second session appears only after a first session ended in an independent clean negative.
+- **Session n/max and round n/max** show how much of the admitted schedule has been used. A second session appears only after a first session ended in an independent clean negative, and a later one only while enough sessions remain to reach the threshold of clean negatives on distinct exploit payloads.
 - **Last gate** names the most recent feedback gate (for example `retry` after a non-decisive audit, or an operational gate from evidence). It is a gate name, never a reason or a verdict.
 - **Deadline** is the elapsed-time budget; when little time is left the workflow will stop scheduling rounds and record an honest non-decisive result.
 - **Timeline** offsets show where time went, for example a long `evidence` step points at image build or probe time and a long `producer` step at model latency.

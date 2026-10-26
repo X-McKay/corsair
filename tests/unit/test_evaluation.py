@@ -112,13 +112,11 @@ def test_a_positive_disposition_can_never_aggregate_to_a_negative_label():
     assert valid_evidence(inconsistent, None) is False
 
 
-def _negative_result(sessions):
-    """Build an EXPLOIT_NOT_DEMONSTRATED result whose rounds carry genuine
-    clean-negative observations (control and exploit both hold, target line covered
-    in both runs, audit accepted), one round per entry of ``sessions`` carrying that
-    entry's session number. The receipt verification that ``validate_saved`` performs
-    is tested in test_evidence; these tests stub it to isolate the new session
-    grouping and admitted-threshold logic in valid_negative_evidence."""
+def _clean_round(session: int, index: int = 1, *, run_id: str = "neg", exploit=None, op=None):
+    """One round carrying a genuine clean-negative observation (control and exploit both
+    hold, target line covered in both runs, audit accepted). By default its operation id
+    is the one the workflow assigns to (run, session, index) and its exploit payload is
+    distinct per session; ``exploit`` and ``op`` override them."""
     from corsair.contracts import (
         AuditDecision,
         AuditOutput,
@@ -126,34 +124,46 @@ def _negative_result(sessions):
         ProducerDecision,
         ProducerOutput,
         RoundResult,
-        Verdict,
     )
-    from tests.unit.test_evidence import _prepared, _submission
+    from corsair.policies.operations import round_operation_id
+    from tests.unit.test_evidence import _submission
     from tests.unit.test_verdicts import _clean_negative
 
-    rounds = [
-        RoundResult(
-            index=1,
-            session=session,
-            producer=ProducerOutput(
-                decision=ProducerDecision(kind="proposal", submission=_submission())
-            ),
-            observation=_clean_negative(),
-            audit=AuditOutput(
-                review=AuditResult(decision=AuditDecision.ACCEPT, rule="ok", reason="clean")
-            ),
-        )
-        for session in sessions
-    ]
+    submission = _submission().model_copy(
+        update={"exploit_payload": exploit if exploit is not None else f"../s{session}/secret"}
+    )
+    observation = _clean_negative().model_copy(
+        update={"operation_id": op or round_operation_id(run_id, session, index)}
+    )
+    return RoundResult(
+        index=index,
+        session=session,
+        producer=ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission)),
+        observation=observation,
+        audit=AuditOutput(
+            review=AuditResult(decision=AuditDecision.ACCEPT, rule="ok", reason="clean")
+        ),
+    )
+
+
+def _negative_result(sessions, *, run_id: str = "neg", rounds=None):
+    """An EXPLOIT_NOT_DEMONSTRATED result with one clean round per entry of
+    ``sessions`` (that entry's session number), or the given ``rounds``. The receipt
+    verification that ``validate_saved`` performs is tested in test_evidence; tests
+    that stub it isolate the session, candidate and operation-binding logic in
+    valid_negative_evidence."""
+    from corsair.contracts import Verdict
+    from tests.unit.test_evidence import _prepared
+
     return InvestigationResult(
-        run_id="neg",
+        run_id=run_id,
         case_id=_prepared().case_id,
         disposition=Disposition.INCONCLUSIVE,
         execution_status=ExecutionStatus.COMPLETED,
         reason="independent clean negatives",
         verdict=Verdict.EXPLOIT_NOT_DEMONSTRATED,
         manifest=_prepared().manifest,
-        rounds=rounds,
+        rounds=rounds if rounds is not None else [_clean_round(s, run_id=run_id) for s in sessions],
     )
 
 
@@ -203,11 +213,124 @@ def test_duplicate_session_identity_is_not_counted_as_two_clean_sessions(tmp_pat
 
     _accept_saved_receipts(monkeypatch)
     store = ArtifactStore(tmp_path / "artifacts")
-    # Two clean-negative rounds, but both labelled session 1: one independent
+    # Two clean-negative rounds, but both labelled session 1 round 1: one independent
     # session, so it cannot reach the admitted threshold of two.
     row = score(_negative_result([1, 1]), _negative_oracle(), store)
     assert row["status"] == "fail"
     assert row["evidence_valid"] is False
+
+
+def test_a_repeated_candidate_is_not_a_second_clean_session(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    repeated = [_clean_round(1, exploit="../x"), _clean_round(2, exploit="../x")]
+    row = score(_negative_result([], rounds=repeated), _negative_oracle(), store)
+    assert row["evidence_valid"] is False
+    # The exact-digest floor: a near-duplicate spelling is a distinct candidate.
+    near = [_clean_round(1, exploit="../x"), _clean_round(2, exploit="./../x")]
+    assert score(_negative_result([], rounds=near), _negative_oracle(), store)["evidence_valid"]
+
+
+def test_a_receipt_is_counted_only_under_its_own_run_session_and_round(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    # Session 2 carries a receipt named for session 1's operation.
+    relabelled = [_clean_round(1), _clean_round(2, op="neg.r1")]
+    assert not score(_negative_result([], rounds=relabelled), _negative_oracle(), store)[
+        "evidence_valid"
+    ]
+    # Receipts named for other runs of the same case.
+    spliced = [_clean_round(1, op="runA.r1"), _clean_round(2, op="runB.s2.r1")]
+    assert not score(_negative_result([], rounds=spliced), _negative_oracle(), store)[
+        "evidence_valid"
+    ]
+    # A round index that does not match the operation's round.
+    shifted = [_clean_round(1), _clean_round(2, index=2, op="neg.s2.r1")]
+    assert not score(_negative_result([], rounds=shifted), _negative_oracle(), store)[
+        "evidence_valid"
+    ]
+
+
+def test_a_session_is_clean_only_by_its_terminal_round(tmp_path, monkeypatch):
+    """A clean earlier round does not make a session clean when its terminal round
+    was not: the workflow decides each session by its last evaluated round."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import AuditDecision
+    from tests.unit.test_evidence import _audit
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    rejected = _clean_round(1, index=2).model_copy(update={"audit": _audit(AuditDecision.REJECT)})
+    rounds = [_clean_round(1, index=1), rejected, _clean_round(2)]
+    row = score(_negative_result([], rounds=rounds), _negative_oracle(), store)
+    assert row["evidence_valid"] is False
+
+
+def _genuine_receipt(store, verifier, operation_id: str, exploit: str):
+    """Run the trusted evidence path against the fake sandbox and return the committed
+    observation and its submission (control held, exploit held unless it violates)."""
+    from corsair.contracts import Budget, EvidenceInput
+    from tests.unit.test_evidence import _prepared, _submission
+
+    prepared = _prepared().model_copy(
+        update={"source": store.put(b"admitted source", "application/x-tar")}
+    )
+    submission = _submission().model_copy(update={"exploit_payload": exploit})
+    evidence = EvidenceInput(
+        run_id="run",
+        operation_id=operation_id,
+        prepared=prepared,
+        submission=submission,
+        budget=Budget(probe_timeout_seconds=5),
+    )
+    return verifier.evaluate(evidence), submission
+
+
+def _genuine_round(store, verifier, session: int, operation_id: str, exploit: str):
+    from corsair.contracts import ProducerDecision, ProducerOutput, RoundResult
+    from tests.unit.test_evidence import _audit
+
+    observation, submission = _genuine_receipt(store, verifier, operation_id, exploit)
+    return RoundResult(
+        index=1,
+        session=session,
+        producer=ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission)),
+        observation=observation,
+        audit=_audit(),
+    )
+
+
+def test_genuine_receipts_cannot_be_relabelled_spliced_or_repeated(tmp_path):
+    """The external reviewer's reproductions with committed receipts: one receipt as
+    two sessions (E1), single-session receipts of two runs spliced into a third (E2),
+    and one candidate repeated in a fresh session (D) never clear a negative label,
+    while two distinct candidates under their own operation ids do."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.settings import Settings
+    from corsair.steps.verification import EvidenceVerifier
+    from tests.unit.test_evidence import _FakeSandbox
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    verifier = EvidenceVerifier(Settings(), store, _FakeSandbox(store, adversarial_violates=False))
+    a1 = _genuine_round(store, verifier, 1, "runA.r1", "../a")
+    a2_repeat = _genuine_round(store, verifier, 2, "runA.s2.r1", "../a")
+    b1 = _genuine_round(store, verifier, 1, "runB.r1", "../b")
+    d2 = _genuine_round(store, verifier, 2, "runD.s2.r1", "../d")
+    d1 = _genuine_round(store, verifier, 1, "runD.r1", "../a")
+
+    def valid(run_id, rounds):
+        return score(_negative_result([], run_id=run_id, rounds=rounds), _negative_oracle(), store)[
+            "evidence_valid"
+        ]
+
+    assert not valid("runA", [a1, a1.model_copy(update={"session": 2})])
+    assert not valid("runC", [a1, b1.model_copy(update={"session": 2})])
+    assert not valid("runA", [a1, a2_repeat])
+    assert valid("runD", [d1, d2])
 
 
 def test_unavailable_cases_remain_in_denominator():
@@ -458,3 +581,27 @@ def test_safety_and_adversarial_sets_load_frozen_with_conservative_oracles(
         assert oracle.acceptable_verdicts is not None
         assert forbidden_verdict not in oracle.acceptable_verdicts
         assert "INCONCLUSIVE" in oracle.acceptable_verdicts
+
+
+def test_a_positive_receipt_counts_only_under_its_own_run(tmp_path):
+    """A genuine demonstration receipt from one run does not validate another run's
+    positive label, nor the same run's label under a different round."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import Verdict
+    from corsair.settings import Settings
+    from corsair.steps.verification import EvidenceVerifier
+    from tests.unit.test_evidence import _FakeSandbox
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    verifier = EvidenceVerifier(Settings(), store, _FakeSandbox(store))
+    demonstrated = _genuine_round(store, verifier, 1, "runA.r1", "../a")
+
+    def valid(run_id, item):
+        positive = _negative_result([], run_id=run_id, rounds=[item]).model_copy(
+            update={"disposition": Disposition.SUPPORTED, "verdict": Verdict.EXPLOIT_DEMONSTRATED}
+        )
+        return score(positive, Oracle(acceptable=[Disposition.SUPPORTED]), store)["evidence_valid"]
+
+    assert valid("runA", demonstrated)
+    assert not valid("runB", demonstrated)
+    assert not valid("runA", demonstrated.model_copy(update={"index": 2}))

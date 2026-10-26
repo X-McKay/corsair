@@ -23,6 +23,7 @@ from corsair.entrypoints.cli import execute, parser
 from corsair.evaluation import ledger
 from corsair.evaluation.ledger import gate_ledger, ledger_counts
 from corsair.evaluation.scoring import save_report, score, summarize
+from corsair.policies.operations import round_operation_id
 from corsair.workflows import investigation
 from tests.unit.test_evidence import _audit, _prepared, _submission
 from tests.unit.test_verdicts import _HELD, _VIOLATION, _clean_negative, _observation, _role
@@ -44,6 +45,10 @@ def _round(
     index: int = 1,
     session: int = 1,
 ) -> RoundResult:
+    if observation is not None:
+        # The receipt is named for the round that claims it, as the workflow names it.
+        operation_id = round_operation_id("ledger", session, index)
+        observation = observation.model_copy(update={"operation_id": operation_id})
     return RoundResult(
         index=index, session=session, producer=producer, observation=observation, audit=audit
     )
@@ -329,3 +334,43 @@ async def test_report_renders_the_ledger_and_keeps_json_mode(tmp_path, capsys):
     assert "Gate ledger" in output and "Failure stops" in output
     assert "producer_invalid:llm_budget" in output
     assert "older empty" in output and "none" in output
+
+
+def test_a_repeated_candidate_leaves_the_session_threshold_unmet():
+    """Two clean sessions on the same exploit payload are one distinct candidate."""
+    repeated = _result(
+        [
+            _round(_proposal(), _clean_negative(), _audit()),
+            _round(_proposal(), _clean_negative(), _audit(), session=2),
+        ]
+    )
+    entries = gate_ledger(repeated, _verified((1, 1), (2, 1)))
+    assert _gates(entries) == [
+        ("kernel", "clean_negative"),
+        ("kernel", "clean_negative"),
+        ("policy", "negative_threshold_unmet"),
+    ]
+    assert entries[-1]["reason"] == "1 of 2 required independent clean negatives"
+
+
+def test_a_withheld_clean_negative_names_the_unqualified_rubric():
+    from tests.unit.test_verdicts import _javascript_case
+
+    result = _result([_round(_proposal(), _clean_negative(), _audit())])
+    entries = gate_ledger(result, {(1, 1): _javascript_case()})
+    assert _gates(entries) == [("kernel", "clean_negative_unqualified")]
+    assert entries[0]["reason"] == (
+        "clean negative withheld: auditor rubric not qualified for javascript.prototype_pollution/1"
+    )
+
+
+def test_a_receipt_named_for_another_round_is_unverified(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.evaluation.ledger import verified_rounds
+    from tests.unit.test_evaluation import _accept_saved_receipts
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    item = _round(_proposal(), _clean_negative(), _audit())
+    relabelled = item.model_copy(update={"session": 2})
+    assert set(verified_rounds(_result([item, relabelled]), store)) == {(1, 1)}

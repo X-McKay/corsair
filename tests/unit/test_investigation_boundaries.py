@@ -12,10 +12,11 @@ from corsair.contracts import (
     Verdict,
     validate_root_identity,
 )
+from corsair.policies.operations import operation_prefix
 from corsair.workflows.investigation import (
     _BLIND_RETRY_REASON,
     _aggregate_case_verdict,
-    _operation_prefix,
+    _clean_negatives_admit_another_session,
     _retry_feedback,
     _session_outcome,
 )
@@ -71,11 +72,20 @@ def test_retry_feedback_depends_on_the_audit_alone():
 # --- finding 2: a later terminal failure is not masked by an earlier round -----
 
 
-def _round(index: int, observation, audit) -> RoundResult:
+def _round(
+    index: int, observation, audit, exploit: str | None = None, control: str | None = None
+) -> RoundResult:
+    """One round; ``exploit`` replaces the fixture's exploit payload (a new candidate)
+    and ``control`` its benign payload (the same candidate)."""
     from corsair.contracts import ProducerDecision, ProducerOutput
     from tests.unit.test_evidence import _submission
 
-    producer = ProducerOutput(decision=ProducerDecision(kind="proposal", submission=_submission()))
+    submission = _submission()
+    if exploit is not None:
+        submission = submission.model_copy(update={"exploit_payload": exploit})
+    if control is not None:
+        submission = submission.model_copy(update={"control_payload": control})
+    producer = ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission))
     return RoundResult(index=index, producer=producer, observation=observation, audit=audit)
 
 
@@ -127,9 +137,47 @@ def test_completed_clean_negative_alone_is_inconclusive_at_threshold_two():
 def test_two_independent_clean_negative_sessions_are_exploit_not_demonstrated():
     first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
     assert first.clean_negative
-    rounds = [_round(1, _clean_negative(), _audit())]
+    rounds = [_round(1, _clean_negative(), _audit(), exploit="../../etc/passwd")]
     verdict = _aggregate_case_verdict(_prepared(), rounds, _result(), [first])
     assert verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+
+
+def test_a_repeated_candidate_in_a_fresh_session_stays_inconclusive():
+    """The second session ran the same exploit payload with a different control: the
+    same candidate, so not a second independent negative."""
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    second = [_round(1, _clean_negative(), _audit(), control="other.txt")]
+    assert _session_outcome(_prepared(), second, _result()).candidate_key == first.candidate_key
+    verdict = _aggregate_case_verdict(_prepared(), second, _result(), [first])
+    assert verdict is Verdict.INCONCLUSIVE
+
+
+def test_the_session_candidate_is_its_terminal_round_candidate():
+    rounds = [
+        _round(1, _clean_negative(), _audit(), exploit="first"),
+        _round(2, _clean_negative(), _audit(), exploit="second"),
+    ]
+    from corsair.policies.verdicts import candidate_key
+
+    terminal = rounds[-1].producer.submission_for_verification()
+    assert terminal is not None
+    outcome = _session_outcome(_prepared(), rounds, _result())
+    assert outcome.candidate_key == candidate_key(terminal)
+
+
+def test_a_repeated_candidate_schedules_another_session_only_while_reachable():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    repeated = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    # Session 2 of 3 repeated session 1: one distinct negative, one session left.
+    assert _clean_negatives_admit_another_session(repeated, [first], 2, 2, 3, distinct=True)
+    # Session 2 of 2: the threshold is no longer reachable.
+    assert not _clean_negatives_admit_another_session(repeated, [first], 2, 2, 2, distinct=True)
+    # Session 3 of 4 after a repeat needs two more distinct negatives but has one session.
+    assert not _clean_negatives_admit_another_session(
+        repeated, [first, repeated], 3, 3, 4, distinct=True
+    )
+    # Histories recorded before distinct-candidates-v1 replay the per-session count.
+    assert not _clean_negatives_admit_another_session(repeated, [first], 2, 2, 3, distinct=False)
 
 
 def test_second_session_operational_failure_is_not_a_clean_negative():
@@ -155,8 +203,8 @@ def test_a_demonstration_in_the_second_session_is_exploit_demonstrated():
 
 def test_later_sessions_use_disjoint_operation_ids_with_suffix_headroom():
     root = "r" * 60
-    assert _operation_prefix(root, 1) == root
-    second = _operation_prefix(root, 2)
+    assert operation_prefix(root, 1) == root
+    second = operation_prefix(root, 2)
     assert second != root and second.startswith(f"{root}.")
     validate_root_identity(root)
     from pydantic import TypeAdapter
