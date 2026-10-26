@@ -45,11 +45,11 @@ class ReferenceModel(BaseLlm):
             packet = json.loads(user_message.parts[0].text.split("\n", maxsplit=1)[1])
             revision = packet["round"]["revision"]
             if not any(
-                part.function_response and part.function_response.name == "load_skill"
+                part.function_response and part.function_response.name == "read_file"
                 for content in llm_request.contents
                 for part in content.parts
             ):
-                yield tool_response("load_skill", {"skill_name": "source-grounding"})
+                yield tool_response("read_file", {"path": "target.py"})
                 return
             yield text_response(
                 json.dumps(
@@ -129,12 +129,7 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.fix_observation.cleanup_confirmed
     assert result.result_artifact and store.reconcile(f"result.{identity}")
     assert len(model.requests) == 3
-    assert result.manifest.capabilities["producer"]["tools"] == [
-        "read_file",
-        "list_files",
-        "load_skill",
-        "load_skill_resource",
-    ]
+    assert result.manifest.capabilities["producer"]["tools"] == ["read_file", "list_files"]
     from corsair.evaluation.scoring import Oracle, score
 
     relabelled = result.model_copy(update={"case_id": "different-case"})

@@ -46,7 +46,6 @@ _BUDGET_REASONS = frozenset(
 # Fixed adapter reasons behind the non-operational producer_invalid/audit_invalid
 # gates. Qualifying them separates "ran out of calls" from "returned bad output".
 _INVALID_QUALIFIERS = (
-    ("exhausted its runtime skill loader budget", "loader_budget"),
     ("exhausted its tool-call budget", "tool_budget"),
     ("exhausted its LLM-call budget", "llm_budget"),
     ("no remaining model-call budget", "llm_budget"),
