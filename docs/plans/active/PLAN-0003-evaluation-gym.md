@@ -202,3 +202,12 @@ content-addressed tags and cannot contaminate parallel runs.
   `cached_input_tokens` stays None. Identity and fixture digests unchanged (Usage is outside both). Report rows still
   carry only totals; per-call lists live in the stored output artifact (row copying in `evaluation/agents.py` is WP2/WP3
   territory). Re-exports for `ModelCall`, `ToolCall`, `MAX_USAGE_CALL_ENTRIES` added on `gym/loop` (d0816f13).
+- 2026-10-26 WP2 merged (bada655f, branch `gym/wp2-core` 4ddc51ec): `contracts/gym.py`, `evaluation/gym/{scoring,
+  budgets,gate,capture,export,render,ledger}.py`, 7 unit test files. Its worktree gates: `just check` exit 0,
+  `just -- test -q -W error` 1106 passed, 107 deselected, 0 warnings. Decisions recorded by the implementer: unknown
+  tokens on either side make the gate INCOMPARABLE (not REJECTED); a correct decisive verdict with invalid evidence
+  scores 0.0; capture writes fixtures only where trusted code can state the oracle (auditor fixture only against a
+  validated covered differential, producer fixture only from a kernel-validated demonstrated round) and skips the rest
+  with a reason; kernel cases are replayed before being written and never overwrite. On `gym/loop` after both merges:
+  `just check` exit 0 (after sorting re-exports, 43de2bc6), `just -- test -q -W error` 1124 passed, 107 deselected.
+  Docker, Temporal and live gates not run for WP2 (offline scope).

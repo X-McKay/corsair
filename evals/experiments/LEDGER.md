@@ -8,6 +8,11 @@ Rules: every row names the tier, repeats, dataset digest and configuration ident
 across different dataset digests is INCOMPARABLE, never a regression or a win; live numbers are small-n diagnostics on
 `Qwen3.6-35B-A3B-NVFP4` via `hosted_vllm/`; nothing here promotes a baseline.
 
+Ideas already rejected in PLAN-0002 and not to be retried without new evidence: running producer and auditor roles
+concurrently (control cleanup must precede the adversarial run; container time dominates anyway), and carrying the
+complete target module in the producer packet (superseded: the 0/3 producer result was the RootModel output schema).
+The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`; edit the JSONL, not the tables.
+
 ## Baselines
 
 | Id | Commit | Tier | Repeats | Dataset digest | Objective J | Macro verified acc | Worst language | Macro eff. tokens | p50 s | Scorecard |
@@ -15,14 +20,7 @@ across different dataset digests is INCOMPARABLE, never a regression or a win; l
 
 ## Waves
 
-### Wave 0 (instrument build)
-
-| Experiment | Track | Branch | Decision | Gate result | Lesson |
-| --- | --- | --- | --- | --- | --- |
-
-## Rejected ideas (do not retry without new evidence)
+## Rejected ideas
 
 | Idea | Wave | Why it failed |
 | --- | --- | --- |
-| Run producer and auditor roles concurrently | PLAN-0002 round 1 | Control cleanup must precede the adversarial run; container time dominates anyway |
-| Carry the complete target module in the producer packet | PLAN-0002 round 1 | Superseded: the 0/3 producer result was the RootModel output schema, not packet content |
