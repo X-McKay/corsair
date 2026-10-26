@@ -1,6 +1,6 @@
 ---
 name: semantic-review
-description: Review a supplied Corsair producer packet for semantic coherence with a reported disclosure mechanism. Use when deciding whether a complete payload claim is supported, insufficiently grounded, or must be rejected without creating evidence.
+description: Review a supplied Corsair producer packet for semantic coherence with a reported security mechanism. Use when deciding whether a complete payload claim is supported, insufficiently grounded, or must be rejected without creating evidence.
 ---
 
 # Semantic review
@@ -10,3 +10,4 @@ description: Review a supplied Corsair producer packet for semantic coherence wi
 3. `INSUFFICIENT_CONTEXT` when nothing is contradicted but the packet cannot establish a required link; `rule` is the first unestablished id.
 4. `ACCEPT` only when R1 to R4 are all supported; `rule` is `ALL`.
 5. Do not create facts, execution evidence, coverage, private values, or negative clearance. Semantic acceptance is not a finding disposition.
+6. Per-class notes under `references/` refine this rubric; when the finding's class is clear, the packet already carries the matching note under `## Class reference`. Notes create no facts.

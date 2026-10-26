@@ -55,6 +55,15 @@ class ModelSettings(Contract):
         return self
 
 
+def _default_images(python_image: str) -> dict[str, str]:
+    """The default recipe-kind image map, with the Python row following ``image``."""
+    return {
+        "python.secret_disclosure/1": python_image,
+        "javascript.prototype_pollution/1": "corsair-javascript:0.1",
+        "ruby.secret_disclosure/1": "corsair-ruby:0.1",
+    }
+
+
 class Settings(Contract):
     artifact_root: str = ".runs"
     source_root: str = "."
@@ -62,6 +71,13 @@ class Settings(Contract):
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
+    # Trusted runtime image per recipe kind. ``image`` stays the Python default for
+    # compatibility; a recipe kind absent here falls back to it. A new language adds one
+    # entry and its own reviewed Dockerfile under deploy/, never a code path.
+    # When ``images`` is omitted, its Python disclosure row follows ``image`` (see
+    # default_images), so a settings file naming only ``image`` keeps selecting that image
+    # for every Python recipe instead of silently falling back to the fixed default tag.
+    images: dict[str, str] = Field(default_factory=lambda: _default_images("corsair-python:0.1"))
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)
@@ -74,7 +90,28 @@ class Settings(Contract):
     # The prepare activity admits both into RunManifest, which the workflow reads.
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
+    # Temporal worker task slots. An investigation has at most one activity in flight,
+    # so max_concurrent_activities caps how many investigations (including a batch's
+    # child workflows) progress at once; work above it waits in the task queue, and
+    # that wait counts against each activity's schedule-to-close deadline. Keep it at
+    # least the largest `eval --concurrency` plus any investigations run alongside.
+    # Workflow tasks are short deterministic replays; the SDK requires at least two
+    # while workflows are cached.
+    max_concurrent_activities: int = Field(default=4, ge=1, le=64)
+    max_concurrent_workflow_tasks: int = Field(default=100, ge=2, le=1000)
     models: ModelSettings = Field(default_factory=ModelSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_images(cls, data: object) -> object:
+        """Derive the omitted image map from a configured ``image``."""
+        if isinstance(data, dict) and "images" not in data and "image" in data:
+            return {**data, "images": _default_images(data["image"])}
+        return data
+
+    def image_for(self, kind: str) -> str:
+        """Return the configured image tag for a recipe kind, or the Python default."""
+        return self.images.get(kind, self.image)
 
     @property
     def identity(self) -> str:

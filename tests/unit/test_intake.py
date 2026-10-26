@@ -43,7 +43,12 @@ def _scanner_finding(**overrides) -> ScannerFinding:
 
 
 @pytest.mark.parametrize(
-    "name", ["library-template-injection.json", "preview-server-path-traversal.json"]
+    "name",
+    [
+        "library-template-injection.json",
+        "preview-server-path-traversal.json",
+        "python-reader-no-line.json",
+    ],
 )
 def test_example_scan_reports_parse(name):
     report = load_scan_report(FIXTURES / name)
@@ -115,3 +120,61 @@ def test_unusual_severity_strings_are_carried_not_rejected():
     finding = finding_from_scanner(_scanner_finding(severity="SEV-0 (vendor custom)"))
     assert finding.scanner is not None
     assert finding.scanner.severity == "SEV-0 (vendor custom)"
+
+
+def test_a_line_less_scanner_finding_round_trips_to_a_derived_target_line(tmp_path):
+    """A scanner that names the function but no line: intake keeps the line absent,
+    and trusted prepare code binds it to the recipe function, recording that."""
+    from corsair.adapters.scm.local import prepare_case
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import Case, LineProvenance, PythonRecipe, Source
+    from corsair.policies.target_binding import target_binding
+    from corsair.settings import Settings
+
+    [scanner_finding] = load_scan_report(FIXTURES / "python-reader-no-line.json").findings
+    assert scanner_finding.line is None
+    finding = finding_from_scanner(scanner_finding)
+    assert finding.line is None  # intake never invents a line
+    module = (
+        "from pathlib import Path\n\n\n"
+        "def read_file(root, path):\n"
+        '    """Read one file under root."""\n'
+        "    return (Path(root) / path).read_text()\n"
+    )
+    (tmp_path / "project").mkdir()
+    (tmp_path / "project" / "reader.py").write_text(module, encoding="utf-8")
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    recipe = PythonRecipe(
+        module_file="reader.py",
+        function="read_file",
+        payload_parameter="path",
+        fixed_kwargs={"root": "/fixtures/allowed"},
+    )
+    case = Case(case_id="scan", finding=finding, source=Source(path="project"), recipe=recipe)
+
+    prepared = prepare_case(case, settings, ArtifactStore(settings.artifact_root), _manifest())
+
+    assert prepared.finding.line == 6
+    assert prepared.line_provenance is LineProvenance.RECIPE_FUNCTION
+    assert prepared.finding.scanner == finding.scanner
+    assert target_binding(prepared.finding, recipe, module) is None
+    # The derived line is the same exact-line target the verdict gates bind to.
+    assert _verdict_for_prepared(prepared) is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
+
+
+def _manifest():
+    return _prepared().manifest
+
+
+def _verdict_for_prepared(prepared) -> Verdict:
+    evidence = _demonstrated()
+    covered = [prepared.finding.line]
+    assert evidence.control is not None and evidence.adversarial is not None
+    evidence = evidence.model_copy(
+        update={
+            "source_digest": prepared.source.sha256,
+            "control": evidence.control.model_copy(update={"covered_lines": covered}),
+            "adversarial": evidence.adversarial.model_copy(update={"covered_lines": covered}),
+        }
+    )
+    return session_verdict(prepared, evidence, _audit(), FixStatus.NOT_REQUESTED).verdict

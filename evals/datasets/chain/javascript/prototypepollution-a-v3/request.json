@@ -1,0 +1,30 @@
+{
+  "case": {
+    "case_id": "js-prototypepollution-a",
+    "finding": {
+      "title": "Prototype pollution in mergePreferences",
+      "description": "mergePreferences recursively merges a parsed-JSON request body onto stored defaults. A key such as __proto__ in the untrusted source reaches the shared object prototype. Only the merge source (the final argument) is caller controlled; the target is the fixed empty defaults object.",
+      "file": "src/merge.js",
+      "line": 2,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "ecc2a322c4592db8428753dc0c1daa6ff97fbff668f77ec8e2d3a0fbcb71b5f2"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "src/merge.js",
+      "function": "mergePreferences",
+      "fixed_arguments": [{}]
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30
+  }
+}

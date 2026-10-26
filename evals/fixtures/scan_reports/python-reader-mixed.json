@@ -1,0 +1,131 @@
+{
+  "schema_version": "corsair.scan_report/1",
+  "scan_completed": true,
+  "vulnerabilities_found": true,
+  "findings": [
+    {
+      "title": "read_file joins a caller path onto the root",
+      "description": "read_file in reader.py joins the caller's path onto the root without a containment check.",
+      "file": "reader.py",
+      "line": 6,
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read files outside the root.",
+      "exploit_scenario": "A caller passes ../ segments as the path.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helpers",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://example.invalid/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Cached read_file joins a caller path onto the root",
+      "description": "The cached read_file in cached.py concatenates the caller's path onto the root. The scanner reported the function but not a line.",
+      "file": "cached.py",
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read files outside the root.",
+      "exploit_scenario": "A caller passes ../ segments as the path.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helpers",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://example.invalid/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Vendored reader joins a caller path onto the root",
+      "description": "A vendored reader module joins the caller's path onto the root. The scanner points at a file that is not in the supplied source.",
+      "file": "vendor/missing.py",
+      "line": 3,
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read files outside the root.",
+      "exploit_scenario": "A caller passes ../ segments as the path.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helpers",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://example.invalid/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    },
+    {
+      "title": "join_root joins a caller path onto the root",
+      "description": "join_root in helpers.py joins the caller's path onto the root without a containment check.",
+      "file": "helpers.py",
+      "line": 5,
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read files outside the root.",
+      "exploit_scenario": "A caller passes ../ segments as the path.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helpers",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://example.invalid/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    },
+    {
+      "title": "read_file reported at a stale line",
+      "description": "read_file in reader.py joins the caller's path onto the root; the scanner's line is from an older revision.",
+      "file": "reader.py",
+      "line": 40,
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.5,
+      "impact": "A caller who controls the path can read files outside the root.",
+      "exploit_scenario": "A caller passes ../ segments as the path.",
+      "recommendation": "Resolve the joined path and reject it unless it stays under the root.",
+      "preconditions": [
+        "The caller controls the path argument."
+      ],
+      "scope": {
+        "application": "[Library] File reader helpers",
+        "repositories": [
+          {
+            "name": "reader",
+            "url": "https://example.invalid/reader",
+            "branch": "main"
+          }
+        ]
+      }
+    }
+  ]
+}

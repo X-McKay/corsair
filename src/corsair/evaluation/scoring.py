@@ -3,7 +3,7 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
@@ -20,7 +20,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
-from corsair.evaluation.ledger import gate_ledger, ledger_counts, verified_rounds
+from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
 
@@ -84,10 +84,18 @@ def dataset_root(path: Path) -> Path:
     return parent.parent if parent.name == "datasets" else parent
 
 
-def _read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
-    """Read once and verify the exact bytes that the evaluator will parse."""
+def resolve_frozen(root: Path, relative: str) -> Path:
+    """Resolve a manifest path below its dataset root; every evaluator and the validator use it."""
     path = (root / relative).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
+    if not path.is_relative_to(root):
+        raise ValueError("dataset path escapes its root")
+    return path
+
+
+def read_frozen(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
+    """Read once and verify the exact bytes that the evaluator will parse."""
+    path = resolve_frozen(root, relative)
+    if not path.is_file():
         raise ValueError("dataset path escapes its root or is missing")
     content = path.read_bytes()
     if digest(content) != expected:
@@ -107,16 +115,26 @@ def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[
         if entry.family in family_splits and family_splits[entry.family] != entry.split:
             raise ValueError("related family variants may not cross dataset splits")
         family_splits[entry.family] = entry.split
-        request_path, request_bytes = _read_frozen_file(
+        request_path, request_bytes = read_frozen(
             root, entry.request, entry.request_digest, "request"
         )
-        _, oracle_bytes = _read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
+        _, oracle_bytes = read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
         request = InvestigationRequest.model_validate_json(request_bytes)
         if request.case.case_id != entry.case_id:
             raise ValueError("dataset and request case identities disagree")
         requests.append(normalize_request_sources(request, request_path))
         oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
     return dataset, requests, oracles
+
+
+def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
+    """Read/verify an isolated-agent fixture once; the oracle remains local to the evaluator."""
+    input_path, input_bytes = read_frozen(root, entry["input"], entry["input_digest"], "input")
+    _, oracle_bytes = read_frozen(root, entry["oracle"], entry["oracle_digest"], "oracle")
+    oracle = json.loads(oracle_bytes)
+    if not isinstance(oracle, dict):
+        raise ValueError("isolated oracle must be a JSON object")
+    return input_path, input_bytes, oracle
 
 
 def _saved_evidence_verifier(store: ArtifactStore) -> "EvidenceVerifier":
@@ -297,12 +315,11 @@ def summarize(rows: list[dict]) -> dict:
         "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
         # Every recorded stop, then the final stop of each failed row: where accuracy
-        # was lost. Rows without a ledger (unavailable, agent-only) contribute nothing.
-        "gate_ledger": ledger_counts(row.get("gate_ledger") or [] for row in rows),
+        # was lost. Isolated agent rows saved without a ledger derive their one entry;
+        # rows without either (unavailable results) contribute nothing.
+        "gate_ledger": ledger_counts(row_ledger(row) for row in rows),
         "failure_stops": ledger_counts(
-            row["gate_ledger"][-1:]
-            for row in rows
-            if row.get("status") == "fail" and row.get("gate_ledger")
+            row_ledger(row)[-1:] for row in rows if row.get("status") == "fail"
         ),
     }
 

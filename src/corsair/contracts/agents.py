@@ -6,10 +6,19 @@ import json
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
+from pydantic import Field, GetJsonSchemaHandler, JsonValue, model_validator
+from pydantic.json_schema import JsonSchemaValue, SkipJsonSchema
+from pydantic_core import CoreSchema
 
 from .common import Contract, Feedback, Identifier, Usage
-from .sources import DEFAULT_MAX_OUTPUT_TOKENS, Budget, Finding, PreparedCase, PythonRecipe
+from .sources import (
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    Budget,
+    Finding,
+    LineProvenance,
+    PreparedCase,
+    Recipe,
+)
 
 # Explicit JSON shapes keep native output schemas informative; JsonValue alone emits {}.
 JsonPayload = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
@@ -43,32 +52,62 @@ class Submission(Contract):
         return self
 
 
-class ProducerProposal(Contract):
-    """A source-grounded payload proposal for trusted verification."""
+class _ObjectParameter:
+    """Give an optional model field a top-level ``"type": "object"`` in its JSON schema.
+
+    Pydantic renders such a field as a bare ``$ref``.  ADK turns the output schema's
+    fields into ``set_model_response`` parameters, and OpenAI-compatible tool-call
+    parsers that decode each argument by its parameter's top-level ``type`` (vLLM's
+    XML-style parsers) pass an untyped one through as a string, so the object arrives
+    as JSON text and fails validation.  ``anyOf`` keeps the reference resolvable by
+    the genai schema converter.  Only the JSON schema changes; validation does not.
+    """
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return {"type": "object", "anyOf": [handler(core_schema)]}
+
+
+class ProducerDecision(Contract):
+    """The producer's sole native ADK output: a proposal or an explicit abstention.
+
+    One flat object, so a schema-completion tool declares typed top-level parameters;
+    ``kind`` selects which one of ``submission`` and ``reason`` must be present.
+    """
 
     schema_version: Literal["corsair.producer-decision/1"] = "corsair.producer-decision/1"
-    kind: Literal["proposal"] = "proposal"
-    submission: Submission
+    kind: Literal["proposal", "no_grounded_candidate"] = Field(
+        description="proposal: a source-grounded payload pair in submission; "
+        "no_grounded_candidate: an explicit abstention explained in reason."
+    )
+    submission: Annotated[Submission, _ObjectParameter()] | SkipJsonSchema[None] = Field(
+        default=None,
+        description="Required when kind is proposal; omit it when kind is no_grounded_candidate.",
+    )
+    reason: Annotated[str, Field(min_length=1, max_length=2000)] | SkipJsonSchema[None] = Field(
+        default=None,
+        description="Required when kind is no_grounded_candidate; omit it for a proposal.",
+    )
 
+    @model_validator(mode="after")
+    def kind_carries_exactly_its_field(self):
+        if self.kind == "proposal":
+            if self.submission is None:
+                raise ValueError("a proposal requires submission")
+            if self.reason is not None:
+                raise ValueError("a proposal must omit reason")
+        else:
+            if self.reason is None:
+                raise ValueError("no_grounded_candidate requires reason")
+            if self.submission is not None:
+                raise ValueError("no_grounded_candidate must omit submission")
+        return self
 
-class NoGroundedCandidate(Contract):
-    """An explicit producer abstention when source grounding is unavailable."""
+    def abstention_reason(self) -> str | None:
+        """Return the abstention reason when the producer declined to propose."""
 
-    schema_version: Literal["corsair.producer-decision/1"] = "corsair.producer-decision/1"
-    kind: Literal["no_grounded_candidate"] = "no_grounded_candidate"
-    reason: str = Field(min_length=1, max_length=2000)
-
-
-_ProducerDecisionVariant = Annotated[
-    ProducerProposal | NoGroundedCandidate,
-    Field(discriminator="kind"),
-]
-
-
-class ProducerDecision(RootModel[_ProducerDecisionVariant]):
-    """The producer's sole native ADK output: proposal or explicit abstention."""
-
-    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
+        return self.reason if self.kind == "no_grounded_candidate" else None
 
 
 class ProducerInput(Contract):
@@ -90,10 +129,14 @@ class ProducerOutput(Contract):
     def submission_for_verification(self) -> Submission | None:
         """Return the proposal submission when the producer made one."""
 
-        if self.decision is not None:
-            variant = self.decision.root
-            return variant.submission if isinstance(variant, ProducerProposal) else None
+        if self.decision is not None and self.decision.kind == "proposal":
+            return self.decision.submission
         return None
+
+    def abstention_reason(self) -> str | None:
+        """Return the producer's abstention reason when it declined to propose."""
+
+        return None if self.decision is None else self.decision.abstention_reason()
 
 
 class AuditDecision(StrEnum):
@@ -110,9 +153,12 @@ class AuditResult(Contract):
 
 class AuditInput(Contract):
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source_excerpt: str
     submission: Submission
+    # Copied from PreparedCase: whether finding.line was declared or bound by trusted
+    # prepare code to the recipe function. Defaulted so recorded inputs still decode.
+    line_provenance: LineProvenance = LineProvenance.DECLARED
     # The per-request output cap, reasoning tokens included.  The workflow copies the
     # request's Budget.max_output_tokens; a standalone review uses the Budget default.
     max_output_tokens: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=256, le=16384)

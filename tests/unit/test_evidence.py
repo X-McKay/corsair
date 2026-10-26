@@ -89,6 +89,11 @@ class _FakeSandbox:
     image_id: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
+    adversarial_violates: bool = True
+
+    def image_id_for(self, kind: str) -> str:
+        del kind  # The double resolves one trusted image regardless of recipe kind.
+        return self.image_id
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
@@ -98,7 +103,7 @@ class _FakeSandbox:
         store = self.store
         del budget, heartbeat
         self.calls += 1
-        violation = role == "adversarial"
+        violation = role == "adversarial" and self.adversarial_violates
         driver = {
             "schema_version": "corsair.driver/1",
             "operation_id": operation_id,
@@ -117,7 +122,7 @@ class _FakeSandbox:
             "observation_kind": "disclosure" if violation else "held",
             "target_executed": True,
             "covered_lines": [4],
-            "coverage_file": "reader.py",
+            "coverage_file": prepared.recipe.module_file,
         }
         raw = {
             "schema_version": "corsair.raw-evidence/1",
@@ -367,6 +372,99 @@ def test_driver_children_receive_only_the_fixed_environment(
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
         "COVERAGE_FILE": "/work/.coverage",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         # sys.monitoring line measurement; an inherited core choice cannot override it.
         "COVERAGE_CORE": "sysmon",
     }
+
+
+def test_driver_line_numbers_are_sorted_unique_positive_or_none() -> None:
+    from corsair.adapters.sandboxing import driver
+
+    assert driver._valid_line_numbers({4, 1, 3}) == [1, 3, 4]
+    assert driver._valid_line_numbers([3, 3, 1]) == [1, 3]
+    assert driver._valid_line_numbers([]) == []
+    for invalid in (0, -1, True, "4", 4.0, None):
+        assert driver._valid_line_numbers([1, invalid]) == []
+
+
+_COVERAGE_TARGET = '''"""Module docstring
+spanning lines."""
+
+
+def decorate(function):
+    return function
+
+
+class Box:
+    value = (
+        1 +
+        2
+    )
+
+    @decorate
+    def get(self, flag):
+        if flag:  # pragma: no cover
+            return {
+                "a": flag,
+            }
+        try:
+            raise ValueError(
+                "x"
+            )
+        except ValueError:
+            pass
+        return [item for item in range(3)
+                if item]
+
+
+def unused():
+    return 1
+
+
+Box().get(1)
+Box().get(0)
+'''
+
+
+def test_driver_executed_lines_match_the_coverage_json_report(tmp_path: Path) -> None:
+    import json
+    import subprocess
+    import sys
+
+    from corsair.adapters.sandboxing import driver
+
+    root = tmp_path.resolve()
+    target = root / "target.py"
+    target.write_text(_COVERAGE_TARGET, encoding="utf-8")
+    data_file = root / ".coverage"
+    environment = {"COVERAGE_FILE": str(data_file), "COVERAGE_CORE": "sysmon", "HOME": str(root)}
+    coverage = [sys.executable, "-m", "coverage"]
+    subprocess.run(
+        [*coverage, "run", f"--source={root}", str(target)], cwd=root, env=environment, check=True
+    )
+    report = root / "coverage.json"
+    subprocess.run(
+        [*coverage, "json", "-o", str(report)],
+        cwd=root,
+        env=environment,
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    expected = json.loads(report.read_text(encoding="utf-8"))["files"]
+    (entry,) = expected.values()
+
+    in_process = root / "in-process.json"
+
+    def executed(source: Path | str, data: Path = data_file) -> list[int]:
+        return driver._executed_lines(data, str(source), in_process)
+
+    # Identical to the command-line report: continuation lines map to their statement's
+    # first line, and an unexecuted function body stays absent.
+    assert executed(target) == entry["executed_lines"]
+    assert {5, 9, 10, 27, 31, 35, 36} <= set(executed(target))
+    assert not {11, 12, 28, 32} & set(executed(target))
+    assert executed(root / "absent.py") == []
+    assert executed(target, root / "missing.coverage") == []
+    target.write_text("def broken(:\n", encoding="utf-8")
+    assert executed(target) == []

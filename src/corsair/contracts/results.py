@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, Self
 
@@ -16,6 +17,8 @@ from .sources import RunManifest, Scope
 TERMINAL_RESULT_MAX_BYTES = 1_000_000
 # Budget.max_rounds (16) per session, times the session cap (2).
 MAX_TERMINAL_ROUNDS = 32
+# The workflow keeps only its most recent phase transitions, live and recorded.
+MAX_TERMINAL_TIMELINE = 32
 
 
 class RoundResult(Contract):
@@ -24,6 +27,16 @@ class RoundResult(Contract):
     producer: ProducerOutput
     observation: Observation | None = None
     audit: AuditOutput | None = None
+
+
+class PhaseTransition(Contract):
+    """One workflow phase change at deterministic workflow time; no model or payload
+    content. ``at`` is unknown only when finalization ran outside a workflow."""
+
+    phase: Identifier
+    session: int = Field(ge=0)
+    round: int = Field(ge=0)
+    at: datetime | None = None
 
 
 class Disposition(StrEnum):
@@ -83,6 +96,9 @@ class InvestigationResult(Contract):
     fix_status: FixStatus = FixStatus.NOT_REQUESTED
     fix_observation: Observation | None = None
     result_artifact: ArtifactRef | None = None
+    # Presentation metadata recorded at finalization; never an input to a verdict.
+    # Results recorded before the field existed decode to an empty timeline.
+    timeline: list[PhaseTransition] = Field(default_factory=list, max_length=MAX_TERMINAL_TIMELINE)
 
     @model_validator(mode="after")
     def bounded_terminal_wire(self) -> Self:

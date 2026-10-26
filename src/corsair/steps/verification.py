@@ -24,6 +24,11 @@ from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
 ROLES: tuple[SandboxRole, ...] = ("control", "adversarial")
+# The trusted in-image driver writes exactly one of these markers, and only when its
+# own recipe assertion genuinely failed on the adversarial role. Keep this in sync with
+# VIOLATION_MARKERS in adapters/sandboxing/driver.py. A target cannot forge a violation
+# by making pytest fail some other way: the driver never writes a marker in that case.
+_VIOLATION_MARKERS = frozenset({"disclosure", "sentinel_created"})
 
 
 class EvidenceVerifier:
@@ -221,7 +226,7 @@ class EvidenceVerifier:
             and junit["errors"] == 0
             and junit["skipped"] == 0,
             RoleOutcome.VIOLATION: status == "FAILURE"
-            and record.get("observation_kind") == "disclosure"
+            and record.get("observation_kind") in _VIOLATION_MARKERS
             and expected_role == "adversarial"
             and exit_code != 0
             and junit["failures"] == 1
@@ -237,14 +242,15 @@ class EvidenceVerifier:
             return self._invalid("native exit, junit, and driver outcome disagree"), False
         if record.get("coverage_file") != prepared.recipe.module_file:
             return self._invalid("coverage was not reported for the recipe module"), False
-        # A vulnerable source needs the configured finding line (or, where no line
+        # A vulnerable source needs the bound finding line (or, where no line
         # exists, actual recipe-module execution). Fixed source can delete the old
         # line but must still execute the relevant callable.
         relevant = bool(lines) and target_executed
-        if not fixed and prepared.finding.line is not None:
+        line = prepared.bound_line
+        if not fixed and line is not None:
             relevant = (
                 prepared.finding.file == prepared.recipe.module_file
-                and prepared.finding.line in lines
+                and line in lines
                 and target_executed
             )
         if not relevant:
@@ -377,7 +383,7 @@ class EvidenceVerifier:
                 )
             # Ensure image availability before starting the first role. There is no
             # fake/non-Docker success path.
-            _ = self.sandbox.image_id
+            _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:

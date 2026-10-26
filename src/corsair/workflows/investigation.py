@@ -13,6 +13,7 @@ from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
+        MAX_TERMINAL_TIMELINE,
         AuditDecision,
         AuditInput,
         AuditOutput,
@@ -24,8 +25,8 @@ with workflow.unsafe.imports_passed_through():
         FixStatus,
         InvestigationRequest,
         InvestigationResult,
-        NoGroundedCandidate,
         Observation,
+        PhaseTransition,
         PreparedCase,
         ProducerInput,
         ProducerOutput,
@@ -33,6 +34,15 @@ with workflow.unsafe.imports_passed_through():
         Submission,
         Verdict,
         format_terminal_result,
+    )
+    from corsair.policies.time_bounds import (
+        AUDITOR_ACTIVITY_SECONDS,
+        PREPARE_ACTIVITY_SECONDS,
+        RECORD_ATTEMPT_SECONDS,
+        RECORD_FINALIZATION_SECONDS,
+        evidence_activity_seconds,
+        heartbeat_seconds,
+        producer_activity_seconds,
     )
     from corsair.policies.verdicts import (
         SessionOutcome,
@@ -55,10 +65,6 @@ DEFAULT_NEGATIVE_THRESHOLD = 2
 # no outcome and no structural claim (a prior round may have been rejected or marked
 # invalid): it only asks for a fresh source-grounded candidate.
 _BLIND_RETRY_REASON = "Propose a different source-grounded candidate payload pair."
-
-# The status query keeps only the most recent phase transitions; it is read-only
-# presentation state and never feeds a command, so replay is unaffected.
-_TIMELINE_LIMIT = 32
 
 
 def _retry_feedback(audit: AuditOutput) -> Feedback:
@@ -137,12 +143,9 @@ def _operation_prefix(run_id: str, session: int) -> str:
     return run_id if session == 1 else f"{run_id}.s{session}"
 
 
-def _producer_step(producer: ProducerOutput) -> NoGroundedCandidate | Submission | Feedback:
-    """What one producer episode admits next: an explicit abstention, a submission to
-    verify, or the feedback that ends the round without one."""
-    decision = producer.decision
-    if decision is not None and isinstance(decision.root, NoGroundedCandidate):
-        return decision.root
+def _submission_or_feedback(producer: ProducerOutput) -> Submission | Feedback:
+    """A non-abstaining producer episode admits either a submission to verify or the
+    feedback that ends the round without one."""
     submission = producer.submission_for_verification()
     if submission is not None:
         return submission
@@ -245,14 +248,20 @@ class InvestigationWorkflow:
 
     @phase.setter
     def phase(self, value: str) -> None:
-        """Record each transition at deterministic workflow time for the status query."""
+        """Record each transition at deterministic workflow time.
+
+        The status query and the recorded result keep only the most recent
+        MAX_TERMINAL_TIMELINE transitions. They are presentation state that never feeds
+        a command or a verdict; in the result they ride in the record activity's input,
+        which replay does not compare, so recorded histories replay unchanged.
+        """
         self._phase = value
         # Unit tests drive finalization outside a workflow loop, where there is no clock.
         at = workflow.now().isoformat() if workflow.in_workflow() else None
         self.timeline.append(
             {"phase": value, "session": self.session_index, "round": self.round_index, "at": at}
         )
-        del self.timeline[:-_TIMELINE_LIMIT]
+        del self.timeline[:-MAX_TERMINAL_TIMELINE]
 
     @workflow.query
     def status(self) -> dict:
@@ -284,7 +293,7 @@ class InvestigationWorkflow:
             result_type=result_type,
             start_to_close_timeout=timedelta(seconds=seconds),
             schedule_to_close_timeout=timedelta(seconds=seconds),
-            heartbeat_timeout=timedelta(seconds=min(15, seconds)),
+            heartbeat_timeout=timedelta(seconds=heartbeat_seconds(seconds)),
             retry_policy=RetryPolicy(maximum_attempts=1),
             cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
         )
@@ -293,7 +302,8 @@ class InvestigationWorkflow:
         """Persist the final receipt within its separate retry/finalization allowance."""
         self.phase = "record"
         try:
-            result = format_terminal_result(result)
+            timeline = [PhaseTransition.model_validate(entry) for entry in self.timeline]
+            result = format_terminal_result(result.model_copy(update={"timeline": timeline}))
         except ValueError:
             # An unbounded validation exception must not become another failure payload.
             raise ApplicationError(
@@ -307,9 +317,11 @@ class InvestigationWorkflow:
                 "corsair.record",
                 result,
                 result_type=InvestigationResult,
-                start_to_close_timeout=timedelta(seconds=30),
+                start_to_close_timeout=timedelta(seconds=RECORD_ATTEMPT_SECONDS),
                 schedule_to_close_timeout=(
-                    timedelta(seconds=90) if workflow.patched("bounded-finalization-v1") else None
+                    timedelta(seconds=RECORD_FINALIZATION_SECONDS)
+                    if workflow.patched("bounded-finalization-v1")
+                    else None
                 ),
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
@@ -346,7 +358,7 @@ class InvestigationWorkflow:
                 tool_call_limit=state.tools_left,
             ),
             ProducerOutput,
-            min(300, budget.max_elapsed_seconds - int(elapsed)),
+            producer_activity_seconds(budget, elapsed),
         )
         state.calls_left -= producer.usage.llm_calls
         state.tools_left -= producer.usage.tool_calls
@@ -374,7 +386,7 @@ class InvestigationWorkflow:
             fixed=fixed,
         )
         return await self._execute_bounded_activity(
-            "corsair.evidence", evidence, Observation, 2 * state.budget.probe_timeout_seconds + 45
+            "corsair.evidence", evidence, Observation, evidence_activity_seconds(state.budget)
         )
 
     async def _audit(
@@ -391,6 +403,7 @@ class InvestigationWorkflow:
                 recipe=prepared.recipe,
                 source_excerpt=prepared.source_excerpt,
                 submission=submission,
+                line_provenance=prepared.line_provenance,
                 max_output_tokens=budget.max_output_tokens,
                 llm_call_limit=audit_llm_call_limit,
                 tool_call_limit=audit_tool_call_limit,
@@ -409,7 +422,7 @@ class InvestigationWorkflow:
             "corsair.audit",
             audit_request,
             AuditOutput,
-            180,
+            AUDITOR_ACTIVITY_SECONDS,
         )
         state.calls_left -= audit.usage.llm_calls
         state.tools_left -= audit.usage.tool_calls
@@ -433,12 +446,13 @@ class InvestigationWorkflow:
         self.phase = "producer"
         producer = await self._produce(state, prepared, session, index, elapsed)
         session.rounds.append(RoundResult(index=index, session=session.index, producer=producer))
-        step = _producer_step(producer)
-        if isinstance(step, NoGroundedCandidate):
+        abstention = producer.abstention_reason()
+        if abstention is not None:
             if workflow.patched("producer-abstention-v1"):
-                state.note(reason=f"Producer abstained: {step.reason}")
+                state.note(reason=f"Producer abstained: {abstention}")
                 return False
-            return self._reject(state, session, Feedback(gate="producer", reason=step.reason))
+            return self._reject(state, session, Feedback(gate="producer", reason=abstention))
+        step = _submission_or_feedback(producer)
         if isinstance(step, Feedback):
             return self._reject(state, session, step)
         session.previous = step
@@ -513,7 +527,7 @@ class InvestigationWorkflow:
         try:
             self.phase = "prepare"
             prepared = await self._execute_bounded_activity(
-                "corsair.prepare", request, PreparedCase, 120
+                "corsair.prepare", request, PreparedCase, PREPARE_ACTIVITY_SECONDS
             )
             state.prepared = prepared
             state.note(manifest=prepared.manifest)

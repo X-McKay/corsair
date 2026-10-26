@@ -1,0 +1,9 @@
+{
+  "expected": [
+    "admissible",
+    "blocked:line_missing",
+    "blocked:file_absent",
+    "blocked:function_not_defined",
+    "blocked:line_out_of_range"
+  ]
+}

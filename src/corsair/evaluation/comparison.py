@@ -6,10 +6,11 @@ matches the deterministic case-major, repeat-minor order of a composed batch.
 """
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from corsair.evaluation.ledger import row_ledger
 from corsair.evaluation.scoring import summarize
 
 USAGE_FIELDS = ("llm_calls", "tool_calls", "input_tokens", "output_tokens", "agent_seconds")
@@ -26,6 +27,8 @@ SUMMARY_FIELDS = (
     "unavailable_results",
     *USAGE_FIELDS,
 )
+# Per-gate summary counts compared side by side: every stop, and failed rows' final stop.
+LEDGER_FIELDS = ("gate_ledger", "failure_stops")
 
 
 def read_report(path: Path) -> dict[str, Any]:
@@ -40,12 +43,19 @@ def read_report(path: Path) -> dict[str, Any]:
 
 
 def row_label(row: dict[str, Any]) -> str | None:
-    """The canonical verdict, else the disposition, else an isolated match kind."""
-    for field in ("verdict", "disposition", "match_kind"):
+    """The canonical verdict, else the disposition, an isolated match kind or intake outcome."""
+    for field in ("verdict", "disposition", "match_kind", "intake"):
         value = row.get(field)
         if isinstance(value, str):
             return value
     return None
+
+
+def row_stop(row: dict[str, Any]) -> str | None:
+    """The gate of a row's final ledger entry: what stopped it, in one name."""
+    ledger = row_ledger(row)
+    gate = ledger[-1].get("gate") if ledger and isinstance(ledger[-1], dict) else None
+    return gate if isinstance(gate, str) else None
 
 
 def _number(value: object) -> int | float | None:
@@ -104,6 +114,12 @@ def _identities(rows: Iterable[dict[str, Any]], field: str) -> list[str]:
     return sorted({value for row in rows if isinstance(value := row.get(field), str)})
 
 
+def _family(row: dict[str, Any] | None) -> str | None:
+    """The row's declared dataset family, when its report carries one."""
+    value = None if row is None else row.get("family")
+    return value if isinstance(value, str) else None
+
+
 def _case(
     key: tuple[str, int], before: dict[str, Any] | None, after: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -124,15 +140,22 @@ def _case(
         and (before is None or before.get("forbidden_label") is not True)
     )
     presence = "candidate_only" if before is None else "baseline_only" if after is None else "both"
+    stops = (
+        row_stop(before) if before is not None else None,
+        row_stop(after) if after is not None else None,
+    )
     return {
         "case_id": case_id,
         "repeat": repeat,
+        "family": _family(after) or _family(before),
         "presence": presence,
         "baseline_status": before.get("status") if before else None,
         "candidate_status": after.get("status") if after else None,
         "baseline_label": labels[0],
         "candidate_label": labels[1],
         "label_changed": before is not None and after is not None and labels[0] != labels[1],
+        "baseline_stop": stops[0],
+        "candidate_stop": stops[1],
         "flip": flip,
         "new_forbidden_label": new_forbidden,
         "usage_delta": {
@@ -142,11 +165,27 @@ def _case(
     }
 
 
+def _gate_delta(baseline: object, candidate: object) -> list[dict[str, Any]]:
+    """Per-gate counts on both sides; moved gates first by size, then by name."""
+    before = baseline if isinstance(baseline, Mapping) else {}
+    after = candidate if isinstance(candidate, Mapping) else {}
+    entries = [
+        {
+            "gate": gate,
+            "baseline": before.get(gate, 0),
+            "candidate": after.get(gate, 0),
+            "delta": after.get(gate, 0) - before.get(gate, 0),
+        }
+        for gate in before.keys() | after.keys()
+    ]
+    return sorted(entries, key=lambda entry: (-abs(entry["delta"]), entry["gate"]))
+
+
 def _regressions(cases: list[dict[str, Any]], unidentified: dict[str, int]) -> list[dict]:
     """A pass that stops passing, a new forbidden label, or a lost case regresses."""
     found: list[dict[str, Any]] = []
     for case in cases:
-        identity = {"case_id": case["case_id"], "repeat": case["repeat"]}
+        identity = {"case_id": case["case_id"], "repeat": case["repeat"], "family": case["family"]}
         if case["flip"] == "pass_to_fail":
             found.append({**identity, "reason": "pass_to_fail"})
         if case["new_forbidden_label"]:
@@ -154,7 +193,9 @@ def _regressions(cases: list[dict[str, Any]], unidentified: dict[str, int]) -> l
         if case["presence"] == "baseline_only":
             found.append({**identity, "reason": "missing_in_candidate"})
     if unidentified["candidate"] > unidentified["baseline"]:
-        found.append({"case_id": None, "repeat": None, "reason": "unidentified_rows"})
+        found.append(
+            {"case_id": None, "repeat": None, "family": None, "reason": "unidentified_rows"}
+        )
     return found
 
 
@@ -204,6 +245,11 @@ def compare_reports(
                 ),
             }
             for field in SUMMARY_FIELDS
+        },
+        # Gate movement attributes a change; it never decides a regression.
+        "gate_delta": {
+            field: _gate_delta(summaries["baseline"].get(field), summaries["candidate"].get(field))
+            for field in LEDGER_FIELDS
         },
         "counts": {
             "joined": sum(case["presence"] == "both" for case in cases),

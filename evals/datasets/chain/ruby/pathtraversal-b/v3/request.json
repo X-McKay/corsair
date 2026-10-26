@@ -1,0 +1,45 @@
+{
+  "case": {
+    "case_id": "ruby-pathtraversal",
+    "finding": {
+      "title": "Path traversal in read",
+      "description": "The Attachments.read API must not disclose a file outside its configured public root. The caller controls only the name argument, which reaches File.join/File.read. The private test fixture is at /fixtures/private/secret.txt; its value is not available.",
+      "file": "lib/attachments.rb",
+      "line": 4,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "955f6eaeaa189d980ce2fc5e680bdb91b83f0ab4bc0b17fd5f3cc86aa3ed9139"
+    },
+    "recipe": {
+      "kind": "ruby.secret_disclosure/1",
+      "module_file": "lib/attachments.rb",
+      "receiver": "Attachments",
+      "function": "read",
+      "payload_parameter": "name",
+      "fixed_kwargs": {
+        "root": "/fixtures/allowed"
+      },
+      "public_files": {
+        "readme.txt": "stored attachment"
+      },
+      "expected_control": "stored attachment",
+      "allowed_exceptions": [
+        "ArgumentError"
+      ]
+    },
+    "fixed_source": {
+      "path": "fixed",
+      "expected_digest": "60f146e317c7f070ad8431dddc5043748b544f4383a244439a21b8b9245cba27"
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30
+  }
+}
