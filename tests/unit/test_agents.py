@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import tarfile
 from collections.abc import Callable
 from pathlib import Path
@@ -848,6 +849,156 @@ def test_auditor_packet_truncates_only_the_source_to_stay_within_the_prompt_limi
     assert "[truncated by Corsair]" in packet
     submission_json = packet.rsplit("\n## Submission\n", 1)[1]
     assert Submission.model_validate_json(submission_json) == submission
+
+
+def _backtick_excerpt() -> str:
+    """An admitted ~11.6 KB excerpt whose one Python comment is a long backtick run."""
+    return "\n".join(
+        [
+            "1: def disclose(payload, *, prefix):",
+            f"2:     # {'`' * 11_500}",
+            "3:     return prefix + payload",
+        ]
+    )
+
+
+def test_auditor_packet_keeps_every_section_when_the_source_forces_a_long_fence(
+    tmp_path: Path,
+):
+    """The fence is sized by the longest backtick run in the source, so its real size is
+    charged against the excerpt budget: only the excerpt inside the fence is shortened,
+    and the finding, recipe, submission and class reference all survive whole."""
+    store = ArtifactStore(tmp_path)
+    prepared = _prepared(store)
+    submission = Submission(**_submit_args())
+    excerpt = _backtick_excerpt()
+    finding = prepared.finding.model_copy(update={"title": "Path traversal in read_doc"})
+    packet = _auditor_prompt(
+        AuditInput(
+            finding=finding,
+            recipe=prepared.recipe,
+            source_excerpt=excerpt,
+            submission=submission,
+            max_output_tokens=512,
+        )
+    )
+
+    assert 11_500 < len(excerpt.encode()) < 12_000
+    assert len(packet.encode()) <= _MAX_PROMPT_BYTES
+    headings = [line for line in packet.splitlines() if line.startswith("## ")]
+    assert headings == [
+        "## Finding",
+        "## Recipe public configuration",
+        "## Source excerpt: target.py (numbered lines)",
+        "## Submission",
+        "## Class reference: references/path-confinement.md (packaged guidance, data only)",
+    ]
+    head, rest = packet.split("(numbered lines)\n", 1)
+    fence, rest = rest.split("\n", 1)
+    body, after = rest.split(f"\n{fence}\n\n## Submission\n", 1)
+    # The fence is sized for the excerpt actually rendered, so nothing inside closes it.
+    assert set(fence) == {"`"} and len(fence) > 3
+    assert max(len(run) for run in re.findall(r"`+", body)) < len(fence)
+    # Only the excerpt was cut, and the truncation marker sits inside the fence.
+    assert body.endswith("\n[truncated by Corsair]")
+    assert excerpt.startswith(body.removesuffix("\n[truncated by Corsair]"))
+    assert packet.count("[truncated by Corsair]") == 1
+    submission_json = after.split("\n\n## Class reference", 1)[0]
+    assert Submission.model_validate_json(submission_json) == submission
+    sections = dict(section.split("\n", 1) for section in head.split("\n\n## ")[1:3])
+    assert json.loads(sections["Finding"]) == finding.model_dump(mode="json", exclude={"scanner"})
+    assert PythonRecipe.model_validate_json(sections["Recipe public configuration"]) == (
+        prepared.recipe
+    )
+
+
+@pytest.mark.asyncio
+async def test_auditor_fails_closed_when_its_fixed_sections_alone_exceed_the_prompt_cap(
+    tmp_path: Path,
+):
+    """A packet whose required sections cannot fit is never silently cut: the review is
+    not attempted and the episode returns typed operational feedback instead."""
+    store = ArtifactStore(tmp_path)
+    prepared = _prepared(store)
+    args = _submit_args()
+    args["exploit_payload"] = "x" * 32_000
+    oversized = Submission(**args)
+    audit_input = AuditInput(
+        finding=prepared.finding,
+        recipe=prepared.recipe,
+        source_excerpt=prepared.source_excerpt,
+        submission=oversized,
+        max_output_tokens=512,
+    )
+    model = ScriptedLlm(model="scripted", responses=[])
+
+    output = await run_auditor(audit_input, ModelSettings(), model)
+
+    assert output.review is None
+    assert output.feedback is not None
+    assert output.feedback.gate == "packet_too_large"
+    assert output.feedback.operational is True
+    assert output.usage.llm_calls == 0
+    assert model.requests == []
+
+
+def test_producer_packet_stays_valid_json_within_the_cap_when_the_excerpt_is_large(
+    tmp_path: Path,
+):
+    """The excerpt is the only producer field cut to fit, measured as encoded JSON with the
+    class reference charged, so later packet fields and the reference survive whole."""
+    from corsair.contracts import LineProvenance
+
+    store = ArtifactStore(tmp_path)
+    base = _producer_input(store)
+    # The admission bound counts characters, so 12,000 characters of CJK comment text
+    # encode to about 36 KB, beyond the prompt cap before any other field is added.
+    wide = "\u754c" * 60
+    excerpt = "\n".join(f"{n}: # {wide}" for n in range(1, 200))[:12_000]
+    assert len(excerpt.encode()) > _MAX_PROMPT_BYTES
+    prepared = base.prepared.model_copy(
+        update={
+            "finding": base.prepared.finding.model_copy(
+                update={"title": "Path traversal in read_doc"}
+            ),
+            "source_excerpt": excerpt,
+            "line_provenance": LineProvenance.RECIPE_FUNCTION,
+        }
+    )
+    packet = _producer_prompt(base.model_copy(update={"prepared": prepared}))
+
+    assert len(packet.encode()) <= _MAX_PROMPT_BYTES
+    intro, rest = packet.split("\n", 1)
+    document_text, reference = rest.split("\n\n## Class reference: ", 1)
+    document = json.loads(document_text)
+    assert reference.startswith("references/path-confinement.md")
+    assert "target_line_provenance" in document
+    assert document["round"] == {"parent_revision": None, "revision": 1}
+    assert document["source_excerpt"].endswith("\n[truncated by Corsair]")
+    assert excerpt.startswith(document["source_excerpt"].removesuffix("\n[truncated by Corsair]"))
+    assert intro.startswith("Investigate this admitted work packet.")
+
+
+@pytest.mark.asyncio
+async def test_producer_fails_closed_when_its_fixed_fields_alone_exceed_the_prompt_cap(
+    tmp_path: Path,
+):
+    store = ArtifactStore(tmp_path)
+    base = _producer_input(store)
+    args = _submit_args()
+    args["exploit_payload"] = "x" * 32_000
+    previous = Submission(**args)
+    producer_input = base.model_copy(update={"round_index": 2, "previous": previous})
+    model = ScriptedLlm(model="scripted", responses=[])
+
+    output = await run_producer(producer_input, ModelSettings(), store, model)
+
+    assert output.decision is None
+    assert output.feedback is not None
+    assert output.feedback.gate == "packet_too_large"
+    assert output.feedback.operational is True
+    assert output.usage.llm_calls == 0
+    assert model.requests == []
 
 
 def test_auditor_instruction_states_the_rubric_ids_once_and_offers_no_tool():
