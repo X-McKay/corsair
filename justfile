@@ -99,3 +99,11 @@ eval dataset *args:
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
+
+# Live isolated eval with .state/settings.json; record in .runs/live. Optional BASELINE report, --dry-run.
+live-agent role dataset *args:
+    uv run --locked --extra providers python scripts/live_eval.py agent "$@"
+
+# Live composed eval (needs Temporal and a worker); same record. Optional BASELINE report, --dry-run.
+live-chain dataset *args:
+    uv run --locked --extra providers python scripts/live_eval.py chain "$@"

@@ -36,6 +36,13 @@ Use this workflow to improve or run a stated evaluation boundary. Treat it as ma
 
    Preserve raw reports in ignored `.runs/` and retain only appropriate sanitized records under `evals/baselines/` or `evals/experiments/`.
 
+5. For the improvement loop's rig step, prefer the recording recipes, which refuse without a named connector and its provider environment, and leave a raw report, a sanitised `identity.json`, the `corsair compare` result and a README draft under `.runs/live/` (see [recording a live run](../../../docs/agents/evaluations.md#recording-a-live-run-in-one-step)). Run `--dry-run` first; review the draft and resolve its TODOs before copying a record under `evals/baselines/candidates/`:
+
+   ```bash
+   just -- live-agent auditor evals/datasets/auditor-dev.json BASELINE.json --dry-run
+   just -- live-chain evals/datasets/dev.json BASELINE.json
+   ```
+
 ## Keep qualification levels separate
 
 1. Label a deterministic native-ADK test as factory and schema coverage only. It does not establish provider behavior, target execution, or model accuracy.
