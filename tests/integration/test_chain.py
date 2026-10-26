@@ -244,3 +244,12 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         "case03": "COMPONENT_EXPLOIT_DEMONSTRATED",
     }
     assert all(row["status"] == "pass" for row in rows)
+    # `explain` reads each committed native result offline, re-validates its receipts
+    # and names the kernel gate that decided every session, never evidence_unverified.
+    for row in rows:
+        explained = ["--format", "json", "explain", row["run_id"], "--settings", str(config)]
+        assert await execute(parser().parse_args(explained)) == 0
+        statements = json.loads(capsys.readouterr().out)["statements"]
+        assert statements[0]["text"].startswith(f"Verdict {row['verdict']}:")
+        sessions = [item["text"] for item in statements if item["kind"] == "session"]
+        assert sessions and not any("evidence_unverified" in text for text in sessions)

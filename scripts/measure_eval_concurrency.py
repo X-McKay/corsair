@@ -164,8 +164,8 @@ class SleepingSandbox:
     def image_id(self) -> str:
         return IMAGE_ID
 
-    def image_id_for(self, recipe_kind: str) -> str:
-        del recipe_kind  # One fixed image for every measured recipe kind.
+    def image_id_for(self, kind: str) -> str:
+        del kind  # One measurement image serves every recipe kind.
         return IMAGE_ID
 
     def has_unknown_operation(self, operation_id: str) -> bool:

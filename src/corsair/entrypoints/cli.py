@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
@@ -58,10 +59,22 @@ class CliArguments(argparse.Namespace):
     case: str | None
     limit: int | None
     evidence: bool
+    explain: bool
     model: bool
+    source_root: str
+    recipe_template: str | None
     dataset_command: str
     datasets: list[str]
     fix_digests: bool
+    agent_command: str
+    role: Literal["producer", "auditor"]
+    round: int
+    previous: str | None
+    feedback: tuple[str, str] | None
+    review_submission: str | None
+    diff: str | None
+    full: bool
+    structured_tools: bool | None
 
 
 def validate_run_id(value: str) -> str:
@@ -195,7 +208,7 @@ async def _handle_verify(args: CliArguments, ui: Terminal) -> int:
     identity = validate_run_id(args.run_id or f"reference-{uuid4().hex}")
     sandbox = DockerSandbox(settings, store=store)
     image_id = await ui.wait(
-        asyncio.to_thread(lambda: sandbox.image_id_for(request.case.recipe.kind)),
+        asyncio.to_thread(sandbox.image_id_for, request.case.recipe.kind),
         "Resolving native Docker image",
     )
     prepared = await ui.wait(
@@ -252,6 +265,10 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
     if args.evidence and args.online:
         raise ValueError("--evidence reads the artifact store; it cannot be used with --online")
+    if args.explain and args.online:
+        raise ValueError("--explain reads the artifact store; it cannot be used with --online")
+    if args.explain and args.evidence:
+        raise ValueError("--explain and --evidence are separate views; choose one")
 
     settings = _settings(args)
     if not args.online:
@@ -263,6 +280,10 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
             from corsair.entrypoints.runs import inspect_evidence
 
             ui.emit(inspect_evidence(store, result))
+        elif args.explain:
+            from corsair.entrypoints.runs import explain_run
+
+            ui.emit({"result": result, **explain_run(store, result)}, store=store)
         else:
             ui.emit(result, store=store)
         return 0
@@ -292,6 +313,17 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
         )
     else:
         ui.emit(await handle.query(query, rpc_timeout=timedelta(seconds=5)))
+    return 0
+
+
+async def _handle_explain(args: CliArguments, ui: Terminal) -> int:
+    """Explain a committed result's verdict from the artifact store; no services."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.entrypoints.runs import explain_run
+
+    identity = validate_run_id(args.run_id or "")
+    store = ArtifactStore(_settings(args).artifact_root)
+    ui.emit(explain_run(store, _result_from_store(store, identity)))
     return 0
 
 
@@ -419,7 +451,19 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
-async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
+async def _handle_intake(args: CliArguments, ui: Terminal) -> int:
+    """Dry-run scanner intake: which findings would become admissible requests, and why not."""
+    from corsair.evaluation.intake import intake_receipt
+
+    template = Path(args.recipe_template) if args.recipe_template else None
+    receipt, intakes = intake_receipt(
+        Path(args.report), Path(args.source_root), _settings(args), template
+    )
+    ui.emit(receipt)
+    return 0 if intakes and all(item.admissible for item in intakes) else 1
+
+
+async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
     """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
     from corsair.evaluation.datasets import validate_datasets
 
@@ -429,6 +473,46 @@ async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     )
     ui.emit(report)
     return 0 if report["valid"] else 1
+
+
+async def _handle_replay_candidates(args: CliArguments, ui: Terminal) -> int:
+    """Replay mismatching isolated producer proposals natively; never edits an oracle."""
+    from corsair.adapters.sandboxing.docker import DockerSandbox
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.evaluation.comparison import read_report
+    from corsair.evaluation.replay import replay_candidates
+
+    settings = _settings(args)
+    store = ArtifactStore(settings.artifact_root)
+    report = read_report(Path(args.report))
+    identity = validate_run_id(args.run_id or f"replay-{uuid4().hex}")
+    replayed = await ui.wait(
+        replay_candidates(
+            report,
+            Path(args.dataset),
+            settings,
+            store,
+            DockerSandbox(settings, store=store),
+            replay_id=identity,
+        ),
+        "Replaying mismatching producer proposals natively · evidence only, no oracle change",
+    )
+    output = Path(args.output or f".runs/evaluations/{identity}.json")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(replayed, indent=2) + "\n")
+    counts = replayed["summary"]["replay"]
+    event("replay.completed", run_id=identity, completed=sum(counts.values()))
+    ui.emit({**replayed, "report": str(output)})
+    return 1 if counts["unavailable"] else 0
+
+
+async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
+    """Dispatch one ``corsair dataset`` subcommand."""
+    if args.dataset_command == "validate":
+        return await _handle_dataset_validate(args, ui)
+    if args.dataset_command == "replay-candidates":
+        return await _handle_replay_candidates(args, ui)
+    raise ValueError("Unknown dataset command")
 
 
 async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
@@ -441,6 +525,38 @@ async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+async def _handle_agent(args: CliArguments, ui: Terminal) -> int:
+    """Render what one role would receive, without a model; optionally diff a saved preview."""
+    import json
+
+    from corsair.contracts import Feedback, Submission
+    from corsair.evaluation.preview import diff_previews, load_preview, preview_request
+
+    def submission(path: str | None) -> Submission | None:
+        return None if path is None else Submission.model_validate_json(Path(path).read_bytes())
+
+    baseline = load_preview(Path(args.diff)) if args.diff else None
+    preview = await preview_request(
+        args.role,
+        Path(args.request),
+        _settings(args),
+        round_index=args.round,
+        previous=submission(args.previous),
+        feedback=None
+        if args.feedback is None
+        else Feedback(gate=args.feedback[0], reason=args.feedback[1]),
+        submission=submission(args.review_submission),
+        structured_tools=args.structured_tools,
+    )
+    if args.output:
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(preview, indent=2, ensure_ascii=False) + "\n")
+    shown = preview if baseline is None else diff_previews(baseline, preview)
+    ui.preview(shown, full=args.full)
+    return 0
+
+
 type CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
@@ -450,11 +566,14 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "verify": _handle_verify,
     "inspect": _handle_inspect,
     "runs": _handle_runs,
+    "explain": _handle_explain,
     "cancel": _handle_cancel,
     "investigate": _handle_investigate,
     "eval": _handle_eval,
     "rescore": _handle_rescore,
+    "intake": _handle_intake,
     "dataset": _handle_dataset,
+    "agent": _handle_agent,
 }
 
 
@@ -476,6 +595,22 @@ def positive_limit(value: str) -> int:
     if limit < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return limit
+
+
+def positive_round(value: str) -> int:
+    """Admit a producer round index of at least one."""
+    index = int(value)
+    if index < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return index
+
+
+def gate_reason(value: str) -> tuple[str, str]:
+    """Split ``GATE:REASON`` retry feedback; both halves must be present."""
+    gate, separator, reason = value.partition(":")
+    if not separator or not gate.strip() or not reason.strip():
+        raise argparse.ArgumentTypeError("expected GATE:REASON, for example audit:wrong path")
+    return gate.strip(), reason.strip()
 
 
 def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = False) -> None:
@@ -523,13 +658,18 @@ def parser() -> argparse.ArgumentParser:
         "investigate": "Submit a durable investigation; use --wait for live phase updates",
         "inspect": "Read a committed result or query/watch the native Temporal workflow",
         "runs": "List committed results in the artifact store, newest first; no services",
+        "explain": "Explain a committed verdict in plain language and what would change it; "
+        "no services",
         "cancel": "Request cancellation; this does not assert completed cleanup",
         "verify": "Execute a frozen reference submission natively; no security verdict",
         "eval": "Run frozen cases with bounded child workflows and external oracles",
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
-        "dataset": "Check frozen evaluation datasets offline; no model, target or services",
+        "intake": "Dry-run a scanner report: which findings become admissible requests; "
+        "no model or container",
+        "dataset": "Frozen dataset tools: validate offline; replay-candidates natively in Docker",
+        "agent": "Inspect agent roles offline; no model provider, target or services",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -555,9 +695,15 @@ def parser() -> argparse.ArgumentParser:
     inspect.add_argument(
         "--evidence", action="store_true", help="Per-role native receipts; never payloads"
     )
+    inspect.add_argument(
+        "--explain",
+        action="store_true",
+        help="Add the plain-language verdict explanation; never model text",
+    )
     runs = commands["runs"]
     runs.add_argument("--case", help="Only results for this case id")
     runs.add_argument("--limit", type=positive_limit, help="At most N rows")
+    commands["explain"].add_argument("run_id")
     commands["cancel"].add_argument("run_id")
     verify = commands["verify"]
     verify.add_argument("request")
@@ -583,6 +729,17 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Compare reports over different or undeclared frozen dataset digests",
     )
+    intake = commands["intake"]
+    intake.add_argument("report", help="Scanner report JSON (corsair.scan_report/1)")
+    intake.add_argument(
+        "--source-root",
+        required=True,
+        help="The findings' source tree (a request's source.path), admitted under source_root",
+    )
+    intake.add_argument(
+        "--recipe-template",
+        help="Operator recipe JSON without module_file; intake binds it to each finding's file",
+    )
     datasets = commands["dataset"].add_subparsers(
         dest="dataset_command", required=True, title="dataset commands"
     )
@@ -595,6 +752,16 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Rewrite only stale manifest digests of otherwise valid entries",
     )
+    replay_help = (
+        "Replay a producer report's mismatching proposals in the real sandbox; "
+        "evidence for a human oracle decision, pass/fail unchanged"
+    )
+    replay = datasets.add_parser("replay-candidates", help=replay_help, description=replay_help)
+    _presentation_options(replay)
+    replay.add_argument("report", help="Isolated producer evaluation report JSON")
+    replay.add_argument("dataset", help="The frozen agent dataset the report was run on")
+    replay.add_argument("--run-id", help="Replay identity; operation ids are RUN_ID.c<row>")
+    replay.add_argument("--output", help="Replay report path (default .runs/evaluations/)")
     for name in ("report", "compare"):
         commands[name].add_argument(
             "--families",
@@ -606,6 +773,49 @@ def parser() -> argparse.ArgumentParser:
             dest="family_dataset",
             help="Label rows of an older report from the manifest it was scored against",
         )
+    agents = commands["agent"].add_subparsers(
+        dest="agent_command", required=True, title="agent commands"
+    )
+    preview_help = (
+        "Render the system instruction, tool declarations and packet a role would receive, "
+        "with byte and approximate token counts; no model is called"
+    )
+    preview = agents.add_parser("preview", help=preview_help, description=preview_help)
+    _presentation_options(preview)
+    preview.add_argument("role", choices=("producer", "auditor"))
+    preview.add_argument("request", help="Case request JSON; source paths relative to this file")
+    preview.add_argument(
+        "--submission",
+        dest="review_submission",
+        metavar="FILE",
+        help="Submission JSON the auditor reviews (auditor only)",
+    )
+    preview.add_argument(
+        "--round", type=positive_round, default=1, help="Producer round index (default 1)"
+    )
+    preview.add_argument(
+        "--previous", metavar="FILE", help="Previous-round Submission JSON (producer, round > 1)"
+    )
+    preview.add_argument(
+        "--feedback",
+        type=gate_reason,
+        metavar="GATE:REASON",
+        help="Retry feedback the producer receives (round > 1), e.g. audit:REASON",
+    )
+    preview.add_argument(
+        "--structured-tools",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Force the native response-schema route (or, with --no-, the set_model_response "
+        "tool); default: what the configured model route reports",
+    )
+    preview.add_argument("--output", metavar="FILE", help="Also save the JSON preview here")
+    preview.add_argument(
+        "--diff", metavar="PREVIEW.json", help="Compare against a saved preview, part by part"
+    )
+    preview.add_argument(
+        "--full", action="store_true", help="Human output: print every part (or diff) in full"
+    )
     return root
 
 

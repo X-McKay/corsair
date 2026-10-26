@@ -55,6 +55,14 @@ class ModelSettings(Contract):
         return self
 
 
+def _default_images(python_image: str) -> dict[str, str]:
+    """The default recipe-kind image map, with the Python row following ``image``."""
+    return {
+        "python.secret_disclosure/1": python_image,
+        "javascript.prototype_pollution/1": "corsair-javascript:0.1",
+    }
+
+
 class Settings(Contract):
     artifact_root: str = ".runs"
     source_root: str = "."
@@ -62,15 +70,13 @@ class Settings(Contract):
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
-    # Recipe kind to image tag. Both current Python recipes share one reviewed image
-    # and driver, so they map to the same tag; `image` remains the Python default and
-    # the fallback for any kind absent from this map. A future language/framework image
-    # is added here as a new row, not a new code path. When omitted, the disclosure row
-    # follows `image` (see default_images), so a settings file naming only `image` keeps
-    # selecting that image for every Python recipe.
-    images: dict[str, str] = Field(
-        default_factory=lambda: {"python.secret_disclosure/1": "corsair-python:0.1"}
-    )
+    # Trusted runtime image per recipe kind. ``image`` stays the Python default for
+    # compatibility; a recipe kind absent here falls back to it. A new language adds one
+    # entry and its own reviewed Dockerfile under deploy/, never a code path.
+    # When ``images`` is omitted, its Python disclosure row follows ``image`` (see
+    # default_images), so a settings file naming only ``image`` keeps selecting that image
+    # for every Python recipe instead of silently falling back to the fixed default tag.
+    images: dict[str, str] = Field(default_factory=lambda: _default_images("corsair-python:0.1"))
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)
@@ -97,14 +103,14 @@ class Settings(Contract):
     @model_validator(mode="before")
     @classmethod
     def default_images(cls, data: object) -> object:
-        """Derive the omitted image map from ``image`` instead of a fixed tag."""
+        """Derive the omitted image map from a configured ``image``."""
         if isinstance(data, dict) and "images" not in data and "image" in data:
-            return {**data, "images": {"python.secret_disclosure/1": data["image"]}}
+            return {**data, "images": _default_images(data["image"])}
         return data
 
-    def image_for(self, recipe_kind: str) -> str:
-        """Resolve the configured image tag for a recipe kind, defaulting to ``image``."""
-        return self.images.get(recipe_kind, self.image)
+    def image_for(self, kind: str) -> str:
+        """Return the configured image tag for a recipe kind, or the Python default."""
+        return self.images.get(kind, self.image)
 
     @property
     def identity(self) -> str:

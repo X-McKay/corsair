@@ -6,9 +6,9 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 
 - **Producer agent** (`agents/producer/`): exactly the read-only `read_file`/`list_files` over an admitted immutable snapshot; its `source-grounding` procedure is preloaded into the instruction, with no skill loader (removing the `SkillToolset` cut about 3.3 KB, ~820 approximate tokens, from every producer request; live eval unrun). Returns a `ProducerDecision`: a `Submission` holding one benign/exploit payload pair as JSON, or an explicit abstention. Never runs code, never writes a probe, never sees an outcome.
 - **Auditor agent** (`agents/auditor/`): no tools, native structured `AuditResult`, outcome-blind, reject-only.
-- **Kernel** (`policies/verdicts.py`, `steps/verification.py`, `workflows/investigation.py`): gates in the fixed order `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation (request load binds `finding.file` to the recipe's module, and the prepare activity runs the pre-model `target_binding` gate in `policies/target_binding.py` over the admitted module, blocking a certainly unbindable target as `UNABLE_TO_RUN` before any model call); verdict table producing `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`.
+- **Kernel** (`policies/verdicts.py`, `steps/verification.py`, `workflows/investigation.py`): gates in the fixed order `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation (request load binds `finding.file` to the recipe's module, and the prepare activity runs the pre-model `target_binding` gate in `policies/target_binding.py` over the admitted module, blocking a certainly unbindable target as `UNABLE_TO_RUN` before any model call, then binds the declared line to the line coverage reports for it with `policies/line_binding.py`, recorded as `PreparedCase.target_line`); verdict table producing `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`.
 - **Ports and adapters**: typed inference, source-snapshot and sandbox ports; ADK, local-source, Docker, filesystem and Temporal adapters. The sandbox port is answered by Docker only.
-- **Evaluation**: isolated producer/auditor evaluation (`just eval-agent`), durable dataset evaluation (`just eval`), frozen datasets under `evals/datasets/` including the independent paired corpus and per-language chain rows.
+- **Evaluation**: isolated producer/auditor evaluation (`just eval-agent`), durable dataset evaluation (`just eval`), frozen datasets under `evals/datasets/` including the independent paired corpus and per-language chain rows. Scanner intake is measured offline: `corsair intake` dry-runs a scan report into candidate requests with per-finding admissibility, and `just eval-intake evals/datasets/intake.json` scores 12 frozen findings against per-finding oracles (no model, container or service).
 - **Tooling**: `just check` (Ruff lint/format, Just format, ty, docs links), `just test` (offline), `just test-docker`, `just test-temporal`, `just test-live`, `just verify`, `just eval`, `just eval-agent`.
 
 ## Decisions taken for the pilot
@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the running runtime; a first JavaScript recipe (`javascript.prototype_pollution/1`) is qualified on Linux amd64 on one corpus row (`prototypepollution-a`); Java, Ruby and Perl rows are carried in the corpus matrix only | Capability depth comes from concrete, tested operator-owned recipes; a new language is a discriminated `Case.recipe` union member with its own trusted driver and image, not a generic adapter. macOS arm64 and the live chain for JavaScript are unrun. |
 
 ## Gates and environment
 
@@ -33,6 +33,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 | `just test-docker`, `just test-temporal` | rig | not yet recorded |
 | `just test-live`, composed live batch | rig | not yet recorded |
 | Isolated producer/auditor baselines on the six labels | rig | not yet promoted |
+| JavaScript recipe `corsair verify` + `test_docker_javascript.py` (Linux amd64) | rig | run: control held / adversarial violated on `prototypepollution-a`, 4 Docker tests pass, cleanup confirmed, ~0.16 s/role; live chain unrun ([platforms](../../reference/platforms.md#javascript-prototype-pollution-linux-amd64)) |
 
 ## Open decisions awaiting the owner
 

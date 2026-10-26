@@ -40,11 +40,15 @@ def _commit_run(
     recorded: float = 1_700_000_000,
     cleanup_confirmed: bool = True,
     audit: AuditOutput | None = None,
+    declared_line: int = 4,
 ) -> InvestigationResult:
     """Commit one result whose round observation was produced by the trusted verifier."""
     prepared = _prepared().model_copy(
         update={"case_id": case_id, "source": store.put(b"source", "application/x-tar")}
     )
+    if declared_line != 4:  # _FakeSandbox covers line 4: bind the declared line to it.
+        finding = prepared.finding.model_copy(update={"line": declared_line})
+        prepared = prepared.model_copy(update={"finding": finding, "target_line": 4})
     submission = _submission()
     observation = EvidenceVerifier(
         Settings(), store, _FakeSandbox(store, cleanup_confirmed=cleanup_confirmed)
@@ -152,6 +156,8 @@ def test_inspect_evidence_walks_receipts_without_payloads_or_fixture(tmp_path: P
     # The verified prepared case's target line, as declared by the request.
     assert (item["target_line"], item["line_provenance"]) == (4, LineProvenance.DECLARED)
     assert item["cleanup_confirmed"] is True
+    # A record made before line binding reports the declared line as the bound one.
+    assert item["declared_line"] == item["target_line"] == 4
     control, adversarial = item["roles"]["control"], item["roles"]["adversarial"]
     assert control["outcome"] is RoleOutcome.HELD and control["native_exit_code"] == 0
     assert adversarial["outcome"] is RoleOutcome.VIOLATION
@@ -178,6 +184,15 @@ def test_inspect_evidence_walks_receipts_without_payloads_or_fixture(tmp_path: P
     rendered = json.dumps(view, default=str)
     for private in PRIVATE:
         assert private not in rendered
+
+
+def test_inspect_evidence_reports_the_declared_and_the_bound_target_line(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    result = _commit_run(store, "run-bound", declared_line=3)
+    [item] = inspect_evidence(store, result)["observations"]
+    assert (item["declared_line"], item["target_line"]) == (3, 4)
+    assert item["line_provenance"] == LineProvenance.DECLARED
+    assert item["receipts_admissible"] is True
 
 
 def test_inspect_evidence_reports_unconfirmed_cleanup_as_not_admissible(tmp_path: Path) -> None:
@@ -333,3 +348,12 @@ def test_evidence_caption_marks_a_derived_target_line() -> None:
     assert _target_caption({"target_line": 6, "line_provenance": "recipe_function"}) == (
         " · target=L6 (derived from recipe function)"
     )
+
+
+def test_evidence_caption_names_the_declared_line_a_binding_moved() -> None:
+    from corsair.entrypoints.terminal import _target_caption
+
+    moved = {"target_line": 4, "declared_line": 3, "line_provenance": "declared"}
+    assert _target_caption(moved) == " · target=L4 (declared L3, bound to its reported statement)"
+    kept = {"target_line": 4, "declared_line": 4, "line_provenance": "declared"}
+    assert _target_caption(kept) == " · target=L4"

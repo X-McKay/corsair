@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 
 import pytest
+from temporalio import activity
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
@@ -22,12 +23,15 @@ from corsair.contracts import (
     EvidenceInput,
     ExecutionStatus,
     FixStatus,
+    InvestigationRequest,
     InvestigationResult,
     Observation,
     PlanRevision,
+    PreparedCase,
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
+    RoleObservation,
     RoleOutcome,
     Scope,
     Submission,
@@ -35,6 +39,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
+from corsair.policies.line_binding import bind_target_line
 from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
 from tests.workflow.temporal import (
@@ -195,6 +200,70 @@ async def test_supported_paired_observation_records_bound_result(
     assert "observation" not in audit_packet
     assert "control" not in audit_packet
     assert "adversarial" not in audit_packet
+
+
+# A finding declared on a ``def`` line (4) whose body statement is line 5.
+_DEF_LINE_MODULE = (
+    "from pathlib import Path\n"
+    "\n"
+    "\n"
+    "def read_payload(root, path):\n"
+    "    return (Path(root) / path).read_text()\n"
+)
+
+
+class _DefLineActivities(FakeActivities):
+    """prepare binds the declared line as the real activity does (or, with
+    ``bind=False``, records it unbound as a pre-binding history would); both runs
+    report coverage of the entered body line only."""
+
+    def __init__(self, store, *, bind: bool) -> None:
+        super().__init__(store)
+        self.bind = bind
+
+    @activity.defn(name="corsair.prepare")
+    async def prepare(self, request: InvestigationRequest) -> PreparedCase:
+        prepared = await super().prepare(request)
+        assert prepared.finding.line is not None
+        if not self.bind:
+            return prepared
+        bound = bind_target_line(_DEF_LINE_MODULE, prepared.finding.line)
+        return prepared.model_copy(update={"target_line": bound})
+
+    @staticmethod
+    def _role(outcome: RoleOutcome, line: int | None) -> RoleObservation:
+        del line  # Coverage reports the body line, never the declared def line.
+        return FakeActivities._role(outcome, 5)
+
+
+@pytest.mark.parametrize(
+    ("bind", "verdict"), [(True, Verdict.EXPLOIT_DEMONSTRATED), (False, Verdict.INCONCLUSIVE)]
+)
+async def test_a_def_line_finding_is_decisive_when_both_runs_cover_its_bound_line(
+    temporal_server, temporal_artifact_store, bind, verdict
+):
+    activities = _DefLineActivities(temporal_artifact_store, bind=bind)
+    identity, queue = temporal_id(f"def-line-{bind}"), temporal_id(f"def-line-queue-{bind}")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request(f"def-line-{bind}"),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    prepared = activities.evidence_inputs[0].prepared
+    assert prepared.finding.line == 4
+    assert prepared.target_line == (5 if bind else None)
+    # Unbound, the kernel still requires the declared def line, which these runs never
+    # report, so the same evidence stays INCONCLUSIVE.
+    assert result.verdict is verdict
 
 
 async def test_auditor_receives_only_remaining_root_budgets(
@@ -409,8 +478,8 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
 class _ImageOnlySandbox:
     image_id = "sha256:" + "a" * 64
 
-    def image_id_for(self, recipe_kind: str) -> str:
-        del recipe_kind  # One trusted image regardless of recipe kind.
+    def image_id_for(self, kind: str) -> str:
+        del kind  # One trusted image regardless of recipe kind.
         return self.image_id
 
 

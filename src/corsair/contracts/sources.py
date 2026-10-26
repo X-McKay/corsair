@@ -5,15 +5,14 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_javascript import JavaScriptRecipe
 from .recipes_python import PythonCommandSentinel
-
-DEFAULT_RECIPE_KIND = "python.secret_disclosure/1"
 
 
 class Source(Contract):
@@ -110,23 +109,32 @@ class PythonRecipe(Contract):
         return self
 
 
-def _recipe_kind(value: object) -> str:
-    """Extract the recipe discriminator, defaulting a tag-less recipe to the initial kind.
+def _recipe_kind(value: Any) -> str:
+    """Discriminate recipe members by ``kind``.
 
-    A frozen request written before the recipe union omits ``kind`` entirely; it names
-    the initial disclosure recipe. New requests carry an explicit ``kind``. An unknown
-    tag is rejected by the union rather than silently coerced.
+    A request that predates the recipe union omits ``kind``; it is the original
+    Python secret-disclosure recipe, so a missing tag resolves there. This keeps the
+    frozen request fixtures (and their recorded digests) valid without a rewrite.
     """
-    if isinstance(value, dict):
-        return str(value.get("kind", DEFAULT_RECIPE_KIND))
-    return str(getattr(value, "kind", DEFAULT_RECIPE_KIND))
+    tag = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    return tag if isinstance(tag, str) else "python.secret_disclosure/1"
 
 
-# One discriminated union on ``kind``; add a member here as each concrete, tested
-# recipe lands. The callable discriminator keeps pre-union frozen requests valid.
+# The Python callable recipes: both import one stdlib module directly and invoke one
+# public function, so they share the Python-AST gates (target binding, line derivation)
+# that other languages replace with their own run-time binding gates.
+PythonCallableRecipe = PythonRecipe | PythonCommandSentinel
+PYTHON_CALLABLE_RECIPES = (PythonRecipe, PythonCommandSentinel)
+
+
+# The admitted recipe alternatives, discriminated on the stable ``kind`` tag following
+# the native ProducerDecision pattern. Each member is one concrete, tested recipe with
+# its own trusted observer and runtime image; adding a language adds a union member, not
+# a generic adapter. Every member exposes ``module_file`` so the finding binds uniformly.
 Recipe = Annotated[
-    Annotated[PythonRecipe, Tag(DEFAULT_RECIPE_KIND)]
-    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")],
+    Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")]
+    | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")],
     Discriminator(_recipe_kind),
 ]
 
@@ -220,3 +228,20 @@ class PreparedCase(Contract):
     manifest: RunManifest
     # Defaulted so prepared cases recorded before line derivation still decode.
     line_provenance: LineProvenance = LineProvenance.DECLARED
+    # The line the coverage gate binds to, chosen in code at prepare from finding.line
+    # (declared, or derived when line_provenance is recipe_function) over the admitted
+    # module (corsair.policies.line_binding). finding.line keeps the declared or
+    # derived line. None in records made before line binding: the kernel then binds to
+    # finding.line itself.
+    target_line: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def target_line_needs_a_declared_line(self):
+        if self.target_line is not None and self.finding.line is None:
+            raise ValueError("a bound target line needs a declared finding line")
+        return self
+
+    @property
+    def bound_line(self) -> int | None:
+        """The exact line the kernel requires in both runs: bound, else declared."""
+        return self.finding.line if self.target_line is None else self.target_line

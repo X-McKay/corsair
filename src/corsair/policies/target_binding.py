@@ -15,7 +15,7 @@ import ast
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, Recipe
+from corsair.contracts import Finding, LineProvenance, PythonCallableRecipe
 
 
 class TargetBindingReason(StrEnum):
@@ -114,7 +114,7 @@ def _compiles_to_nothing(statement: ast.stmt) -> bool:
     )
 
 
-def derive_target_line(recipe: Recipe, module_text: str) -> int | None:
+def derive_target_line(recipe: PythonCallableRecipe, module_text: str) -> int | None:
     """Bind a line-less finding to the recipe function's first body statement.
 
     Trusted, deterministic and model-free: the line comes from the operator-owned
@@ -153,7 +153,27 @@ def derive_target_line(recipe: Recipe, module_text: str) -> int | None:
     return first.lineno
 
 
-def _signature_failure(function: ast.FunctionDef, recipe: Recipe) -> TargetBindingFailure | None:
+def bind_target_line(
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str
+) -> tuple[Finding, LineProvenance]:
+    """The finding prepare hands on: its declared line, else one derived from the recipe.
+
+    ``module_text`` is the admitted text of ``finding.file`` (the recipe module). A
+    finding that already declares a line is returned unchanged; a line-less one gets
+    ``derive_target_line`` when that is certain, else stays line-less for
+    ``target_binding`` to report ``line_missing``.
+    """
+    if finding.line is not None:
+        return finding, LineProvenance.DECLARED
+    derived = derive_target_line(recipe, module_text)
+    if derived is None:
+        return finding, LineProvenance.DECLARED
+    return finding.model_copy(update={"line": derived}), LineProvenance.RECIPE_FUNCTION
+
+
+def _signature_failure(
+    function: ast.FunctionDef, recipe: PythonCallableRecipe
+) -> TargetBindingFailure | None:
     """The driver calls ``function(**fixed_kwargs, payload_parameter=payload)``."""
     arguments = function.args
     keyword_names = {argument.arg for argument in (*arguments.args, *arguments.kwonlyargs)}
@@ -192,7 +212,7 @@ def _signature_failure(function: ast.FunctionDef, recipe: Recipe) -> TargetBindi
 
 
 def target_binding(
-    finding: Finding, recipe: Recipe, module_text: str | None
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str | None
 ) -> TargetBindingFailure | None:
     """Return the first certain structural reason the case cannot bind, else None.
 

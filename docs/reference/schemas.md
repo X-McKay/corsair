@@ -41,21 +41,29 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: Recipe (PythonRecipe | PythonCommandSentinel, discriminated on kind)
+│   └── recipe: Recipe  # PythonRecipe | PythonCommandSentinel | JavaScriptRecipe, on `kind`
 └── budget: Budget
 ```
 
 - A **finding** is the reported title, description, source file, optional line, and requested claim scope. It is not trusted evidence.
 - A **source** names a local source-tree path and may pin its expected snapshot digest. It is a proposed local input, not an admitted archive or a remote checkout.
-- A **recipe** is the operator-owned test shape, a discriminated union on a stable `kind` tag ([`Recipe`](../../src/corsair/contracts/sources.py)). Every member binds to one public Python callable and its actual module file; the investigator controls only the `payload_parameter` value, while fixed keyword arguments, public fixtures, and allowed-exception policy are not agent-editable, and the recipe must bind to the finding's file. `python.secret_disclosure/1` ([`PythonRecipe`](../../src/corsair/contracts/sources.py)) asserts a private fixture secret does not appear in the returned value, with an operator `expected_control`. `python.command_sentinel/1` ([`PythonCommandSentinel`](../../src/corsair/contracts/recipes_python.py)) asserts the benign input does not create the operator's `sentinel_path` file while an input reaching command or code execution does. A request written before the union may omit `kind`; it is read as `python.secret_disclosure/1`. The [Python corpus map](corpus-python.md) records which recipe each corpus row's property needs.
+- A **recipe** is the operator-owned test shape, selected by its `kind` tag. See [Recipes](#recipes). The recipe must bind to the finding's file.
 - A **case** combines that finding, source, recipe, optional fixed source, and stable `case_id`. A case describes what to investigate; it has no run budget and no workflow identity.
 - An **investigation request** is a case plus a bounded `Budget`. The default budget is bounded in rounds, model/tool calls, output tokens, elapsed time, probe time, tool output, and source handling. `max_output_tokens` caps each model request of both the producer and the auditor; on a thinking model it includes reasoning tokens (see the `Budget` docstring in [`contracts/sources.py`](../../src/corsair/contracts/sources.py)). It is the typed Temporal input for one investigation.
+
+### Recipes
+
+`Case.recipe` is a discriminated union on the stable `kind` tag, following the native `ProducerDecision` pattern; a request that predates the union omits `kind` and resolves to the Python recipe. Each member is one concrete, tested recipe with its own trusted observer and runtime image. Adding a language adds a union member, not a generic adapter.
+
+- **`PythonRecipe`** (`kind: "python.secret_disclosure/1"`, [`sources.py`](../../src/corsair/contracts/sources.py)) binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable.
+- **`PythonCommandSentinel`** (`kind: "python.command_sentinel/1"`, [`recipes_python.py`](../../src/corsair/contracts/recipes_python.py)) binds to one public Python callable like `PythonRecipe` and shares its fixed-argument, fixture and exception fields. The observed property is whether invoking the callable creates the operator-fixed `sentinel_path` (a non-traversing path under `/work`): the benign input must not, an input reaching command or code execution does (CWE-78, CWE-94). It has no `expected_control`; the control holds when the call returns without creating the sentinel. See the [Python corpus map](corpus-python.md).
+- **`JavaScriptRecipe`** (`kind: "javascript.prototype_pollution/1"`, [`recipes_javascript.py`](../../src/corsair/contracts/recipes_javascript.py)) binds to one exported CommonJS `.js` callable. The investigator controls only the model payload, which the trusted driver passes as the final positional argument to `function(*fixed_arguments, payload)`; `module_file`, `function` and the fixed leading arguments are not agent-editable. The observed property is whether invoking the callable adds any enumerable property to `Object.prototype` (CWE-1321); it reads no fixture. See the [JavaScript corpus survey](corpus-javascript.md) for the row it qualifies.
 
 `load_investigation_request()` validates request JSON and converts source paths to absolute paths relative to the request file. That is not admission. The local admission adapter later accepts only a non-symlink directory beneath configured `source_root`, snapshots its admitted bytes, and exposes only that immutable snapshot. Current source admission is local; remote SCM checkout is not a present schema or adapter.
 
 ## Prepared case, manifest, and artifacts
 
-A **prepared case** is worker-derived after source admission. `PreparedCase` holds the case identity, finding, recipe, source artifact reference, optional fixed-source artifact reference, a bounded source excerpt, a manifest, and `line_provenance`: `declared`, or `recipe_function` when the finding declared no line and trusted prepare code bound it to the recipe function's first body statement (the finding's `line` then holds that derived line). It is not an alternate request format.
+A **prepared case** is worker-derived after source admission. `PreparedCase` holds the case identity, finding, recipe, source artifact reference, optional fixed-source artifact reference, a bounded source excerpt, a manifest, and `line_provenance`: `declared`, or `recipe_function` when the finding declared no line and trusted prepare code bound it to the recipe function's first body statement (the finding's `line` then holds that derived line), and `target_line`: the line the coverage gate requires, bound in code at prepare from `finding.line` (`null` in records made before line binding, where the kernel uses `finding.line`). It is not an alternate request format.
 
 A **run manifest** (`corsair.manifest/1`) binds a run to its request and configuration digests, producer/auditor prompt digests, immutable image ID, chosen model names, and recorded capabilities. It records run provenance; it is not a mutable settings document and does not carry credentials.
 

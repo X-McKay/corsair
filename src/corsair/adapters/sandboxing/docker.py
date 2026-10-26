@@ -25,6 +25,7 @@ from docker.types import LogConfig
 from corsair.adapters.scm.local import SourceAdmissionError, iter_snapshot_files
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     ArtifactRef,
     Budget,
     PreparedCase,
@@ -70,12 +71,12 @@ class DockerSandbox:
 
     @property
     def image_id(self) -> str:
-        """Resolve the default Python image ID or raise if it cannot be obtained."""
+        """Return the immutable Docker image ID of the default Python image."""
         return self._ensure_image(self.settings.image)
 
-    def image_id_for(self, recipe_kind: str) -> str:
-        """Resolve the immutable Docker image ID for the recipe kind's configured tag."""
-        return self._ensure_image(self.settings.image_for(recipe_kind))
+    def image_id_for(self, kind: str) -> str:
+        """Return the immutable Docker image ID for the recipe kind's trusted image."""
+        return self._ensure_image(self.settings.image_for(kind))
 
     def _ensure_image(self, tag: str) -> str:
         cached = self._image_ids.get(tag)
@@ -90,7 +91,7 @@ class DockerSandbox:
             image = client.images.get(tag)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with just images"
+                f"trusted image {tag} unavailable; build its deploy/ Dockerfile with just images"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
@@ -137,20 +138,25 @@ class DockerSandbox:
         private = root / "private"
         cls._mkdir(allowed)
         cls._mkdir(private)
-        for relative, content in prepared.recipe.public_files.items():
-            destination = allowed.joinpath(*relative.split("/"))
-            cls._mkdir(destination.parent)
-            destination.write_text(content, encoding="utf-8")
-            os.chmod(destination, 0o444)
-        # random content never enters PreparedCase, Submission, agent context, logs,
-        # evidence reasons, or the driver job JSON.
-        secret = secrets.token_urlsafe(32)
-        secret_file = private / "secret.txt"
-        secret_file.write_text(secret, encoding="utf-8")
-        # Bind-mounted files retain host ownership under rootless Docker. The fixture
-        # is therefore world-readable within the isolated read-only mount; its random
-        # content never reaches a prompt, job JSON, stdout, or Observation reason.
-        os.chmod(secret_file, 0o444)
+        # Only the secret-disclosure recipe uses public fixtures and a private secret.
+        # Other recipes (e.g. the JavaScript prototype-pollution check) observe a global
+        # side effect and read no fixture, so the mount stays present but empty.
+        recipe = prepared.recipe
+        if isinstance(recipe, PYTHON_CALLABLE_RECIPES):
+            for relative, content in recipe.public_files.items():
+                destination = allowed.joinpath(*relative.split("/"))
+                cls._mkdir(destination.parent)
+                destination.write_text(content, encoding="utf-8")
+                os.chmod(destination, 0o444)
+            # random content never enters PreparedCase, Submission, agent context, logs,
+            # evidence reasons, or the driver job JSON.
+            secret = secrets.token_urlsafe(32)
+            secret_file = private / "secret.txt"
+            secret_file.write_text(secret, encoding="utf-8")
+            # Bind-mounted files retain host ownership under rootless Docker. The fixture
+            # is therefore world-readable within the isolated read-only mount; its random
+            # content never reaches a prompt, job JSON, stdout, or Observation reason.
+            os.chmod(secret_file, 0o444)
         for directory in (allowed, private, root):
             os.chmod(directory, 0o555)
 
