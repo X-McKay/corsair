@@ -5,7 +5,7 @@ The chain corpus carries four C rows under `evals/datasets/chain/common/` (filed
 R0 `no_runtime`). Their source trees live under
 `evals/datasets/corpus/infosec-harness/c/`. This page records what a trusted observer can
 assert for each, and which rows the first qualified C recipe
-([`c.integer_overflow/1`](schemas.md#recipes)) covers.
+([`c.integer_overflow/1`](../schemas.md#recipes)) covers.
 
 C targets are memory-unsafe. The container drops all capabilities and has no network, so a
 crash is an outcome, not a disclosure; the observer therefore asserts a **narrow** property

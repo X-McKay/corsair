@@ -39,6 +39,7 @@ PREVIEW_KEYS = {
     "generation",
     "token_estimate",
     "declared_tools",
+    "episode",
     "parts",
     "totals",
     "request_sha256",
@@ -107,6 +108,9 @@ async def test_producer_preview_renders_case01_through_the_production_factory(
     assert {"read_file", "list_files"} <= set(value["declared_tools"])
     assert ("set_model_response" in value["declared_tools"]) is not structured_tools
     assert ("response_schema" in names) is structured_tools
+    # The fixed abstention is one model call; set_model_response is charged as a tool call.
+    tool_calls = 0 if structured_tools else 1
+    assert value["episode"] == {"requests": 1, "llm_calls": 1, "tool_calls": tool_calls}
     assert value["route"]["capability"] == "override"
     assert value["inputs"] == {
         "request": str(REQUEST),
@@ -127,17 +131,17 @@ async def test_producer_preview_renders_case01_through_the_production_factory(
 
 
 @pytest.mark.asyncio
-async def test_producer_preview_matches_the_measurement_script_sections():
-    """The CLI preview and the measurement script are one renderer, byte for byte."""
+async def test_producer_preview_matches_the_request_size_sections():
+    """The CLI preview and the sections the request-size tests pin are one renderer."""
     value = await preview.preview_request("producer", REQUEST, _settings(), structured_tools=False)
-    requests = await preview.render_requests(
+    requests, _usage = await preview.render_requests(
         "producer", preview.load_request(REQUEST), _settings(), structured_tools=False
     )
     sections = preview.request_sections("producer", requests[0])
 
     assert len(sections["corsair_instruction"].encode()) == _instruction_bytes(value, adk=False)
     tool_parts = [part for part in value["parts"] if part["kind"] == "tool"]
-    # The script reports one JSON list: brackets plus a comma between declarations.
+    # The sections join declarations as one JSON list: brackets plus a comma between them.
     expected_list = sum(part["bytes"] for part in tool_parts) + 2 + len(tool_parts) - 1
     assert len(sections["tool_declarations"].encode()) == expected_list
     assert sections["user_packet"] == value["parts"][-1]["text"]
@@ -158,6 +162,7 @@ async def test_auditor_preview_is_one_tool_free_schema_request(structured_tools:
     names = [part["name"] for part in value["parts"]]
     assert names[:2] == ["instruction.prompt", "instruction.skill.semantic-review"]
     assert value["declared_tools"] == []
+    assert value["episode"] == {"requests": 1, "llm_calls": 1, "tool_calls": 0}
     assert value["totals"]["tool"]["bytes"] == 0
     assert "response_schema" in names
     assert value["generation"]["response_mime_type"] == "application/json"

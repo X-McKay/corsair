@@ -2,7 +2,7 @@
 
 The production worker composition and real activities run against the real local
 Temporal test server; only the inference and sandbox ports are timed doubles from
-scripts/measure_eval_concurrency.py, so no model or container runs.
+scripts/benchmarks/measure_eval_concurrency.py, so no model or container runs.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-MEASURE_SCRIPT = ROOT / "scripts/measure_eval_concurrency.py"
+MEASURE_SCRIPT = ROOT / "scripts/benchmarks/measure_eval_concurrency.py"
 
 
 def _measure_module() -> ModuleType:

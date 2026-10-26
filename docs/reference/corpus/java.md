@@ -1,11 +1,11 @@
 # Java corpus survey
 
 This records the survey that chose one Java row to qualify the first non-Python recipe.
-The rows live under [`evals/datasets/chain/java/`](../../evals/datasets/chain/java) in the
+The rows live under [`evals/datasets/chain/java/`](../../../evals/datasets/chain/java) in the
 older lite shape (`case.json`/`input.json`/`oracle.json`); their trees live under
-[`evals/datasets/corpus/`](../../evals/datasets/corpus). Only the chosen row is migrated
-to the v3 `request.json` + `oracle.json` shape; see [extensions](../guides/extensions.md)
-for what "qualified" requires and [platforms](platforms.md) for the host boundary.
+[`evals/datasets/corpus/`](../../../evals/datasets/corpus). Only the chosen row is migrated
+to the v3 `request.json` + `oracle.json` shape; see [extensions](../../guides/extensions.md)
+for what "qualified" requires and [platforms](../platforms.md) for the host boundary.
 
 The implemented recipe is secret disclosure: a fixed trusted driver invokes one public
 callable with a single model-controlled `String` and reports whether the private fixture
@@ -38,8 +38,8 @@ vulnerability, so it maps onto the existing secret-disclosure kernel with no cha
 control returns the benign document's own text, the exploit expands an external entity
 pointing at `/fixtures/private/secret.txt`, and the paired fixed tree (`xxe-a`) raises
 `org.xml.sax.SAXParseException`, an allowed non-disclosing outcome. The migrated v3
-fixture is [`evals/datasets/chain/java/xxe-b/v3/`](../../evals/datasets/chain/java/xxe-b/v3)
-and the dataset is [`evals/datasets/chain-java.json`](../../evals/datasets/chain-java.json).
+fixture is [`evals/datasets/chain/java/xxe-b/v3/`](../../../evals/datasets/chain/java/xxe-b/v3)
+and the dataset is [`evals/datasets/chain-java.json`](../../../evals/datasets/chain-java.json).
 
 The finding line is bound to the `DocumentBuilder.parse` sink (line 13 of the vulnerable
 `XmlLoader.java`), the line JaCoCo marks executed in a disclosing run. On a run where the

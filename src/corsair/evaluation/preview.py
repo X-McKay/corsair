@@ -42,7 +42,9 @@ from corsair.contracts import (
     InvestigationRequest,
     PreparedCase,
     ProducerInput,
+    ProducerOutput,
     Submission,
+    Usage,
     digest,
 )
 from corsair.policies.target_binding import TargetBindingBlocked
@@ -191,7 +193,7 @@ def request_parts(role: RoleName, request: LlmRequest) -> list[dict[str, Any]]:
 
 
 def request_sections(role: RoleName, request: LlmRequest) -> dict[str, str]:
-    """Group one request's parts into the sections the measurement scripts report.
+    """Group one request's parts into the sections the request-size tests pin.
 
     The Corsair instruction is the role prompt plus its preloaded procedures; the tool
     declarations are one compact JSON list, empty when no tool is declared.
@@ -235,16 +237,16 @@ async def capture_producer(
     store: ArtifactStore,
     *,
     structured_tools: bool,
-) -> list[LlmRequest]:
-    """Run the production producer episode against a capturing model; return its requests."""
+) -> tuple[list[LlmRequest], ProducerOutput]:
+    """Run the production producer episode against a capturing model."""
 
     model = CapturingLlm(
         model="corsair-preview",
         reply=_ABSTAIN,
         structured_tools=structured_tools,
     )
-    await run_producer(producer_input, settings, store, model)
-    return model.requests
+    output = await run_producer(producer_input, settings, store, model)
+    return model.requests, output
 
 
 async def capture_auditor(
@@ -350,9 +352,9 @@ async def render_requests(
     previous: Submission | None = None,
     feedback: Feedback | None = None,
     submission: Submission | None = None,
-) -> list[LlmRequest]:
+) -> tuple[list[LlmRequest], Usage]:
     """Run one role episode for ``request`` through the production path; return every
-    request it sent to the capturing model.
+    request it sent to the capturing model and the usage the episode charged.
 
     Sources are admitted into a throwaway artifact store; nothing is written to the
     configured ``artifact_root`` and no provider, container or oracle is touched.
@@ -371,7 +373,7 @@ async def render_requests(
         store = ArtifactStore(Path(artifacts))
         prepared = _prepare(request, scratch, store)
         if role == "producer":
-            return await capture_producer(
+            requests, produced = await capture_producer(
                 ProducerInput(
                     run_id="agent-preview",
                     prepared=prepared,
@@ -386,9 +388,10 @@ async def render_requests(
                 store,
                 structured_tools=structured_tools,
             )
+            return requests, produced.usage
         if submission is None:  # Refused by _check_role_inputs; narrows the type.
             raise ValueError("agent preview: the auditor reviews a submission; pass --submission")
-        requests, _output = await capture_auditor(
+        requests, audited = await capture_auditor(
             AuditInput(
                 finding=prepared.finding,
                 recipe=prepared.recipe,
@@ -400,7 +403,7 @@ async def render_requests(
             scratch,
             structured_tools=structured_tools,
         )
-        return requests
+        return requests, audited.usage
 
 
 async def preview_request(
@@ -418,7 +421,7 @@ async def preview_request(
 
     request = load_request(request_path)
     described = describe_route(settings, role, structured_tools)
-    requests = await render_requests(
+    requests, usage = await render_requests(
         role,
         request,
         settings,
@@ -442,6 +445,11 @@ async def preview_request(
             "submission": None if submission is None else digest(submission),
         },
         route=described,
+        episode={
+            "requests": len(requests),
+            "llm_calls": usage.llm_calls,
+            "tool_calls": usage.tool_calls,
+        },
     )
 
 
@@ -451,8 +459,9 @@ def build_preview(
     *,
     inputs: Mapping[str, Any],
     route: Mapping[str, Any],
+    episode: Mapping[str, int],
 ) -> dict[str, Any]:
-    """Assemble the JSON preview of one captured request."""
+    """Assemble the JSON preview of one captured request and its episode's counts."""
 
     config = request.config or types.GenerateContentConfig()
     parts = request_parts(role, request)
@@ -467,6 +476,7 @@ def build_preview(
         },
         "token_estimate": TOKEN_ESTIMATE,
         "declared_tools": declared_tool_names(request),
+        "episode": dict(episode),
         "parts": parts,
         "totals": part_totals(parts),
         "request_sha256": hashlib.sha256(

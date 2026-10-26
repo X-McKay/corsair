@@ -12,7 +12,7 @@ or container cost.
 
 Run from the repository root inside the Nix shell::
 
-    uv run --locked python scripts/measure_eval_concurrency.py
+    uv run --locked python scripts/benchmarks/measure_eval_concurrency.py
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ from corsair.ports.sandboxing import SandboxRole
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CASE = ROOT / "evals/fixtures/case01/request.json"
 IMAGE_ID = "sha256:measure-eval-concurrency"
 

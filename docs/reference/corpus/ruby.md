@@ -1,12 +1,12 @@
 # Ruby corpus survey
 
 This page surveys the Ruby rows under `evals/datasets/chain/ruby/` against the one
-implemented recipe property, `ruby.secret_disclosure/1` (see [schemas](schemas.md) and
-the [extension guide](../guides/extensions.md)). It records which rows a trusted
+implemented recipe property, `ruby.secret_disclosure/1` (see [schemas](../schemas.md) and
+the [extension guide](../../guides/extensions.md)). It records which rows a trusted
 observer can assert today and which need framework, image, or a different recipe property
 first. One row, `pathtraversal-b`, is migrated to the v3 `request.json` + `oracle.json`
 shape and qualified with real Docker evidence (Linux amd64); every other row remains a
-corpus matrix entry only, exactly as [PLAN-0001](../plans/active/PLAN-0001-pilot-plan-and-open-decisions.md)
+corpus matrix entry only, exactly as [PLAN-0001](../../plans/active/PLAN-0001-pilot-plan-and-open-decisions.md)
 records.
 
 "Recipe fit" means whether the secret-disclosure property fits the row's entry method:
@@ -57,5 +57,5 @@ so the operator fixes `root` to `/fixtures/allowed` and the investigator control
 `name`, mirroring the Python `case01` fixture. `root` is operator-fixed, not a widening
 of the finding, which stays "Path traversal in read" (CWE-22) on `lib/attachments.rb`.
 The dataset entry and digests are in
-[`evals/datasets/chain-ruby.json`](../../evals/datasets/chain-ruby.json); the native gate
+[`evals/datasets/chain-ruby.json`](../../../evals/datasets/chain-ruby.json); the native gate
 is `tests/integration/test_docker_ruby.py`.
