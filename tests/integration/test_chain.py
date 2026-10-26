@@ -224,11 +224,11 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
     }
     # Canonical labels: case01 demonstrates with no fixed-revision precondition;
     # case02 is a lone clean negative (never EXPLOIT_NOT_DEMONSTRATED); case03's
-    # application-scope claim is only proven at component scope, so it stays
-    # non-decisive rather than over-claiming the label.
+    # application-scope claim is only proven at the component seam, so it is the
+    # explicit COMPONENT_EXPLOIT_DEMONSTRATED label, not the full one.
     assert {row["case_id"]: row["verdict"] for row in rows} == {
         "case01": "EXPLOIT_DEMONSTRATED",
         "case02": "INCONCLUSIVE",
-        "case03": "INCONCLUSIVE",
+        "case03": "COMPONENT_EXPLOIT_DEMONSTRATED",
     }
     assert all(row["status"] == "pass" for row in rows)

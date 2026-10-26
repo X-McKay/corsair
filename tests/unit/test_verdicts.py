@@ -106,6 +106,20 @@ def test_unevaluable_fixed_revision_falls_back_to_the_vulnerable_differential():
     assert outcome.verdict is Verdict.EXPLOIT_DEMONSTRATED
 
 
+def test_application_claim_proven_only_at_component_is_component_scoped():
+    """An application-scope claim whose differential genuinely holds at the component
+    seam -- but whose application reachability was not established -- is the explicit
+    COMPONENT_EXPLOIT_DEMONSTRATED label, not the full application-scope one and not a
+    soft INCONCLUSIVE."""
+    from corsair.contracts import Scope
+
+    finding = _prepared().finding.model_copy(update={"claim_scope": Scope.APPLICATION})
+    prepared = _prepared().model_copy(update={"finding": finding})
+    outcome = session_verdict(prepared, _demonstrated(), _audit(), FixStatus.NOT_REQUESTED)
+    assert outcome.verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
+    assert outcome.clean_negative is False
+
+
 def test_coverage_miss_blocks_any_decisive_session():
     # Adversarial run never executed the declared finding line.
     observation = _observation(_HELD, _role(RoleOutcome.VIOLATION, [], 1))
@@ -200,8 +214,22 @@ def _inconclusive() -> SessionOutcome:
     return SessionOutcome(Verdict.INCONCLUSIVE, "nothing")
 
 
+def _component() -> SessionOutcome:
+    return SessionOutcome(Verdict.COMPONENT_EXPLOIT_DEMONSTRATED, "component")
+
+
 def test_any_exploitable_session_wins():
     verdict, _ = case_verdict([_le(), _error(), _neg()])
+    assert verdict is Verdict.EXPLOIT_DEMONSTRATED
+
+
+def test_component_demonstration_is_decisive_over_a_clean_negative():
+    verdict, _ = case_verdict([_component(), _neg()])
+    assert verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
+
+
+def test_full_application_scope_outranks_a_component_demonstration():
+    verdict, _ = case_verdict([_component(), _le()])
     assert verdict is Verdict.EXPLOIT_DEMONSTRATED
 
 

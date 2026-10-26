@@ -22,7 +22,7 @@ Recorded architecture decisions describe implemented choices:
 1. [SDK-owned durable rounds](architecture/decisions/0001-sdk-owned-durable-rounds.md).
 2. [Canonical Pydantic contracts and narrow ports](architecture/decisions/0002-pydantic-contracts-and-ports.md).
 3. [Immutable native evidence](architecture/decisions/0003-immutable-native-evidence.md).
-4. [Payload pair, coverage-gated kernel, and five labels](architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md).
+4. [Payload pair, coverage-gated kernel, and six labels](architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md).
 
 ## Development
 

@@ -8,7 +8,7 @@ This is the current work index. Current user guides start at the [documentation 
 
 ## Decisions in force
 
-The architecture decisions in [`docs/architecture/decisions/`](../architecture/decisions/0001-sdk-owned-durable-rounds.md) are the accepted design: SDK-owned durable rounds with one ADK episode per Temporal activity, canonical Pydantic contracts and narrow ports, immutable native evidence, and the payload-pair contract with a coverage-gated kernel and five labels. PLAN-0001 lists which of those the owner may still revisit.
+The architecture decisions in [`docs/architecture/decisions/`](../architecture/decisions/0001-sdk-owned-durable-rounds.md) are the accepted design: SDK-owned durable rounds with one ADK episode per Temporal activity, canonical Pydantic contracts and narrow ports, immutable native evidence, and the payload-pair contract with a coverage-gated kernel and six labels. PLAN-0001 lists which of those the owner may still revisit.
 
 ## Record conventions
 

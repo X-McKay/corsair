@@ -48,9 +48,18 @@ class FixStatus(StrEnum):
 class Verdict(StrEnum):
     """The canonical per-case label decided by code, layered over the internal
     Disposition/ExecutionStatus/FixStatus. A false EXPLOIT_NOT_DEMONSTRATED is the
-    costliest mistake, so it is the hardest verdict to reach."""
+    costliest mistake, so it is the hardest verdict to reach.
+
+    EXPLOIT_DEMONSTRATED and COMPONENT_EXPLOIT_DEMONSTRATED differ only in scope:
+    both require a genuine control-vs-exploit differential (coverage in both runs,
+    accepted audit). EXPLOIT_DEMONSTRATED is for a finding whose claimed scope the
+    demonstration covers; COMPONENT_EXPLOIT_DEMONSTRATED is for an application-scope
+    claim proven only at the component seam, where reachability to the claimed
+    application entry point was not established. Neither is ever a soft landing for
+    a weak demonstration -- merely reaching a sink stays non-decisive."""
 
     EXPLOIT_DEMONSTRATED = "EXPLOIT_DEMONSTRATED"
+    COMPONENT_EXPLOIT_DEMONSTRATED = "COMPONENT_EXPLOIT_DEMONSTRATED"
     EXPLOIT_NOT_DEMONSTRATED = "EXPLOIT_NOT_DEMONSTRATED"
     INCONCLUSIVE = "INCONCLUSIVE"
     UNABLE_TO_RUN = "UNABLE_TO_RUN"

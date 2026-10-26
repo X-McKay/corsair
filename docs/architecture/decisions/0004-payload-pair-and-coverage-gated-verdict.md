@@ -1,4 +1,4 @@
-# ADR 0004: Payload pair, coverage-gated kernel, and five labels
+# ADR 0004: Payload pair, coverage-gated kernel, and six labels
 
 - **Date:** 2026-10-25
 - **Status:** Accepted — implemented; items the owner may revisit are listed in [PLAN-0001](../../plans/active/PLAN-0001-pilot-plan-and-open-decisions.md)
@@ -13,7 +13,7 @@ Three constraints shape the design. The repository's rules forbid an agent from 
 
 **Payload pair, not probe module.** The producer proposes one JSON payload pair, a benign payload and an exploit payload for the same target seam, as canonical `ProducerDecision` data. The kernel owns the operator-reviewed recipe, materializes the probe from recipe plus payloads at run time, and runs it. The producer never writes code, never runs anything, and never sees an outcome. The executable is operator-owned; the model contributes data.
 
-**Five labels.** The result label is one of `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR`. Claim scope is carried as separate result data, not folded into the label.
+**Six labels.** The result label is one of `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR`. `EXPLOIT_DEMONSTRATED` and `COMPONENT_EXPLOIT_DEMONSTRATED` differ only in scope: both require the same genuine control-versus-exploit differential (target-line coverage in both runs, accepted audit); the component label is awarded when the finding claimed application scope but only the component seam was exercised, so reachability to the claimed application entry point was not established. The scope signal is code-decided from `finding.claim_scope` and the recipe that binds the component seam, never a model judgment, and merely reaching a sink is never either label. `INCONCLUSIVE` means no demonstration settled at any scope. Developer next step for `COMPONENT_EXPLOIT_DEMONSTRATED`: harden the component or prove an upstream guard blocks the input.
 
 **Exact target-line coverage gate.** Control and exploit come from one differential run pair differing only in payload. Each run must show that the finding's exact target line executed. A pair with an uncovered run is discarded as `INCONCLUSIVE` and counts toward nothing. Coverage is checked before any observation reaches `evidence_agreement`, `blind_audit`, or the verdict table.
 
@@ -36,6 +36,6 @@ The verdict is decided by [`policies/verdicts.py`](../../../src/corsair/policies
 
 The producer's output surface is data, which keeps the agent evaluable in isolation with fixture-answered ports and keeps exploit authorship with the operator-reviewed recipe. Recipe coverage, not model creativity, bounds what the pilot can validate; a finding without a matching recipe is `UNABLE_TO_RUN`, not a model guess.
 
-A negative label costs at least two producer sessions and two differential pairs; a positive label rests on one vulnerable-revision differential pair, with an optional fixed-revision pair as confirmation when a fix is supplied. That is the intended price of making a false `EXPLOIT_NOT_DEMONSTRATED` the hardest outcome to produce. Evaluation datasets and oracles use the five labels.
+A negative label costs at least two producer sessions and two differential pairs; a positive label rests on one vulnerable-revision differential pair, with an optional fixed-revision pair as confirmation when a fix is supplied. That is the intended price of making a false `EXPLOIT_NOT_DEMONSTRATED` the hardest outcome to produce. Evaluation datasets and oracles use the six labels.
 
 The decision does not change contract/port boundaries ([ADR 0002](0002-pydantic-contracts-and-ports.md)) or evidence immutability ([ADR 0003](0003-immutable-native-evidence.md)). See [Data flow](../data-flow.md) for the gate order and verdict table and [Security architecture](../security.md) for the non-negotiables.

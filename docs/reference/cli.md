@@ -184,7 +184,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 
-Always parse the returned JSON or result panel in addition to the exit code. In particular, the labels `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` and the execution statuses `BLOCKED` and `CANCELLED` have different evidence and operational meanings.
+Always parse the returned JSON or result panel in addition to the exit code. In particular, the labels `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` and the execution statuses `BLOCKED` and `CANCELLED` have different evidence and operational meanings.
 
 ## Troubleshooting
 

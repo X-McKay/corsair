@@ -18,7 +18,7 @@ CLI / typed Python API ──► Temporal service ◄── Worker
                                   │                ├── coverage-gated kernel (verdict in code)
                                   │                └── immutable artifact store
                                   ▼
-                       durable investigation result (one of five labels)
+                       durable investigation result (one of six labels)
 ```
 
 The package keeps those concerns explicit:
@@ -67,6 +67,6 @@ There is no application-owned agent graph, scheduler, generic provider protocol,
 - Each ADK episode is one Temporal activity with a single attempt; Corsair does not use the experimental ADK Temporal plugin ([ADR 0001](decisions/0001-sdk-owned-durable-rounds.md)). Uncertain side effects are reconciled by identity, not replayed.
 - Shared artifacts are required for worker/client inspection and recovery. A local artifact host remains a single-host durability limit.
 
-The five labels are `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR` ([ADR 0004](decisions/0004-payload-pair-and-coverage-gated-verdict.md)). The costliest error is a false `EXPLOIT_NOT_DEMONSTRATED`, and every gate is ordered to make that label the hardest to reach.
+The six labels are `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR` ([ADR 0004](decisions/0004-payload-pair-and-coverage-gated-verdict.md)). `COMPONENT_EXPLOIT_DEMONSTRATED` is a genuine component-seam demonstration of an application-scope claim whose application reachability was not established (developer next step: harden the component or prove an upstream guard blocks the input). The costliest error is a false `EXPLOIT_NOT_DEMONSTRATED`, and every gate is ordered to make that label the hardest to reach.
 
 The [packaged risk assessment](../../src/corsair/policies/risk.md) is the authority for risk acceptance and residual-risk language. Architecture describes the design; it does not claim production readiness, hostile-target attestation, or population-level model accuracy. Python is the running pilot runtime; JavaScript, Java, Ruby, and Perl rows exist in the corpus matrix but are not qualified runtimes.

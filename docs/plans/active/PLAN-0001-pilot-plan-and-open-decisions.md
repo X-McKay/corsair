@@ -32,7 +32,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 | `just test` | cloud | run per change |
 | `just test-docker`, `just test-temporal` | rig | not yet recorded |
 | `just test-live`, composed live batch | rig | not yet recorded |
-| Isolated producer/auditor baselines on the five labels | rig | not yet promoted |
+| Isolated producer/auditor baselines on the six labels | rig | not yet promoted |
 
 ## Open decisions awaiting the owner
 

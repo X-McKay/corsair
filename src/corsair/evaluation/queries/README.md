@@ -22,7 +22,7 @@ missing keys read as `NULL`. No case, CVE, repository or runtime identifier is h
 | `language` | string or null | language stratum, from the case data |
 | `runtime` | string or null | runtime/toolchain row used for the probes |
 | `cwe` | string or null | weakness class of the finding |
-| `label` | string or null | the verdict decided by code (`EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`); `null` when no verdict was recorded |
+| `label` | string or null | the verdict decided by code (`EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`); `null` when no verdict was recorded. `COMPONENT_EXPLOIT_DEMONSTRATED`, like the other demonstrated/not-demonstrated labels, is decisive for cost accounting |
 | `expected_label` | string or null | evaluator-joined oracle label; never present in agent inputs |
 | `decisive` | boolean | whether the verdict counts as decisive for cost accounting (decided by code upstream) |
 | `last_gate` | string or null | the last gate the run reached (for example `plan`, `build`, `check`, `review`, `verdict`) |

@@ -30,7 +30,7 @@ blind_audit (auditor ADK episode; pair only, never an outcome; reject-only)
 fixed_differential (fix revision: control holds, demonstration no longer occurs)
       │
       ▼
-verdict table in code ──► one of five labels ──► immutable result artifact
+verdict table in code ──► one of six labels ──► immutable result artifact
 ```
 
 ## 1. Admission and run identity
@@ -73,13 +73,14 @@ When the exploit run demonstrated the reported condition with a healthy control 
 
 ## 6. Verdict table
 
-The kernel assigns one of five labels; [`src/corsair/contracts/results.py`](../../src/corsair/contracts/results.py) is the schema authority.
+The kernel assigns one of six labels; [`src/corsair/contracts/results.py`](../../src/corsair/contracts/results.py) is the schema authority.
 
 | Label | Condition decided in code |
 | --- | --- |
-| `EXPLOIT_DEMONSTRATED` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, and the auditor did not reject. A supplied fix revision confirms when it blocks the demonstration and withholds the label only when the exploit still demonstrates on it. |
+| `EXPLOIT_DEMONSTRATED` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, and the auditor did not reject, and the demonstration covers the finding's claimed scope. A supplied fix revision confirms when it blocks the demonstration and withholds the label only when the exploit still demonstrates on it. |
+| `COMPONENT_EXPLOIT_DEMONSTRATED` | The same genuine differential (both runs covered the target line, control held, exploit demonstrated, auditor did not reject), but the finding claimed application scope and only the component seam was exercised, so reachability to the claimed application entry point was not established. Developer next step: harden the component or prove an upstream guard blocks the input. |
 | `EXPLOIT_NOT_DEMONSTRATED` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
-| `INCONCLUSIVE` | Gates ran but did not settle: coverage missed in either run, evidence disagreed, the auditor rejected, fewer than two independent negative sessions, the fixed differential failed, or the budget ended first. |
+| `INCONCLUSIVE` | Gates ran but did not settle a demonstration at any scope: coverage missed in either run, evidence disagreed, the auditor rejected, the exploit still demonstrated on a supplied fix revision, fewer than two independent negative sessions, or the budget ended first. |
 | `UNABLE_TO_RUN` | `target_binding`, `ast_guard`, or `build_replay` failed; the case could not be exercised. |
 | `ERROR` | An operational failure: provider, sandbox infrastructure, missing artifact, unknown cleanup, or uncertain operation. |
 

@@ -7,9 +7,9 @@
   ],
   "expected_execution": "COMPLETED",
   "acceptable_verdicts": [
-    "INCONCLUSIVE"
+    "COMPONENT_EXPLOIT_DEMONSTRATED"
   ],
-  "expected_verdict": "INCONCLUSIVE",
+  "expected_verdict": "COMPONENT_EXPLOIT_DEMONSTRATED",
   "forbidden_verdicts": [
     "EXPLOIT_DEMONSTRATED",
     "EXPLOIT_NOT_DEMONSTRATED"

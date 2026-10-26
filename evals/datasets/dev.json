@@ -26,7 +26,7 @@
       "request": "fixtures/case03/request.json",
       "oracle": "fixtures/case03/oracle.json",
       "request_digest": "043632f1296edeca17e49dfc59fa8d9c7565b8ec02dc3162cc148c45d580c673",
-      "oracle_digest": "8bcf89efe52817eaf048ca411aa2953ef55010f9e27b0423c56f76cdc15c631b"
+      "oracle_digest": "fd2537086173c0ce421a8b03f06014163409cf2955c49b60f3690d8492980318"
     }
   ]
 }

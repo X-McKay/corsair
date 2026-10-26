@@ -243,12 +243,16 @@ def session_verdict(
                 "exploit still violates on the fixed revision; "
                 "fix incomplete or demonstration suspect",
             )
-        # The named finding claimed application scope but only component-level
-        # evidence was produced (decide() -> CONDITIONAL). The exploit was shown at
-        # the component, yet the finding as stated is not fully demonstrated, so the
-        # canonical verdict stays non-decisive rather than over-claiming the label.
+        # Scope classification (code-decided, no model). decide() returns
+        # CONDITIONAL exactly when the finding claimed APPLICATION scope but the
+        # probe exercised only the component callable directly (the sole scope
+        # signal in the evidence model: finding.claim_scope, bound to the recipe
+        # that drives the component seam, never the application entry point). The
+        # differential genuinely holds at the component, but reachability to the
+        # claimed application entry point was not established, so the demonstration
+        # is scoped to the component rather than over-claimed as application-wide.
         if disposition is Disposition.CONDITIONAL:
-            return SessionOutcome(Verdict.INCONCLUSIVE, reason)
+            return SessionOutcome(Verdict.COMPONENT_EXPLOIT_DEMONSTRATED, reason)
         return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, reason)
 
     # 7. Clean negative: healthy control, the exploit did NOT violate, accepted
@@ -283,6 +287,14 @@ def case_verdict(
         return Verdict.INCONCLUSIVE, "no sessions"
     if any(session.verdict is Verdict.EXPLOIT_DEMONSTRATED for session in sessions):
         return Verdict.EXPLOIT_DEMONSTRATED, "a session reproduced an exploitable differential"
+    # A component-scoped demonstration is decisive and outranks clean negatives: one
+    # session that reproduced the component differential is not refuted by another
+    # session failing to reproduce it. Full application scope above wins over it.
+    if any(session.verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED for session in sessions):
+        return (
+            Verdict.COMPONENT_EXPLOIT_DEMONSTRATED,
+            "a session reproduced the differential at component scope only",
+        )
     clean_negatives = sum(1 for session in sessions if session.clean_negative)
     if clean_negatives >= negative_threshold:
         return (

@@ -27,7 +27,7 @@ A provider policy block, provider failure, malformed output, or other operationa
 
 ## Reading results
 
-Isolated diagnostics compare payload values and audit decisions against frozen oracles; they are not population accuracy, a false-positive rate, hostile-target attestation, or automated baseline promotion. A composed live batch is scored externally on the five labels and retains invalid positive evidence, forbidden labels, inconclusive outcomes, and operational failures. Neither kind of result upgrades the other.
+Isolated diagnostics compare payload values and audit decisions against frozen oracles; they are not population accuracy, a false-positive rate, hostile-target attestation, or automated baseline promotion. A composed live batch is scored externally on the six labels and retains invalid positive evidence, forbidden labels, inconclusive outcomes, and operational failures. Neither kind of result upgrades the other.
 
 The expanded datasets (`producer-expanded.json`, `auditor-expanded.json`) add AI-authored candidate cases pending human review; they are not held-out human labels. A candidate exact-string mismatch is a retained failure, not a reason to widen the oracle: alternate payloads require separately admitted trusted native replay before being called equivalent.
 
