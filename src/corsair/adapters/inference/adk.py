@@ -51,6 +51,7 @@ from corsair.contracts import (
     Recipe,
     Usage,
 )
+from corsair.contracts.common import MAX_USAGE_CALL_ENTRIES, ModelCall, ToolCall
 from corsair.observability.logging import event
 from corsair.policies.time_bounds import (
     AUDITOR_ACTIVITY_SECONDS,
@@ -78,6 +79,40 @@ _SENSITIVE_HEADER = re.compile(
 )
 _BEARER_TOKEN = re.compile(r"\bbearer\s+[^\s,;]+", re.IGNORECASE)
 _COMMON_SECRET = re.compile(r"\b(?:sk-|AIza|ghp_|xox[baprs]-)[A-Za-z0-9_=-]+")
+_MAX_TOOL_NAME_CHARS = 128
+
+
+def _reported_count(usage: object, name: str) -> int | None:
+    """One provider-reported token count, or ``None`` when it was not reported."""
+
+    value = getattr(usage, name, None)
+    return None if value is None else int(value)
+
+
+def _reported_cached_count(usage: object) -> int | None:
+    """Cached input tokens only when positive: ADK's LiteLLM route reports absence as 0."""
+
+    value = _reported_count(usage, "cached_content_token_count")
+    return value if value is not None and value > 0 else None
+
+
+def _add_known(total: int | None, value: int | None) -> int | None:
+    """Add a reported count to a running total that stays ``None`` until one is reported."""
+
+    return total if value is None else (total or 0) + value
+
+
+def _tool_call_index(call: ToolCall) -> int:
+    return call.index
+
+
+def _tool_result_bytes(tool_response: dict[str, Any]) -> int:
+    """Size of a native tool response as compact JSON, the form the model receives."""
+
+    rendered = json.dumps(
+        tool_response, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return len(rendered.encode("utf-8"))
 
 
 @dataclass
@@ -99,6 +134,17 @@ class _EpisodeAccounting:
     applied_output_cap: int | None = None
     final_response_hit_output_cap: bool = False
     skills_preloaded: list[str] = field(default_factory=list)
+    cached_input_tokens: int | None = None
+    thought_tokens: int | None = None
+    model_calls: list[ModelCall] = field(default_factory=list)
+    tool_calls_detail: list[ToolCall] = field(default_factory=list)
+    calls_truncated: bool = False
+    # Dispatch time of the model request awaiting its complete response; model
+    # requests within one episode are sequential.
+    model_started: float | None = None
+    # Admission ordinal and time of each tool call awaiting its response, keyed by
+    # ADK's function-call id so parallel calls pair correctly.
+    open_tool_calls: dict[str | None, tuple[int, float]] = field(default_factory=dict)
 
     async def before_model(
         self, callback_context: CallbackContext, llm_request: LlmRequest
@@ -121,6 +167,7 @@ class _EpisodeAccounting:
             else min(configured, self.max_output_tokens)
         )
         self.applied_output_cap = llm_request.config.max_output_tokens
+        self.model_started = time.perf_counter()
         return None
 
     async def before_tool(
@@ -134,6 +181,41 @@ class _EpisodeAccounting:
             tool_context._invocation_context.end_invocation = True
             return {"error": "tool-call budget exhausted"}
         self.tool_calls += 1
+        self.open_tool_calls[tool_context.function_call_id] = (
+            self.tool_calls,
+            time.perf_counter(),
+        )
+        return None
+
+    async def after_tool(
+        self,
+        tool: BaseTool,
+        args: dict[str, Any],
+        tool_context: ToolContext,
+        tool_response: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Record one admitted tool call's result size and time; never alter the result.
+
+        ADK skips after-tool callbacks for an unknown tool name, so such a call is
+        counted in ``tool_calls`` by ``before_tool`` but has no detail entry.  A call
+        the budget refused was never admitted and has no entry either.
+        """
+
+        del args
+        opened = self.open_tool_calls.pop(tool_context.function_call_id, None)
+        if opened is None:
+            return None
+        index, started = opened
+        if self.within_call_cap(index):
+            self.tool_calls_detail.append(
+                ToolCall(
+                    index=index,
+                    name=tool.name[:_MAX_TOOL_NAME_CHARS],
+                    result_bytes=_tool_result_bytes(tool_response),
+                    truncated=tool_response.get("truncated") is True,
+                    seconds=time.perf_counter() - started,
+                )
+            )
         return None
 
     async def after_model(
@@ -143,14 +225,22 @@ class _EpisodeAccounting:
 
         del callback_context
         usage = llm_response.usage_metadata
-        if usage is not None:
-            prompt_tokens = getattr(usage, "prompt_token_count", None)
-            output_tokens = getattr(usage, "candidates_token_count", None)
-            if prompt_tokens is not None:
-                self.input_tokens = (self.input_tokens or 0) + int(prompt_tokens)
-            if output_tokens is not None:
-                self.output_tokens = (self.output_tokens or 0) + int(output_tokens)
+        # Output tokens are the provider's candidate count as reported; thought tokens
+        # are recorded beside them and never added (see ``ModelCall``).
+        self.input_tokens = _add_known(
+            self.input_tokens, _reported_count(usage, "prompt_token_count")
+        )
+        self.output_tokens = _add_known(
+            self.output_tokens, _reported_count(usage, "candidates_token_count")
+        )
+        self.cached_input_tokens = _add_known(
+            self.cached_input_tokens, _reported_cached_count(usage)
+        )
+        self.thought_tokens = _add_known(
+            self.thought_tokens, _reported_count(usage, "thoughts_token_count")
+        )
         if not llm_response.partial:
+            self.record_model_call(usage)
             # Only the latest complete response decides whether the episode ended
             # truncated; an earlier capped turn that the model recovered from does not.
             self.final_response_hit_output_cap = _stopped_at_output_cap(llm_response)
@@ -159,7 +249,37 @@ class _EpisodeAccounting:
             self.provider_error_message = str(llm_response.error_message or "")
         return None
 
+    def record_model_call(self, usage: object) -> None:
+        """Close the dispatched model request with its complete response's usage."""
+
+        if self.model_started is None:
+            return
+        seconds = time.perf_counter() - self.model_started
+        self.model_started = None
+        if not self.within_call_cap(self.llm_calls):
+            return
+        self.model_calls.append(
+            ModelCall(
+                index=self.llm_calls,
+                input_tokens=_reported_count(usage, "prompt_token_count"),
+                cached_input_tokens=_reported_cached_count(usage),
+                output_tokens=_reported_count(usage, "candidates_token_count"),
+                thought_tokens=_reported_count(usage, "thoughts_token_count"),
+                seconds=seconds,
+            )
+        )
+
+    def within_call_cap(self, index: int) -> bool:
+        """Whether a call ordinal fits its detail list; past the cap only totals grow."""
+
+        if index <= MAX_USAGE_CALL_ENTRIES:
+            return True
+        self.calls_truncated = True
+        return False
+
     def usage(self, seconds: float) -> Usage:
+        # Parallel tool calls finish in any order; the record keeps admission order.
+        tool_calls_detail = sorted(self.tool_calls_detail, key=_tool_call_index)
         return Usage(
             llm_calls=self.llm_calls,
             tool_calls=self.tool_calls,
@@ -169,6 +289,11 @@ class _EpisodeAccounting:
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
             seconds=seconds,
+            cached_input_tokens=self.cached_input_tokens,
+            thought_tokens=self.thought_tokens,
+            model_calls=self.model_calls,
+            tool_calls_detail=tool_calls_detail,
+            calls_truncated=self.calls_truncated,
         )
 
 
@@ -471,6 +596,7 @@ async def _run_native_episode(
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
     agent.before_tool_callback = accounting.before_tool
+    agent.after_tool_callback = accounting.after_tool
     last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
