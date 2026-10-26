@@ -1,4 +1,4 @@
-# PLAN-0002: improvement loop, rounds 1 to 3 (2026-10-25 to 2026-10-26)
+# PLAN-0002: improvement loop, rounds 1 to 4 (2026-10-25 to 2026-10-26)
 
 Two rounds of parallel experiments on `feature/improvement-loop`, cut from `main` at `d3e69c00`. Each experiment ran as one
 Opus agent in its own worktree and branch (`exp/<name>`, `exp2/<name>`), reported hypothesis, changes, evidence, checks,
@@ -173,6 +173,45 @@ Two findings:
   resolves it 1/1, and `corsair dataset validate` now rejects a demonstration label the policy cannot produce for the
   request's claim (`claim_scope_problems`, unit and dataset tests).
 
+## Round 4: response to the external review of head `032fba85`
+
+An external static review (fourteen claims, three of them redesign-scale) was verified claim by claim with
+reproductions before anything changed. Nine claims held at least in part; five of those exist identically on `main`
+and were not introduced by this branch; one concerned a code lineage this repository never read. None of the three
+redesign requests was adopted: each has a bounded, kernel-side fix that gives the same guarantee. Four branches
+(`r4/<name>`, one Opus agent each, failing test first) implemented the agreed decisions.
+
+| Item (review severity) | Verified | Decision and change |
+| --- | --- | --- |
+| Repeated candidates count as independent clean negatives (P1) | Confirmed with genuine receipts; pre-existing on main | `policies/verdicts.py`: a session's candidate key is the digest of its exploit payload; `case_verdict`, the scheduling rule (`workflow.patched("distinct-candidates-v1")`), the scorer and the ledger count distinct keys; a repeated pair stays INCONCLUSIVE or schedules another session while the threshold is reachable. Exact-digest floor documented in the ADR 0004 addendum. The reviewer's run-bound protocol redesign was declined as a second state machine; the fields added here are the ones such a record needs, so the model converges on it. |
+| Spliced final result (P1) | Partly: cross-case splice already blocked; operation ids not bound to session and round | `policies/operations.py` is the one definition of the operation id; the scorer and ledger count a round only when its receipt's operation id equals `run.session.round`, with distinct (session, index), by terminal round. `result.{run_id}` reconciliation not added (eval and rescore already read the immutable record). |
+| Component negative shown at application scope (P1) | Partly: verdict right, display misleading | Panel row "Claimed scope" plus a code-fixed "Evidence scope: component (recipe seam)"; the negative explanation rule names the seam; glossary entry. `result.scope` keeps meaning the claim. |
+| Model text in human views (P1) | Confirmed (owner item 7) | Reason row and column dropped from the human result panel and human/Markdown reports; JSON keeps `reason`; sentinel tests on accepted, rejected and abstention paths. |
+| Private state admitted as source (P1) | Confirmed, identical on main | `.runs`, `.state`, `.work`, `.venv` and the configured artifact root (by inode) are never admitted; security tests cannot list, read or materialise them; frozen digests unchanged. |
+| C evidence fabrication (P1) | Partly: text classified before the exit code | A C violation needs the sanitizer text AND the sanitizer's own exit status (86); forged text with a normal return is ERROR. Unit and real-Docker regressions; `risk.md` names the observer-integrity limit per runtime. Hostile-source attestation is still not claimed. |
+| Python-only prompts for six kinds (P1) | Confirmed | Interim guard: `CLEAN_NEGATIVE_QUALIFIED_KINDS` (the two Python kinds); a held pair of any other kind is INCONCLUSIVE "clean negative withheld", never a negative; positives unaffected. Per-kind reference notes were NOT written: two attempts (an agent and the integrator) were stopped by a safety classifier while authoring them; they need a human author (owner decision 8). Dataset validation rejects a negative-only label for an unqualified kind. |
+| Audit rule unconstrained (P2) | Confirmed | `AuditRule` enum R1 to R4 and ALL on the contract (so the declared output schema constrains decoding), ACCEPT iff ALL; incoherent output is `audit_invalid`. Both retained replay histories came from the synthetic double and were patched (documented in `tests/replay/histories/README.md`). New auditor schema identity. |
+| Cancel during record (P2) | Confirmed mechanism, pre-existing | Record keeps its shield and re-awaits the same handle on cancel (`record-survives-cancel-v1`); workflow test with a paused record. |
+| Line not inside callable (P2) | Partly: containment is the wrong rule | Lines at module or class-body level (import-time) are blocked before any model call (`line_runs_at_import`); helper and nested functions stay allowed; no frozen case affected. |
+| Legacy producer decode (P2) | Refuted | The `submission` shape never existed on this lineage; no change. |
+| Digest repair in place (P2) | Confirmed mechanism | `dataset validate` never writes; `corsair dataset refreeze` rewrites, prints the dataset digest old to new, and exits 1 so the diff is reviewed. |
+| Prepare heartbeat (P2) | Confirmed, fails safe | The shared heartbeat loop now wraps both blocking prepare calls. |
+| Compare on mismatched datasets (note) | Confirmed, opt-in | INCOMPARABLE with `comparable: false`, `regression: null` and exit 2. |
+
+Not taken: the corpus move under `evals/fixtures` (no basis in AGENTS.md, would churn every digest and baseline), the
+replay status rename, and the per-kind reference notes (above). AGENTS.md was updated so the rules match the code:
+one canonical per-round record by convergence, distinct-candidate counting, qualified-rubric gating of clean
+negatives, evidence scope at the component seam, kind-neutral instructions with human-authored per-kind notes,
+enum audit rules, code-owned human views, observer-integrity limits, private state never admitted, loud manifest
+rewrites and incomparable comparisons.
+
+Configuration identity: the kernel (distinct candidates, withheld negatives, import-time gate), the auditor output
+schema, the C driver and image, and `risk.md` all changed; no baseline was promoted and the round-3 live records
+predate this identity.
+
+Gates on the integrated branch after round 4: `just check` pass; offline 1065 passed; Temporal 54 passed, 10 skipped (replay included);
+Docker 58 passed, 1 skipped (opt-in long probe) with images rebuilt by `just images`; wheel built and its new modules and resources loaded from outside the checkout.
+
 ## Decisions for the project owner
 
 1. The C runtime image's `/work` tmpfs drops `noexec` for `c.integer_overflow/1` only (`NATIVE_EXEC_KINDS`), so a
@@ -185,8 +224,12 @@ Two findings:
 5. The Perl corpus licence (PLAN-0001 item 5) is still open; the Perl row points at the frozen tree in place.
 6. The 2026-10-26 candidate baselines no longer match the current dataset digests; record fresh baselines with
    `just live-agent` / `just live-chain` and compare with `corsair compare`.
-7. The human result panel prints `result.reason`, which can carry the auditor's or an abstention's model text; the
-   explanation and markdown views avoid it. A small follow-up should drop it from the panel.
+7. Resolved in round 4: human views no longer print `result.reason`.
+8. Per-kind reference notes for JavaScript, Ruby, Java, Perl and C (both roles) need a human author: two attempts to
+   write them in this loop were stopped by a safety classifier. Until they exist and per-kind auditor cohorts are
+   run, clean negatives for those kinds are withheld by `CLEAN_NEGATIVE_QUALIFIED_KINDS`.
+9. Licence and notice retention for the permissive corpus families (upstream LICENSE/NOTICE bytes and hashes are
+   not retained) widens decision 5 beyond Perl; sharing waits on it.
 
 ## Next round candidates
 
