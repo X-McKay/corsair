@@ -76,6 +76,24 @@ docker inspect "$CONTAINER_ID"
 
 Compare the actual ID and labels to the run’s operation/role before taking any host-level action. Corsair has no separate cleanup command and does not certify a manually removed or label-wide-pruned container as clean. Keep the run operationally unresolved and follow local incident controls; do not rerun the operation automatically.
 
+## A model route fails, times out, or returns no tool calls
+
+Probe the configured routes before a batch rather than after it:
+
+```bash
+uv run --locked corsair doctor --model --settings .state/settings.json
+```
+
+This sends a few minimal requests per role model and no agent content (see the [CLI reference](../reference/cli.md#doctor)). Read the failed check and its `remedy`:
+
+- `model_credentials` fails: the named variable is not set in the environment that runs the worker and `doctor`. Export it there; never put it in `--settings`.
+- A `model_*` request fails with a timeout: the endpoint did not answer within `models.request_timeout_seconds`. Check the endpoint's load before raising the timeout (at most 300 seconds); the roles use the same value.
+- A `model_*` request fails with an unknown model or an authentication error: correct the model name, the route prefix, or the credential; do not switch providers silently.
+- `model_producer_tools` fails because the model answered in text: the route does not return native function calls, so every producer episode would end without using its tools. A LiteLLM `openai/` route on vLLM behaves this way, and settings already reject it for the producer; use a route that returns tool calls, such as `hosted_vllm/` with tool calling enabled on the server.
+- `model_producer_tools` warns that it stopped at the probe cap: a reasoning model spent the cap before calling the tool. The result is inconclusive, not a failure; confirm the route with an isolated producer evaluation.
+
+A passing probe does not show that role-sized requests fit the role output caps; `provider_max_tokens` feedback in a result still means a role's cap was too small for its response.
+
 ## Provider feedback or native observation reports an error
 
 Inspect the final result’s rounds, feedback gate, usage metadata, and manifest before changing any provider setting. Provider failures are classified as redacted operational feedback, including policy blocks, temporary failures, and permanent failures. Credentials and raw provider responses are intentionally unavailable to the CLI result/log stream. Do not put them into a report to debug the issue, bypass policy, or silently select another provider.
