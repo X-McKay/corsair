@@ -265,6 +265,17 @@ A check that cannot run because an earlier one failed is `skip`, as are source a
 
 The command exits `0` when every dataset is valid and `1` when any entry, manifest or cross-dataset check fails.
 
+### `dataset replay-candidates REPORT.json DATASET.json`
+
+```bash
+corsair dataset replay-candidates .runs/evaluations/producer-1.json \
+  evals/datasets/producer-expanded.json --settings .state/settings.json
+```
+
+Replays every mismatching proposal of a saved isolated producer report (`control_mismatch` or `candidate_exact_mismatch` rows) natively in the configured Docker sandbox on the row's frozen request, exactly as `verify` does, and writes a copy of the report whose rows gain a `replay` entry and whose summary gains `replay` counts (`demonstrated`, `not_demonstrated`, `unavailable`, `not_replayed`). Row `status` and the pass/fail summary are unchanged, and no oracle file is read or written; see [admitting an alternate producer payload](../agents/evaluations.md#admitting-an-alternate-producer-payload). The output artifacts named by the report must be in `artifact_root` of `--settings`. The command refuses (exit `2`) a report whose rows are not all producer rows or whose `dataset_digest` differs from `DATASET.json`.
+
+`--run-id ID` sets the replay identity (operation ids are `ID.c<row index>`), and `--output PATH` defaults to `.runs/evaluations/<replay-id>.json`. Human output adds a `Replay` column (`demonstrates`, `does not` with both role outcomes and coverage, or `unavailable`) and the replay counts; `--format markdown` adds the column, a `Native replay` table and the human-decision note; `--format json` emits the saved report plus its `report` path. It exits `1` when any replay was `unavailable`, otherwise `0` whatever the replay outcomes. `corsair report` and `corsair compare` read the replay report like any other.
+
 ### `rescore DATASET RUN_ID...`
 
 ```bash
@@ -326,7 +337,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression. `runs` and `inspect` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression. `runs` and `inspect` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
@@ -418,7 +419,7 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
-async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
+async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
     """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
     from corsair.evaluation.datasets import validate_datasets
 
@@ -428,6 +429,46 @@ async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     )
     ui.emit(report)
     return 0 if report["valid"] else 1
+
+
+async def _handle_replay_candidates(args: CliArguments, ui: Terminal) -> int:
+    """Replay mismatching isolated producer proposals natively; never edits an oracle."""
+    from corsair.adapters.sandboxing.docker import DockerSandbox
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.evaluation.comparison import read_report
+    from corsair.evaluation.replay import replay_candidates
+
+    settings = _settings(args)
+    store = ArtifactStore(settings.artifact_root)
+    report = read_report(Path(args.report))
+    identity = validate_run_id(args.run_id or f"replay-{uuid4().hex}")
+    replayed = await ui.wait(
+        replay_candidates(
+            report,
+            Path(args.dataset),
+            settings,
+            store,
+            DockerSandbox(settings, store=store),
+            replay_id=identity,
+        ),
+        "Replaying mismatching producer proposals natively · evidence only, no oracle change",
+    )
+    output = Path(args.output or f".runs/evaluations/{identity}.json")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(replayed, indent=2) + "\n")
+    counts = replayed["summary"]["replay"]
+    event("replay.completed", run_id=identity, completed=sum(counts.values()))
+    ui.emit({**replayed, "report": str(output)})
+    return 1 if counts["unavailable"] else 0
+
+
+async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
+    """Dispatch one ``corsair dataset`` subcommand."""
+    if args.dataset_command == "validate":
+        return await _handle_dataset_validate(args, ui)
+    if args.dataset_command == "replay-candidates":
+        return await _handle_replay_candidates(args, ui)
+    raise ValueError("Unknown dataset command")
 
 
 async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
@@ -528,7 +569,7 @@ def parser() -> argparse.ArgumentParser:
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
-        "dataset": "Check frozen evaluation datasets offline; no model, target or services",
+        "dataset": "Frozen dataset tools: validate offline; replay-candidates natively in Docker",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -594,6 +635,16 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Rewrite only stale manifest digests of otherwise valid entries",
     )
+    replay_help = (
+        "Replay a producer report's mismatching proposals in the real sandbox; "
+        "evidence for a human oracle decision, pass/fail unchanged"
+    )
+    replay = datasets.add_parser("replay-candidates", help=replay_help, description=replay_help)
+    _presentation_options(replay)
+    replay.add_argument("report", help="Isolated producer evaluation report JSON")
+    replay.add_argument("dataset", help="The frozen agent dataset the report was run on")
+    replay.add_argument("--run-id", help="Replay identity; operation ids are RUN_ID.c<row>")
+    replay.add_argument("--output", help="Replay report path (default .runs/evaluations/)")
     for name in ("report", "compare"):
         commands[name].add_argument(
             "--families",
