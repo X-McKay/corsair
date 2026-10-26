@@ -89,6 +89,7 @@ class _FakeSandbox:
     image_id: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
+    adversarial_violates: bool = True
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
@@ -98,7 +99,7 @@ class _FakeSandbox:
         store = self.store
         del budget, heartbeat
         self.calls += 1
-        violation = role == "adversarial"
+        violation = role == "adversarial" and self.adversarial_violates
         driver = {
             "schema_version": "corsair.driver/1",
             "operation_id": operation_id,
@@ -117,7 +118,7 @@ class _FakeSandbox:
             "observation_kind": "disclosure" if violation else "held",
             "target_executed": True,
             "covered_lines": [4],
-            "coverage_file": "reader.py",
+            "coverage_file": prepared.recipe.module_file,
         }
         raw = {
             "schema_version": "corsair.raw-evidence/1",

@@ -253,6 +253,20 @@ def _grid() -> Table:
     return grid
 
 
+def _replay_cell(replay: object) -> Text:
+    """A native replay's demonstrates/does-not result beside the exact-match label."""
+    if not isinstance(replay, Mapping):
+        return Text("-")
+    status = replay.get("status")
+    if status == "demonstrated":
+        return Text("demonstrates", style="green")
+    if status == "not_demonstrated":
+        roles = f"{_plain(replay.get('control'))}/{_plain(replay.get('adversarial'))}"
+        covered = "covered" if replay.get("covered") else "not covered"
+        return Text(f"does not · {roles} · {covered}", style="yellow")
+    return Text(f"unavailable · {_plain(replay.get('reason'))}", style="red")
+
+
 def _outcome(role: RoleObservation) -> Text:
     return Text(
         _OUTCOME_WORDS.get(role.outcome, role.outcome.value),
@@ -586,6 +600,8 @@ class Terminal:
             self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
             if "dataset_digest" in rendered:
                 self.out.print(Text("Dataset: ") + _text(rendered["dataset_digest"]))
+            if "replay_note" in rendered:
+                self.out.print(_text(rendered["replay_note"]))
             if isinstance(rendered.get("rows"), list):
                 self._report_rows(rendered["rows"])
             for key, detail in counts.items():
@@ -612,7 +628,9 @@ class Terminal:
     def _report_rows(self, rows: list[dict[str, Any]]) -> None:
         """Render one table row per scored attempt; unknown usage stays unknown."""
         table = Table(expand=True)
-        for column in ("Case", "Run", "Status", "Label", "Stop", "Usage", "Reason"):
+        replayed = any("replay" in row for row in rows)
+        columns = ("Case", "Run", "Status", "Label", *(("Replay",) if replayed else ()))
+        for column in (*columns, "Stop", "Usage", "Reason"):
             table.add_column(column, overflow="fold")
         for row in rows:
             status = row.get("status")
@@ -620,11 +638,13 @@ class Terminal:
             detail = _plain(status)
             if execution not in {None, "COMPLETED"}:
                 detail += f" · {_plain(execution)}"
+            replay = (_replay_cell(row.get("replay")),) if replayed else ()
             table.add_row(
                 _text(row.get("case_id")),
                 _text(row.get("run_id")),
                 Text(detail, style=_STYLES.get(str(status), "cyan")),
                 _text(row_label(row)),
+                *replay,
                 _text(row_stop(row) or "-"),
                 _text(_usage(row, _plain)),
                 _text(row.get("reason") or ""),
