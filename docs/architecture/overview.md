@@ -29,7 +29,7 @@ src/corsair/
   contracts/       canonical SDK-free Pydantic models, including the payload pair and labels
   ports/           typed inference, source-snapshot, and sandbox boundaries
   adapters/        ADK, local-source, Docker, filesystem, and Temporal SDK code
-  entrypoints/     CLI, typed Python API, worker, diagnostics, terminal rendering
+  entrypoints/     CLI, typed Python API, worker, diagnostics, terminal rendering (render/)
   policies/        the deterministic kernel gates and verdict table; packaged risk assessment
   workflows/       deterministic Temporal coordination of episodes and gates
   steps/           activities, manifests, differential execution, receipt verification

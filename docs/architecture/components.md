@@ -11,7 +11,7 @@ Corsair organizes stable domain meaning separately from SDK-dependent execution.
 | `steps/` | Activity composition, manifests, probe materialization from the recipe and payload pair, differential execution/reconciliation, receipt and coverage validation | Temporal scheduling policy or model-authored judgment |
 | `workflows/` | Deterministic Temporal coordination of episodes, gate order, session count, deadlines, cancellation, and result finalization | Nondeterministic I/O, model calls, or container creation |
 | `policies/` | The pure kernel: gate decisions, the verdict table, `negative_threshold`, and the packaged risk assessment | Evidence generation or operator authorization |
-| `entrypoints/` | CLI, typed Python API, worker composition, diagnostics, and terminal output | A separate web/API server or alternate scheduler |
+| `entrypoints/` | CLI, typed Python API, worker composition, diagnostics, and terminal output ([presentation](#terminal-presentation)) | A separate web/API server or alternate scheduler |
 | `observability/` | Sanitized lifecycle logging and native instrumentation | Raw prompts, source content, payloads, credentials, or model reasoning |
 | `evaluation/` | Frozen isolated-role evaluation and external scoped scoring against labelled corpora | Runtime fallback behavior or in-band oracle access |
 
@@ -44,3 +44,18 @@ A Temporal workflow only coordinates deterministic state and calls named activit
 This separation prevents a model, an adapter, or a provisional observation from asserting a label. See [Data flow](data-flow.md) for how these components interact, [Deployment architecture](deployment.md) for their runtime placement, and [ADR 0002](decisions/0002-pydantic-contracts-and-ports.md) for the contract/port decision.
 
 The steps package is the application/activity layer, not a second workflow engine. Shared file-relative source normalization is owned by the source adapter boundary and reused by request loading/evaluation. Agent factories accept native ADK model types directly rather than importing adapter-only aliases. Forbidden dependency directions are maintained test gates.
+
+## Terminal presentation
+
+[`entrypoints/terminal.py`](../../src/corsair/entrypoints/terminal.py) holds the `Terminal` class and its options protocol: it chooses JSON, Markdown or human output, waits on SDK completion with an optional status query, logs a failed command, and dispatches each human view to one module of [`entrypoints/render/`](../../src/corsair/entrypoints/render/). JSON and Markdown output never pass through `render/`.
+
+| Module | Renders | Commands |
+| --- | --- | --- |
+| `common` | Shared cells, labels, digest abbreviation, signed deltas and clock durations | none on its own |
+| `result` | Investigation result, verdict explanation and native reference observation | `investigate`, `inspect`, `explain`, `verify` |
+| `reports` | Evaluation summary, scored rows, family/split tables, gate counts and report comparison | `eval`, `rescore`, `report`, `compare`, `dataset replay-candidates` |
+| `runs` | Committed-run listing and per-role evidence receipts | `runs`, `inspect --evidence` |
+| `checks` | Environment checks, dataset validation and scanner-intake dry run | `doctor`, `dataset validate`, `intake` |
+| `preview` | Agent request preview and preview diff | `agent preview` |
+| `progress` | Live progress panel and plain progress lines while a workflow runs | every command that waits on a workflow status query |
+| `remedies` | The fixed next step logged beside a failed command | every command's error path; `doctor` checks |

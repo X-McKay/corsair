@@ -15,6 +15,7 @@ from rich.console import Console
 
 from corsair.entrypoints import terminal as terminal_module
 from corsair.entrypoints.cli import execute, parser, validate_run_id
+from corsair.entrypoints.render import result as result_render
 from corsair.entrypoints.terminal import (
     Terminal,
     child_changes,
@@ -889,7 +890,7 @@ def test_human_result_names_each_round_stop_and_the_case_stop_without_model_text
         seen.append(store)
         return ledger_cases._verified((1, 2))
 
-    monkeypatch.setattr(terminal_module, "verified_rounds", verified)
+    monkeypatch.setattr(result_render, "verified_rounds", verified)
     store = ArtifactStore(tmp_path / "artifacts")
 
     output = _wide(capsys, monkeypatch, result, store=store)
@@ -925,7 +926,7 @@ def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_rea
     from tests.unit.test_verdicts import _observation as _pair
 
     monkeypatch.setattr(
-        terminal_module, "verified_rounds", lambda value, store: ledger_cases._verified((1, 1))
+        result_render, "verified_rounds", lambda value, store: ledger_cases._verified((1, 1))
     )
     demonstrated = ledger_cases._result(
         [
@@ -1010,7 +1011,7 @@ def test_json_result_carries_the_timeline_and_never_the_rendered_ledger(
     def unexpected(*_arguments):
         raise AssertionError("JSON output must not verify receipts")
 
-    monkeypatch.setattr(terminal_module, "verified_rounds", unexpected)
+    monkeypatch.setattr(result_render, "verified_rounds", unexpected)
     timeline = _transitions(("prepare", 0, 0, 0), ("record", 1, 1, 1))
     result = _demonstrated_result().model_copy(update={"timeline": timeline})
     terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))

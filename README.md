@@ -37,7 +37,7 @@ src/corsair/
   contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels, one recipe per runtime
   ports/           narrow inference, source-snapshot and sandbox interfaces
   adapters/        ADK inference, local SCM, Docker sandboxing with one trusted driver per runtime, filesystem storage and Temporal
-  entrypoints/     CLI, typed Python API, worker, terminal and diagnostics
+  entrypoints/     CLI, typed Python API, worker, diagnostics; terminal.py dispatches human output to render/, one module per view family
   policies/        the deterministic kernel: gate order, verdict table, fix decisions, target and line binding, time bounds, explanations, risk assessment
   workflows/       deterministic durable coordination of episodes and gates
   steps/           activities, differential execution, coverage and receipt verification, manifests
