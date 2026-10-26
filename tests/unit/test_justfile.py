@@ -22,7 +22,7 @@ def test_default_just_lists_recipes_without_running_side_effects():
     process = subprocess.run([just_binary()], cwd=ROOT, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
     assert "Available recipes" in process.stdout
-    for recipe in ("check", "test-all", "verify", "eval-agent"):
+    for recipe in ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up"):
         assert recipe in process.stdout
 
 

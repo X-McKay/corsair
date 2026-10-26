@@ -2,7 +2,7 @@
 
 A durable investigation uses ordinary Temporal activities to coordinate bounded producer and outcome-blind auditor episodes with immutable artifacts. Unlike [reference replay](quickstart.md), it invokes the provider selected by the operator. It is a personal-use, component-scope pilot; a completed result is not a production, hostile-target, or population-accuracy claim.
 
-Before starting, complete the no-model replay and retain its `.state/settings.json`. The fixture request remains `evals/fixtures/case01/request.json`: its `source` and `comparison` paths are resolved relative to that JSON, and the quickstart's `source_root` of `evals/fixtures/case01` admits those exact directories. For another request, choose the narrowest trusted `source_root` containing the request-relative source directory and review the [configuration guide](../guides/configuration.md) rather than copying a configuration schema into the request.
+Before starting, complete the no-model replay and retain its `.state/settings.json`. The fixture request remains `evals/fixtures/case01/request.json`: its `source` and `comparison` paths are resolved relative to that JSON, and the quickstart's `source_root` (the repository root) admits those directories. For another request, choose the narrowest trusted `source_root` containing the request-relative source directory and review the [configuration guide](../guides/configuration.md) rather than copying a configuration schema into the request.
 
 ## Select the provider deliberately
 
@@ -17,7 +17,7 @@ Do not start an investigation until a trusted Docker daemon is available, the re
 
 ## Start the three terminals
 
-Run each command from the repository root after `nix develop` and `just sync`.
+Run each command from the repository root after `nix develop` and `just sync`. With the provider credentials exported in one shell, `just temporal-up` and `just worker-up` start Terminals 1 and 2 in the background instead, and `just worker-down temporal-down` stops them; the [pilot runbook](../operations/runbooks/pilot.md#4-start-the-durable-path) describes them.
 
 ### Terminal 1: local Temporal service
 
