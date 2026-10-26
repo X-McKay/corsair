@@ -50,6 +50,7 @@ _FIELDS = frozenset(
         "message",
         "role",
         "skill_name",
+        "remedy",
     ]
 )
 
@@ -123,8 +124,11 @@ class JsonFormatter(logging.Formatter):
 
 class TextFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        fields = " ".join(f"{key}={value}" for key, value in getattr(record, "fields", {}).items())
-        return f"{record.getMessage()} {fields}".rstrip()
+        fields = dict(getattr(record, "fields", {}))
+        remedy = fields.pop("remedy", None)
+        line = f"{record.getMessage()} {' '.join(f'{k}={v}' for k, v in fields.items())}".rstrip()
+        # A remedy is a next step for a person, so it gets its own line rather than a key=value.
+        return f"{line}\nremedy: {remedy}" if remedy else line
 
 
 def _set_log_handlers(handlers: list[logging.Handler], level: str) -> None:
