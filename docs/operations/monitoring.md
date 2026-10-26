@@ -65,7 +65,7 @@ A round’s observation records control/adversarial outcomes, target execution, 
 
 The immutable manifest binds a run to the Docker image ID; selected producer/auditor model names; and request, configuration, prompt, output-schema, capability, and budget digests. It intentionally does not copy provider credentials or endpoint URLs into the run metadata. Round outputs and sanitized lifecycle logs may include model/tool call counts, reported token counts when the provider returned them, elapsed time, provider feedback gates, and whether usage is complete. Missing token metadata is unknown, not zero or an exact cost figure.
 
-A provider feedback gate such as `provider_policy_blocked`, `provider_temporary`, or `provider_permanent` is operational evidence. Preserve the result and redacted gate; do not silently swap providers, remove policy checks, or replay an uncertain episode to obtain a different answer.
+A provider feedback gate such as `provider_policy_blocked`, `provider_temporary`, or `provider_permanent` is operational evidence. Preserve the result and redacted gate; do not silently swap providers, remove policy checks, or replay an uncertain episode to obtain a different answer. `provider_max_tokens` means the episode's final response stopped at the per-request `max_output_tokens` cap named in its reason; on a thinking model reasoning tokens count against that cap, so it signals budget starvation rather than a provider fault. The truncated response is never parsed into a decision or review.
 
 ## Logs and retention
 

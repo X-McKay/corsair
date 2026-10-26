@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from google.adk.models.llm_response import LlmResponse
 from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.tools.tool_context import ToolContext
+from google.genai import types
 
 from corsair.adapters.inference.adk import (
     _auditor_prompt,
@@ -25,6 +27,7 @@ from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.toolsets import build_producer_toolset
 from corsair.agents.resources import load_runtime_skills
 from corsair.contracts import (
+    AuditDecision,
     AuditInput,
     AuditResult,
     Budget,
@@ -46,6 +49,7 @@ from tests.unit.adk import (
     text_response,
     tool_batch_response,
     tool_response,
+    truncated_response,
 )
 
 
@@ -452,3 +456,146 @@ async def test_core_procedure_reaches_first_model_request_without_inventing_tool
     assert "Runtime procedure: semantic-review" in str(
         audit_model.requests[0].config.system_instruction
     )
+
+
+_TRUNCATED_SHAPES = {
+    "native_finish_reason": lambda: truncated_response('{"schema_version":"corsair.produ'),
+    "litellm_length_error": lambda: truncated_response(),
+}
+
+
+def _audit_input(store: ArtifactStore, **limits: int) -> AuditInput:
+    prepared = _prepared(store)
+    return AuditInput(
+        finding=prepared.finding,
+        recipe=prepared.recipe,
+        source_excerpt=prepared.source_excerpt,
+        submission=Submission(**_submit_args()),
+        **limits,
+    )
+
+
+def _assert_output_cap_feedback(feedback, role: str, cap: int) -> None:
+    assert feedback is not None
+    assert feedback.gate == "provider_max_tokens"
+    assert feedback.operational is True
+    assert f"{role} response stopped at the {cap}-token" in feedback.reason
+    assert "reasoning tokens" in feedback.reason
+
+
+@pytest.mark.parametrize("shape", sorted(_TRUNCATED_SHAPES))
+@pytest.mark.asyncio
+async def test_producer_truncated_final_response_is_an_operational_output_cap_gate(
+    tmp_path: Path, shape: str
+):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted-truncated",
+        responses=[tool_response("read_file", {"path": "target.py"}), _TRUNCATED_SHAPES[shape]()],
+    )
+
+    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
+
+    assert output.decision is None
+    assert output.submission_for_verification() is None
+    _assert_output_cap_feedback(output.feedback, "producer", 512)
+    assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
+    assert [request.config.max_output_tokens for request in model.requests] == [512, 512]
+
+
+@pytest.mark.parametrize("shape", sorted(_TRUNCATED_SHAPES))
+@pytest.mark.asyncio
+async def test_auditor_truncated_final_response_is_an_operational_output_cap_gate(
+    tmp_path: Path, shape: str
+):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(model="scripted-truncated", responses=[_TRUNCATED_SHAPES[shape]()])
+
+    output = await run_auditor(_audit_input(store, max_output_tokens=768), ModelSettings(), model)
+
+    assert output.review is None
+    _assert_output_cap_feedback(output.feedback, "auditor", 768)
+    assert output.usage.llm_calls == 1
+    assert model.requests[0].config.max_output_tokens == 768
+
+
+@pytest.mark.asyncio
+async def test_output_cap_names_the_smaller_cap_actually_applied_to_the_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A role factory may configure its own lower cap; the gate reports that one."""
+
+    import corsair.adapters.inference.adk as adk_adapter
+
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(model="scripted-truncated", responses=[truncated_response()])
+
+    def build_with_lower_cap(model_arg, tools):
+        agent = build_auditor(model_arg, tools)
+        agent.generate_content_config = types.GenerateContentConfig(max_output_tokens=300)
+        return agent
+
+    monkeypatch.setattr(adk_adapter, "build_auditor", build_with_lower_cap)
+    output = await run_auditor(_audit_input(store, max_output_tokens=768), ModelSettings(), model)
+
+    assert model.requests[0].config.max_output_tokens == 300
+    _assert_output_cap_feedback(output.feedback, "auditor", 300)
+
+
+@pytest.mark.asyncio
+async def test_a_capped_intermediate_turn_the_model_recovers_from_is_not_a_gate(tmp_path: Path):
+    """Only the final complete response decides truncation; a capped tool-call turn
+    that ADK still executes, followed by a complete answer, is an ordinary episode."""
+
+    store = ArtifactStore(tmp_path)
+    capped_tool_turn = tool_response("read_file", {"path": "target.py"})
+    capped_tool_turn.finish_reason = types.FinishReason.MAX_TOKENS
+    model = ScriptedLlm(
+        model="scripted-recovered",
+        responses=[capped_tool_turn, text_response(json.dumps(_proposal_args()))],
+    )
+
+    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
+
+    assert output.feedback is None
+    assert output.submission_for_verification() is not None
+
+
+@pytest.mark.asyncio
+async def test_a_non_cap_provider_error_keeps_its_provider_classification(tmp_path: Path):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted-provider-error",
+        responses=[LlmResponse(error_code="503", error_message="service unavailable")],
+    )
+
+    output = await run_auditor(_audit_input(store, max_output_tokens=512), ModelSettings(), model)
+
+    assert output.feedback is not None
+    assert output.feedback.gate == "provider_temporary"
+    assert output.feedback.operational is True
+
+
+@pytest.mark.asyncio
+async def test_standalone_audit_cap_defaults_to_the_request_budget_default(tmp_path: Path):
+    """An isolated review without an explicit cap gets the same per-request cap a
+    default investigation Budget gives the producer, not a smaller auditor value."""
+
+    store = ArtifactStore(tmp_path)
+    audit_input = _audit_input(store)
+    assert audit_input.max_output_tokens == Budget().max_output_tokens
+    model = ScriptedLlm(
+        model="scripted",
+        responses=[
+            text_response(
+                json.dumps(
+                    {"decision": AuditDecision.ACCEPT, "rule": "grounded", "reason": "grounded"}
+                )
+            )
+        ],
+    )
+
+    output = await run_auditor(audit_input, ModelSettings(), model)
+
+    assert output.feedback is None and output.review is not None
+    assert model.requests[0].config.max_output_tokens == Budget().max_output_tokens

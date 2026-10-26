@@ -72,7 +72,7 @@ Each native operation claims an immutable intent before Docker work. If an inten
 
 ### Provider, structured-output, or live-evaluation failure
 
-Provider credentials remain in the worker environment, never command arguments, files committed to the checkout, or an example. A `provider_policy_blocked`, temporary, permanent, malformed-output, or budget gate is an attributable outcome. Preserve its sanitized feedback and usage; do not disable TLS validation, change policy, silently select another provider, inflate frozen budgets, or write a decoder to force malformed output through a contract.
+Provider credentials remain in the worker environment, never command arguments, files committed to the checkout, or an example. A `provider_policy_blocked`, temporary, permanent, `provider_max_tokens`, malformed-output, or budget gate is an attributable outcome. Preserve its sanitized feedback and usage; do not disable TLS validation, change policy, silently select another provider, inflate frozen budgets, or write a decoder to force malformed output through a contract.
 
 The required discipline: a round that reaches native `execution_error` remains `ERROR`, is recorded as such, and is never hidden as a successful safe result.
 

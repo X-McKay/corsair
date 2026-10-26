@@ -88,6 +88,8 @@ class _EpisodeAccounting:
     llm_limit_exhausted: bool = False
     provider_error_code: str | None = None
     provider_error_message: str | None = None
+    applied_output_cap: int | None = None
+    final_response_hit_output_cap: bool = False
     skills_loaded: list[str] = field(default_factory=list)
     skills_preloaded: list[str] = field(default_factory=list)
 
@@ -111,6 +113,7 @@ class _EpisodeAccounting:
             if configured is None
             else min(configured, self.max_output_tokens)
         )
+        self.applied_output_cap = llm_request.config.max_output_tokens
         return None
 
     async def before_tool(
@@ -146,6 +149,10 @@ class _EpisodeAccounting:
                 self.input_tokens = (self.input_tokens or 0) + int(prompt_tokens)
             if output_tokens is not None:
                 self.output_tokens = (self.output_tokens or 0) + int(output_tokens)
+        if not llm_response.partial:
+            # Only the latest complete response decides whether the episode ended
+            # truncated; an earlier capped turn that the model recovered from does not.
+            self.final_response_hit_output_cap = _stopped_at_output_cap(llm_response)
         if llm_response.error_code or llm_response.error_message:
             self.provider_error_code = str(llm_response.error_code or "")
             self.provider_error_message = str(llm_response.error_message or "")
@@ -303,6 +310,39 @@ def _feedback_for_provider(code: str | None, message: str | None) -> Feedback:
     )
 
 
+def _stopped_at_output_cap(llm_response: LlmResponse) -> bool:
+    """Whether a response ended on the per-request output cap rather than completing.
+
+    ADK's native Gemini path reports the cap only as ``finish_reason`` and keeps the
+    truncated content; its LiteLLM path maps an OpenAI-style ``length`` finish to the
+    same reason and also stamps it as ``error_code``.  Both mean the same thing.
+    """
+
+    cap = types.FinishReason.MAX_TOKENS
+    return llm_response.finish_reason == cap or llm_response.error_code == cap
+
+
+def _feedback_for_output_cap(accounting: _EpisodeAccounting) -> Feedback:
+    """Attribute a truncated final response to the output budget, not a provider fault.
+
+    A thinking model spends reasoning tokens from the same ``max_output_tokens``
+    allowance as its answer, so a cap below the model's reasoning spend truncates
+    the structured response before it is complete.  This is operational: a truncated
+    response is never parsed into a decision, a review, or a verdict input.
+    """
+
+    cap = accounting.applied_output_cap or accounting.max_output_tokens
+    return Feedback(
+        gate="provider_max_tokens",
+        reason=(
+            f"{accounting.role or 'agent'} response stopped at the {cap}-token per-request "
+            "output cap (MAX_TOKENS) before structured completion; reasoning tokens count "
+            "against this cap"
+        ),
+        operational=True,
+    )
+
+
 def _feedback_for_exception(error: Exception) -> Feedback:
     return _feedback_for_provider(type(error).__name__, str(error))
 
@@ -366,6 +406,8 @@ async def _run_native_episode(
         )
     except Exception as error:  # Provider/transport failures are activity data, not retries.
         return last_text, _feedback_for_exception(error)
+    if accounting.final_response_hit_output_cap:
+        return last_text, _feedback_for_output_cap(accounting)
     if accounting.provider_error_code or accounting.provider_error_message:
         return last_text, _feedback_for_provider(
             accounting.provider_error_code, accounting.provider_error_message
