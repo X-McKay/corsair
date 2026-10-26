@@ -1,0 +1,79 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "unsafe",
+    "paired_with": "ruby/deserialization-a"
+  },
+  "why": "The tainted argument reaches the sink unguarded.",
+  "revision_tree_sha256": "10852086054ef44d3de4403814590f76c003bcc8e58d0596e1c48ecace8d131f",
+  "fixed_tree_sha256": "8e947f1fa6e2f30cb434f63123884fa0eb2a3c60a2d39cd57b8966a1e58ebc23",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/session_store.rb",
+          "start_line": 5,
+          "end_line": 5,
+          "quote": "  def self.restore(cookie)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/session_store.rb",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "  def self.restore(cookie)"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/session_store.rb",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "  # Restore a session from its cookie value."
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

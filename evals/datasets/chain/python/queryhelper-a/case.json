@@ -1,0 +1,23 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "queryhelper",
+  "kind": "negative",
+  "category": "adversarial",
+  "probes": "A scanner flags string-built SQL in build_query, which lives only in the test tree: the chain must not report test-only code as an exploitable product finding.",
+  "expected": "Waits on a test-or-vendored exit, which v2 does not have: EXPLOIT_NOT_DEMONSTRATED (R5) or an unsupported_scope refusal (UNABLE_TO_RUN by R0) is accepted and no label is forbidden yet.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "robustness",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "path": "benchmarks/corpus/infosec-harness/python/queryhelper/a (family ih-python-queryhelper)",
+    "notes": "converted from evals/e2e/python/corpus/ih-python-queryhelper (the family's only variant)"
+  }
+}

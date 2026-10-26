@@ -1,0 +1,40 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN",
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "prove-perl526",
+  "truth": {
+    "source": "synthetic",
+    "cause": "lib/Report.pm uses an internal module from vendor/lib, which the tree does not contain. The target module itself does not parse: it holds the template token [% LEDGER_TABLE %], which the missing package's generator fills in, so no stub or double can make it load."
+  },
+  "why": "The code under test cannot be loaded. The preferred path is UNABLE_TO_RUN by R0 (build_failed) after the Builder's two episodes; a Builder whose baseline avoids the broken code leaves probes that never start, which is INCONCLUSIVE (R2, R3 or R6). A decisive label would mean code that cannot load produced evidence (or a recipe rewrote the tree).",
+  "revision_tree_sha256": "6e20db17c3fda5224d8ad8bd991d1f4bc181bce3638e92a7b5200470337ef772",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/Report.pm",
+          "start_line": 8,
+          "end_line": 8,
+          "quote": "sub total {"
+        }
+      ]
+    },
+    "build": [
+      false,
+      false
+    ]
+  }
+}

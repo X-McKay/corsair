@@ -1,0 +1,95 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "xxe-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "app.py",
+      "sink_line": 27,
+      "source": "document parameter",
+      "target_callable": "parse_note"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-xxe/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "reproduced",
+        "fix": "verified"
+      }
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "91f4d09f83a9e68bbd69cfb79458a6044523fedb9baf7600f1c4a25cbd27182d",
+  "fixed_tree_sha256": "42260c7b141962cf998ef3d92bedebadfa531f19e4b56c74d45dc0b3d1460803",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 21,
+          "end_line": 21,
+          "quote": "def parse_note(document: str) -> str:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 21,
+            "end_line": 21,
+            "quote": "def parse_note(document: str) -> str:"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 21,
+            "end_line": 21,
+            "quote": "def parse_note(document: str) -> str:"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

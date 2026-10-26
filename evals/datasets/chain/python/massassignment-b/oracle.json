@@ -1,0 +1,95 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "massassignment-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "app.py",
+      "sink_line": 20,
+      "source": "body parameter (request JSON)",
+      "target_callable": "update_profile"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-massassignment/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "reproduced",
+        "fix": "verified"
+      }
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "1935510d4eee7b214c66e72667246907ffd216ba9b60c48b8010c03ed11ee108",
+  "fixed_tree_sha256": "502ae917c34c369ff63c1f43f937eff7960144b8d12ea5f63261ac70443b6aa8",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 15,
+          "end_line": 15,
+          "quote": "def update_profile(username: str, body: str) -> User:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 15,
+            "end_line": 15,
+            "quote": "def update_profile(username: str, body: str) -> User:"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 15,
+            "end_line": 15,
+            "quote": "EDITABLE_FIELDS = frozenset({\"email\", \"display_name\"})"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

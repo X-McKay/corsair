@@ -1,0 +1,87 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "jest29-node22",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "javascript-cors-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "src/server.js",
+      "sink_line": 7,
+      "source": "Origin request header",
+      "target_callable": "handleProfile"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "64412c2861113d035d20699cf6c420ea1d3ce352a75ae36f28990a9bd7cbb5e7",
+  "fixed_tree_sha256": "701d9cade156c727d5ade67289fb15bf22e8799c5da9ea4eec4f497af1790db3",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/server.js",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "function handleProfile(req, res) {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/server.js",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "function handleProfile(req, res) {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/server.js",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "const ALLOWED_ORIGINS = new Set([\"https://app.example.com\", \"https://admin.example.com\"]);"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

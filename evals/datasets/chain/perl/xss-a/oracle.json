@@ -1,0 +1,70 @@
+{
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "prove-perl526",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "perl-xss-fixed",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "lib/Renderer.pm",
+      "sink_line": 13,
+      "source": "text argument",
+      "target_callable": "render"
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability neutralized).",
+  "revision_tree_sha256": "b9a5eebdca09beb24218e838193afc8e60e6b86fccb29f0111cec8724517d656",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/Renderer.pm",
+          "start_line": 10,
+          "end_line": 10,
+          "quote": "sub render {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/Renderer.pm",
+            "start_line": 10,
+            "end_line": 10,
+            "quote": "sub render {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+**
+!deploy/
+!deploy/python/
+!deploy/python/Dockerfile
+!src/
+!src/corsair/
+!src/corsair/adapters/
+!src/corsair/adapters/sandboxing/
+!src/corsair/adapters/sandboxing/driver.py

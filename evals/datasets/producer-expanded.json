@@ -1,0 +1,26 @@
+{
+  "schema_version": "corsair.agent-dataset/1",
+  "entries": [
+    {
+      "case_id": "case01",
+      "input": "fixtures/case01/request.json",
+      "oracle": "fixtures/case01/producer-oracle.json",
+      "input_digest": "ce6ec1813d3dbb3031f2b6e2d1b66dbd8f53e6769e4e6744ddb173fe58f9ed8a",
+      "oracle_digest": "02275f674a11f70a0cd426d67593d3e995a9fc1af9c91d55d9a889b427069eaf"
+    },
+    {
+      "case_id": "producer02",
+      "input": "fixtures/producer02/request.json",
+      "oracle": "fixtures/producer02/producer-oracle.json",
+      "input_digest": "1e9df9d56ba385a2e5b7491e795e0f159afe6b760c05c8163e104d9643d2480f",
+      "oracle_digest": "1b0dae93873d5ad14d36e3d8647e7273e80476e5e1e11b5029cb9855720eba7a"
+    },
+    {
+      "case_id": "producer03",
+      "input": "fixtures/producer03/request.json",
+      "oracle": "fixtures/producer03/producer-oracle.json",
+      "input_digest": "d55f7ee3a7bd68e25cf7aa762e244d8063e5ee2081c710aa67fa0b143fefb3f7",
+      "oracle_digest": "45a5f3eeebc7af5aacb19c02690fd9b25325fdf372d2ed67a86b8e96402f1237"
+    }
+  ]
+}

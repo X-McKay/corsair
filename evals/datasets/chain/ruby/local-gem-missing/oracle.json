@@ -1,0 +1,40 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN",
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "cause": "The Gemfile names a path gem the tree does not contain, and lib/report.rb requires it. The target module itself does not parse: it holds the template token @LEDGER_TABLE@, which the missing package's generator fills in, so no stub or double can make it load."
+  },
+  "why": "The code under test cannot be loaded. The preferred path is UNABLE_TO_RUN by R0 (build_failed) after the Builder's two episodes; a Builder whose baseline avoids the broken code leaves probes that never start, which is INCONCLUSIVE (R2, R3 or R6). A decisive label would mean code that cannot load produced evidence (or a recipe rewrote the tree).",
+  "revision_tree_sha256": "0e12c0e657e4cd5abf4ac970254d69d6fa63741b65d1b78fe8c07215b4939d88",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/report.rb",
+          "start_line": 5,
+          "end_line": 5,
+          "quote": "  def self.total(account)"
+        }
+      ]
+    },
+    "build": [
+      false,
+      false
+    ]
+  }
+}

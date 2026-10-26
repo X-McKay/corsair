@@ -1,0 +1,79 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "unsafe",
+    "paired_with": "ruby/hostcheck-a"
+  },
+  "why": "The tainted argument reaches the sink unguarded.",
+  "revision_tree_sha256": "26a5171b6672f8e381cf2d3fc15ad3e421bf71ebcf6ff67127360c4a976b9b8e",
+  "fixed_tree_sha256": "865b8672f726048b5745f4f5146ad38df15b108fb2303910ca44df6d04f71722",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/host_check.rb",
+          "start_line": 2,
+          "end_line": 2,
+          "quote": "  ALLOWED = /^[a-z0-9-]+\\.example\\.com$/"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/host_check.rb",
+            "start_line": 2,
+            "end_line": 2,
+            "quote": "  ALLOWED = /^[a-z0-9-]+\\.example\\.com$/"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/host_check.rb",
+            "start_line": 2,
+            "end_line": 2,
+            "quote": "  ALLOWED = /\\A[a-z0-9-]+\\.example\\.com\\z/"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

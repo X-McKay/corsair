@@ -1,0 +1,96 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": null,
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "toctou-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "app.py",
+      "sink_line": 7,
+      "source": "path parameter",
+      "target_callable": "read_config"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-toctou/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "reproduced",
+        "fix": "verified"
+      }
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable). A race window is not reliably reachable from one native unit test, so an Investigator unsupported_scope refusal (UNABLE_TO_RUN by R0) is accepted too.",
+  "revision_tree_sha256": "21f2851de3f3fed3338f82e01b1b0f4cbdda8090d226259c4746057282da22f0",
+  "fixed_tree_sha256": "380fde83c1717e59055527b5bb23b7d8cb0a90ee5a3ad1eaf65c0b3a83f086c5",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "def read_config(path: str) -> str:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "def read_config(path: str) -> str:"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "def read_config(path: str) -> str:"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

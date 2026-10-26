@@ -1,0 +1,40 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN",
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "junit5-maven-temurin17",
+  "truth": {
+    "source": "synthetic",
+    "cause": "ReportDao imports a class the tree does not define, so the main sources never compile."
+  },
+  "why": "The code under test cannot be loaded. The preferred path is UNABLE_TO_RUN by R0 (build_failed) after the Builder's two episodes; a Builder whose baseline avoids the broken code leaves probes that never start, which is INCONCLUSIVE (R2, R3 or R6). A decisive label would mean code that cannot load produced evidence (or a recipe rewrote the tree).",
+  "revision_tree_sha256": "7b6b3d5893d10f9bd9e6085ec6fb57e671888142de65a980eab03e4e5f6b9fd2",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/com/example/ReportDao.java",
+          "start_line": 14,
+          "end_line": 14,
+          "quote": "    public ResultSet total(String account) throws Exception {"
+        }
+      ]
+    },
+    "build": [
+      false,
+      false
+    ]
+  }
+}

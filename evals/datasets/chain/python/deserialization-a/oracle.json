@@ -1,0 +1,95 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "deserialization-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "app.py",
+      "sink_line": 6,
+      "source": "blob parameter",
+      "target_callable": "load_profile"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-deserialization/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "reproduced",
+        "fix": "verified"
+      }
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "856de85056608524129670ea5e5c762f91ee7f25af903078146c5315a00cd24b",
+  "fixed_tree_sha256": "2c2c29fe868e2ed7b8f5a24a742465b66d202a1bd37b499aa4bcbb53fca0fbb6",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "def load_profile(blob: bytes) -> object:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "def load_profile(blob: bytes) -> object:"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "# A profile is plain data; these are the only classes a legitimate payload may name."
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "redos-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "app.py",
+      "sink_line": 8,
+      "source": "value parameter",
+      "target_callable": "is_valid_email"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-redos/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "reproduced",
+        "fix": "verified"
+      }
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "81d556a7fa1927cd4aa9e5c5ef0cbad8ad1ed5b315c579991e227c16fd2e45c7",
+  "fixed_tree_sha256": "c666ff4547b0cc2b645a8d7fa8d065b675b8108bc01d049bd3d19a18d098984d",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 6,
+          "end_line": 6,
+          "quote": "def is_valid_email(value: str) -> bool:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 6,
+            "end_line": 6,
+            "quote": "def is_valid_email(value: str) -> bool:"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 6,
+            "end_line": 6,
+            "quote": "def is_valid_email(value: str) -> bool:"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

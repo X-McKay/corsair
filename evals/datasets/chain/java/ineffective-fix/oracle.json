@@ -1,0 +1,78 @@
+{
+  "expected_label": "INCONCLUSIVE",
+  "acceptable_labels": [
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R6",
+  "expected_terminal_reason": "not_differential",
+  "expected_finding": "inconclusive",
+  "expected_fix": "not_verified",
+  "expected_runtime_row": "junit5-maven-temurin17",
+  "truth": {
+    "source": "synthetic fix revision: the java/cmdi-b exploitable tree plus one comment in the target file, so the reported condition still occurs on it"
+  },
+  "why": "The claimed fix changes no behaviour, so a PoV that demonstrates the condition passes on both revisions and R6 reports not_differential; a LIKELY label would mean the two identical behaviours were observed differently.",
+  "revision_tree_sha256": "3e09473c9cff61919b77a499fc7d3770db5fdf3ec968605a4f9f400153c97469",
+  "fixed_tree_sha256": "7af98a1d2147d15b65cf9be4685468804ba10f1ddf059e939f6785af16118f45",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/com/example/Runner.java",
+          "start_line": 5,
+          "end_line": 5,
+          "quote": "    public Process run(String arg) throws Exception {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/com/example/Runner.java",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "    public Process run(String arg) throws Exception {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/com/example/Runner.java",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "    public Process run(String arg) throws Exception {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "passed"
+      }
+    },
+    "build_fixed": true
+  }
+}

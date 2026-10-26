@@ -1,61 +1,79 @@
 # Corsair
 
-Corsair validates a reported security issue against an exact repository revision. Agents write exactly two native
-unit tests, a benign control probe and a security-regression (exploit) probe, against the real code; trusted code runs
-both in a sandbox and a fixed rule table labels the issue `LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`,
-`INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. No model runs after execution.
+Corsair validates a reported security finding against a pinned source snapshot. **Google ADK** runs two bounded agents: a producer that proposes a benign/exploit payload pair as JSON, and an outcome-blind auditor with no tools that can only reject. A deterministic, coverage-gated **kernel** in trusted code admits the target, runs the differential pair in a sandbox, requires exact target-line coverage in both runs, and decides the label. **Temporal** runs each agent episode as one activity and coordinates rounds, budgets, cancellation and immutable results. No model ever assigns a verdict.
 
-This branch carries Corsair v2, a rebuild on native PydanticAI agents and skills, the PydanticAI workspace interface
-(Docker is the default; the explicitly selected OpenShell backend is implemented but not live-qualified) and
-Temporal durability. The v1 implementation remains on `main`.
-[src/corsair/README.md](src/corsair/README.md) describes the chain, its stages and the rules every module keeps.
+The label is one of `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions with covered, non-demonstrating exploit runs; `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision control-versus-exploit differential, with a supplied fix revision as optional confirmation. `COMPONENT_EXPLOIT_DEMONSTRATED` is the same genuine differential proven only at the component seam when an application-scope claim's reachability to the claimed entry point was not established. Everything else is never a negative security clearance. This is a personal-use pilot whose running runtime is Python, not a general-purpose autonomous penetration tester.
 
-## Commands
+## Start here
 
-Requirements: Linux, Python 3.12, `uv`; Docker for workspace, build and canary runs.
+Use the locked tool shell on **Linux amd64 or macOS arm64**. Live runs also need a reviewed Docker daemon, a Temporal service and an explicitly configured model provider; a cloud development environment without those runs only the offline gates.
 
-```shell
-make test-v2                     # offline suite (alias: make test); no model, no cluster; Docker tests skip without Docker
-make test-config                 # fast configuration and shared developer-skill guards
-make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>]   # one agent's isolated eval
-make eval-baseline AGENT=<agent> RUN=<run id>                             # promote a run as that agent's baseline
-make canary                      # classify each runtime-matrix row's passing and failing canary on its image
-make toolchain-images TOOLCHAINS=python   # build toolchain images and run their trusted controls
-uv run --locked corsair-v2 run --case <name> [--mode direct|temporal]     # one case through the chain
-```
+1. Follow [installation](docs/getting-started/installation.md) and the [quickstart](docs/getting-started/quickstart.md).
+2. Establish the native, no-model reference path with `just verify` before starting a worker.
+3. Run your [first durable investigation](docs/getting-started/first-project.md) with an explicitly configured model provider.
 
-The kind + OpenShell cluster for the v2 OpenShell backend (`make tools kind-up ... openshell-config qualify-openshell-v2`) is in the [OpenShell v2 runbook](docs/runbooks/openshell-v2.md).
+Do not admit untrusted repositories on a machine containing production workloads or credentials. Read [SECURITY.md](SECURITY.md) and the [security architecture](docs/architecture/security.md) before execution.
 
-Stage logs go to stderr. Interactive terminals show an indeterminate Rich spinner and scrolling
-stage states; pipes remain append-only. The final text includes recorded per-agent tokens, requests,
-tool calls and agent seconds, with missing values shown as `unknown`. `NO_COLOR` and `--color never`
-disable color. Tool identities/durations and live token deltas remain a follow-on, not inferred metrics.
+## Documentation
 
-```shell
-uv run --locked corsair-v2 run --case <name> --format json
-uv run --locked corsair-v2 runs compare <run_dir>... --agents
-uv run --locked corsair-v2 runs compare <run_dir>... --format json
-```
+The [documentation index](docs/index.md) is the main navigation page.
 
-JSON mode emits one versioned object on stdout and retains null telemetry. Direct cancellation
-records a lifecycle receipt without manufacturing a verdict; it is not proof of external command
-termination, cleanup, or resumability. An unfinished recorded run is `incomplete`, not presumed active.
+| Need | Read |
+| --- | --- |
+| Understand the design | [Architecture overview](docs/architecture/overview.md), [components](docs/architecture/components.md), [data flow](docs/architecture/data-flow.md), [decisions](docs/architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md) |
+| Develop or contribute | [Setup](docs/development/setup.md), [conventions](docs/development/conventions.md), [testing](docs/development/testing.md), [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Configure or integrate | [Configuration guide](docs/guides/configuration.md), [Python integration](docs/guides/integration.md), [API reference](docs/reference/api.md) |
+| Operate the pilot | [Operations](docs/operations/overview.md), [deployment guide](docs/guides/deployment.md), [pilot runbook](docs/operations/runbooks/pilot.md) |
+| Use the CLI | [CLI reference](docs/reference/cli.md), [monitoring](docs/operations/monitoring.md), [troubleshooting](docs/operations/troubleshooting.md) |
+| Extend support | [Extension guide](docs/guides/extensions.md), [coding-agent workflows](docs/development/coding-agent-workflows.md) |
+| Improve agents | [Agent development](docs/agents/development.md), [evaluations](docs/agents/evaluations.md), [safety](docs/agents/safety.md) |
+| Inspect contracts or status | [Schemas](docs/reference/schemas.md), [current work and open decisions](docs/plans/README.md), [changelog](CHANGELOG.md) |
 
-Evidence lands under `.runs/` and is never committed.
-
-## Layout
+## Code map
 
 ```text
-src/corsair/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
-  skills/frameworks/      per-framework guidance and canaries (the only place framework knowledge lives, with the matrix)
-  workspace/              sandbox port and explicit Docker/OpenShell backends (pydantic_ai.workspaces)
-deploy/v2/runtime-matrix.yaml   operator-owned runtime rows: image, framework, exit-code map
-deploy/qualification/toolchains/ toolchain image sources; tools/toolchain_images.py builds them
-config/v2/                provider configuration
-evals/                    frozen per-case eval data and sets, the corpus loader, and `make eval` (evals/run.py)
-benchmarks/               benchmark inventory and the imported infosec-harness corpus
-tools/                    canary runner and toolchain image builder
-tests/v2/                 offline tests
+src/corsair/
+  agents/          producer and auditor ADK factories, instructions, toolsets and packaged skills
+  contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels
+  ports/           narrow inference, source-snapshot and sandbox interfaces
+  adapters/        ADK inference, local SCM, Docker sandboxing, filesystem storage and Temporal
+  entrypoints/     CLI, typed Python API, worker, terminal and diagnostics
+  policies/        the deterministic kernel: gate order, verdict table, fix decisions, risk assessment
+  workflows/       deterministic durable coordination of episodes and gates
+  steps/           activities, differential execution, coverage and receipt verification, manifests
+  observability/   sanitized lifecycle logging
+  evaluation/      isolated-agent evaluation and external scoring
 ```
 
-Development rules are in [AGENTS.md](AGENTS.md).
+Remote forge adapters, a separate HTTP API, an OpenShell sandbox adapter, additional qualified runtimes and a general repair framework are not hidden behind this layout. The Python API and CLI share the same native workflow submission functions.
+
+## Development checks
+
+After [development setup](docs/development/setup.md):
+
+```bash
+just sync
+just check
+just test
+```
+
+| Recipe | Runs |
+| --- | --- |
+| `just check` | Pinned Ruff lint/format, Just formatting, ty with warnings failing, and local documentation link checks |
+| `just test` | Offline tests (no Docker, Temporal or provider) |
+| `just test-docker` | Real Docker sandbox tests (`CORSAIR_TEST_TEMPORAL=1` adds integrated durable tests) |
+| `just test-temporal` | Real Temporal workflow and replay tests |
+| `just test-live` | Explicitly configured provider tests; requires `CORSAIR_LIVE_CONFIG` |
+| `just verify REQUEST SUBMISSION` | Execute a frozen reference pair through the kernel without a model |
+| `just eval DATASET` | Run a durable frozen dataset through the full workflow |
+| `just eval-agent AGENT DATASET` | Run an isolated producer or auditor evaluation against its frozen oracle |
+
+Use `just -- RECIPE ...` when forwarding command flags. Native and live recipes have real prerequisites; see [testing](docs/development/testing.md).
+
+## Qualification and limits
+
+Gate results, unrun gates and the decisions still open with the project owner are recorded in [current work](docs/plans/README.md). A passing offline suite is not a live qualification, a small live batch is not population accuracy, and `INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR` is never a negative finding.
+
+Local artifacts do not survive artifact-host loss without backups or shared storage. The pilot does not establish hostile-interpreter observation integrity or production readiness. See [disaster recovery](docs/operations/disaster-recovery.md) and the [packaged risk assessment](src/corsair/policies/risk.md).
+
+No project-wide license grant is currently specified; [LICENSE](LICENSE) records that status. Dependency licenses remain separate.

@@ -1,0 +1,87 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "ruby-ruby-git-fetch-a",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "lib/git/lib.rb",
+      "sink_line": 14,
+      "source": "remote",
+      "target_callable": "fetch"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "2d263d5051e6cf412aff96b6310c38507cc3e60ba2e588eba210eadea0b3d9b2",
+  "fixed_tree_sha256": "1f9648850c568a64db9d5b5af488b6c083c2403490daecdfb73dc47bf2f563dd",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/git/lib.rb",
+          "start_line": 14,
+          "end_line": 14,
+          "quote": "      command('fetch', arr_opts)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/git/lib.rb",
+            "start_line": 14,
+            "end_line": 14,
+            "quote": "      command('fetch', arr_opts)"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/git/lib.rb",
+            "start_line": 16,
+            "end_line": 16,
+            "quote": "      command('fetch', arr_opts)"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

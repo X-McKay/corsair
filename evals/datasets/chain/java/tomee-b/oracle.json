@@ -1,0 +1,70 @@
+{
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "junit4-maven-temurin8",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "java-tomee-b",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+      "sink_line": 59,
+      "source": "class name from the serialized stream",
+      "target_callable": "check"
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability neutralized).",
+  "revision_tree_sha256": "904becfa83de5ca015b2bcb0e221d9a2cde339334e1084e46c1c62ccfb6206a0",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+          "start_line": 59,
+          "end_line": 59,
+          "quote": "                if (\"*\".equals(white) || name.startsWith(white)) {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+            "start_line": 59,
+            "end_line": 59,
+            "quote": "                if (\"*\".equals(white) || name.startsWith(white)) {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

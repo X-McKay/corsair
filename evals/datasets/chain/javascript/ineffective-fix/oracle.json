@@ -1,0 +1,78 @@
+{
+  "expected_label": "INCONCLUSIVE",
+  "acceptable_labels": [
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R6",
+  "expected_terminal_reason": "not_differential",
+  "expected_finding": "inconclusive",
+  "expected_fix": "not_verified",
+  "expected_runtime_row": "jest29-node22",
+  "truth": {
+    "source": "synthetic fix revision: the javascript/cmdi-b exploitable tree plus one comment in the target file, so the reported condition still occurs on it"
+  },
+  "why": "The claimed fix changes no behaviour, so a PoV that demonstrates the condition passes on both revisions and R6 reports not_differential; a LIKELY label would mean the two identical behaviours were observed differently.",
+  "revision_tree_sha256": "e0a96fa335e6e785ffde4c390baf99aba5ffbea4facd3500f7e021e7e415d1d1",
+  "fixed_tree_sha256": "87b99834ffc3ed959c8455140f6fcc3104474d9c3562a3f42910b2c469fe3214",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/cmd.js",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "function countLines(path, cb) {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/cmd.js",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "function countLines(path, cb) {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/cmd.js",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "function countLines(path, cb) {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "passed"
+      }
+    },
+    "build_fixed": true
+  }
+}

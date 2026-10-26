@@ -1,0 +1,62 @@
+{
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "guarded",
+    "paired_with": "ruby/deserialization-a"
+  },
+  "why": "The same finding against the guarded variant: the control on the path holds.",
+  "revision_tree_sha256": "8e947f1fa6e2f30cb434f63123884fa0eb2a3c60a2d39cd57b8966a1e58ebc23",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/session_store.rb",
+          "start_line": 6,
+          "end_line": 6,
+          "quote": "  def self.restore(cookie)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/session_store.rb",
+            "start_line": 6,
+            "end_line": 6,
+            "quote": "  def self.restore(cookie)"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

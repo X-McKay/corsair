@@ -1,0 +1,78 @@
+{
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "unreachable",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "unreachable",
+      "sink_file": "app.py",
+      "sink_line": 12,
+      "source": "none (constant query)",
+      "target_callable": "healthcheck"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-healthcheck/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "not_reproduced",
+        "fix": "not_applicable"
+      }
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability unreachable).",
+  "revision_tree_sha256": "7cf45bea4dfd7b918d5292f8f64a56c221be3efe3c0260ebb4ce10dd803a5c66",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 15,
+          "end_line": 15,
+          "quote": "def healthcheck(conn) -> list:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 15,
+            "end_line": 15,
+            "quote": "def healthcheck(conn) -> list:"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "ruby-ruby-git-fetch-b",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "lib/git/lib.rb",
+      "sink_line": 16,
+      "source": "remote",
+      "target_callable": "fetch"
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability neutralized).",
+  "revision_tree_sha256": "1f9648850c568a64db9d5b5af488b6c083c2403490daecdfb73dc47bf2f563dd",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/git/lib.rb",
+          "start_line": 16,
+          "end_line": 16,
+          "quote": "      command('fetch', arr_opts)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/git/lib.rb",
+            "start_line": 16,
+            "end_line": 16,
+            "quote": "      command('fetch', arr_opts)"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

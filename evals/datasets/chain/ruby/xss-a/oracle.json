@@ -1,0 +1,79 @@
+{
+  "expected_label": "EXPLOIT_DEMONSTRATED",
+  "acceptable_labels": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "unsafe",
+    "paired_with": "ruby/xss-b"
+  },
+  "why": "The tainted argument reaches the sink unguarded.",
+  "revision_tree_sha256": "cdbd9c26c7523e04f66be68e758897fa2feca419f18101d7d2194ba1c9de48c7",
+  "fixed_tree_sha256": "f953ea44d0849a57d67220d2556f827996726e536f1c9e480480aa76227433d1",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/greeting.rb",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "  TEMPLATE = ERB.new('<p>Hello, <%= name %>!</p>')"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/greeting.rb",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "  TEMPLATE = ERB.new('<p>Hello, <%= name %>!</p>')"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/greeting.rb",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "  TEMPLATE = ERB.new('<p>Hello, <%= ERB::Util.html_escape(name) %>!</p>')"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

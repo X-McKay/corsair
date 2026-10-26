@@ -1,0 +1,31 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R0",
+  "expected_terminal_reason": "no_runtime",
+  "expected_finding": "none",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": null,
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "javascript-zipbomb-fixed",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "src/inflate.js",
+      "sink_line": 7,
+      "source": "buf parameter",
+      "target_callable": "inflate"
+    }
+  },
+  "why": "No row of deploy/v2/runtime-matrix.yaml detects this tree (node:test); the manifest's finding truth (likely_not_exploitable) applies once a row exists, and this oracle must then be revised.",
+  "revision_tree_sha256": "f6140d40d58d5facabc1205db6d3ee2babc0dcac18e2ff8959ab9ece69d4a222",
+  "fixed_tree_sha256": null
+}

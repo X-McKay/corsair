@@ -1,0 +1,105 @@
+# Corsair CI tiers, cheapest first (docs/development/testing.md, SPEC-0082).
+#
+#   Tier 1  offline-doubles        every push and pull request; the only required gate.
+#                                  `just check`, the offline pytest selection
+#                                  (`not docker and not temporal and not live`) and the
+#                                  package build. No Docker daemon, no Temporal server
+#                                  and NO MODEL CALL: every external boundary is a typed
+#                                  port answered by fixtures or deterministic doubles.
+#   Tier 2  conformance-replay     real Docker observer image per language shard;
+#                                  scripted agents, no model call, no live provider.
+#   Tier 3  durable-workflows      real local Temporal test server; workflow and replay
+#                                  tests with typed fake activities, no Docker target
+#                                  execution and no model call.
+#   macOS   macos-host             tiers 1 and 3 on the second supported platform
+#                                  (aarch64-darwin). Hosted macOS has no nested Docker.
+#   Live    never in CI            `just test-live`, `just eval` and `just eval-agent`
+#                                  need the operator's CORSAIR_LIVE_CONFIG and are run
+#                                  by hand; no job here sets or reads it.
+#
+# The replay, oracle-separation, safety-set and known-vulnerable gates are enforced by
+# the test and evaluation suites themselves; CI only runs those suites. Every action is
+# pinned to an exact release and the Nix shell enters with --no-update-lock-file so the
+# toolchain is the one recorded in flake.lock and uv.lock.
+name: corsair-checks
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Tier 1: the required offline gate. Must stay green without Docker, Temporal or a
+  # provider; it is the branch-protection check for pull requests to main.
+  offline-doubles:
+    name: "Tier 1: offline doubles and package"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: cachix/install-nix-action@31.11.3
+      - name: Refuse a live-provider configuration in the required job
+        run: test -z "${CORSAIR_LIVE_CONFIG:-}" || { echo 'CORSAIR_LIVE_CONFIG must not reach the offline tier'; exit 1; }
+      - run: nix flake check --all-systems --no-build --no-update-lock-file
+      - run: |
+          nix develop --no-update-lock-file --command bash -euc '
+            just sync check
+            just -- test -q -W error
+            just build
+          '
+
+  # Tier 2: real Docker observer image, scripted agents, no model. One matrix entry per
+  # supported toolchain shard; add a shard when its reviewed image is registered.
+  conformance-replay:
+    name: "Tier 2: conformance replay (${{ matrix.language }})"
+    needs: offline-doubles
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: cachix/install-nix-action@31.11.3
+      - run: nix develop --no-update-lock-file --command just sync images
+      - run: nix develop --no-update-lock-file --command env CORSAIR_TEST_TEMPORAL=1 CORSAIR_TEST_LONG_PROBE=1 just -- test-docker -q -W error
+
+  # Tier 3: real Temporal test server, typed fake activities, no Docker target, no model.
+  durable-workflows:
+    name: "Tier 3: durable workflows and replay"
+    needs: offline-doubles
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: cachix/install-nix-action@31.11.3
+      - run: |
+          nix develop --no-update-lock-file --command bash -euc '
+            just sync
+            just -- test-temporal -q -W error
+          '
+
+  # Second supported platform: tiers 1 and 3 only. No model call.
+  macos-host:
+    name: "macOS arm64: tiers 1 and 3"
+    needs: offline-doubles
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: cachix/install-nix-action@31.11.3
+      - run: |
+          nix develop --no-update-lock-file --command bash -euc '
+            python --version
+            uv --version
+            just --version
+            temporal --version
+            docker --version
+            just sync check
+            just -- test -q -W error
+            just -- test-temporal -q -W error
+          '

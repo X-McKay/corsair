@@ -1,0 +1,204 @@
+{
+  "dataset_digest": "e865d259995f2e31d971ba5e01a3b5a627fe02771a195436fb73203b927fe0ef",
+  "rows": [
+    {
+      "run_id": "isolated-87360f0eb52641cd89369b1d6d23d2c8",
+      "case_id": "audit01",
+      "repeat": 0,
+      "status": "fail",
+      "match_kind": "operational_failure",
+      "cohort": "live-model-fixture",
+      "execution_status": "ERROR",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "76ef272aae3e440a9648e611f9ad6beddf837323cd0cf164168175e5f5fba2b4",
+        "size": 300,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 1,
+      "tool_calls": 0,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 2163,
+      "output_tokens": 2048,
+      "agent_seconds": 26.503304463112727,
+      "feedback": {
+        "gate": "provider_permanent",
+        "reason": "FinishReason.MAX_TOKENS Maximum tokens reached",
+        "operational": true
+      }
+    },
+    {
+      "run_id": "isolated-64987b2423634ff990d49b9da788ec0b",
+      "case_id": "audit02",
+      "repeat": 0,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "ba4cc75b9fc667d4c1e9ae34e1d02873ea71cf4cd211e73a5eddcb5185c53bfd",
+        "size": 914,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4744,
+      "output_tokens": 1229,
+      "agent_seconds": 15.155375740025192,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-5966235d588d4adeab032ce32c7effa2",
+      "case_id": "audit01",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "operational_failure",
+      "cohort": "live-model-fixture",
+      "execution_status": "ERROR",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "31ef471c4bbd5950b146fbdfcb9365d2aba295e835156c0fc79470eb2ca891e4",
+        "size": 317,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 1,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4685,
+      "output_tokens": 2129,
+      "agent_seconds": 24.980502685997635,
+      "feedback": {
+        "gate": "provider_permanent",
+        "reason": "FinishReason.MAX_TOKENS Maximum tokens reached",
+        "operational": true
+      }
+    },
+    {
+      "run_id": "isolated-308b8b53637c44859dc087d42a8391f7",
+      "case_id": "audit02",
+      "repeat": 1,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "9435124b23164cabf3882d402c67084d3ed4bc2d17b44e6243dedbef8a2c61f9",
+        "size": 1205,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 1,
+      "tool_calls": 1,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 2153,
+      "output_tokens": 824,
+      "agent_seconds": 7.88792958506383,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-1a3697038517469a8dfe35d5fa7d6c0a",
+      "case_id": "audit01",
+      "repeat": 2,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "c5d3cfeec6a420a16f002dbb04756d2a5084bc1c09f45837e0821060027cdaf7",
+        "size": 332,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4682,
+      "output_tokens": 2095,
+      "agent_seconds": 19.70445014210418,
+      "feedback": {
+        "gate": "audit_invalid",
+        "reason": "auditor exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-2556bcc7a159480da357933d56cfe5ad",
+      "case_id": "audit02",
+      "repeat": 2,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "4ca7df03eb4357d7d3a4a5d72845ad9c122a82922c0fb7eaee0c176c3f7804c6",
+        "size": 1138,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5092,
+      "output_tokens": 1224,
+      "agent_seconds": 12.093404127983376,
+      "feedback": null
+    }
+  ],
+  "summary": {
+    "attempts": 6,
+    "passed": 3,
+    "failed": 3,
+    "pass_rate": 0.5,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 2,
+    "unavailable_results": 0,
+    "llm_calls": 10,
+    "tool_calls": 8,
+    "input_tokens": 23519,
+    "output_tokens": 9549,
+    "cost_usd": null
+  }
+}

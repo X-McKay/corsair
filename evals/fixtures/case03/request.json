@@ -1,0 +1,38 @@
+{
+  "case": {
+    "case_id": "case03",
+    "finding": {
+      "title": "File access input validation",
+      "description": "The read_file API must not disclose a file outside its configured public root. Investigate path inputs through this API. The private test fixture is at /fixtures/private/secret.txt; its value is not available. Only the path argument is caller controlled.",
+      "file": "target.py",
+      "line": 4,
+      "claim_scope": "application"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "16167a014b9076794ad94fcda2e0171907e48abfe955c109c918ed4fbcee134c"
+    },
+    "recipe": {
+      "module_file": "target.py",
+      "function": "read_file",
+      "payload_parameter": "path",
+      "fixed_kwargs": {
+        "root": "/fixtures/allowed"
+      },
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "expected_control": "hello",
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_elapsed_seconds": 900
+  }
+}

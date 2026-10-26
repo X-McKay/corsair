@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "cmdi",
+  "kind": "positive",
+  "category": "smoke",
+  "probes": "OS command injection in list_entries (CWE-78) on the Ruby variant where the argument reaches the sink unguarded: the chain must reproduce it through list_entries with Minitest probes.",
+  "expected": "The control and the proof-of-vulnerability (exploit) probe pass: EXPLOIT_DEMONSTRATED by R4; on the paired guarded tree the control passes and the PoV's assertion fails, so the fix is verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "Corsair-authored",
+    "license": "n/a (synthetic)",
+    "notes": "tree under tree/; paired with ruby/cmdi-b"
+  }
+}

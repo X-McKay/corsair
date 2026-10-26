@@ -1,0 +1,7 @@
+{
+  "control_payload": "hello.txt",
+  "candidate_payloads": [
+    "../private/secret.txt",
+    "/fixtures/private/secret.txt"
+  ]
+}

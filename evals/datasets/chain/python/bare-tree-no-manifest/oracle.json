@@ -1,0 +1,22 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ],
+  "expected_rule": "R0",
+  "expected_terminal_reason": "no_runtime",
+  "expected_finding": "none",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": null,
+  "truth": {
+    "source": "synthetic",
+    "code_truth": "the sink is reachable from the argument"
+  },
+  "why": "No matrix row's detection hint matches the tree, so Select returns no runtime and the chain stops before any agent runs, whatever the code does.",
+  "revision_tree_sha256": "bd6c80d24131dfa4fa49e15c31766bd84b4bf3cf38184d8ce43387d6d32a0466",
+  "fixed_tree_sha256": null
+}
