@@ -547,7 +547,9 @@ class Terminal:
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
-        if isinstance(rendered, dict) and "disposition" in rendered:
+        if isinstance(rendered, dict) and "statements" in rendered:
+            self._explanation(rendered)
+        elif isinstance(rendered, dict) and "disposition" in rendered:
             self._result(InvestigationResult.model_validate(rendered))
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             self._observation(Observation.model_validate(rendered))
@@ -882,6 +884,18 @@ class Terminal:
         title = f"Corsair · Evidence {safe_text(value['run_id'])} · {safe_text(value['verdict'])}"
         body = Group(*tables) if tables else Text("No observations were recorded")
         self.out.print(Panel(body, title=title, border_style="cyan"))
+
+    def _explanation(self, value: dict[str, Any]) -> None:
+        """Render the verdict explanation in order, after the result panel when it is present."""
+        if isinstance(value.get("result"), dict):
+            self._result(InvestigationResult.model_validate(value["result"]))
+        verdict = value.get("verdict")
+        style = _VERDICT_STYLES.get(Verdict(verdict), "cyan") if verdict else "cyan"
+        table = _grid()
+        for statement in value["statements"]:
+            table.add_row(_label(statement["kind"]), _text(statement["text"]))
+        title = f"Corsair · Why {safe_text(verdict or 'no verdict')} · {safe_text(value['run_id'])}"
+        self.out.print(Panel(table, title=title, border_style=style))
 
     def report_failure(self, error: Exception) -> None:
         """Log a failed command with its sanitized detail and, when known, a fixed remedy."""

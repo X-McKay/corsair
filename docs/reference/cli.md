@@ -168,6 +168,9 @@ corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
 
 # Per-role native receipts behind the committed result.
 corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
+
+# The result panel followed by the plain-language explanation.
+corsair inspect "$RUN_ID" --explain --settings .state/settings.json
 ```
 
 Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one.
@@ -175,6 +178,29 @@ Without `--online`, `inspect` reads the immutable committed result from the shar
 With `--online`, it uses the workflow’s native status query without opening or creating a local artifact store. `--watch` without `--online` is rejected before runtime I/O. For an investigation, the reported phase and round come from the actual Temporal workflow state, not a CLI estimate. For an evaluation, the status reports actual completed and total child work. `--watch` repeats the native status query while the workflow remains open, then waits for and returns the workflow’s actual final result. It does not fabricate a percentage, infer model progress, or turn an activity heartbeat into a security conclusion.
 
 `--evidence` reads the committed result offline (it is rejected with `--online`) and walks each round's observation, and the fixed-revision observation when present, to its committed operation record, evidence bundle and raw container receipts. Each observation reports `committed` (the operation record resolves to the same observation the result carries), `evidence` (`present`, `absent` or `unreadable`), `cleanup_confirmed`, the feedback `gate`, and `receipts_admissible`: whether the saved receipts still pass the trusted verifier's admission rules, or `null` when the round has no submission or the result has no manifest. When the receipts are admissible it also reports, from the verified prepared case, `target_line` (the line the coverage gate checked) and `line_provenance` (`declared`, or `recipe_function` when prepare derived the line from the recipe function); both are `null` otherwise. Per role it reports the admitted `outcome`, `target_executed`, `covered_lines` and `native_exit_code`, and from the raw receipt only `receipt` status, `cleanup_confirmed`, `container_id`, `image_id`, `docker_exit_code` and the receipt digest. Payloads, the driver job and record, the rest of the prepared case (finding text, recipe and source excerpt) and model output are never printed. The view is a navigation aid, not a verdict: the label remains the result's code-decided `verdict`, and `receipts_admissible: false` is an operational fact to investigate, never a negative security result.
+
+`--explain` reads the committed result offline (it is rejected with `--online` or `--evidence`) and adds the [`explain`](#explain-run_id) statements after the result. Its JSON is `{"result": ..., "run_id", "case_id", "verdict", "statements"}`.
+
+### `explain RUN_ID`
+
+```bash
+corsair explain "$RUN_ID" --settings .state/settings.json
+corsair --format json explain "$RUN_ID" --settings .state/settings.json | jq -r '.statements[] | select(.kind == "change") | .text'
+```
+
+Explains a committed result's verdict in plain language, offline: it reads the result from the artifact store, re-validates each round's saved receipts, builds the [gate ledger](../agents/evaluations.md#reading-results) and passes both to the pure [`explain_result`](../../src/corsair/policies/explanation.py). It never contacts Temporal, Docker or a model and never changes the label. The output is `run_id`, `case_id`, `verdict` and an ordered list of `statements`, each with `kind`, `session`, `gate` and `text`:
+
+| `kind` | What it states |
+| --- | --- |
+| `verdict` | The label with execution status, claimed scope and fix status. |
+| `rule` | The verdict-table rule behind that label ([ADR 0004](../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md)). |
+| `session` | Per session: rounds and the gate that stopped each, then the last evaluated round's decisive facts (control and exploit outcome, whether the declared target line ran in both runs, audit decision), or that it demonstrated or ended in a clean negative. |
+| `shortfall` | The single gate at which a non-decisive session fell short, with its fixed meaning. A run that did not complete is attributed to its operational stop. |
+| `policy` | `negative_threshold` and `max_sessions` from the manifest, sessions run and clean negatives reached, a `budget_exhausted` stop, and the request digest that identifies the budget (the limits themselves are not recorded in the result). |
+| `fix` | What the fixed-revision status means for this label. |
+| `change` | What would change the label, derived from the verdict table: for example how many more clean negatives `EXPLOIT_NOT_DEMONSTRATED` needs, what each short session needed, or that only a `NOT_BLOCKED` fixed revision withholds a demonstration. |
+
+Every sentence is fixed text over enum values, counts and gate names. The explanation never reads payloads, the hypothesis or plan, the audit rule or reason, a producer abstention, feedback reasons or the result's `reason` (which can carry model text), and it reads no oracle. A round whose receipts no longer validate is explained as `evidence_unverified` rather than from its unverified fields. A missing result fails with the same remedy as `inspect`. The [glossary](glossary.md) defines the labels and gate terms it uses.
 
 ### `runs`
 
@@ -287,7 +313,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. `runs` and `inspect` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 
