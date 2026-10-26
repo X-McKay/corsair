@@ -209,6 +209,39 @@ Configuration identity: the kernel (distinct candidates, withheld negatives, imp
 schema, the C driver and image, and `risk.md` all changed; no baseline was promoted and the round-3 live records
 predate this identity.
 
+### Live chain per runtime under the round-4 identity (operator vLLM, dev Temporal, rebuilt images)
+
+Head `5b601788`, one repeat each, then three Java repeats. Records:
+`.runs/live/20261026T17{4151,4342,4514,4548,4918,5008}Z-chain-chain-<language>/` and
+`.runs/live/20261026T175122Z-chain-chain-java/`.
+
+| Runtime | Case | Verdict | Resolved | LLM calls | Agent s | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Python | chain-python-cmdi-b | EXPLOIT_DEMONSTRATED | yes | 5 | 54 | |
+| Python | chain-python-cmdi-a | INCONCLUSIVE | no (permitted) | 1 | 19 | producer abstained, as in round 3 |
+| Python | chain-python-codeinjection-b | EXPLOIT_DEMONSTRATED | yes | 5 | 35 | |
+| JavaScript | js-prototypepollution-a | EXPLOIT_DEMONSTRATED | yes | 7 | 89 | corrected label |
+| Ruby | ruby-pathtraversal | EXPLOIT_DEMONSTRATED | yes | 2 | 32 | |
+| Java | java-xxe-b (first run) | INCONCLUSIVE | no (permitted) | 8 | 200 | see below |
+| Java | java-xxe-b (3 repeats) | 2 demonstrated, 1 ERROR | 2 of 3 | 4 to 5 | 36 to 72 | see below |
+| Perl | perl-xss-b | EXPLOIT_DEMONSTRATED | yes | 5 | 47 | |
+| C | c-intoverflow-a | EXPLOIT_DEMONSTRATED | yes | 5 | 28 | sanitizer text and exit status |
+
+Every demonstrated case ran control and exploit in the real runtime image with valid evidence; no forbidden label or
+invalid positive evidence; every audit rule was a coherent enum value. The Java runs show the round-4 kernel doing
+what it was changed to do, and the producer gap the review named:
+
+- First run: the producer aimed the external entity at system files (`/etc/passwd`, then `/etc/hosts`) instead of
+  the private fixture named in the finding. The trusted observation held in both rounds; the auditor accepted the
+  first (the per-kind rubric gap: an accepted claim that cannot satisfy the recipe's condition) and rejected the
+  second on R4. The kernel withheld the clean negative (`clean_negative_unqualified`) and stopped INCONCLUSIVE;
+  before round 4 a second such session could have been counted toward EXPLOIT_NOT_DEMONSTRATED.
+- Repeats: two proposals aimed at the fixture and demonstrated; one aimed a relative `file:` entity at the public
+  fixture, the parser raised, the driver reported the adversarial role as an execution error and the kernel labelled
+  the run ERROR (never a verdict). Over the four Java runs under this identity: 2 demonstrated, 1 INCONCLUSIVE,
+  1 ERROR, 0 false labels. Aim variance on the Java XXE case is the producer-side item for the per-kind notes
+  (owner decision 8).
+
 Gates on the integrated branch after round 4: `just check` pass; offline 1065 passed; Temporal 54 passed, 10 skipped (replay included);
 Docker 58 passed, 1 skipped (opt-in long probe) with images rebuilt by `just images`; wheel built and its new modules and resources loaded from outside the checkout.
 
