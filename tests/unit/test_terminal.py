@@ -327,3 +327,272 @@ def test_client_only_operations_do_not_import_worker_or_adk_composition():
         timeout=10,
     )
     assert result.returncode == 0, result.stderr
+
+
+# Payload, hypothesis, plan and model-authored reason strings that human output must never show.
+_PRIVATE = (
+    "CONTROL-PAYLOAD-SENTINEL",
+    "EXPLOIT-PAYLOAD-SENTINEL",
+    "HYPOTHESIS-SENTINEL",
+    "PLAN-SENTINEL",
+    "AUDIT-REASON-SENTINEL",
+    "FEEDBACK-REASON-SENTINEL",
+)
+
+
+def _manifest():
+    from corsair.contracts import RunManifest
+
+    return RunManifest(
+        package_version="0.1.0",
+        request_digest="1" * 64,
+        config_digest="2" * 64,
+        producer_prompt_digest="3" * 64,
+        auditor_prompt_digest="4" * 64,
+        image_id="sha256:" + "5" * 64,
+        models={"producer": "scripted-producer", "auditor": "scripted-auditor"},
+    )
+
+
+def _proposal():
+    from corsair.contracts import (
+        PlanRevision,
+        ProducerDecision,
+        ProducerProposal,
+        Submission,
+    )
+
+    submission = Submission(
+        hypothesis="HYPOTHESIS-SENTINEL",
+        plan=PlanRevision(
+            revision=1,
+            objective="PLAN-SENTINEL objective",
+            next_steps=["PLAN-SENTINEL step"],
+            reason="PLAN-SENTINEL reason",
+        ),
+        control_payload={"path": "CONTROL-PAYLOAD-SENTINEL"},
+        exploit_payload={"path": "../EXPLOIT-PAYLOAD-SENTINEL"},
+    )
+    return ProducerDecision(root=ProducerProposal(submission=submission))
+
+
+def _observation(adversarial_outcome, *, operation_id="run1.r1"):
+    from corsair.contracts import ArtifactRef, Observation, RoleObservation, RoleOutcome
+
+    return Observation(
+        operation_id=operation_id,
+        source_digest="6" * 64,
+        submission_digest="7" * 64,
+        control=RoleObservation(
+            outcome=RoleOutcome.HELD,
+            target_executed=True,
+            covered_lines=[12, 13, 14, 20],
+            reason="validated native pytest/coverage evidence",
+            native_exit_code=0,
+        ),
+        adversarial=RoleObservation(
+            outcome=adversarial_outcome,
+            target_executed=True,
+            covered_lines=[12, 13, 14, 20, 21],
+            reason="validated native pytest/coverage evidence",
+            native_exit_code=1 if adversarial_outcome is RoleOutcome.VIOLATION else 0,
+        ),
+        artifact=ArtifactRef(sha256="8" * 64, size=512),
+        cleanup_confirmed=True,
+    )
+
+
+def _audit(decision, rule):
+    from corsair.contracts import AuditOutput, AuditResult, Usage
+
+    return AuditOutput(
+        review=AuditResult(decision=decision, rule=rule, reason="AUDIT-REASON-SENTINEL"),
+        usage=Usage(llm_calls=1, input_tokens=300, output_tokens=40, seconds=1.5),
+    )
+
+
+def _demonstrated_result():
+    from corsair.contracts import (
+        ArtifactRef,
+        AuditDecision,
+        Disposition,
+        ExecutionStatus,
+        InvestigationResult,
+        ProducerOutput,
+        RoleOutcome,
+        RoundResult,
+        Usage,
+        Verdict,
+    )
+
+    return InvestigationResult(
+        run_id="run1",
+        case_id="case01",
+        disposition=Disposition.SUPPORTED,
+        verdict=Verdict.EXPLOIT_DEMONSTRATED,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="paired native observation supports the component claim",
+        manifest=_manifest(),
+        rounds=[
+            RoundResult(
+                index=1,
+                producer=ProducerOutput(
+                    decision=_proposal(),
+                    usage=Usage(
+                        llm_calls=3, tool_calls=4, input_tokens=1200, output_tokens=210, seconds=4
+                    ),
+                ),
+                observation=_observation(RoleOutcome.VIOLATION),
+                audit=_audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+            )
+        ],
+        result_artifact=ArtifactRef(sha256="9" * 64, size=2048),
+    )
+
+
+def _inconclusive_result():
+    from corsair.contracts import (
+        AuditDecision,
+        Disposition,
+        ExecutionStatus,
+        Feedback,
+        InvestigationResult,
+        ProducerOutput,
+        RoleOutcome,
+        RoundResult,
+        Usage,
+        Verdict,
+    )
+
+    rejected = RoundResult(
+        index=1,
+        producer=ProducerOutput(decision=_proposal(), usage=Usage(llm_calls=2, tool_calls=1)),
+        observation=_observation(RoleOutcome.VIOLATION),
+        audit=_audit(AuditDecision.REJECT, "payload-not-grounded"),
+    )
+    held = RoundResult(
+        index=2,
+        session=2,
+        producer=ProducerOutput(
+            decision=_proposal(),
+            usage=Usage(llm_calls=1, tool_calls=2),
+            feedback=Feedback(gate="audit", reason="FEEDBACK-REASON-SENTINEL"),
+        ),
+        observation=_observation(RoleOutcome.HELD, operation_id="run2.s2.r2"),
+        audit=_audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+    )
+    return InvestigationResult(
+        run_id="run2",
+        case_id="case02",
+        disposition=Disposition.INCONCLUSIVE,
+        verdict=Verdict.INCONCLUSIVE,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="Investigation budget exhausted.",
+        manifest=_manifest(),
+        rounds=[rejected, held],
+        usage_complete=False,
+    )
+
+
+def _human(capsys, value, *extra):
+    terminal = Terminal(parser().parse_args(["--format", "human", *extra, "report", "x"]))
+    terminal.emit(value)
+    return capsys.readouterr().out
+
+
+def _assert_private_content_absent(output):
+    for sentinel in _PRIVATE:
+        assert sentinel not in output, sentinel
+
+
+def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys):
+    output = _human(capsys, _demonstrated_result(), "--no-color")
+
+    verdict = output.index("EXPLOIT_DEMONSTRATED")
+    assert verdict < output.index("Rounds") < output.index("Identity")
+    assert "SUPPORTED" in output and "COMPLETED" in output and "component" in output
+    assert "held" in output and "violated" in output
+    assert "L12-14, 20 " in output and "L12-14, 20-21" in output
+    assert "ACCEPT" in output and "differential-is-relevant" in output
+    assert "3 llm · 4 tool" in output and "1200/210 tok" in output
+    assert "scripted-producer" in output and "sha256:555555555555" in output
+    # The full result digest is folded across lines at 80 columns, never ellipsized.
+    assert "9" * 64 in "".join(ch for ch in output if ch not in " │\n")
+    # Totals come from the shared scoring calculation: producer plus audit usage.
+    assert "LLM calls       4 " in output and "Input tokens    1500" in output
+    assert "Cost            unknown" in output
+    assert "…" not in output.split("Identity")[0]  # no fact is ellipsized at 80 columns
+    _assert_private_content_absent(output)
+
+
+def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(capsys):
+    output = _human(capsys, _inconclusive_result(), "--no-color")
+
+    assert output.index("INCONCLUSIVE") < output.index("Rounds")
+    assert "REJECT" in output and "payload-not-grounded" in output
+    assert "gate: audit" in output
+    assert "2.2" in output  # session 2, round 2
+    assert "tokens unknown" in output
+    assert "Usage complete  false" in output
+    assert "LLM calls       unknown" in output
+    _assert_private_content_absent(output)
+
+
+def test_human_verify_observation_renders_roles_without_a_verdict(capsys):
+    from corsair.contracts import RoleOutcome
+
+    output = _human(capsys, _observation(RoleOutcome.VIOLATION), "--no-color")
+
+    assert "Native reference observation" in output
+    assert "no security verdict" in output
+    assert "EXPLOIT_DEMONSTRATED" not in output
+    assert "control" in output and "adversarial" in output
+    assert "held" in output and "violated" in output
+    assert "L12-14, 20-21" in output
+    assert "validated native" in output  # kernel-authored role reason
+    assert "Cleanup           confirmed" in output
+    assert "run1.r1" in output
+    _assert_private_content_absent(output)
+
+
+def test_human_result_colours_verdict_without_interpreting_markup(capsys, monkeypatch):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    result = _demonstrated_result().model_copy(update={"reason": "[bold]not markup[/bold]"})
+
+    output = _human(capsys, result)
+
+    assert "\x1b[1;31mEXPLOIT_DEMONSTRATED" in output
+    assert "[bold]not markup[/bold]" in output
+    _assert_private_content_absent(output)
+
+
+def test_json_result_and_observation_are_unchanged_dumps(capsys):
+    from corsair.contracts import RoleOutcome
+
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+    for value in (_demonstrated_result(), _observation(RoleOutcome.HELD)):
+        terminal.emit(value)
+        expected = json.dumps(value.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"
+        assert capsys.readouterr().out == expected
+
+
+def test_human_result_renders_fixed_revision_roles_and_gate(capsys):
+    from corsair.contracts import Feedback, FixStatus, RoleOutcome
+
+    fixed = _observation(RoleOutcome.HELD, operation_id="run1.fix1").model_copy(
+        update={
+            "cleanup_confirmed": False,
+            "feedback": Feedback(gate="sandbox", reason="FEEDBACK-REASON-SENTINEL"),
+        }
+    )
+    result = _demonstrated_result().model_copy(
+        update={"fix_status": FixStatus.NOT_BLOCKED, "fix_observation": fixed}
+    )
+
+    output = _human(capsys, result, "--no-color")
+
+    assert output.index("Rounds") < output.index("Fixed revision") < output.index("Identity")
+    assert "NOT_BLOCKED" in output
+    assert "cleanup NOT confirmed · gate: sandbox" in output
+    _assert_private_content_absent(output)

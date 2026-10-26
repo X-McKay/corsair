@@ -10,25 +10,65 @@ from contextlib import nullcontext
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import TypeAdapter
-from rich.console import Console
+from rich.console import Console, Group
 from rich.json import JSON
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from corsair.contracts import InvestigationResult
+from corsair.contracts import (
+    AuditDecision,
+    AuditOutput,
+    ExecutionStatus,
+    InvestigationResult,
+    NoGroundedCandidate,
+    Observation,
+    RoleObservation,
+    RoleOutcome,
+    RoundResult,
+    Usage,
+    Verdict,
+)
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_text
 
-_STYLES: dict[str, str] = {
-    "SUPPORTED": "green",
-    "CONDITIONAL": "yellow",
-    "INCONCLUSIVE": "yellow",
-    "ERROR": "red",
-    "BLOCKED": "red",
-    "CANCELLED": "yellow",
-    "COMPLETED": "green",
+# Colour by what the label means to an operator: a demonstrated exploit is the
+# finding coming true (red), a scoped negative is the property holding (green),
+# a non-decisive stop is yellow and an operational stop is magenta.
+_VERDICT_STYLES: dict[Verdict, str] = {
+    Verdict.EXPLOIT_DEMONSTRATED: "bold red",
+    Verdict.COMPONENT_EXPLOIT_DEMONSTRATED: "red",
+    Verdict.EXPLOIT_NOT_DEMONSTRATED: "green",
+    Verdict.INCONCLUSIVE: "yellow",
+    Verdict.UNABLE_TO_RUN: "magenta",
+    Verdict.ERROR: "bold magenta",
 }
+_STATUS_STYLES: dict[ExecutionStatus, str] = {
+    ExecutionStatus.COMPLETED: "green",
+    ExecutionStatus.BLOCKED: "red",
+    ExecutionStatus.ERROR: "red",
+    ExecutionStatus.CANCELLED: "yellow",
+}
+_OUTCOME_STYLES: dict[RoleOutcome, str] = {
+    RoleOutcome.HELD: "green",
+    RoleOutcome.VIOLATION: "red",
+    RoleOutcome.INVALID: "yellow",
+    RoleOutcome.ERROR: "magenta",
+}
+_AUDIT_STYLES: dict[AuditDecision, str] = {
+    AuditDecision.ACCEPT: "green",
+    AuditDecision.REJECT: "red",
+    AuditDecision.INSUFFICIENT: "yellow",
+}
+# Human words for the kernel's role outcomes; JSON keeps the enum values.
+_OUTCOME_WORDS: dict[RoleOutcome, str] = {
+    RoleOutcome.HELD: "held",
+    RoleOutcome.VIOLATION: "violated",
+    RoleOutcome.INVALID: "invalid",
+    RoleOutcome.ERROR: "error",
+}
+_MAX_LINE_RANGES = 4
+_MAX_RULE_CHARS = 48
 T = TypeVar("T")
 
 
@@ -43,6 +83,157 @@ class TerminalOptions(Protocol):
 
 def _text(value: object) -> Text:
     return Text("unknown" if value is None else safe_text(value))
+
+
+def _label(key: str) -> Text:
+    return Text(key, style="cyan")
+
+
+def _grid() -> Table:
+    """A label/value grid whose values wrap rather than hide characters."""
+    grid = Table.grid(padding=(0, 2), expand=True)
+    grid.add_column(no_wrap=True)
+    grid.add_column(ratio=1, overflow="fold")
+    return grid
+
+
+def _outcome(role: RoleObservation) -> Text:
+    return Text(
+        _OUTCOME_WORDS.get(role.outcome, role.outcome.value),
+        style=_OUTCOME_STYLES.get(role.outcome, "cyan"),
+    )
+
+
+def _short(value: str, keep: int = 12) -> str:
+    """Abbreviate a digest for reading; JSON output keeps the full value."""
+    prefix, _, rest = value.rpartition(":")
+    body = rest if prefix else value
+    head = f"{prefix}:" if prefix else ""
+    return f"{head}{body[:keep]}…" if len(body) > keep else value
+
+
+def _line_ranges(lines: list[int]) -> str:
+    """Compress covered target lines (12,13,14,20 -> L12-14, 20)."""
+    ordered = sorted(set(lines))
+    if not ordered:
+        return "no lines"
+    ranges: list[str] = []
+    start = previous = ordered[0]
+    for line in [*ordered[1:], None]:
+        if line is not None and line == previous + 1:
+            previous = line
+            continue
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
+        if line is not None:
+            start = previous = line
+    shown = ", ".join(ranges[:_MAX_LINE_RANGES])
+    hidden = len(ranges) - _MAX_LINE_RANGES
+    return f"L{shown}" + (f" +{hidden} more" if hidden > 0 else "")
+
+
+def _role_cell(role: RoleObservation | None) -> Text:
+    """Outcome and coverage only; the role reason stays in the JSON receipt."""
+    if role is None:
+        return Text("not observed", style="dim")
+    cell = _outcome(role)
+    cell.append(f"\n{_line_ranges(role.covered_lines)}", style="dim")
+    if not role.target_executed:
+        cell.append("\nnot executed", style="yellow")
+    return cell
+
+
+def _usage_lines(usage: Usage) -> str:
+    tokens = (
+        "tokens unknown"
+        if usage.input_tokens is None or usage.output_tokens is None
+        else f"{usage.input_tokens}/{usage.output_tokens} tok"
+    )
+    return f"\n{usage.llm_calls} llm · {usage.tool_calls} tool\n{tokens}"
+
+
+def _producer_cell(item: RoundResult) -> Text:
+    """Decision kind and gate name only: abstention and feedback reasons can be model text."""
+    decision = item.producer.decision
+    if decision is None:
+        cell = Text("no decision", style="yellow")
+    elif isinstance(decision.root, NoGroundedCandidate):
+        cell = Text("abstained", style="yellow")
+    else:
+        cell = Text("proposal")
+    feedback = item.producer.feedback
+    if feedback is None and item.observation is not None:
+        feedback = item.observation.feedback
+    if feedback is not None:
+        cell.append(f"\ngate: {safe_text(feedback.gate)}", style="yellow")
+    cell.append(_usage_lines(item.producer.usage), style="dim")
+    return cell
+
+
+def _audit_cell(audit: AuditOutput | None) -> Text:
+    """Decision and rule name only; the auditor's free-text reason is never shown."""
+    if audit is None:
+        return Text("not audited", style="dim")
+    if audit.review is None:
+        cell = Text("no review", style="yellow")
+        if audit.feedback:
+            cell.append(f"\ngate: {safe_text(audit.feedback.gate)}", style="yellow")
+        return cell
+    review = audit.review
+    rule = safe_text(review.rule)
+    if len(rule) > _MAX_RULE_CHARS:
+        rule = rule[: _MAX_RULE_CHARS - 1] + "…"
+    cell = Text(review.decision.value, style=_AUDIT_STYLES.get(review.decision, "cyan"))
+    cell.append(f"\n{rule}", style="dim")
+    return cell
+
+
+def _rounds_table(rounds: list[RoundResult]) -> Table:
+    table = Table(title="Rounds", title_justify="left", expand=True)
+    table.add_column("S.R", no_wrap=True)
+    for column in ("Producer", "Control", "Adversarial", "Audit"):
+        table.add_column(column, overflow="fold")
+    for item in rounds:
+        observation = item.observation
+        table.add_row(
+            Text(f"{item.session}.{item.index}"),
+            _producer_cell(item),
+            _role_cell(observation.control if observation else None),
+            _role_cell(observation.adversarial if observation else None),
+            _audit_cell(item.audit),
+        )
+    return table
+
+
+def _roles_table(observation: Observation, title: str, *, caption: bool = False) -> Table:
+    """Kernel-authored role facts for a native observation; no payload or model content."""
+    table = Table(title=title, title_justify="left", expand=True)
+    if caption:
+        summary = Text("cleanup ") + _cleanup_text(observation.cleanup_confirmed)
+        if observation.feedback is not None:
+            summary.append(f" · gate: {safe_text(observation.feedback.gate)}", style="yellow")
+        table.caption = summary
+        table.caption_justify = "left"
+    for column in ("Role", "Outcome", "Ran", "Exit", "Coverage", "Reason"):
+        table.add_column(column, overflow="fold")
+    for name, role in (("control", observation.control), ("adversarial", observation.adversarial)):
+        if role is None:
+            table.add_row(
+                Text(name), Text("not observed", style="dim"), *(Text("") for _ in "1234")
+            )
+            continue
+        table.add_row(
+            Text(name),
+            _outcome(role),
+            Text("yes" if role.target_executed else "no"),
+            _text(role.native_exit_code),
+            Text(_line_ranges(role.covered_lines)),
+            _text(role.reason or "-"),
+        )
+    return table
+
+
+def _cleanup_text(confirmed: bool) -> Text:
+    return Text("confirmed", style="green") if confirmed else Text("NOT confirmed", style="red")
 
 
 class Terminal:
@@ -78,7 +269,9 @@ class Terminal:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
         if isinstance(rendered, dict) and "disposition" in rendered:
-            self._result(rendered)
+            self._result(InvestigationResult.model_validate(rendered))
+        elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
+            self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "checks" in rendered:
             table = Table("Check", "Status", "Details", expand=True)
             for check in rendered["checks"]:
@@ -109,54 +302,97 @@ class Terminal:
                 )
             )
 
-    def _result(self, value: dict[str, Any]) -> None:
-        """Render a validated investigation result without exposing model content."""
-        table = Table.grid(padding=(0, 2), expand=True)
-        label = value["disposition"]
-        table.add_row(
-            Text("Disposition", style="cyan"), Text(label, style=_STYLES.get(label, "cyan"))
+    def _result(self, result: InvestigationResult) -> None:
+        """Verdict first, then rounds, identity and totals; never model or payload content."""
+        style = _VERDICT_STYLES.get(result.verdict, "cyan") if result.verdict else "cyan"
+        header = _grid()
+        header.add_row(
+            _label("Verdict"),
+            Text(result.verdict.value, style=style)
+            if result.verdict
+            else Text("not recorded", style="yellow"),
         )
-        for key in ("run_id", "case_id", "execution_status", "scope", "reason", "fix_status"):
-            table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(value.get(key)))
-        for item in value.get("rounds", []):
-            observation = item.get("observation") or {}
-            session = item.get("session", 1)
-            name = (
-                f"Round {item['index']}"
-                if session == 1
-                else f"Session {session} round {item['index']}"
-            )
-            for role in ("control", "adversarial"):
-                evidence = observation.get(role) or {}
-                detail = (
-                    f"{evidence.get('outcome', 'not observed')} · "
-                    f"exit={evidence.get('native_exit_code')} · "
-                    f"coverage={evidence.get('covered_lines', [])}"
-                )
-                table.add_row(_text(f"{name} {role}"), _text(detail))
-            audit = (item.get("audit") or {}).get("review") or {}
-            table.add_row(_text(f"{name} audit"), _text(audit.get("decision")))
-            usage = item["producer"]["usage"]
+        header.add_row(
+            _label("Execution"),
+            Text(
+                result.execution_status.value,
+                style=_STATUS_STYLES.get(result.execution_status, "cyan"),
+            ),
+        )
+        header.add_row(_label("Disposition"), _text(result.disposition.value))
+        header.add_row(_label("Scope"), _text(result.scope.value))
+        header.add_row(_label("Fix"), _text(result.fix_status.value))
+        header.add_row(_label("Reason"), _text(result.reason))
+        header.add_row(_label("Run"), _text(result.run_id))
+        header.add_row(_label("Case"), _text(result.case_id))
+        self.out.print(Panel(header, title="Corsair · Investigation", border_style=style))
+        if result.rounds:
+            self.out.print(_rounds_table(result.rounds))
+        else:
+            self.out.print(Text("No rounds recorded.", style="dim"))
+        if result.fix_observation is not None:
+            self.out.print(_roles_table(result.fix_observation, "Fixed revision", caption=True))
+        self.out.print(self._identity(result))
+
+    @staticmethod
+    def _identity(result: InvestigationResult) -> Panel:
+        table = _grid()
+        manifest = result.manifest
+        if manifest is not None:
+            table.add_row(_label("Package"), _text(manifest.package_version))
+            table.add_row(_label("Image"), _text(_short(manifest.image_id)))
+            for key, value in (
+                ("Request", manifest.request_digest),
+                ("Config", manifest.config_digest),
+                ("Producer prompt", manifest.producer_prompt_digest),
+                ("Auditor prompt", manifest.auditor_prompt_digest),
+            ):
+                table.add_row(_label(key), _text(_short(value)))
+            for role, model in manifest.models.items():
+                table.add_row(_label(f"{role.title()} model"), _text(model))
             table.add_row(
-                _text(f"{name} producer"),
-                _text(f"{usage['llm_calls']} LLM / {usage['tool_calls']} tool calls"),
+                _label("Evidence policy"),
+                _text(
+                    f"{manifest.negative_threshold} negatives · {manifest.max_sessions} sessions"
+                ),
             )
-            feedback = item["producer"].get("feedback") or observation.get("feedback")
-            if feedback:
-                table.add_row(Text("Gate", style="yellow"), _text(feedback["gate"]))
-        table.add_row(
-            Text("Usage complete", style="cyan"), _text(value.get("usage_complete", True))
-        )
-        for key, total in usage_metrics(InvestigationResult.model_validate(value)).items():
-            table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(total))
-        for role, model in (value.get("manifest") or {}).get("models", {}).items():
-            table.add_row(Text(f"{role.title()} model", style="cyan"), _text(model))
-        table.add_row(Text("Cost", style="cyan"), Text("unknown"))
-        artifact = value.get("result_artifact") or {}
-        table.add_row(Text("Result SHA-256", style="cyan"), _text(artifact.get("sha256")))
+        else:
+            table.add_row(_label("Manifest"), Text("not recorded", style="yellow"))
+        totals = Table.grid(padding=(0, 2))
+        totals.add_row(_label("Usage complete"), _text(str(result.usage_complete).lower()))
+        for key, total in usage_metrics(result).items():
+            if key == "agent_seconds" and total is not None:
+                total = f"{total:.1f}"
+            name = key.replace("_", " ").capitalize().replace("Llm", "LLM")
+            totals.add_row(_label(name), _text(total))
+        totals.add_row(_label("Cost"), Text("unknown"))
+        layout = Table.grid(padding=(0, 4), expand=True)
+        layout.add_column(ratio=3)
+        layout.add_column(ratio=2)
+        layout.add_row(table, totals)
+        artifact = _grid()
+        reference = result.result_artifact
+        artifact.add_row(_label("Result SHA-256"), _text(reference.sha256 if reference else None))
+        return Panel(Group(layout, artifact), title="Identity · Totals", border_style="cyan")
+
+    def _observation(self, observation: Observation) -> None:
+        """A native reference replay: role facts and identity, explicitly without a verdict."""
+        header = _grid()
+        header.add_row(_label("Verdict"), Text("none · no security verdict", style="dim"))
+        header.add_row(_label("Operation"), _text(observation.operation_id))
+        header.add_row(_label("Source"), _text(_short(observation.source_digest)))
+        header.add_row(_label("Submission"), _text(_short(observation.submission_digest)))
+        header.add_row(_label("Cleanup"), _cleanup_text(observation.cleanup_confirmed))
+        if observation.feedback is not None:
+            gate = Text(safe_text(observation.feedback.gate), style="yellow")
+            gate.append(f" · {safe_text(observation.feedback.reason)}")
+            header.add_row(_label("Gate"), gate)
+        artifact = observation.artifact
+        header.add_row(_label("Evidence SHA-256"), _text(artifact.sha256 if artifact else None))
         self.out.print(
-            Panel(table, title="Corsair · Investigation", border_style=_STYLES.get(label, "cyan"))
+            Panel(header, title="Corsair · Native reference observation", border_style="cyan")
         )
+        self.out.print(_roles_table(observation, "Roles"))
 
     async def wait(
         self,

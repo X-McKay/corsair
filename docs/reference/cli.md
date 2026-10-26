@@ -36,7 +36,38 @@ In human mode, the CLI uses compact Rich output when the terminal supports it. `
 
 ## Result and log confidentiality
 
-A completed human investigation panel contains only the operator-facing conclusion and identifiers: disposition/execution state, reason, scope, control result, adversarial result, audit decision, usage summary, and artifact identity. It does not invent an intermediate stage or claim unobserved work.
+A completed human investigation rendering leads with the canonical verdict, coloured by meaning (red: exploit demonstrated, green: exploit not demonstrated, yellow: inconclusive, magenta: unable to run or error), followed by execution status, disposition, scope, fix status, the result reason and run/case identity. A rounds table then lists, per session and round, the producer's decision kind (proposal, abstained or no decision), the gate name that stopped or redirected it, its LLM/tool calls and tokens, the control and adversarial outcomes with their covered target lines, and the audit decision with its rule name. A fixed-revision observation, when present, gets its own role table. The last panel shows the manifest identity (package, abbreviated image and prompt/config digests, models, evidence policy), the full result SHA-256 and the usage totals; missing usage and cost stay `unknown`.
+
+It never shows payloads, the hypothesis or plan, the auditor's reason, feedback reasons (which can carry model text) or any oracle data. Values are rendered as plain text, never as Rich markup, and long values wrap instead of being cut. It does not invent an intermediate stage or claim unobserved work. JSON output is unchanged and remains the complete record.
+
+```text
+╭────────────────────────── Corsair · Investigation ───────────────────────────╮
+│ Verdict      EXPLOIT_DEMONSTRATED                                            │
+│ Execution    COMPLETED                                                       │
+│ Disposition  SUPPORTED                                                       │
+│ Scope        component                                                       │
+│ Fix          NOT_REQUESTED                                                   │
+│ Reason       paired native observation supports the component claim          │
+│ Run          run1                                                            │
+│ Case         case01                                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Rounds
+┏━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ S.R ┃ Producer       ┃ Control    ┃ Adversarial   ┃ Audit                    ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1.1 │ proposal       │ held       │ violated      │ ACCEPT                   │
+│     │ 3 llm · 4 tool │ L12-14, 20 │ L12-14, 20-21 │ differential-is-relevant │
+│     │ 1200/210 tok   │            │               │                          │
+└─────┴────────────────┴────────────┴───────────────┴──────────────────────────┘
+╭───────────────────────────── Identity · Totals ──────────────────────────────╮
+│ Package          0.1.0                        Usage complete  true           │
+│ Image            sha256:555555555555…         LLM calls       4              │
+│ Request          111111111111…                Tool calls      4              │
+│ ...                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+The example uses synthetic digests and model names.
 
 Structured JSON logs use a metadata allowlist: for example, timestamp, level, run/workflow identity, workflow phase/round, event name, and safe exception classification. They must not serialize prompts, source excerpts, source trees, payloads, secrets, provider responses, or raw model reasoning. Before exception text is emitted, configured endpoint URLs and known credential values from the environment are redacted. Text logs follow the same content boundary. Raw SDK content is suppressed because it can carry request data; the safe event retains the originating logger, severity and available exception class. Pydantic validation diagnostics identify failed fields without reflecting rejected values. With `--log-format json`, expected CLI errors are emitted as JSON Lines diagnostics rather than as a second plaintext error line.
 
@@ -87,6 +118,8 @@ corsair verify evals/fixtures/case01/request.json \
 ```
 
 Runs the trusted native reference observer directly against an admitted request/submission pair. It requires Docker and the configured image; it does not contact Temporal or a model. It returns observation data, never a release-facing security disposition. Use this first when bringing up a host or changing source-admission, driver, image, or runtime behavior.
+
+In human mode the observation is shown as a header (explicitly "no security verdict", operation identity, abbreviated source and submission digests, cleanup confirmation, any kernel gate with its reason, and the evidence SHA-256) and a role table with each role's outcome, whether the target ran, the native exit code, covered target lines and the kernel's role reason. It never shows the submitted payloads.
 
 `--run-id ID` optionally supplies the operation identity. A healthy control/adversarial execution exits `0`, whether it demonstrates a violation or not; an invalid or operational native observation exits `1`.
 
