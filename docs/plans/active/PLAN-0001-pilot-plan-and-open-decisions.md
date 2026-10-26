@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the primary runtime; Perl is qualified for the `perl.html_injection/1` recipe on one corpus row (Linux amd64, real Docker); JavaScript, Java and Ruby rows are carried in the corpus matrix only | A second runtime is qualified narrowly and per host; the remaining corpus rows preserve the matrix without claiming support. See [corpus-perl](../../reference/corpus-perl.md). |
 
 ## Gates and environment
 
@@ -40,7 +40,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 2. **Probe module versus payload pair.** The pilot keeps the payload-pair contract because the standing rules forbid agent-authored executable exploit code. If the owner wants the producer to write a probe module instead, that rule changes first and [ADR 0004](../../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md) is revisited.
 3. **Per-call Temporal plugin versus one episode per activity.** The pilot runs one ADK episode per activity. Adopting the ADK Temporal plugin needs a separate decision, conformance review and qualification.
 4. **`negative_threshold`.** Set to 2 for the pilot. Raising it costs more sessions per negative; lowering it to 1 is not acceptable under the false-negative rule.
-5. **Perl corpus licence.** The Perl rows under `evals/datasets/chain/perl/` need a licence decision before they are treated as redistributable corpus material.
+5. **Perl corpus licence.** The Perl rows under `evals/datasets/chain/perl/` need a licence decision before they are treated as redistributable corpus material. The qualified `perl-xss-b` row does not copy Perl source: its request points at the existing frozen corpus tree in place, so the licence decision is still outstanding and gates any redistribution.
 
 ## Blockers
 

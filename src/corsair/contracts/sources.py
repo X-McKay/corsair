@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_perl import PerlRecipe
 
 
 class Source(Contract):
@@ -107,12 +108,34 @@ class PythonRecipe(Contract):
         return self
 
 
+def _recipe_tag(value: object) -> str:
+    """Pick the recipe member by its ``kind`` tag.
+
+    A recipe serialized before any second language omits ``kind`` entirely; it is the
+    original Python secret-disclosure recipe, so a missing tag resolves there. This keeps
+    every frozen request/dataset byte valid while new language recipes carry their tag.
+    """
+    if isinstance(value, dict):
+        return str(value.get("kind", "python.secret_disclosure/1"))
+    return str(getattr(value, "kind", "python.secret_disclosure/1"))
+
+
+# The canonical recipe alternatives: one discriminated union on the stable ``kind`` tag,
+# following the ProducerDecision native pattern. PythonRecipe stays where it is; new
+# language recipes are added as members from their own modules.
+Recipe = Annotated[
+    Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[PerlRecipe, Tag("perl.html_injection/1")],
+    Discriminator(_recipe_tag),
+]
+
+
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
 
     @model_validator(mode="after")
@@ -176,7 +199,7 @@ class RunManifest(Contract):
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str

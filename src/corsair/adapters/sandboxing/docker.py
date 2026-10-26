@@ -28,6 +28,7 @@ from corsair.contracts import (
     ArtifactRef,
     Budget,
     PreparedCase,
+    PythonRecipe,
     Submission,
     digest,
 )
@@ -61,36 +62,39 @@ class DockerSandbox:
         self.settings = settings
         self._client: docker.DockerClient | None = client
         self._client_error: str | None = None
-        self._image_id: str | None = None
+        self._image_ids: dict[str, str] = {}
         if client is None:
             try:
                 self._client = docker.from_env()
             except DockerException as exc:
                 self._client_error = type(exc).__name__
 
-    @property
-    def image_id(self) -> str:
-        """Return the immutable Docker image ID or raise if it cannot be obtained."""
-        return self._ensure_image()
+    def image_id(self, recipe_kind: str) -> str:
+        """Return the immutable Docker image ID for a recipe kind, or raise."""
+        return self._ensure_image(recipe_kind)
 
-    def _ensure_image(self) -> str:
-        if self._image_id is not None:
-            return self._image_id
+    def _ensure_image(self, recipe_kind: str) -> str:
+        tag = self.settings.image_for(recipe_kind)
+        cached = self._image_ids.get(tag)
+        if cached is not None:
+            return cached
         client = self._client
         if client is None:
             raise SandboxUnavailable(
                 f"Docker client unavailable: {self._client_error or 'unknown error'}"
             )
         try:
-            image = client.images.get(self.settings.image)
+            image = client.images.get(tag)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with just images"
+                f"trusted image {tag} unavailable; build its Dockerfile under deploy/ "
+                "with just images"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
-        self._image_id = str(image.id)
-        return self._image_id
+        resolved = str(image.id)
+        self._image_ids[tag] = resolved
+        return resolved
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         """An old labeled container means the operation may have run; never rerun it."""
@@ -131,7 +135,12 @@ class DockerSandbox:
         private = root / "private"
         cls._mkdir(allowed)
         cls._mkdir(private)
-        for relative, content in prepared.recipe.public_files.items():
+        # Public fixtures belong to the Python secret-disclosure recipe; other language
+        # recipes stage none and the driver ignores the mount.
+        public_files = (
+            prepared.recipe.public_files if isinstance(prepared.recipe, PythonRecipe) else {}
+        )
+        for relative, content in public_files.items():
             destination = allowed.joinpath(*relative.split("/"))
             cls._mkdir(destination.parent)
             destination.write_text(content, encoding="utf-8")
@@ -267,7 +276,7 @@ class DockerSandbox:
 
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
-        image_id = self._ensure_image()
+        image_id = self._ensure_image(prepared.recipe.kind)
         client = self._client
         if client is None:
             raise SandboxUnavailable(

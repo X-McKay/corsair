@@ -86,9 +86,13 @@ class _FakeSandbox:
     unknown: bool = False
     cleanup_confirmed: bool = True
     calls: int = 0
-    image_id: str = "sha256:trusted"
+    image: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
+
+    def image_id(self, recipe_kind: str) -> str:
+        del recipe_kind
+        return self.image
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.

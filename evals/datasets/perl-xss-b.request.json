@@ -1,0 +1,33 @@
+{
+  "case": {
+    "case_id": "perl-xss-b",
+    "finding": {
+      "title": "Cross-site scripting in render",
+      "description": "The render sub interpolates the untrusted text argument directly into HTML markup (CWE-79). Investigate whether a payload can inject raw tags into the rendered comment. Only the text argument is caller controlled; it is appended after the recipe's fixed arguments.",
+      "file": "lib/Renderer.pm",
+      "line": 10,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "corpus/infosec-harness/perl/xss/b",
+      "expected_digest": "507ae0bafe40bdafa91268587768e72197453f614777a738d2756fe2113d3646"
+    },
+    "recipe": {
+      "kind": "perl.html_injection/1",
+      "module_file": "lib/Renderer.pm",
+      "package": "Renderer",
+      "function": "render",
+      "fixed_args": [],
+      "expected_control": "<div class='comment'>hello</div>",
+      "baseline_markup_chars": 4,
+      "allowed_exceptions": []
+    },
+    "fixed_source": {
+      "path": "corpus/infosec-harness/perl/xss/a",
+      "expected_digest": "9378bc3614372fe9b272f98a297da53951771ff3c7ff2673c9f7f94fd634d9d9"
+    }
+  },
+  "budget": {
+    "max_rounds": 2
+  }
+}

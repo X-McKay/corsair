@@ -13,8 +13,7 @@ class SandboxUnavailable(RuntimeError):
 
 
 class SandboxPort(Protocol):
-    @property
-    def image_id(self) -> str: ...
+    def image_id(self, recipe_kind: str) -> str: ...
 
     def has_unknown_operation(self, operation_id: str) -> bool: ...
 

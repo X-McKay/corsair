@@ -130,7 +130,7 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
 
 def test_real_docker_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(), client=client).image_id("python.secret_disclosure/1")
 
     settings, store, vulnerable = _prepared(tmp_path / "vulnerable-case", image_id)
     sandbox = DockerSandbox(settings, client=client, store=store)
@@ -229,7 +229,7 @@ def test_native_failures_and_canned_markers_never_become_positive(
     tmp_path, body, expected_control, expected_adversarial
 ):
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(), client=client).image_id("python.secret_disclosure/1")
     settings, store, prepared = _prepared(tmp_path, image_id)
     (tmp_path / "vulnerable/reader.py").write_text("\n\n\ndef read_file(root, path):\n" + body)
     case = Case(
@@ -261,7 +261,7 @@ def test_native_failures_and_canned_markers_never_become_positive(
 
 def test_native_timeout_removes_owned_container(tmp_path):
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(), client=client).image_id("python.secret_disclosure/1")
     settings, store, prepared = _prepared(tmp_path, image_id)
     (tmp_path / "vulnerable/reader.py").write_text(
         "\n\n\ndef read_file(root, path):\n    while True:\n        pass\n"
@@ -297,9 +297,12 @@ def test_real_docker_probe_deadline_can_exceed_120_seconds(tmp_path: Path) -> No
         pytest.skip("set CORSAIR_TEST_LONG_PROBE=1 to run the 121-second Docker regression")
     client = _docker_client()
     image = os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
-    image_id = DockerSandbox(Settings(image=image), client=client).image_id
+    probe_images = {"python.secret_disclosure/1": image}
+    image_id = DockerSandbox(Settings(image=image, images=probe_images), client=client).image_id(
+        "python.secret_disclosure/1"
+    )
     settings, store, prepared = _prepared(tmp_path, image_id)
-    settings = settings.model_copy(update={"image": image})
+    settings = settings.model_copy(update={"image": image, "images": probe_images})
     prepared = prepared.model_copy(
         update={
             "manifest": prepared.manifest.model_copy(update={"config_digest": settings.identity})

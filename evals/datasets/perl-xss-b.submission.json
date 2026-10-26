@@ -1,0 +1,15 @@
+{
+  "hypothesis": "render() concatenates the untrusted text straight into the HTML comment wrapper without escaping, so a payload carrying angle-bracketed markup injects raw tags; a benign word is rendered unchanged.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Show that caller-controlled text can introduce markup characters beyond the fixed template",
+    "next_steps": [
+      "Read lib/Renderer.pm",
+      "Submit a benign word and an angle-bracketed payload to render"
+    ],
+    "reason": "The sink interpolates $text into a string returned as HTML"
+  },
+  "control_payload": "hello",
+  "exploit_payload": "<script>alert(1)</script>"
+}

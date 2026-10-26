@@ -6,6 +6,8 @@ Source admission checks the APIs it actually uses rather than accepting an OS na
 
 These checks do not attest an arbitrary network, FUSE, synchronized-cloud or removable filesystem. Use a dedicated disposable workspace and test the filesystem that will hold source. Native targets still run only inside the reviewed Linux container, never inside the Nix shell on the host.
 
+Runtime images are per recipe kind. `corsair-python:0.1` serves the Python secret-disclosure recipe and `corsair-perl:0.1` the Perl html-injection recipe; `just images` builds every Dockerfile under `deploy/`. Each image's qualification is per host: the Perl recipe's real-Docker evidence (`tests/integration/test_docker_perl.py`, `corsair verify`) is recorded on **Linux amd64 only**. macOS arm64 and every other host are separate, unrun qualifications for it.
+
 ## Development and CI
 
 ```bash

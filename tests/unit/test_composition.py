@@ -52,9 +52,8 @@ class SourcesStub:
 
 
 class SandboxStub:
-    @property
-    def image_id(self) -> str:
-        raise AssertionError("unexpected image lookup")
+    def image_id(self, recipe_kind: str) -> str:
+        raise AssertionError(f"unexpected image lookup: {recipe_kind}")
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         raise AssertionError(f"unexpected operation lookup: {operation_id}")
