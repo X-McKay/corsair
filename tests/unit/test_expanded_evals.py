@@ -6,7 +6,7 @@ import pytest
 from corsair.adapters.scm.local import snapshot_source
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import AuditInput, InvestigationRequest, PythonRecipe
-from corsair.evaluation.agents import load_frozen_fixture
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]

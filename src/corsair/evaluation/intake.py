@@ -6,8 +6,9 @@ binding (``bind_target_line``) and pre-model ``target_binding`` check that the p
 activity runs, over the files of the admitted source snapshot. It reads no finding
 narrative, calls no model and runs no target code. ``admit_source`` is its I/O edge: the
 real snapshot admission, into a scratch store that is discarded. ``score_dataset``
-scores a frozen intake dataset against evaluator-only oracles; ``main`` runs it for
-``just eval-intake``.
+scores a frozen intake dataset against evaluator-only oracles through the frozen-file loaders
+of ``corsair.evaluation.datasets`` (imported as a module object: dataset validation imports this
+module back); ``main`` runs it for ``just eval-intake``.
 """
 
 from __future__ import annotations
@@ -43,7 +44,8 @@ from corsair.contracts import (
     format_diagnostic,
 )
 from corsair.contracts.intake import MAX_SCANNER_FINDINGS
-from corsair.evaluation.scoring import dataset_root, read_frozen, resolve_frozen, summarize
+from corsair.evaluation import datasets
+from corsair.evaluation.scoring import summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.policies.target_binding import (
     TargetBindingReason,
@@ -321,7 +323,7 @@ class IntakeOracle(Contract):
 
 
 def _frozen_source(root: Path, relative: str) -> Path:
-    path = resolve_frozen(root, relative)
+    path = datasets.resolve_frozen(root, relative)
     if not path.is_dir():
         raise ValueError("dataset source is missing")
     return path
@@ -329,13 +331,15 @@ def _frozen_source(root: Path, relative: str) -> Path:
 
 def _entry_rows(root: Path, entry: IntakeDatasetEntry) -> list[dict[str, Any]]:
     """Assess one frozen report and score each finding against its oracle."""
-    report_path, report_bytes = read_frozen(root, entry.report, entry.report_digest, "report")
-    _, oracle_bytes = read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
+    report_path, report_bytes = datasets.read_frozen(
+        root, entry.report, entry.report_digest, "report"
+    )
+    _, oracle_bytes = datasets.read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
     template = None
     if entry.recipe_template is not None:
         if entry.recipe_template_digest is None:
             raise ValueError("a dataset recipe template needs its digest")
-        template_path, _ = read_frozen(
+        template_path, _ = datasets.read_frozen(
             root, entry.recipe_template, entry.recipe_template_digest, "recipe template"
         )
         template = load_recipe_template(template_path)
@@ -387,7 +391,7 @@ def _entry_rows(root: Path, entry: IntakeDatasetEntry) -> list[dict[str, Any]]:
 def score_dataset(path: Path) -> dict[str, Any]:
     """Verify every frozen file, assess each report and score it; oracles stay here."""
     dataset = IntakeDataset.model_validate_json(path.read_bytes())
-    root = dataset_root(path)
+    root = datasets.dataset_root(path)
     if len({entry.case_id for entry in dataset.entries}) != len(dataset.entries):
         raise ValueError("duplicate intake case identity")
     rows = [row for entry in dataset.entries for row in _entry_rows(root, entry)]

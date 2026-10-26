@@ -112,7 +112,7 @@ The narrow ports preserve this separation: `SourceSnapshotPort` produces a prepa
 
 `InvestigationResult` (`corsair.result/1`) brings these values together with the run and case IDs, reason, scope, optional manifest, rounds, usage-completeness flag, optional fixed observation, and final result artifact reference. A returned result must be read as both a disposition and an execution status.
 
-For batch evaluation, [`evaluation.py`](../../src/corsair/contracts/evaluation.py) defines `BatchRequest` (bounded requests, repeats, concurrency, and batch ID) and `BatchItem` (case/run identity plus artifact or error). Evaluation labels and scores are owned outside this workflow-input contract.
+For batch evaluation, [`evaluation.py`](../../src/corsair/contracts/evaluation.py) defines `BatchRequest` (bounded requests, repeats, concurrency, and batch ID) and `BatchItem` (case/run identity plus artifact or error). The same module holds the evaluator-only frozen-dataset schemas: `Dataset` and `DatasetEntry` (a composed-case manifest and its digest-pinned request/oracle paths) and `Oracle` (a case's acceptable and forbidden dispositions and labels). Their schema is canonical here, but oracle values are read only by [`corsair.evaluation`](../../src/corsair/evaluation/datasets.py) and never enter `BatchRequest` or any agent, tool or workflow input; evaluation labels and scores are owned outside the workflow-input contract.
 
 The [Python API reference](api.md) shows how these models enter and leave a Temporal workflow. For concise terminology, see the [glossary](glossary.md); for current schema-related work, see [current plans](../plans/README.md).
 

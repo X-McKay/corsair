@@ -27,7 +27,10 @@ from .common import safe_path as safe_path
 from .common import validate_root_identity as validate_root_identity
 from .evaluation import BatchItem as BatchItem
 from .evaluation import BatchRequest as BatchRequest
+from .evaluation import Dataset as Dataset
+from .evaluation import DatasetEntry as DatasetEntry
 from .evaluation import MatchKind as MatchKind
+from .evaluation import Oracle as Oracle
 from .evidence import EvidenceInput as EvidenceInput
 from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation

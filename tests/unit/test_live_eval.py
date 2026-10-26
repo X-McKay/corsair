@@ -108,7 +108,7 @@ def test_script_vocabulary_matches_canonical_contracts(tmp_path):
     assert live_eval.canonical_digest(AGENT_DATASET) == digest(AGENT_DATASET)
     dataset = json.loads((ROOT / "evals/datasets/auditor-dev.json").read_bytes())
     assert live_eval.canonical_digest(dataset) == digest(dataset)
-    from corsair.evaluation.scoring import Dataset
+    from corsair.contracts import Dataset
 
     chain = {"entries": [json.loads((ROOT / "evals/datasets/dev.json").read_bytes())["entries"][0]]}
     path = tmp_path / "chain.json"

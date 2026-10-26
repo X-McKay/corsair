@@ -3,23 +3,10 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pydantic import Field
-
-from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import (
-    Contract,
-    Digest,
-    Disposition,
-    ExecutionStatus,
-    FixStatus,
-    InvestigationRequest,
-    InvestigationResult,
-    Verdict,
-    digest,
-)
+from corsair.contracts import Digest, Disposition, FixStatus, InvestigationResult, Oracle, Verdict
 from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
@@ -37,104 +24,6 @@ _DECISIVE_VERDICTS = frozenset(
         Verdict.EXPLOIT_NOT_DEMONSTRATED,
     }
 )
-
-
-class Oracle(Contract):
-    acceptable: list[Disposition] = Field(min_length=1)
-    forbidden: list[Disposition] = Field(default_factory=list)
-    expected_execution: ExecutionStatus = ExecutionStatus.COMPLETED
-    expected_fix: FixStatus | None = None
-    # Canonical case-label expectations. Omitted means the oracle does not score
-    # the verdict (older Disposition-only oracles keep passing unchanged).
-    expected_verdict: Verdict | None = None
-    acceptable_verdicts: list[Verdict] | None = None
-    forbidden_verdicts: list[Verdict] = Field(default_factory=list)
-
-    def verdict_allowed(self, verdict: Verdict | None) -> bool:
-        """Whether a result's canonical verdict satisfies this oracle."""
-        if self.acceptable_verdicts is None and self.expected_verdict is None:
-            return verdict not in self.forbidden_verdicts
-        if verdict is None:
-            return False
-        if self.acceptable_verdicts is not None and verdict not in self.acceptable_verdicts:
-            return False
-        if self.expected_verdict is not None and verdict != self.expected_verdict:
-            return False
-        return verdict not in self.forbidden_verdicts
-
-
-class DatasetEntry(Contract):
-    case_id: str
-    family: str
-    request: str
-    oracle: str
-    request_digest: Digest
-    oracle_digest: Digest
-    split: str
-
-
-class Dataset(Contract):
-    schema_version: str = "corsair.dataset/1"
-    entries: list[DatasetEntry] = Field(min_length=1, max_length=64)
-
-
-def dataset_root(path: Path) -> Path:
-    # Reference-layout manifests in evals/datasets address the enclosing evals tree.
-    parent = path.parent.resolve()
-    return parent.parent if parent.name == "datasets" else parent
-
-
-def resolve_frozen(root: Path, relative: str) -> Path:
-    """Resolve a manifest path below its dataset root; every evaluator and the validator use it."""
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root):
-        raise ValueError("dataset path escapes its root")
-    return path
-
-
-def read_frozen(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
-    """Read once and verify the exact bytes that the evaluator will parse."""
-    path = resolve_frozen(root, relative)
-    if not path.is_file():
-        raise ValueError("dataset path escapes its root or is missing")
-    content = path.read_bytes()
-    if digest(content) != expected:
-        raise ValueError(f"frozen {kind} digest changed")
-    return path, content
-
-
-def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
-    """Verify the frozen files first. Return oracle data only to the evaluator caller."""
-    dataset = Dataset.model_validate_json(path.read_bytes())
-    root = dataset_root(path)
-    requests, oracles = [], {}
-    family_splits: dict[str, str] = {}
-    for entry in dataset.entries:
-        if entry.case_id in oracles:
-            raise ValueError("duplicate case identity")
-        if entry.family in family_splits and family_splits[entry.family] != entry.split:
-            raise ValueError("related family variants may not cross dataset splits")
-        family_splits[entry.family] = entry.split
-        request_path, request_bytes = read_frozen(
-            root, entry.request, entry.request_digest, "request"
-        )
-        _, oracle_bytes = read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
-        request = InvestigationRequest.model_validate_json(request_bytes)
-        if request.case.case_id != entry.case_id:
-            raise ValueError("dataset and request case identities disagree")
-        requests.append(normalize_request_sources(request, request_path))
-        oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
-    return dataset, requests, oracles
-
-
-def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
-    """Read/verify an isolated-agent fixture once; the oracle remains local to the evaluator."""
-    input_path, input_bytes = read_frozen(root, entry["input"], entry["input_digest"], "input")
-    _, oracle_bytes = read_frozen(root, entry["oracle"], entry["oracle_digest"], "oracle")
-    oracle = json.loads(oracle_bytes)
-    if not isinstance(oracle, dict):
-        raise ValueError("isolated oracle must be a JSON object")
-    return input_path, input_bytes, oracle
 
 
 def _saved_evidence_verifier(store: ArtifactStore) -> "EvidenceVerifier":

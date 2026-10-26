@@ -355,7 +355,7 @@ async def test_report_families_adds_per_family_and_per_split_views(tmp_path, cap
 
 async def test_report_dataset_labels_an_older_report_only_from_its_own_manifest(tmp_path, capsys):
     from corsair.contracts import digest
-    from corsair.evaluation.scoring import load_dataset
+    from corsair.evaluation.datasets import load_dataset
 
     dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"
     dataset, _, _ = load_dataset(dataset_path)
@@ -429,7 +429,7 @@ async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsy
     from corsair.adapters.temporal import client as temporal_client
     from corsair.contracts import BatchItem, digest
     from corsair.entrypoints import api
-    from corsair.evaluation.scoring import load_dataset
+    from corsair.evaluation.datasets import load_dataset
     from corsair.settings import Settings
 
     class Handle:
@@ -479,7 +479,7 @@ async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsy
 async def test_rescore_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):
     from corsair.contracts import digest
     from corsair.entrypoints import cli
-    from corsair.evaluation.scoring import load_dataset
+    from corsair.evaluation.datasets import load_dataset
     from corsair.settings import Settings
 
     dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"

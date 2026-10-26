@@ -5,7 +5,7 @@ adversarial row built on them). The baseline policy promotes only on family-grou
 held-out data, so a family must sit in exactly one split across every dataset manifest,
 and a chain pair (request directories ``<class>-a`` and ``<class>-b`` under one parent)
 must keep one split and one family. The check reads manifests only: frozen request and
-oracle bytes are verified by :func:`corsair.evaluation.scoring.load_dataset`, and no oracle
+oracle bytes are verified by :func:`corsair.evaluation.datasets.load_dataset`, and no oracle
 content is read here. The report views group already-scored rows; they never re-score.
 """
 
@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from corsair.contracts import digest
+from corsair.contracts import Dataset, digest
 from corsair.evaluation.intake import INTAKE_SCHEMA, IntakeDataset
-from corsair.evaluation.scoring import Dataset, summarize
+from corsair.evaluation.scoring import summarize
 
 _PAIR_DIRECTORY = re.compile(r"^(?P<stem>.+)-(?P<variant>[ab])$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")

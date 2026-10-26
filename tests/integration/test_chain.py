@@ -21,7 +21,7 @@ from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import Disposition, FixStatus, Scope, Verdict, digest
 from corsair.entrypoints.requests import load_investigation_request
-from corsair.evaluation.scoring import load_dataset
+from corsair.evaluation.datasets import load_dataset
 from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
@@ -134,7 +134,8 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.result_artifact and store.reconcile(f"result.{identity}")
     assert len(model.requests) == 3
     assert result.manifest.capabilities["producer"]["tools"] == ["read_file", "list_files"]
-    from corsair.evaluation.scoring import Oracle, score
+    from corsair.contracts import Oracle
+    from corsair.evaluation.scoring import score
 
     relabelled = result.model_copy(update={"case_id": "different-case"})
     row = score(relabelled, Oracle(acceptable=[Disposition.SUPPORTED]), store)

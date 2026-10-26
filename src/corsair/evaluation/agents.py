@@ -25,9 +25,9 @@ from corsair.contracts import (
     ProducerOutput,
     digest,
 )
+from corsair.evaluation.datasets import dataset_root, load_frozen_fixture
 from corsair.evaluation.ledger import agent_row_ledger
-from corsair.evaluation.scoring import dataset_root, summarize
-from corsair.evaluation.scoring import load_frozen_fixture as load_frozen_fixture
+from corsair.evaluation.scoring import summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.settings import Settings, load_settings
 from corsair.steps.manifest import build_manifest

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from corsair.contracts import digest
+from corsair.contracts import Oracle, digest
 from corsair.entrypoints import cli
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.datasets import (
@@ -20,7 +20,6 @@ from corsair.evaluation.datasets import (
     validate_dataset,
     validate_datasets,
 )
-from corsair.evaluation.scoring import Oracle
 
 ROOT = Path(__file__).resolve().parents[2]
 EVALS = ROOT / "evals"
@@ -95,7 +94,7 @@ def test_every_checked_in_dataset_manifest_validates(path):
 
 
 def test_validation_reports_the_digest_the_evaluation_report_records():
-    from corsair.evaluation.scoring import load_dataset
+    from corsair.evaluation.datasets import load_dataset
 
     dataset, _, _ = load_dataset(EVALS / "datasets/dev.json")
     report = validate_dataset(EVALS / "datasets/dev.json").as_dict()

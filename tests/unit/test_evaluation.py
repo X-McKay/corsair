@@ -2,8 +2,9 @@ import json
 
 import pytest
 
-from corsair.contracts import Disposition, ExecutionStatus, InvestigationResult, digest
-from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score, summarize
+from corsair.contracts import Disposition, ExecutionStatus, InvestigationResult, Oracle, digest
+from corsair.evaluation.datasets import load_dataset
+from corsair.evaluation.scoring import save_report, score, summarize
 
 
 def result(label=Disposition.INCONCLUSIVE):
@@ -378,7 +379,7 @@ def test_dataset_parses_only_the_bytes_it_verified(tmp_path, monkeypatch):
     from collections import Counter
     from pathlib import Path
 
-    from corsair.evaluation.scoring import Dataset, DatasetEntry
+    from corsair.contracts import Dataset, DatasetEntry
 
     request = tmp_path / "request.json"
     oracle = tmp_path / "oracle.json"
