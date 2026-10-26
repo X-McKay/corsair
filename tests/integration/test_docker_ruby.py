@@ -192,7 +192,9 @@ def test_real_ruby_vulnerable_discloses_and_fix_blocks(tmp_path: Path) -> None:
     assert observation.control.covered_lines and 4 in observation.control.covered_lines
     assert 4 in observation.adversarial.covered_lines
     # Two short Ruby role containers; this records the per-role order of magnitude.
-    assert elapsed < 20
+    # Test-side bound on the control + adversarial pair; the kernel probe timeout is separate and
+    # slower hosts have taken over 20 s here, so leave generous headroom.
+    assert elapsed < 60
     _assert_cleanup(client, "ruby-vulnerable")
 
     fixed_observation = verifier.evaluate(
