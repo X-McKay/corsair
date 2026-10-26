@@ -59,6 +59,7 @@ class CliArguments(argparse.Namespace):
     case: str | None
     limit: int | None
     evidence: bool
+    explain: bool
     model: bool
     source_root: str
     recipe_template: str | None
@@ -254,6 +255,10 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
     if args.evidence and args.online:
         raise ValueError("--evidence reads the artifact store; it cannot be used with --online")
+    if args.explain and args.online:
+        raise ValueError("--explain reads the artifact store; it cannot be used with --online")
+    if args.explain and args.evidence:
+        raise ValueError("--explain and --evidence are separate views; choose one")
 
     settings = _settings(args)
     if not args.online:
@@ -265,6 +270,10 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
             from corsair.entrypoints.runs import inspect_evidence
 
             ui.emit(inspect_evidence(store, result))
+        elif args.explain:
+            from corsair.entrypoints.runs import explain_run
+
+            ui.emit({"result": result, **explain_run(store, result)}, store=store)
         else:
             ui.emit(result, store=store)
         return 0
@@ -294,6 +303,17 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
         )
     else:
         ui.emit(await handle.query(query, rpc_timeout=timedelta(seconds=5)))
+    return 0
+
+
+async def _handle_explain(args: CliArguments, ui: Terminal) -> int:
+    """Explain a committed result's verdict from the artifact store; no services."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.entrypoints.runs import explain_run
+
+    identity = validate_run_id(args.run_id or "")
+    store = ArtifactStore(_settings(args).artifact_root)
+    ui.emit(explain_run(store, _result_from_store(store, identity)))
     return 0
 
 
@@ -504,6 +524,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "verify": _handle_verify,
     "inspect": _handle_inspect,
     "runs": _handle_runs,
+    "explain": _handle_explain,
     "cancel": _handle_cancel,
     "investigate": _handle_investigate,
     "eval": _handle_eval,
@@ -578,6 +599,8 @@ def parser() -> argparse.ArgumentParser:
         "investigate": "Submit a durable investigation; use --wait for live phase updates",
         "inspect": "Read a committed result or query/watch the native Temporal workflow",
         "runs": "List committed results in the artifact store, newest first; no services",
+        "explain": "Explain a committed verdict in plain language and what would change it; "
+        "no services",
         "cancel": "Request cancellation; this does not assert completed cleanup",
         "verify": "Execute a frozen reference submission natively; no security verdict",
         "eval": "Run frozen cases with bounded child workflows and external oracles",
@@ -612,9 +635,15 @@ def parser() -> argparse.ArgumentParser:
     inspect.add_argument(
         "--evidence", action="store_true", help="Per-role native receipts; never payloads"
     )
+    inspect.add_argument(
+        "--explain",
+        action="store_true",
+        help="Add the plain-language verdict explanation; never model text",
+    )
     runs = commands["runs"]
     runs.add_argument("--case", help="Only results for this case id")
     runs.add_argument("--limit", type=positive_limit, help="At most N rows")
+    commands["explain"].add_argument("run_id")
     commands["cancel"].add_argument("run_id")
     verify = commands["verify"]
     verify.add_argument("request")

@@ -20,6 +20,8 @@ from corsair.contracts import (
     Submission,
     digest,
 )
+from corsair.evaluation.ledger import gate_ledger, verified_rounds
+from corsair.policies.explanation import explain_result
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
 
@@ -219,4 +221,15 @@ def inspect_evidence(store: ArtifactStore, result: InvestigationResult) -> dict[
         "execution_status": result.execution_status,
         "fix_status": result.fix_status,
         "observations": observations,
+    }
+
+
+def explain_run(store: ArtifactStore, result: InvestigationResult) -> dict[str, Any]:
+    """Plain-language statements for a committed result, from its re-validated gate ledger."""
+    ledger = gate_ledger(result, verified_rounds(result, store))
+    return {
+        "run_id": result.run_id,
+        "case_id": result.case_id,
+        "verdict": result.verdict,
+        "statements": explain_result(result, ledger),
     }
