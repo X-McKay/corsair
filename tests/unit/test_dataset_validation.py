@@ -287,9 +287,45 @@ def test_a_blocked_case_passes_when_its_oracle_expects_the_unable_to_run_stop(tm
 
     entry = _entry(validate_dataset(path).as_dict(), "case02")
 
-    assert entry["status"] == "pass", entry
+    assert entry["status"] == "pass", entry["problems"]
     assert entry["notes"][0].startswith("target_binding line_out_of_range")
     assert entry["notes"][0].endswith("the oracle accepts the resulting UNABLE_TO_RUN stop")
+
+
+def test_a_line_less_finding_is_validated_on_the_line_prepare_derives(tmp_path):
+    # Validation must bind the target line as prepare_case does before the gate runs.
+    from corsair.adapters.scm.local import prepare_case
+    from corsair.adapters.scm.requests import normalize_request_sources
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import InvestigationRequest, LineProvenance
+    from corsair.settings import Settings
+    from corsair.steps.manifest import build_manifest
+
+    _copy_fixture(tmp_path, "case01")
+    request_path = tmp_path / "fixtures/case01/request.json"
+    _edit_json(request_path, lambda document: document["case"]["finding"].update(line=None))
+    path = _write_dataset(tmp_path, [_case_entry(tmp_path, "case01")])
+
+    entry = _entry(validate_dataset(path).as_dict(), "case01")
+
+    request = normalize_request_sources(
+        InvestigationRequest.model_validate_json(request_path.read_bytes()), request_path
+    )
+    assert request.case.finding.line is None
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    prepared = prepare_case(
+        request.case,
+        settings,
+        ArtifactStore(settings.artifact_root),
+        build_manifest(request, settings, "sha256:" + "0" * 64),
+    )
+    assert prepared.line_provenance is LineProvenance.RECIPE_FUNCTION
+    assert prepared.finding.line == 4
+    assert entry["status"] == "pass", entry["problems"]
+    assert entry["checks"]["target_binding"] == "pass"
+    assert entry["notes"] == [
+        "target line 4 derived from recipe function read_file (line_provenance recipe_function)"
+    ]
 
 
 def test_a_request_whose_case_identity_differs_from_its_entry_fails(tmp_path):

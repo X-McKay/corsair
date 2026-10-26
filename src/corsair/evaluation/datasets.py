@@ -30,6 +30,7 @@ from corsair.contracts import (
     FixStatus,
     InvestigationRequest,
     InvestigationResult,
+    LineProvenance,
     Source,
     Verdict,
     digest,
@@ -53,7 +54,7 @@ from corsair.evaluation.scoring import (
     score,
 )
 from corsair.observability.logging import safe_error_detail, safe_text
-from corsair.policies.target_binding import target_binding
+from corsair.policies.target_binding import bind_target_line, target_binding
 from corsair.settings import Settings
 
 CASE_SCHEMA = "corsair.dataset/1"
@@ -310,7 +311,16 @@ class _Validator:
             # The structural gate is Python-AST specific, as in activities.prepare.
             entry.passed("target_binding")
             return
-        failure = target_binding(request.case.finding, recipe, text)
+        finding = request.case.finding
+        if text is not None:
+            # Bind a missing line from the recipe function exactly as prepare_case does.
+            finding, provenance = bind_target_line(finding, recipe, text)
+            if provenance is LineProvenance.RECIPE_FUNCTION:
+                entry.notes.append(
+                    f"target line {finding.line} derived from recipe function {recipe.function} "
+                    f"(line_provenance {provenance.value})"
+                )
+        failure = target_binding(finding, recipe, text)
         if failure is None:
             entry.passed("target_binding")
             return
