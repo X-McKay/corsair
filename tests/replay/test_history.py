@@ -11,6 +11,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 
 from corsair.contracts import Budget, InvestigationResult, RoleOutcome, Verdict
+from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
 from tests.workflow.temporal import ActivityScenario, investigation_request, temporal_id
 
@@ -185,4 +186,18 @@ async def test_recorded_activity_options_match_the_time_bound_policy():
                 )
     assert recorded == expected
     replay = await _replayer().replay_workflow(history)
+    assert replay.replay_failure is None
+
+
+async def test_counts_only_evaluation_history_replays_with_the_child_state_query():
+    """Recorded by the evaluation workflow before its status query listed child rows
+    (two cases, two repeats, concurrency one, two failed children). Child rows and
+    their workflow-time stamps issue no command, so the history replays unchanged."""
+    history = WorkflowHistory.from_json(
+        "evaluation-counts-only",
+        (HISTORIES / "evaluation-counts-only.json").read_text(),
+    )
+    replay = await Replayer(
+        workflows=[EvaluationWorkflow], data_converter=pydantic_data_converter
+    ).replay_workflow(history)
     assert replay.replay_failure is None

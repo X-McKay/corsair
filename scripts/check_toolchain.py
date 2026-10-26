@@ -28,7 +28,7 @@ JUST_REMEDY = f"{ENTER_NIX} (or `uv tool install rust-just=={PINNED_JUST}`)"
 SYNC_REMEDY = "run `just sync` (uv sync --locked --all-extras)"
 RECREATE = "`uv venv --clear && uv sync --locked --all-extras`"
 NATIVE_REMEDY = (
-    f"duckdb's wheel cannot load libstdc++ outside the Nix shell; {ENTER_NIX}, or recreate "
+    f"protobuf's wheel cannot load libstdc++ outside the Nix shell; {ENTER_NIX}, or recreate "
     f"it here with {RECREATE} (a .venv built outside Nix also works inside it)"
 )
 PYTHON_PIN = ".python-version"
@@ -133,7 +133,7 @@ def check_venv_python(root: Path, config: dict[str, str] | None) -> Finding:
 
 
 def native_library_gap(python_home: str, platform: str, ld_library_path: str) -> Finding | None:
-    """FAIL a Nix-store Python on Linux that cannot find libstdc++ for duckdb's wheel.
+    """FAIL a Nix-store Python on Linux that cannot find libstdc++ for native (protobuf) wheels.
 
     Nix's loader never searches the host's library directories, so such an interpreter imports
     manylinux wheels only where the Nix shell's LD_LIBRARY_PATH supplies their C++ runtime.
@@ -150,7 +150,7 @@ def native_library_gap(python_home: str, platform: str, ld_library_path: str) ->
 def check_venv_owner(
     config: dict[str, str] | None, uv_python: str | None, platform: str, ld_library_path: str
 ) -> Finding | None:
-    """Explain a .venv that uv would replace, or keep although it cannot import duckdb."""
+    """Explain a .venv that uv would replace, or keep although it cannot import native wheels."""
 
     if config is None:
         return None
@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--before-sync",
         action="store_true",
-        help="report only a .venv that `uv sync` would keep although it cannot import duckdb",
+        help="report only a .venv that `uv sync` would keep although it cannot import protobuf",
     )
     arguments = parser.parse_args(argv)
     uv_python = os.environ.get("UV_PYTHON")

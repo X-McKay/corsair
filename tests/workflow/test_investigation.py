@@ -1146,7 +1146,66 @@ async def test_batch_status_query_reports_running_and_error_counts(
         await handle.result()
         status = await handle.query(EvaluationWorkflow.status)
 
-    assert status == {"completed": 2, "total": 2, "running": 0, "errors": 1}
+    children = status.pop("children")
+    started = datetime.fromisoformat(status.pop("started"))
+    assert status == {
+        "completed": 2,
+        "total": 2,
+        "running": 0,
+        "errors": 1,
+        "children_omitted": 0,
+    }
+    assert [(row["case_id"], row["repeat"], row["state"]) for row in children] == [
+        ("statusbad", 0, "failed"),
+        ("statusok", 0, "completed"),
+    ]
+    assert [row["run_id"] for row in children] == [
+        f"{request.batch_id}.c1.r0",
+        f"{request.batch_id}.c0.r0",
+    ]
+    for row in children:
+        assert set(row) == {"case_id", "repeat", "run_id", "state", "started", "finished"}
+        assert started <= datetime.fromisoformat(row["started"])
+        assert datetime.fromisoformat(row["started"]) <= datetime.fromisoformat(row["finished"])
+
+
+async def test_batch_status_query_reports_running_then_pending_children_mid_batch(
+    temporal_server, temporal_artifact_store
+):
+    request = BatchRequest(
+        batch_id=temporal_id("batchlive"),
+        requests=[investigation_request("liveb"), investigation_request("livea")],
+        repeats=1,
+        concurrency=1,
+    )
+    scenario = ActivityScenario(pause_prepare=True)
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        handle = await temporal_server.client.start_workflow(
+            EvaluationWorkflow.run,
+            request,
+            id=temporal_id("batchlive"),
+            task_queue=task_queue,
+            result_type=list[BatchItem],
+        )
+        await asyncio.wait_for(acts.prepare_started.wait(), timeout=15)
+        during = await handle.query(EvaluationWorkflow.status)
+        acts.release_prepare.set()
+        await handle.result()
+        after = await handle.query(EvaluationWorkflow.status)
+
+    assert (during["completed"], during["running"], during["total"]) == (0, 1, 2)
+    # Running first, then pending: the order the operator needs, not submission order.
+    assert [(row["case_id"], row["state"]) for row in during["children"]] == [
+        ("liveb", "running"),
+        ("livea", "pending"),
+    ]
+    running, pending = during["children"]
+    assert running["started"] is not None and running["finished"] is None
+    assert pending["started"] is None and pending["finished"] is None
+    assert [(row["case_id"], row["state"]) for row in after["children"]] == [
+        ("livea", "completed"),
+        ("liveb", "completed"),
+    ]
 
 
 async def test_slow_producer_episode_ends_inside_its_activity_as_episode_timeout(
