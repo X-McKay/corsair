@@ -1,0 +1,372 @@
+{
+  "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7",
+  "rows": [
+    {
+      "run_id": "isolated-acc4155e700d4534b05c50a7d38838a0",
+      "case_id": "audit01",
+      "repeat": 0,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "ea0ac9c87fc3a87f393e3a39015fe8ddded2442174562b1411bcf90757b40eb3",
+        "size": 1724,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5098,
+      "output_tokens": 1691,
+      "agent_seconds": 18.950265320949256,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-5e1be1c459344c2fbc03c23e9bc1bf94",
+      "case_id": "audit02",
+      "repeat": 0,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "1d638083b1e8fefdc32953ec553a6d5ed0dc2d57616b0808fd0d6875f42aa21b",
+        "size": 1067,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5256,
+      "output_tokens": 1821,
+      "agent_seconds": 17.63980928203091,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-28be8f09f6ef4698ac53f77fc79639a9",
+      "case_id": "audit03",
+      "repeat": 0,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "bbe652e83c8570224b601788acb009ccb7cf0b19dd929350052f8d3685dfd1e8",
+        "size": 1084,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4727,
+      "output_tokens": 1348,
+      "agent_seconds": 12.50897859595716,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-8e255cd0049946c6b7e7823a49c12b30",
+      "case_id": "audit04",
+      "repeat": 0,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "fac72ce5a34967eaf62dee12b96c1c1d3885584b6d8ed196d46a8e55892baf84",
+        "size": 1050,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4734,
+      "output_tokens": 802,
+      "agent_seconds": 8.109315539943054,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-73e941166c5e4db09abf41eea5b431b1",
+      "case_id": "audit01",
+      "repeat": 1,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "efe8eed1413aea3b262f152383c88a8dbf0faaf6a1b2e85a50fa83eac99febc4",
+        "size": 987,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5190,
+      "output_tokens": 1317,
+      "agent_seconds": 12.605632562888786,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-706740122c2f4af88c4675cf3bb448ef",
+      "case_id": "audit02",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "5f2879487c33730c4e71643d3a294ce5a4a30a0396b8a55be0e419787c08fe60",
+        "size": 331,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4659,
+      "output_tokens": 575,
+      "agent_seconds": 6.027782371034846,
+      "feedback": {
+        "gate": "audit_invalid",
+        "reason": "auditor exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-edf847ab2284490491f7e848c9188daf",
+      "case_id": "audit03",
+      "repeat": 1,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "c6656d91c83376bf578fcfc5340b59a44d9667d5803ae16fd33a56cbcac5b609",
+        "size": 1177,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5964,
+      "output_tokens": 2134,
+      "agent_seconds": 19.77369615295902,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-dfe13a9117594ed8b91b41f1ab1ad9e0",
+      "case_id": "audit04",
+      "repeat": 1,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "51e18b8447d2613663a591915a16efe3682b191b0015224715581d601b68fc7b",
+        "size": 1265,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4734,
+      "output_tokens": 1302,
+      "agent_seconds": 12.057168405037373,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-a1d5c957253b40eba3b0be8dd107b249",
+      "case_id": "audit01",
+      "repeat": 2,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "7e39821aa5478a20bddd79223321f4a2ee7cf1af9114f86badcbbd5dd8656b19",
+        "size": 1158,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5171,
+      "output_tokens": 1375,
+      "agent_seconds": 12.859294577036053,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-ffb570d1ffbe4bc8bb3b2ee11170ffc6",
+      "case_id": "audit02",
+      "repeat": 2,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "c829b2376227b0fcd3376722da638dbaed2632bf70c0b45972b6bb69d8d574f0",
+        "size": 747,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 5263,
+      "output_tokens": 1008,
+      "agent_seconds": 9.775189824867994,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-507c24b90f3f4af49e0cc6ad26d3c37a",
+      "case_id": "audit03",
+      "repeat": 2,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "caea789a86f64bd8f57156279f98793f4a350f5908693afe7faa742e4eadf337",
+        "size": 1167,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4735,
+      "output_tokens": 1882,
+      "agent_seconds": 16.6338853740599,
+      "feedback": null
+    },
+    {
+      "run_id": "isolated-61b38903d10c44d0af71e0c7ac3930e9",
+      "case_id": "audit04",
+      "repeat": 2,
+      "status": "pass",
+      "match_kind": "exact_match",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "auditor",
+      "output_artifact": {
+        "sha256": "bb85c7fc73ae18a12dd919a7dffc9d8750e77405a5b01cfb0f32001deae14be9",
+        "size": 1028,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19",
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "skills_loaded": [
+        "semantic-review"
+      ],
+      "skills_preloaded": [
+        "semantic-review"
+      ],
+      "input_tokens": 4733,
+      "output_tokens": 926,
+      "agent_seconds": 9.073737830854952,
+      "feedback": null
+    }
+  ],
+  "summary": {
+    "attempts": 12,
+    "passed": 11,
+    "failed": 1,
+    "pass_rate": 0.9166666666666666,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 0,
+    "unavailable_results": 0,
+    "llm_calls": 24,
+    "tool_calls": 24,
+    "input_tokens": 60264,
+    "output_tokens": 16181,
+    "cost_usd": null
+  }
+}

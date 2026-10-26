@@ -1,0 +1,311 @@
+{
+  "dataset_digest": "0252acb753f04beff8dc177adc675131ff69607fffe041b2424ab30041f10331",
+  "rows": [
+    {
+      "run_id": "isolated-e361c3bfeda7450e9683e74f09daaed7",
+      "case_id": "case01",
+      "repeat": 0,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "2c6593429c76cd747fd5760c928d9f69ad1a3f7bd2be54f02c45f4c860f91076",
+        "size": 341,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 3,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 10962,
+      "output_tokens": 565,
+      "agent_seconds": 12.878562757046893,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-ecfea2152afc4b588856479c256c4220",
+      "case_id": "producer02",
+      "repeat": 0,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "b8d4190ffc593c29cded84310b89ee22c2755a6fb2bccb2ca185ee0569b37bcf",
+        "size": 342,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11855,
+      "output_tokens": 1670,
+      "agent_seconds": 18.036315362900496,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-0cd13baaaaeb4db68b8c5b4caef89dc0",
+      "case_id": "producer03",
+      "repeat": 0,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "698fed24679ebf6b02df83babca64f720d58cc733cbe57708df5bed1944050d4",
+        "size": 324,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 3,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11211,
+      "output_tokens": 1841,
+      "agent_seconds": 24.026616636896506,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-226a0ad34ea64748bf9c59787b7aa190",
+      "case_id": "case01",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "4e51c8442aa78080134ed438d338014a351780ad7dc0c3cb40ab755cb7c8019d",
+        "size": 341,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11133,
+      "output_tokens": 1457,
+      "agent_seconds": 19.30052069714293,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-f7d1227aae404f54a6be3b127e54d57e",
+      "case_id": "producer02",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "f0279a953d2b51d8f8265e68491c1587fc581f79fa68cb0cbeac1d8a5c46d629",
+        "size": 324,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 10999,
+      "output_tokens": 1480,
+      "agent_seconds": 20.136965261073783,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-761b1c455e2c4204ad48dbbd400581bd",
+      "case_id": "producer03",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "1ff2d2fac6c27abbb71649a987770fed8b4d46ed821e859dce8b3e4db3015f41",
+        "size": 341,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11208,
+      "output_tokens": 1378,
+      "agent_seconds": 24.33789292909205,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-457c6b203e434fa7936e8c540a403ab5",
+      "case_id": "case01",
+      "repeat": 2,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "6b46dbfc9e14d8552d10098492ef3e8e1555acd5dedf8aba0865cf92246a8b6c",
+        "size": 342,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11050,
+      "output_tokens": 1583,
+      "agent_seconds": 23.929452097974718,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-6b01337973304be9920b8dd5c24f797b",
+      "case_id": "producer02",
+      "repeat": 2,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "bcda84a3980f16bc23820b0b6144eefa2ff6e3016128158e5604b5249fb3354c",
+        "size": 323,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11060,
+      "output_tokens": 1684,
+      "agent_seconds": 24.49075246299617,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-b8f80235617b4349922c96b09d278742",
+      "case_id": "producer03",
+      "repeat": 2,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "0b29b7e6be9c53c76872ff00465f8d6b75ea63f4985bb438c8e942f332adeab5",
+        "size": 324,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 3,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 10867,
+      "output_tokens": 1305,
+      "agent_seconds": 20.562757703009993,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    }
+  ],
+  "summary": {
+    "attempts": 9,
+    "passed": 0,
+    "failed": 9,
+    "pass_rate": 0.0,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 0,
+    "unavailable_results": 0,
+    "llm_calls": 27,
+    "tool_calls": 33,
+    "input_tokens": 100345,
+    "output_tokens": 12963,
+    "cost_usd": null
+  }
+}

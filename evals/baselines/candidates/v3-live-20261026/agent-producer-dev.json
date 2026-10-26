@@ -1,0 +1,117 @@
+{
+  "dataset_digest": "6d0b2e5531644e5ef6699177919085f60c3c530e24bbb18b3faaffe2e6eb9265",
+  "rows": [
+    {
+      "run_id": "isolated-f4bd62783a4a4afca9786662df720259",
+      "case_id": "case01",
+      "repeat": 0,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "83385216a6492bb5babeab2b0104bfe118f11a2ccc1ce3b88c35e405aaa7796c",
+        "size": 324,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 3,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 11768,
+      "output_tokens": 1642,
+      "agent_seconds": 17.761064674938098,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-a45dfe844b3b473f9f028dc4dd81e7e1",
+      "case_id": "case01",
+      "repeat": 1,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "2d5cbe826508b81fb47b92530283698ecca335f5424534ee5d325556bdaa20fe",
+        "size": 342,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 4,
+      "skills_loaded": [
+        "source-grounding"
+      ],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 10815,
+      "output_tokens": 1357,
+      "agent_seconds": 17.812952266074717,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    },
+    {
+      "run_id": "isolated-31048add7254401d927f947ae9f17fa0",
+      "case_id": "case01",
+      "repeat": 2,
+      "status": "fail",
+      "match_kind": "no_valid_output",
+      "cohort": "live-model-fixture",
+      "execution_status": "COMPLETED",
+      "agent": "producer",
+      "output_artifact": {
+        "sha256": "026485df4244c3376cfbf1cd7bfc82948c2f28f2974b83d3d8035c0c46a0b14e",
+        "size": 324,
+        "media_type": "application/json"
+      },
+      "config_digest": "5a7902eaba60178cb3be7af2e6eb12eb3ad719459ba3182527027e7dc2b59de1",
+      "agent_resources_digest": "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409",
+      "llm_calls": 3,
+      "tool_calls": 3,
+      "skills_loaded": [],
+      "skills_preloaded": [
+        "source-grounding"
+      ],
+      "input_tokens": 10025,
+      "output_tokens": 1160,
+      "agent_seconds": 15.925275407964364,
+      "feedback": {
+        "gate": "producer_invalid",
+        "reason": "producer exhausted its LLM-call budget before structured completion",
+        "operational": false
+      }
+    }
+  ],
+  "summary": {
+    "attempts": 3,
+    "passed": 0,
+    "failed": 3,
+    "pass_rate": 0.0,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 0,
+    "unavailable_results": 0,
+    "llm_calls": 9,
+    "tool_calls": 10,
+    "input_tokens": 32608,
+    "output_tokens": 4159,
+    "cost_usd": null
+  }
+}
