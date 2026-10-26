@@ -95,11 +95,14 @@ def _counts(console: Console, key: str, counts: dict) -> None:
 
 
 def _report_rows(console: Console, rows: list[dict[str, Any]]) -> None:
-    """Render one table row per scored attempt; unknown usage stays unknown."""
+    """Render one table row per scored attempt; unknown usage stays unknown.
+
+    A row's ``reason`` is the result's reason, which can be an auditor's review or a
+    producer's abstention, so only its code-chosen stopping gate is shown."""
     table = Table(expand=True)
     replayed = any("replay" in row for row in rows)
     columns = ("Case", "Run", "Status", "Label", *(("Replay",) if replayed else ()))
-    for column in (*columns, "Stop", "Usage", "Reason"):
+    for column in (*columns, "Stop", "Usage"):
         table.add_column(column, overflow="fold")
     for row in rows:
         status = row.get("status")
@@ -116,7 +119,6 @@ def _report_rows(console: Console, rows: list[dict[str, Any]]) -> None:
             *replay,
             as_text(row_stop(row) or "-"),
             as_text(_usage(row, _plain)),
-            as_text(row.get("reason") or ""),
         )
     console.print(Panel(table, title="Corsair · Cases", border_style="cyan"))
 

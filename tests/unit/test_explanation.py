@@ -144,6 +144,22 @@ def test_exploit_not_demonstrated_counts_clean_negatives_against_the_threshold()
     assert "shortfall" not in _kinds(statements)
 
 
+def test_exploit_not_demonstrated_rule_states_the_component_seam_whatever_the_claim():
+    for scope in (Scope.COMPONENT, Scope.APPLICATION):
+        result = _result(
+            [
+                _round(_proposal(), _clean_negative(), _audit()),
+                _round(_proposal(), _clean_negative(), _audit(), session=2),
+            ],
+            verdict=Verdict.EXPLOIT_NOT_DEMONSTRATED,
+        ).model_copy(update={"scope": scope})
+        [rule] = _texts(_explain(result, (1, 1), (2, 1)), "rule")
+
+        assert (
+            "at the component seam only, for the exercised payloads, revision and runtime" in rule
+        )
+
+
 def test_inconclusive_names_the_single_fact_that_fell_short_per_session():
     uncovered = _observation(_HELD, _role(RoleOutcome.VIOLATION, [], 1))
     result = _result(

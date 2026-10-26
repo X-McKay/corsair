@@ -36,21 +36,21 @@ In human mode, the CLI uses compact Rich output when the terminal supports it. `
 
 ## Result and log confidentiality
 
-A completed human investigation rendering leads with the canonical verdict, coloured by meaning (red: exploit demonstrated, green: exploit not demonstrated, yellow: inconclusive, magenta: unable to run or error), followed by the case stop, execution status, disposition, scope, fix status, the result reason and run/case identity. A rounds table then lists, per session and round, the producer's decision kind (proposal, abstained or no decision), the gate name that stopped or redirected it, its LLM/tool calls and tokens, the control and adversarial outcomes with their covered target lines, the audit decision with its rule name, and **Stopped at**: the round's [gate-ledger](../agents/evaluations.md) stage and gate. The **case stop** names the case-level policy stops (`budget_exhausted`, `negative_threshold_unmet`, `fix_not_blocked`, `execution_*`), or else the last round's gate with its stage and session.round. Both come from the evaluator's pure [`gate_ledger`](../../src/corsair/evaluation/ledger.py), which describes the recorded verdict and never decides one; only gate and stage names are shown, plus the fixed sentence of a budget, threshold or fix stop, never a ledger reason that can carry model text. A fixed-revision observation, when present, gets its own role table. A **Phases** table follows when the result recorded a timeline: each phase transition's session.round, offset from the first retained transition and duration until the next one (the final `record` has no recorded end, so it shows `-`), with per-phase totals; an unknown time stays `unknown`, and a timeline whose first entry is not `prepare` says that earlier transitions were not retained. The last panel shows the manifest identity (package, abbreviated image and prompt/config digests, models, evidence policy), the full result SHA-256 and the usage totals; missing usage and cost stay `unknown`.
+A completed human investigation rendering leads with the canonical verdict, coloured by meaning (red: exploit demonstrated, green: exploit not demonstrated, yellow: inconclusive, magenta: unable to run or error), followed by the case stop, execution status, disposition, the finding's **claimed scope** (`result.scope`), the fixed **evidence scope** `component (recipe seam)` (every implemented recipe probes the component seam, whatever the claim; see [scope](glossary.md)), fix status and run/case identity. A rounds table then lists, per session and round, the producer's decision kind (proposal, abstained or no decision), the gate name that stopped or redirected it, its LLM/tool calls and tokens, the control and adversarial outcomes with their covered target lines, the audit decision with its rule name, and **Stopped at**: the round's [gate-ledger](../agents/evaluations.md) stage and gate. The **case stop** names the case-level policy stops (`budget_exhausted`, `negative_threshold_unmet`, `fix_not_blocked`, `execution_*`), or else the last round's gate with its stage and session.round. Both come from the evaluator's pure [`gate_ledger`](../../src/corsair/evaluation/ledger.py), which describes the recorded verdict and never decides one; only gate and stage names are shown, plus the fixed sentence of a budget, threshold or fix stop, never a ledger reason that can carry model text. A fixed-revision observation, when present, gets its own role table. A **Phases** table follows when the result recorded a timeline: each phase transition's session.round, offset from the first retained transition and duration until the next one (the final `record` has no recorded end, so it shows `-`), with per-phase totals; an unknown time stays `unknown`, and a timeline whose first entry is not `prepare` says that earlier transitions were not retained. The last panel shows the manifest identity (package, abbreviated image and prompt/config digests, models, evidence policy), the full result SHA-256 and the usage totals; missing usage and cost stay `unknown`.
 
-It never shows payloads, the hypothesis or plan, the auditor's reason, feedback reasons (which can carry model text) or any oracle data. Values are rendered as plain text, never as Rich markup, and long values wrap instead of being cut. It does not invent an intermediate stage or claim unobserved work. JSON output remains the complete record; its only addition is the result's `timeline` field (see [`inspect`](#inspect-run_id)).
+Every value it shows is code-owned: enum labels, gate and stage names, the verifier's fixed role and gate sentences, identity and counts. It never shows payloads, the hypothesis or plan, the auditor's reason, a producer's abstention, feedback reasons or the result's `reason` (which repeats an accepted or rejected audit's review or an abstention's text on those paths), nor any oracle data. Values are rendered as plain text, never as Rich markup, and long values wrap instead of being cut. It does not invent an intermediate stage or claim unobserved work. JSON output remains the complete machine record, including `reason`; its only addition is the result's `timeline` field (see [`inspect`](#inspect-run_id)).
 
 ```text
 ╭────────────────────────── Corsair · Investigation ───────────────────────────╮
-│ Verdict      EXPLOIT_DEMONSTRATED                                            │
-│ Case stop    demonstrated · kernel at 1.1                                    │
-│ Execution    COMPLETED                                                       │
-│ Disposition  SUPPORTED                                                       │
-│ Scope        component                                                       │
-│ Fix          NOT_REQUESTED                                                   │
-│ Reason       paired native observation supports the component claim          │
-│ Run          run1                                                            │
-│ Case         case01                                                          │
+│ Verdict         EXPLOIT_DEMONSTRATED                                         │
+│ Case stop       demonstrated · kernel at 1.1                                 │
+│ Execution       COMPLETED                                                    │
+│ Disposition     SUPPORTED                                                    │
+│ Claimed scope   component                                                    │
+│ Evidence scope  component (recipe seam)                                      │
+│ Fix             NOT_REQUESTED                                                │
+│ Run             run1                                                         │
+│ Case            case01                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Rounds
 ┏━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
@@ -205,7 +205,7 @@ Explains a committed result's verdict in plain language, offline: it reads the r
 | `kind` | What it states |
 | --- | --- |
 | `verdict` | The label with execution status, claimed scope and fix status. |
-| `rule` | The verdict-table rule behind that label ([ADR 0004](../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md)). |
+| `rule` | The verdict-table rule behind that label ([ADR 0004](../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md)); the `EXPLOIT_NOT_DEMONSTRATED` rule states that it holds at the component seam only, for the exercised payloads, revision and runtime. |
 | `session` | Per session: rounds and the gate that stopped each, then the last evaluated round's decisive facts (control and exploit outcome, whether the declared target line ran in both runs, audit decision), or that it demonstrated or ended in a clean negative. |
 | `shortfall` | The single gate at which a non-decisive session fell short, with its fixed meaning. A run that did not complete is attributed to its operational stop. |
 | `policy` | `negative_threshold` and `max_sessions` from the manifest, sessions run and clean negatives reached, a `budget_exhausted` stop, and the request digest that identifies the budget (the limits themselves are not recorded in the result). |
@@ -317,7 +317,7 @@ Scores existing committed result artifacts against evaluator-owned oracles witho
 corsair report .runs/evaluations/dev.json
 ```
 
-Reads an existing evaluation report. Human output shows the summary, the report's dataset digest and one table row per scored attempt (case, run, status, verdict or disposition or match kind, the gate of the row's final [gate ledger](../agents/evaluations.md#reading-results) entry, usage and reason); unknown usage is shown as `unknown`. `--format json` emits the complete saved report (`rows`, `summary` and `dataset_digest`). It does not re-run, re-score, or repair the report.
+Reads an existing evaluation report. Human output shows the summary, the report's dataset digest and one table row per scored attempt (case, run, status, verdict or disposition or match kind, the gate of the row's final [gate ledger](../agents/evaluations.md#reading-results) entry and usage); unknown usage is shown as `unknown`. A row's `reason` is never shown, because it can carry an auditor's review or a producer's abstention text; `--format json` keeps it. `--format json` emits the complete saved report (`rows`, `summary` and `dataset_digest`). It does not re-run, re-score, or repair the report.
 
 ```bash
 corsair --format markdown report .runs/evaluations/dev.json > record.md

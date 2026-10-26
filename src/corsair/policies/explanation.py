@@ -49,7 +49,8 @@ _RULES: dict[Verdict, str] = {
         "At least the required number of independent sessions each ended in a clean negative "
         "(control held, exploit held, both runs covered the declared target line, audit "
         "accepted) and no session demonstrated the exploit. It is scoped to the exercised "
-        "finding, payloads, revision and runtime (sensitivity unverified)."
+        "finding at the component seam only, for the exercised payloads, revision and runtime "
+        "(sensitivity unverified)."
     ),
     Verdict.INCONCLUSIVE: (
         "No session demonstrated the exploit and fewer than the required independent clean "
