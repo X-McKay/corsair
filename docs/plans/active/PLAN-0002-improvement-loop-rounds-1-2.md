@@ -1,4 +1,4 @@
-# PLAN-0002: improvement loop, rounds 1 and 2 (2026-10-25 to 2026-10-26)
+# PLAN-0002: improvement loop, rounds 1 to 3 (2026-10-25 to 2026-10-26)
 
 Two rounds of parallel experiments on `feature/improvement-loop`, cut from `main` at `d3e69c00`. Each experiment ran as one
 Opus agent in its own worktree and branch (`exp/<name>`, `exp2/<name>`), reported hypothesis, changes, evidence, checks,
@@ -101,7 +101,7 @@ model (`Qwen3.6-35B-A3B-NVFP4` via `hosted_vllm/`), not promoted baselines; see 
 
 Run through the Nix shell on this Linux amd64 host after every merge (`just check`, `just -- test -q`); the Temporal and
 Docker suites after any workflow, step, driver or image change. The final numbers are in the last line of the round-2
-notes above. The live chain (`just live-chain`), macOS arm64, and every non-Python runtime under a live model remain unrun.
+notes above. The first live chain per runtime ran in round 3 (below); macOS arm64 remains unrun.
 
 ## PR review fixes (X-McKay/corsair#208, review of head `1452fc22`)
 
@@ -118,6 +118,56 @@ Seven findings from the first review, each reproduced with a failing test before
 | 7 (P2) | `PerlRecipe` defaulted `baseline_markup_chars` to 0 against an `expected_control` with four markup characters, so the default control was INVALID. | The baseline is derived from the expected control when omitted and must equal its markup count; the frozen Perl row already set it explicitly. |
 
 Also raised the test-side 20 s elapsed bounds in the Perl and Ruby Docker suites to 60 s (the reviewer's environment took 22.4 s). The reviewer's three shutdown-test failures came from zombie processes in that environment and did not reproduce here.
+
+## Round 3: organization pass (4 branches) and the first live chain per runtime
+
+Four mechanical, test-protected moves so that "where would I look for X?" answers itself; no gate, policy, sandbox,
+prompt, schema or rendered output changed meaning. Each ran as one Opus agent in `.worktrees/org/<name>`.
+
+| Branch | Decision | What moved | Proof of no behaviour change |
+| --- | --- | --- | --- |
+| org/terminal-split | MERGED | `entrypoints/terminal.py` 1,642 -> 235 lines (the `Terminal` class: modes, dispatch, wait, failures); views in `entrypoints/render/` (`common`, `result`, `reports`, `runs`, `checks`, `preview`, `progress`, `remedies`), each docstring naming the commands it serves; `test_layout` pins the module list against the components page. | Capture of every render at widths 60/80/120/200, colour and plain, JSON and Markdown: 181 suite records (1,062 outputs) plus 36 extra scenarios (314 outputs), empty diff against the pre-split head. |
+| org/dataset-loaders | MERGED | `Oracle`, `Dataset`, `DatasetEntry` to `contracts/evaluation.py` (re-exported from `corsair.contracts`); `load_dataset`, `read_frozen`, `resolve_frozen`, `dataset_root`, `load_frozen_fixture` from `scoring.py` to `evaluation/datasets.py`; `scoring.py` is scoring only. `intake` and `datasets` import each other as modules (tested in both orders). New layout test: no module under agents/, steps/, adapters/ or workflows references oracles or loaders. | `validate_datasets` over all 16 manifests and the `Oracle`/`Dataset` JSON schemas identical before and after (the boundary note became a comment so the schema `description` stays byte-identical). |
+| org/runtime-symmetry | MERGED | `adapters/sandboxing/driver.py` -> `drivers/python/driver.py` (100 % rename; `deploy/python/Dockerfile` COPY updated); `contracts/recipes_<language>.py` -> `contracts/recipes/<language>.py` with the `Recipe` union, `PYTHON_CALLABLE_RECIPES` and `NATIVE_EXEC_KINDS` in `recipes/__init__.py`; `PythonRecipe` moved beside `PythonCommandSentinel`. | Every public contract schema hashes the same; the rebuilt Python image has identical RootFS layers (only the config-level image ID changes, so `just images` records a new identity); Python Docker suite 13 passed on the scratch tag, full Docker suite 57 passed. |
+| org/scripts-prune | MERGED | `scripts/measure_{producer,auditor}_request.py` deleted (`corsair agent preview` now also reports `episode: {requests, llm_calls, tool_calls}`; the frozen-auditor-row coverage stays in `test_auditor_request_size.py` through `capture_auditor`); the two benchmark harnesses to `scripts/benchmarks/` with a README (`profile_source_snapshot.py` was broken at HEAD by an invalid synthetic module and is fixed); `docs/reference/corpus-<language>.md` -> `docs/reference/corpus/<language>.md` with an index. | Request-size assertions unchanged; offline count unchanged; git records the moves as renames. |
+
+Integration fixes: the request-size tests import `load_frozen_fixture` from `evaluation.datasets` (the two branches crossed);
+the three documentation conflicts were resolved by hand and a stale duplicate JavaScript paragraph in the extension guide
+(a keep-both leftover from round 2) was dropped; `just worker-up` now refuses to start unless the dev server that
+`temporal-up` started is running and `temporal_address` is an explicit local address, after a worker started with the
+default address polled the cluster Temporal forwarded on `localhost:7233` for eleven seconds (it received no task; the
+events were only `connecting`, `ready`, `stopping`, `stopped`).
+
+### First live chain per runtime (operator vLLM, `just live-chain`, one repeat)
+
+Dev Temporal on `127.0.0.1:7244`, worker from the checkout at `89ba205f`, images from `just images` at that head, the
+CLI between `7758030d` and `fdbc8fb4` (organization merges only; no kernel, driver, agent or policy change among them).
+Records: `.runs/live/20261026T14{2216,2349,2434,2514,2603,2649}Z-chain-chain-<language>/`.
+
+| Runtime | Case | Verdict | Expected | Resolved | LLM calls | Tokens in/out | Agent s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Python | chain-python-cmdi-b | EXPLOIT_DEMONSTRATED | demonstrated | yes | 4 | 11,726 / 3,053 | 31 |
+| Python | chain-python-cmdi-a | INCONCLUSIVE | not demonstrated | no (permitted) | 3 | 8,917 / 2,443 | 24 |
+| Python | chain-python-codeinjection-b | EXPLOIT_DEMONSTRATED | demonstrated | yes | 2 | 4,355 / 4,005 | 35 |
+| JavaScript | js-prototypepollution-a | EXPLOIT_DEMONSTRATED | see note | yes after relabel | 5 | 14,595 / 4,679 | 42 |
+| Ruby | ruby-pathtraversal | EXPLOIT_DEMONSTRATED | demonstrated | yes | 6 | 18,372 / 3,981 | 37 |
+| Java | java-xxe-b | EXPLOIT_DEMONSTRATED | demonstrated | yes | 2 | 3,844 / 4,495 | 40 |
+| Perl | perl-xss-b | EXPLOIT_DEMONSTRATED | demonstrated | yes | 5 | 15,012 / 5,012 | 43 |
+| C | c-intoverflow-a | EXPLOIT_DEMONSTRATED | demonstrated | yes | 6 | 19,418 / 5,389 | 47 |
+
+Every demonstrated case ran its control and exploit in the real runtime image with valid evidence, the fixed revision
+blocked the exploit where the case declares one, and no forbidden label or invalid positive evidence occurred.
+Two findings:
+
+- `chain-python-cmdi-a` (expected `EXPLOIT_NOT_DEMONSTRATED`): the producer abstained with a correct reading of the
+  source (`subprocess.run` with `shell=False` and a list argument), so the kernel stopped at `INCONCLUSIVE`, a permitted
+  but unresolved label. Reaching the negative label needs the producer to submit a probe whose control and adversarial
+  runs both hold under coverage; this is the producer-behaviour question round 2 left open for the dev set.
+- `js-prototypepollution-a` was labelled `COMPONENT_EXPLOIT_DEMONSTRATED` while its request claims component scope,
+  which the scope policy labels `EXPLOIT_DEMONSTRATED` (an application claim probed at the component seam is what
+  earns the component label). The oracle was corrected and its digest refreshed, `corsair rescore` on the stored run
+  resolves it 1/1, and `corsair dataset validate` now rejects a demonstration label the policy cannot produce for the
+  request's claim (`claim_scope_problems`, unit and dataset tests).
 
 ## Decisions for the project owner
 
@@ -136,8 +186,8 @@ Also raised the test-side 20 s elapsed bounds in the Perl and Ruby Docker suites
 
 ## Next round candidates
 
-- Composed live chain on the Python dev set with the new producer schema, then the first live run of each non-Python
-  runtime through the producer and auditor (their prompts are still Python-worded).
+- Repeats of the per-runtime live chain (round 3 ran one repeat each) and the Python dev set, to separate variance from
+  the producer's abstention on `chain-python-cmdi-a`; the non-Python prompts are still Python-worded.
 - A bytes-payload option on `python.command_sentinel/1` to unlock the deserialization rows; `c.stack_overflow/1` for the
   remaining C rows; the framework-dependent rows mapped in the per-language corpus surveys.
 - Live `auditor-rubric` repeats to settle the `audit06`/`audit09` labels; producer-dev repeats to separate variance from
