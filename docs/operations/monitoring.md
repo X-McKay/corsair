@@ -32,7 +32,18 @@ uv run --locked corsair inspect "$RUN_ID" --online --settings .state/settings.js
 uv run --locked corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
 ```
 
-For an investigation, the native query returns its actual phase and round. For an evaluation batch, it returns actual completed and total child work. `--watch` requires `--online`; it waits for the workflow’s real final result and may be interrupted locally without cancelling work. It is not a heartbeating status service and must not be treated as proof that a security conclusion has been reached.
+For an investigation, the native query returns its actual phase, session and round with their admitted maxima, the last feedback gate name, the start time and elapsed-time deadline, and a bounded timeline of recent phase transitions. For an evaluation batch, it returns actual completed, total, running and errored child work. `--watch` requires `--online`; it waits for the workflow’s real final result and may be interrupted locally without cancelling work. It is not a heartbeating status service and must not be treated as proof that a security conclusion has been reached.
+
+### Reading the live view
+
+While `investigate --wait`, `inspect --online --watch` or `eval` waits, a human terminal shows that query as a live panel on stderr (or, with `--no-animation`, one line per status change). Read it as follows:
+
+- **Session n/max and round n/max** show how much of the admitted schedule has been used. A second session appears only after a first session ended in an independent clean negative.
+- **Last gate** names the most recent feedback gate (for example `retry` after a non-decisive audit, or an operational gate from evidence). It is a gate name, never a reason or a verdict.
+- **Deadline** is the elapsed-time budget; when little time is left the workflow will stop scheduling rounds and record an honest non-decisive result.
+- **Timeline** offsets show where time went, for example a long `evidence` step points at image build or probe time and a long `producer` step at model latency.
+
+The view adds only local elapsed time. It does not show model content and does not predict a disposition; the final result on stdout is the only outcome. See the [CLI reference](../reference/cli.md#live-progress-while-waiting) for the exact fields and modes.
 
 Use Docker only as a supplemental host observation. A currently retained Corsair container can be listed without modifying it:
 

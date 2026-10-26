@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -929,3 +929,100 @@ async def test_two_clean_sessions_under_threshold_three_stay_non_decisive(
 
     assert result.verdict is Verdict.INCONCLUSIVE
     assert acts.call_counts["corsair.produce"] == 2
+
+
+_STATUS_KEYS = {
+    "phase",
+    "session",
+    "round",
+    "max_sessions",
+    "max_rounds",
+    "gate",
+    "started",
+    "deadline",
+    "timeline",
+}
+
+
+async def test_status_query_reports_bounds_deadline_and_phase_timeline(
+    temporal_server, temporal_artifact_store
+):
+    request = investigation_request("statusquery")
+    async with temporal_server.worker(temporal_artifact_store) as (task_queue, _activities):
+        handle = await temporal_server.client.start_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("statusquery"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+        result = await handle.result()
+        status = await handle.query(InvestigationWorkflow.status)
+
+    assert result.disposition is Disposition.SUPPORTED
+    assert set(status) == _STATUS_KEYS
+    assert (status["phase"], status["session"], status["round"]) == ("complete", 1, 1)
+    assert status["max_rounds"] == request.budget.max_rounds
+    assert result.manifest is not None
+    assert status["max_sessions"] == result.manifest.max_sessions
+    assert status["gate"] is None
+    started = datetime.fromisoformat(status["started"])
+    deadline = datetime.fromisoformat(status["deadline"])
+    assert (deadline - started).total_seconds() == request.budget.max_elapsed_seconds
+    assert [entry["phase"] for entry in status["timeline"]] == [
+        "prepare",
+        "producer",
+        "evidence",
+        "audit",
+        "record",
+        "complete",
+    ]
+    assert [(entry["session"], entry["round"]) for entry in status["timeline"]][1:4] == [(1, 1)] * 3
+    moments = [datetime.fromisoformat(entry["at"]) for entry in status["timeline"]]
+    assert moments == sorted(moments) and moments[0] >= started
+
+
+async def test_status_query_reports_the_last_feedback_gate_per_round(
+    temporal_server, temporal_artifact_store
+):
+    held = ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 3)
+    request = investigation_request("statusgate", budget=_three_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, _activities):
+        handle = await temporal_server.client.start_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("statusgate"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+        await handle.result()
+        status = await handle.query(InvestigationWorkflow.status)
+
+    assert status["gate"] in {"audit", "retry"}
+    assert (status["round"], status["max_rounds"]) == (3, 3)
+    producers = [entry["round"] for entry in status["timeline"] if entry["phase"] == "producer"]
+    assert producers == [1, 2, 3]
+
+
+async def test_batch_status_query_reports_running_and_error_counts(
+    temporal_server, temporal_artifact_store
+):
+    request = BatchRequest(
+        batch_id=temporal_id("batchstatus"),
+        requests=[investigation_request("statusok"), investigation_request("statusbad")],
+        repeats=1,
+        concurrency=2,
+    )
+    scenario = ActivityScenario(fail_record_case_ids=frozenset({"statusbad"}))
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, _):
+        handle = await temporal_server.client.start_workflow(
+            EvaluationWorkflow.run,
+            request,
+            id=temporal_id("batchstatus"),
+            task_queue=task_queue,
+            result_type=list[BatchItem],
+        )
+        await handle.result()
+        status = await handle.query(EvaluationWorkflow.status)
+
+    assert status == {"completed": 2, "total": 2, "running": 0, "errors": 1}

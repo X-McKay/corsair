@@ -171,6 +171,27 @@ Lists committed investigation results in the artifact store, newest first, witho
 
 Operation names are stored hashed, so the listing reads every committed record and admits a result only if it validates and is committed under its own `result.<run_id>` name. Observation and intent records are skipped. `invalid_records` counts records that could not be read or a result-shaped record that failed validation or that binding; they are reported, never listed or repaired. `recorded_at` is the operation record's filesystem time in UTC: operational metadata for ordering, not evidence, and it changes if the store is copied without preserving times. The command never writes to the store, although opening an absent artifact root creates its empty directories as every local store command does.
 
+
+#### Live progress while waiting
+
+`investigate --wait`, `inspect --online --watch` and `eval` poll the workflow's native `status` query about once a second and render it on stderr; stdout still carries only the final result.
+
+| Field | Investigation query | Evaluation query |
+| --- | --- | --- |
+| Position | `phase`, `session`, `round` | `completed`, `total` |
+| Bounds | `max_sessions` (admitted manifest; `0` before prepare), `max_rounds` (budget) | `running` (child workflows in flight), `errors` (child workflows that failed) |
+| Time | `started`, `deadline` (ISO 8601 workflow time; the deadline is the elapsed-time budget) | none |
+| Kernel | `gate`: the last feedback gate name (for example `retry`, `audit`, `producer`), or `null` | none |
+| History | `timeline`: the most recent 32 phase transitions, each `{phase, session, round, at}` | none |
+
+The query carries workflow-owned metadata only: no model text, feedback reason, source, payload, observation or label. The view adds only local wall-clock time (elapsed since `started`, time left before `deadline`).
+
+- Human mode on an interactive terminal draws a live panel: the current phase with a spinner, elapsed time, session n/max, round n/max, last gate, deadline with time left, and the last eight transitions with their offsets from the start. An evaluation shows completed/total cases, running and errors.
+- Human mode with `--no-animation`, or when stderr is not a terminal, prints one plain line per status change and no cursor movement.
+- `--format json` prints no progress view; progress is visible only as `workflow.progress` log events.
+
+A failed query is logged once as `workflow.progress_unavailable` and the view keeps the last real status; it never invents progress.
+
 ### `cancel RUN_ID`
 
 ```bash
