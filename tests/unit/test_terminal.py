@@ -250,7 +250,9 @@ async def test_execute_compare_exits_by_regression_and_emits_the_structured_diff
     assert await execute(args) == 1
     diff = json.loads(capsys.readouterr().out)
     assert diff["baseline_report"] == str(baseline)
-    assert diff["regressions"] == [{"case_id": "case01", "repeat": 0, "reason": "pass_to_fail"}]
+    assert diff["regressions"] == [
+        {"case_id": "case01", "repeat": 0, "family": None, "reason": "pass_to_fail"}
+    ]
 
 
 async def test_execute_compare_refuses_mismatched_datasets_without_the_flag(tmp_path, capsys):
@@ -309,6 +311,118 @@ async def test_human_compare_of_identical_reports_reports_no_changes(tmp_path, c
     assert "NO REGRESSION" in output
     assert "No per-case status or label changes" in output
     assert "Dataset mismatch" not in output
+
+
+def _family_report(path, *rows, digest_value="sha256:frozen"):
+    path.write_text(
+        json.dumps({"rows": list(rows), "summary": {"attempts": 1}, "dataset_digest": digest_value})
+    )
+    return path
+
+
+def _family_row(case_id, family, split, *, status="pass", forbidden=False):
+    return {
+        "run_id": f"run-{case_id}",
+        "case_id": case_id,
+        "family": family,
+        "split": split,
+        "status": status,
+        "verdict": "EXPLOIT_DEMONSTRATED" if status == "pass" else "INCONCLUSIVE",
+        "execution_status": "COMPLETED",
+        "forbidden_label": forbidden,
+    }
+
+
+async def test_report_families_adds_per_family_and_per_split_views(tmp_path, capsys):
+    report = _family_report(
+        tmp_path / "report.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "held_out", status="fail"),
+    )
+
+    args = parser().parse_args(["--format", "json", "report", str(report), "--families"])
+    assert await execute(args) == 0
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert [item["family"] for item in emitted["families"]] == ["cmdi", "sqli"]
+    assert [item["split"] for item in emitted["splits"]] == ["dev", "held_out"]
+    assert emitted["rows"][0]["family"] == "cmdi"
+
+    args = parser().parse_args(["--format", "json", "report", str(report)])
+    assert await execute(args) == 0
+    assert "families" not in json.loads(capsys.readouterr().out)
+
+
+async def test_report_dataset_labels_an_older_report_only_from_its_own_manifest(tmp_path, capsys):
+    from corsair.contracts import digest
+    from corsair.evaluation.scoring import load_dataset
+
+    dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"
+    dataset, _, _ = load_dataset(dataset_path)
+    row = {"case_id": "case01", "run_id": "r", "status": "pass", "verdict": "INCONCLUSIVE"}
+    matching = _family_report(tmp_path / "match.json", row, digest_value=digest(dataset))
+    stale = _family_report(tmp_path / "stale.json", row, digest_value="0" * 64)
+
+    args = parser().parse_args(
+        ["--format", "json", "report", str(matching), "--families", "--dataset", str(dataset_path)]
+    )
+    assert await execute(args) == 0
+    (group,) = json.loads(capsys.readouterr().out)["families"]
+    assert (group["family"], group["splits"]) == ("family01", ["dev"])
+
+    args = parser().parse_args(
+        ["--format", "json", "report", str(stale), "--dataset", str(dataset_path)]
+    )
+    with pytest.raises(ValueError, match="differs from the report's dataset digest"):
+        await execute(args)
+
+
+def test_human_report_renders_family_and_split_tables(capsys, monkeypatch):
+    from corsair.evaluation.families import family_view
+
+    monkeypatch.setenv("COLUMNS", "200")
+    rows = [
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "held_out", status="fail", forbidden=True),
+        {"case_id": "lost", "run_id": "lost", "status": "unavailable"},
+    ]
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+
+    terminal.emit({"rows": rows, "summary": {"attempts": 3}, **family_view(rows)})
+
+    output = capsys.readouterr().out
+    assert "Corsair · Families" in output and "Corsair · Splits" in output
+    assert "held_out" in output and "(undeclared)" in output
+    assert "1/1" in output and "0/1" in output and "unknown" in output
+
+
+async def test_compare_families_attributes_a_regression_to_its_family(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("COLUMNS", "200")
+    baseline = _family_report(
+        tmp_path / "baseline.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "dev"),
+    )
+    candidate = _family_report(
+        tmp_path / "candidate.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "dev", status="fail"),
+    )
+    argv = ["compare", str(baseline), str(candidate), "--families"]
+
+    assert await execute(parser().parse_args(["--format", "json", *argv])) == 1
+    diff = json.loads(capsys.readouterr().out)
+    deltas = {item["family"]: item for item in diff["families"]}
+    assert (deltas["sqli"]["regressions"], deltas["cmdi"]["regressions"]) == (1, 0)
+    assert diff["regressions"][0]["family"] == "sqli"
+
+    assert await execute(parser().parse_args(["--format", "human", "--no-color", *argv])) == 1
+    output = capsys.readouterr().out
+    assert "Corsair · Families" in output
+    assert "sqli-a #0 [sqli]: pass_to_fail" in output
+    assert "1.0 -> 0.0 (-1.0)" in output
 
 
 async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):
@@ -1277,10 +1391,11 @@ def test_parser_exits_load_no_presentation_contract_or_sdk_modules(tmp_path, arg
 
 
 @pytest.mark.parametrize("command", ["report", "compare"])
-def test_saved_report_commands_load_no_runtime_sdks(tmp_path, command):
+@pytest.mark.parametrize("families", [[], ["--families"]])
+def test_saved_report_commands_load_no_runtime_sdks(tmp_path, command, families):
     report = tmp_path / "report.json"
     report.write_text(json.dumps({"summary": {"passed": 1, "failed": 0}, "rows": []}))
-    reports = [str(report)]
+    reports = [str(report), *families]
     if command == "compare":
         reports += [str(report), "--allow-dataset-mismatch"]
 
