@@ -6,13 +6,16 @@ import logging
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from rich.console import Console
 
+from corsair.entrypoints import terminal as terminal_module
 from corsair.entrypoints.cli import execute, parser, validate_run_id
-from corsair.entrypoints.terminal import Terminal
+from corsair.entrypoints.terminal import Terminal, progress_fields, progress_panel
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
 
 
@@ -327,3 +330,163 @@ def test_client_only_operations_do_not_import_worker_or_adk_composition():
         timeout=10,
     )
     assert result.returncode == 0, result.stderr
+
+
+_NOW = datetime(2026, 10, 25, 12, 4, 30, tzinfo=UTC)
+
+
+def _status(phase: str, session: int, round_index: int, **extra: object) -> dict[str, object]:
+    timeline = [
+        {"phase": "prepare", "session": 0, "round": 0, "at": "2026-10-25T12:00:00+00:00"},
+        {"phase": "producer", "session": 1, "round": 1, "at": "2026-10-25T12:00:05+00:00"},
+    ]
+    return {
+        "phase": phase,
+        "session": session,
+        "round": round_index,
+        "max_sessions": 2,
+        "max_rounds": 4,
+        "gate": None,
+        "started": "2026-10-25T12:00:00+00:00",
+        "deadline": "2026-10-25T12:15:00+00:00",
+        "timeline": timeline,
+        **extra,
+    }
+
+
+def _scripted_query(statuses: list[dict[str, object]], done: asyncio.Event):
+    """A fake native query that advances one status per poll, then completes the wait."""
+    remaining = list(statuses)
+
+    async def query():
+        if len(remaining) == 1:
+            done.set()
+            return remaining[0]
+        return remaining.pop(0)
+
+    return query
+
+
+async def _finish(done: asyncio.Event) -> str:
+    await done.wait()
+    return "final"
+
+
+def test_progress_fields_come_only_from_status_and_local_time():
+    fields = dict(progress_fields(_status("evidence", 1, 2, gate="coverage"), _NOW, 999.0))
+
+    assert fields == {
+        "elapsed": "04:30",
+        "phase": "evidence",
+        "session": "1/2",
+        "round": "2/4",
+        "last gate": "coverage",
+        "deadline": "2026-10-25T12:15:00+00:00 (10:30 left)",
+    }
+    assert dict(progress_fields(None, _NOW, 7.0)) == {
+        "elapsed": "00:07",
+        "status": "waiting for the workflow status query",
+    }
+    batch = {"completed": 3, "total": 8, "running": 2, "errors": 1}
+    assert dict(progress_fields(batch, _NOW, 65.0)) == {
+        "elapsed": "01:05",
+        "cases": "3/8",
+        "running": "2",
+        "errors": "1",
+    }
+    expired = dict(
+        progress_fields(_status("audit", 1, 1), datetime(2026, 10, 25, 13, tzinfo=UTC), 0)
+    )
+    assert expired["deadline"].endswith("(passed)")
+
+
+def test_progress_panel_renders_status_and_phase_timeline():
+    status = _status("producer", 1, 1)
+    console = Console(file=io.StringIO(), width=100, color_system=None, record=True)
+    console.print(progress_panel("Investigation run1", status, progress_fields(status, _NOW, 0)))
+    frame = console.export_text()
+
+    assert "Corsair · Investigation run1" in frame
+    assert "Session" in frame and "1/2" in frame
+    assert "Round" in frame and "1/4" in frame
+    assert "10:30 left" in frame
+    assert "+00:00" in frame and "+00:05" in frame and "prepare" in frame
+
+
+def test_progress_panel_bounds_the_timeline_to_recent_transitions():
+    many = [
+        {"phase": f"p{index}", "session": 1, "round": index, "at": "2026-10-25T12:00:00+00:00"}
+        for index in range(12)
+    ]
+    status = _status("p11", 1, 11, timeline=many)
+    console = Console(file=io.StringIO(), width=100, color_system=None, record=True)
+    console.print(progress_panel("run", status, progress_fields(status, _NOW, 0)))
+    frame = console.export_text()
+
+    assert "… 4 earlier" in frame
+    assert " p3 " not in frame and " p4 " in frame
+
+
+async def test_plain_human_wait_prints_one_line_per_status_change(capsys, monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-animation", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [
+        _status("producer", 1, 1),
+        _status("producer", 1, 1),
+        _status("evidence", 1, 1),
+        _status("audit", 1, 1, gate="coverage"),
+    ]
+
+    result = await terminal.wait(
+        _finish(done), "Investigation run1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "\x1b" not in captured.err
+    common = "session 1/2 · round 1/4"
+    deadline = "deadline 2026-10-25T12:15:00+00:00 (10:30 left)"
+    assert captured.err.splitlines() == [
+        f"Investigation run1 · elapsed 04:30 · phase producer · {common} · {deadline}",
+        f"Investigation run1 · elapsed 04:30 · phase evidence · {common} · {deadline}",
+        f"Investigation run1 · elapsed 04:30 · phase audit · {common} · last gate coverage"
+        f" · {deadline}",
+    ]
+
+
+async def test_json_wait_prints_no_progress_view(capsys, monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [_status("producer", 1, 1), _status("evidence", 1, 1)]
+
+    result = await terminal.wait(
+        _finish(done), "Investigation run1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "Investigation run1" not in captured.err and "session" not in captured.err
+    assert "\x1b" not in captured.err
+
+
+async def test_animated_wait_draws_the_live_panel_on_stderr(monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
+    stream = io.StringIO()
+    terminal.err = Console(file=stream, force_terminal=True, color_system=None, width=100)
+    terminal.animate = True
+    done = asyncio.Event()
+    statuses = [_status("producer", 1, 1), _status("evidence", 1, 2)]
+
+    result = await terminal.wait(_finish(done), "Evaluation", query=_scripted_query(statuses, done))
+    frame = stream.getvalue()
+
+    assert result == "final"
+    assert "Corsair · Evaluation" in frame
+    assert "evidence" in frame and "2/4" in frame

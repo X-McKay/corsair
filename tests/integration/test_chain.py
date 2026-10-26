@@ -206,7 +206,12 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         assert json.loads(capsys.readouterr().out)["summary"]["attempts"] == 3
         inspection = ["inspect", args.run_id, "--online", "--settings", str(config)]
         assert await execute(parser().parse_args(inspection)) == 0
-        assert json.loads(capsys.readouterr().out) == {"completed": 3, "total": 3}
+        assert json.loads(capsys.readouterr().out) == {
+            "completed": 3,
+            "total": 3,
+            "running": 0,
+            "errors": 0,
+        }
         assert await execute(parser().parse_args([*inspection, "--watch"])) == 0
         children = json.loads(capsys.readouterr().out)
         assert len(children) == 3

@@ -53,6 +53,10 @@ DEFAULT_NEGATIVE_THRESHOLD = 2
 # invalid): it only asks for a fresh source-grounded candidate.
 _BLIND_RETRY_REASON = "Propose a different source-grounded candidate payload pair."
 
+# The status query keeps only the most recent phase transitions; it is read-only
+# presentation state and never feeds a command, so replay is unaffected.
+_TIMELINE_LIMIT = 32
+
 
 def _retry_feedback(audit: AuditOutput) -> Feedback:
     """Feedback for the next producer round after a completed round that did not
@@ -134,14 +138,45 @@ class BudgetExhausted(Exception):
 @workflow.defn(name="corsair.investigation")
 class InvestigationWorkflow:
     def __init__(self) -> None:
-        self.phase = "pending"
+        self._phase = "pending"
         self.session_index = 0
         self.round_index = 0
+        self.max_sessions = 0
+        self.max_rounds = 0
+        self.gate: str | None = None
+        self.started: datetime | None = None
         self.deadline: datetime | None = None
+        self.timeline: list[dict[str, str | int | None]] = []
+
+    @property
+    def phase(self) -> str:
+        return self._phase
+
+    @phase.setter
+    def phase(self, value: str) -> None:
+        """Record each transition at deterministic workflow time for the status query."""
+        self._phase = value
+        # Unit tests drive finalization outside a workflow loop, where there is no clock.
+        at = workflow.now().isoformat() if workflow.in_workflow() else None
+        self.timeline.append(
+            {"phase": value, "session": self.session_index, "round": self.round_index, "at": at}
+        )
+        del self.timeline[:-_TIMELINE_LIMIT]
 
     @workflow.query
     def status(self) -> dict:
-        return {"phase": self.phase, "session": self.session_index, "round": self.round_index}
+        """Workflow-owned progress metadata only: no model, source or payload content."""
+        return {
+            "phase": self.phase,
+            "session": self.session_index,
+            "round": self.round_index,
+            "max_sessions": self.max_sessions,
+            "max_rounds": self.max_rounds,
+            "gate": self.gate,
+            "started": self.started.isoformat() if self.started else None,
+            "deadline": self.deadline.isoformat() if self.deadline else None,
+            "timeline": list(self.timeline),
+        }
 
     async def _execute_bounded_activity[Result](
         self, name: str, argument: Any, result_type: type[Result], seconds: int
@@ -196,6 +231,8 @@ class InvestigationWorkflow:
         run_id = workflow.info().workflow_id
         budget = request.budget
         started = workflow.now()
+        self.started = started
+        self.max_rounds = budget.max_rounds
         self.deadline = started + timedelta(seconds=budget.max_elapsed_seconds)
         result = InvestigationResult(
             run_id=run_id,
@@ -222,6 +259,7 @@ class InvestigationWorkflow:
             # rounds restart per session.
             calls_left, tools_left = budget.max_llm_calls, budget.max_tool_calls
             max_sessions = prepared.manifest.max_sessions
+            self.max_sessions = max_sessions
             threshold = prepared.manifest.negative_threshold
             for session in range(1, max_sessions + 1):
                 self.session_index = session
@@ -277,6 +315,7 @@ class InvestigationWorkflow:
                             )
                             break
                         feedback = Feedback(gate="producer", reason=decision.root.reason)
+                        self.gate = feedback.gate
                         result = result.model_copy(update={"reason": feedback.reason})
                         continue
                     submission = producer.submission_for_verification()
@@ -284,6 +323,7 @@ class InvestigationWorkflow:
                         feedback = producer.feedback or Feedback(
                             gate="producer", reason="No submission"
                         )
+                        self.gate = feedback.gate
                         result = result.model_copy(update={"reason": feedback.reason})
                         if feedback.operational:
                             result = result.model_copy(
@@ -310,6 +350,7 @@ class InvestigationWorkflow:
                     rounds[-1] = round_result
                     if observation.feedback is not None:
                         feedback = observation.feedback
+                        self.gate = feedback.gate
                         result = result.model_copy(update={"reason": feedback.reason})
                         if feedback.operational:
                             result = result.model_copy(
@@ -391,6 +432,7 @@ class InvestigationWorkflow:
                     if status != ExecutionStatus.COMPLETED:
                         break
                     feedback = _retry_feedback(audit)
+                    self.gate = feedback.gate
                 # Another session runs only while every earlier one ended in an
                 # independent clean negative and the threshold is still unmet; any
                 # other outcome is already final for case_verdict.
