@@ -90,6 +90,20 @@ def test_a_confirmed_demonstration_survives_a_later_failure():
     assert verdict is Verdict.EXPLOIT_DEMONSTRATED
 
 
+def test_a_component_demonstration_survives_a_later_failure():
+    from corsair.contracts import Scope
+
+    prepared = _prepared().model_copy(
+        update={
+            "finding": _prepared().finding.model_copy(update={"claim_scope": Scope.APPLICATION})
+        }
+    )
+    rounds = [_round(1, _demonstrated(), _audit())]
+    result = _result(execution_status=ExecutionStatus.ERROR, reason="later fault")
+    verdict = _aggregate_case_verdict(prepared, rounds, result)
+    assert verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
+
+
 def test_completed_clean_negative_alone_is_inconclusive_at_threshold_two():
     rounds = [_round(1, _clean_negative(), _audit())]
     result = _result(execution_status=ExecutionStatus.COMPLETED, reason="completed")

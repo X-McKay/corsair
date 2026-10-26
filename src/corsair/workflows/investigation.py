@@ -68,6 +68,10 @@ def _retry_feedback(audit: AuditOutput) -> Feedback:
     return Feedback(gate="retry", reason=_BLIND_RETRY_REASON)
 
 
+# A positive demonstration is a fact that a later operational failure cannot erase.
+_DEMONSTRATIONS = frozenset({Verdict.EXPLOIT_DEMONSTRATED, Verdict.COMPONENT_EXPLOIT_DEMONSTRATED})
+
+
 def _session_outcome(
     prepared: PreparedCase | None,
     rounds: list[RoundResult],
@@ -78,8 +82,9 @@ def _session_outcome(
     The last evaluated round decides a demonstration, but a later terminal
     operational failure (an ERROR/BLOCKED/CANCELLED round after it) must not be
     masked by an earlier non-decisive round: unless the earlier round positively
-    demonstrated the exploit, the operational failure carries into the outcome so
-    the canonical five-label result keeps its operational-error signal.
+    demonstrated the exploit (at application or component scope), the operational
+    failure carries into the outcome so the canonical result keeps its
+    operational-error signal.
     """
     terminal = next(
         (r for r in reversed(rounds) if r.observation is not None and r.audit is not None),
@@ -92,7 +97,7 @@ def _session_outcome(
         outcome = status_outcome(result.execution_status, result.reason)
     if (
         result.execution_status is not ExecutionStatus.COMPLETED
-        and outcome.verdict is not Verdict.EXPLOIT_DEMONSTRATED
+        and outcome.verdict not in _DEMONSTRATIONS
     ):
         outcome = status_outcome(result.execution_status, result.reason)
     return outcome
