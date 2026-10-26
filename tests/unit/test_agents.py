@@ -5,7 +5,7 @@ import json
 import tarfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from google.adk.models.llm_response import LlmResponse
@@ -221,17 +221,15 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
 
     assert producer.name == "producer"
     tool_names = []
-    for tool in producer.tools[:2]:
-        assert callable(tool)
+    for tool in producer.tools:
+        assert callable(tool) and not isinstance(tool, SkillToolset)
         name = getattr(tool, "__name__", None)
         assert isinstance(name, str)
         tool_names.append(name)
     assert tool_names == ["read_file", "list_files"]
-    producer_loader = producer.tools[2]
+    assert "## Runtime procedure: source-grounding\n" in str(producer.instruction)
     auditor_loader = auditor.tools[0]
-    assert isinstance(producer_loader, SkillToolset)
     assert isinstance(auditor_loader, SkillToolset)
-    assert [skill.name for skill in producer_loader.skills] == ["source-grounding"]
     assert [skill.name for skill in auditor_loader.skills] == ["semantic-review"]
     assert auditor.include_contents == "none"
     assert auditor.output_schema is AuditResult
@@ -246,8 +244,12 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
         schema["$defs"]["Submission"]["required"]
     )
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False
-    with pytest.raises(ValueError, match="exactly one native SkillToolset"):
+    with pytest.raises(ValueError, match="must exactly match approved metadata"):
         build_producer("gemini-2.5-flash", tools[:-1])
+    with pytest.raises(ValueError, match="must be native callables"):
+        build_producer(
+            "gemini-2.5-flash", [*tools, cast(Callable[..., Any], build_auditor_toolset()[0])]
+        )
 
 
 def test_producer_output_exposes_only_the_decision_submission():
@@ -411,10 +413,7 @@ async def test_source_inspection_then_structured_completion_share_one_native_epi
     assert output.feedback is None and output.submission_for_verification() is not None
     assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
     assert all(request.config.response_schema is ProducerDecision for request in model.requests)
-    assert all(
-        set(request.tools_dict) == {"read_file", "list_files", "load_skill", "load_skill_resource"}
-        for request in model.requests
-    )
+    assert all(set(request.tools_dict) == {"read_file", "list_files"} for request in model.requests)
 
 
 @pytest.mark.asyncio

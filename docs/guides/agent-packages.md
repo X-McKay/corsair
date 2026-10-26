@@ -13,7 +13,7 @@ src/corsair/agents/
     agent.json                         # validated Corsair role metadata
     contracts.py                       # object-identity re-exports from corsair.contracts
     factory.py                          # native LlmAgent construction
-    toolsets.py                         # source tools + native SkillToolset composition
+    toolsets.py                         # the two source tools (procedure is preloaded)
     instructions/
       __init__.py
       system.md                         # always-on producer instruction
@@ -52,7 +52,7 @@ The system instruction and a procedure skill have different jobs. `instructions/
 
 ## Native skill loading boundary
 
-Role-local `toolsets.py` initializes the native ADK `SkillToolset` in `EAGER` mode from an explicit role allowlist of built-package files. It exposes only the native `load_skill` and `load_skill_resource` calls after filtering. Producer composition also retains the static, episode-private `read_file` and `list_files` functions. Auditor composition exposes no source or external function tool.
+The auditor's `toolsets.py` initializes the native ADK `SkillToolset` in `EAGER` mode from an explicit role allowlist of built-package files. It exposes only the native `load_skill` and `load_skill_resource` calls after filtering. Auditor composition exposes no source or external function tool. Producer composition is only the static, episode-private `read_file` and `list_files` functions; its procedure is preloaded and it has no loader.
 
 A loaded skill or resource becomes context for that single native episode. It is not a script runner, a code executor, a state-injection mechanism, a filesystem browser, an environment loader, a remote catalog, or an alternate agent loop. The current skills contain only `SKILL.md`; do not create a resource directory until a specific admitted, useful resource requires one.
 
@@ -70,4 +70,4 @@ Procedural skills do not prove model quality, target execution, evidence validit
 
 ## Core preload versus optional progressive loading
 
-The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. Optional native load_skill refreshes and load_skill_resource reference requests remain available within finite root/episode budgets; only successful model-requested loads populate Usage.skills_loaded, and their dispatches count as tool calls. A provider that never requests an optional load is reported as such; it is not rewritten as successful tool use.
+The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. For the auditor, optional native load_skill refreshes and load_skill_resource reference requests remain available within finite root/episode budgets (the producer has no loader); only successful model-requested loads populate Usage.skills_loaded, and their dispatches count as tool calls. A provider that never requests an optional load is reported as such; it is not rewritten as successful tool use.

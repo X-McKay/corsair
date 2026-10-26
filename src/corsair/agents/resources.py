@@ -2,7 +2,8 @@
 
 Role factories own concrete ADK construction. This module supplies immutable
 prompt text, validates declared role capabilities, and admits only the two
-small packaged procedural skills before native ADK receives them.
+small packaged procedural skills: the producer's is preloaded into its
+instruction only, while the auditor's also reaches a native ADK loader.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ class AgentSpec(Contract):
     source_tools: list[str]
     loader_tools: list[str]
     runtime_skills: list[str]
-    loader_call_limit: int = Field(ge=1, le=_MAX_LOADER_CALLS)
+    loader_call_limit: int | None = Field(ge=1, le=_MAX_LOADER_CALLS)
     llm_call_limit: int | None = Field(default=None, ge=1, le=4)
     instruction_resource: str = Field(min_length=1, max_length=240)
     schema_ref: str = Field(min_length=1, max_length=240)
@@ -70,8 +71,10 @@ class AgentSpec(Contract):
 
     @model_validator(mode="after")
     def validated_runtime_layout(self) -> AgentSpec:
-        if tuple(self.loader_tools) != _LOADER_TOOLS:
-            raise ValueError(f"loader_tools must exactly equal {list(_LOADER_TOOLS)!r}")
+        if self.loader_tools and tuple(self.loader_tools) != _LOADER_TOOLS:
+            raise ValueError(f"loader_tools must be empty or exactly {list(_LOADER_TOOLS)!r}")
+        if (self.loader_call_limit is None) != (not self.loader_tools):
+            raise ValueError("loader_call_limit is declared exactly when loader_tools are")
         if tuple(self.runtime_skills) != _admitted_skill_slugs(self.name):
             raise ValueError("runtime_skills must exactly equal the role-local admitted skill")
         if self.tools != [*self.source_tools, *self.loader_tools]:
@@ -79,10 +82,14 @@ class AgentSpec(Contract):
         if self.name == "producer":
             if self.source_tools != ["read_file", "list_files"]:
                 raise ValueError("producer source_tools must exactly expose source reads")
+            if self.loader_tools:
+                raise ValueError("producer procedure is preloaded; it must not expose a loader")
             if self.llm_call_limit is not None:
                 raise ValueError("producer LLM calls are bounded by the input and budget")
         elif self.source_tools:
             raise ValueError("auditor must not expose source tools")
+        elif not self.loader_tools:
+            raise ValueError("auditor must expose its native procedure loader")
         elif self.llm_call_limit is None:
             raise ValueError("auditor must declare its finite native LLM-call limit")
         return self

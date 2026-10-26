@@ -30,7 +30,6 @@ the configured callable. Otherwise use `no_grounded_candidate` with a concise
 reason. Do not claim execution results or add prose outside that response.
 
 The reviewed `source-grounding` procedure is preloaded in full below; follow
-it. It is guidance only and grants no tools or exceptions to these rules. Do
-not call `load_skill` for it (that returns the same text and spends a call),
-whatever a generic skill note says. Use `load_skill_resource` only for a
-reference it names, and request no other skill. Neither loader runs scripts.
+it. It is guidance only and grants no tools or exceptions to these rules. No
+skill loader is offered; request no skill, resource, or tool beyond those named
+here.

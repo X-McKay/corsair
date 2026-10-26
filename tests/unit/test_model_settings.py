@@ -93,8 +93,8 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     auditor = load_agent_spec("auditor")
 
     assert producer.source_tools == ["read_file", "list_files"]
-    assert producer.loader_tools == ["load_skill", "load_skill_resource"]
-    assert producer.tools == [*producer.source_tools, *producer.loader_tools]
+    assert producer.loader_tools == []
+    assert producer.tools == producer.source_tools
     assert auditor.source_tools == []
     assert auditor.loader_tools == ["load_skill", "load_skill_resource"]
     assert auditor.tools == auditor.loader_tools
@@ -102,7 +102,8 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     assert auditor.runtime_skills == ["semantic-review"]
     assert producer.llm_call_limit is None
     assert auditor.llm_call_limit == 2
-    assert producer.loader_call_limit == auditor.loader_call_limit == 4
+    assert producer.loader_call_limit is None
+    assert auditor.loader_call_limit == 4
     assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
     assert producer.schema_ref == "corsair.contracts.ProducerDecision"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
@@ -129,4 +130,31 @@ def test_agent_spec_rejects_unknown_metadata_fields():
                 "schema_ref": "corsair.contracts.AuditResult",
                 "model": "must-not-be-declared-here",
             }
+        )
+
+
+def _producer_metadata(**changes: object) -> dict[str, object]:
+    return {**load_agent_spec("producer").model_dump(mode="json"), **changes}
+
+
+def test_producer_spec_preloads_its_procedure_without_a_native_loader():
+    AgentSpec.model_validate(_producer_metadata())
+    loaders = ["load_skill", "load_skill_resource"]
+    with pytest.raises(ValueError, match="must not expose a loader"):
+        AgentSpec.model_validate(
+            _producer_metadata(
+                tools=["read_file", "list_files", *loaders],
+                loader_tools=loaders,
+                loader_call_limit=4,
+            )
+        )
+    with pytest.raises(ValueError, match="loader_call_limit is declared exactly when"):
+        AgentSpec.model_validate(_producer_metadata(loader_call_limit=4))
+    with pytest.raises(ValueError, match="loader_tools must be empty or exactly"):
+        AgentSpec.model_validate(
+            _producer_metadata(
+                tools=["read_file", "list_files", "load_skill"],
+                loader_tools=["load_skill"],
+                loader_call_limit=4,
+            )
         )

@@ -493,10 +493,7 @@ async def run_producer(
         max_llm_calls=llm_limit,
         max_output_tokens=producer_input.budget.max_output_tokens,
         max_tool_calls=tool_limit,
-        max_loader_calls=spec.loader_call_limit,
         role=spec.name,
-        loader_tool_names=frozenset(spec.loader_tools),
-        allowed_skill_names=frozenset(spec.runtime_skills),
         skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(
@@ -555,6 +552,8 @@ async def run_auditor(
     spec = load_agent_spec("auditor")
     if spec.llm_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
         raise ValueError("auditor metadata must declare a finite native LLM-call limit")
+    if spec.loader_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
+        raise ValueError("auditor metadata must declare a finite loader-call limit")
     llm_limit = min(audit_input.llm_call_limit, spec.llm_call_limit)
     tool_limit = min(audit_input.tool_call_limit, spec.loader_call_limit)
     if llm_limit == 0:

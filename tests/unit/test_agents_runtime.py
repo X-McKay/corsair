@@ -52,25 +52,30 @@ def test_role_contract_re_exports_are_the_canonical_models(tmp_path: Path):
     assert RoleProducerDecision is ProducerDecision
     assert RoleAuditResult is AuditResult
     producer_tools = build_producer_toolset(_producer_input(store), StoredSourceReader(store))
-    producer_names = [getattr(tool, "__name__", None) for tool in producer_tools[:2]]
+    producer_names = [getattr(tool, "__name__", None) for tool in producer_tools]
     assert producer_names == ["read_file", "list_files"]
-    producer_loader = producer_tools[2]
-    assert isinstance(producer_loader, SkillToolset)
-    assert [skill.name for skill in producer_loader.skills] == ["source-grounding"]
+    assert not any(isinstance(tool, SkillToolset) for tool in producer_tools)
     auditor_tools = build_auditor_toolset()
     assert [skill.name for skill in auditor_tools[0].skills] == ["semantic-review"]
 
 
 @pytest.mark.asyncio
-async def test_producer_native_load_skill_then_schema_completion_counts_real_calls(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize(
+    ("loader", "args"),
+    [
+        ("load_skill", {"skill_name": "source-grounding"}),
+        ("load_skill_resource", {"skill_name": "semantic-review", "file_path": "references/r.md"}),
+    ],
+)
+async def test_producer_loader_call_is_a_native_unknown_tool_and_records_no_load(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, loader: str, args: dict[str, str]
 ):
     store = ArtifactStore(tmp_path)
     model = ScriptedLlm(
-        model="scripted-runtime-skill",
+        model="scripted-no-producer-loader",
         structured_tools=False,
         responses=[
-            tool_response("load_skill", {"skill_name": "source-grounding"}),
+            tool_response(loader, args),
             tool_response("set_model_response", _proposal_args()),
         ],
     )
@@ -78,46 +83,18 @@ async def test_producer_native_load_skill_then_schema_completion_counts_real_cal
     caplog.set_level(logging.INFO, logger="corsair")
     output = await run_producer(_producer_input(store), ModelSettings(), store, model)
 
-    assert output.feedback is None
-    assert output.decision is not None
+    assert output.feedback is None and output.decision is not None
     assert output.usage.llm_calls == output.usage.tool_calls == 2
-    assert output.usage.skills_loaded == ["source-grounding"]
-    assert "set_model_response" in model.requests[1].tools_dict
-    assert {"load_skill", "load_skill_resource"} <= set(model.requests[0].tools_dict)
-    assert not {
-        "list_skills",
-        "search_skills",
-        "run_skill_script",
-        "unload_skill",
-    } & set(model.requests[0].tools_dict)
+    assert output.usage.skills_loaded == []
+    assert output.usage.skills_preloaded == ["source-grounding"]
+    assert set(model.requests[0].tools_dict) == {"read_file", "list_files", "set_model_response"}
+    assert "no tool with that name" in _tool_response(model, loader)["error"]
+    assert not any(record.message == "agent.skill_loaded" for record in caplog.records)
     assert any(
-        record.message == "agent.skill_loaded"
+        record.message == "agent.skill_preloaded"
         and getattr(record, "fields", {}) == {"role": "producer", "skill_name": "source-grounding"}
         for record in caplog.records
     )
-
-
-@pytest.mark.asyncio
-async def test_resource_loader_rejects_another_roles_skill_without_claiming_load(tmp_path: Path):
-    store = ArtifactStore(tmp_path)
-    model = ScriptedLlm(
-        model="scripted-cross-role-resource",
-        responses=[
-            tool_response(
-                "load_skill_resource",
-                {"skill_name": "semantic-review", "file_path": "references/review.md"},
-            ),
-            text_response(json.dumps(_proposal_args())),
-        ],
-    )
-
-    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
-
-    assert output.feedback is None and output.decision is not None
-    assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
-    assert output.usage.skills_loaded == []
-    assert _tool_response(model, "load_skill_resource")["error_code"] == "SKILL_NOT_FOUND"
-    assert "run_skill_script" not in model.requests[0].tools_dict
 
 
 @pytest.mark.asyncio
@@ -150,14 +127,13 @@ async def test_auditor_native_load_skill_is_bounded_and_remains_source_free(tmp_
 
 
 @pytest.mark.asyncio
-async def test_runtime_skill_loads_are_fresh_for_each_native_producer_episode(tmp_path: Path):
+async def test_preloaded_procedure_is_fresh_for_each_native_producer_episode(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     model = ScriptedLlm(
-        model="scripted-fresh-skills",
+        model="scripted-fresh-episodes",
         responses=[
-            tool_response("load_skill", {"skill_name": "source-grounding"}),
+            tool_response("read_file", {"path": "target.py"}),
             text_response(json.dumps(_proposal_args())),
-            tool_response("load_skill", {"skill_name": "source-grounding"}),
             text_response(json.dumps(_proposal_args())),
         ],
     )
@@ -167,30 +143,31 @@ async def test_runtime_skill_loads_are_fresh_for_each_native_producer_episode(tm
     second = await run_producer(producer_input, ModelSettings(), store, model)
 
     assert first.feedback is second.feedback is None
-    assert first.usage.skills_loaded == second.usage.skills_loaded == ["source-grounding"]
-    assert len(model.requests) == 4
+    assert first.usage.skills_preloaded == second.usage.skills_preloaded == ["source-grounding"]
+    assert first.usage.skills_loaded == second.usage.skills_loaded == []
+    assert len(model.requests) == 3
+    procedure = load_runtime_skills("producer")[0].instructions
+    assert procedure in str(model.requests[2].config.system_instruction)
     assert not any(
-        part.function_response and part.function_response.name == "load_skill"
+        part.function_response
         for content in model.requests[2].contents
-        for part in content.parts
+        for part in content.parts or []
     )
 
 
 @pytest.mark.asyncio
-async def test_runtime_skill_loader_cap_stops_a_fifth_native_load_without_widening_budget(
-    tmp_path: Path,
-):
+async def test_repeated_producer_loader_calls_spend_the_ordinary_tool_budget(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     base = _producer_input(store)
     producer_input = base.model_copy(
         update={
-            "budget": base.budget.model_copy(update={"episode_llm_calls": 6, "max_tool_calls": 6}),
+            "budget": base.budget.model_copy(update={"episode_llm_calls": 6, "max_tool_calls": 3}),
             "llm_call_limit": 6,
-            "tool_call_limit": 6,
+            "tool_call_limit": 3,
         }
     )
     model = ScriptedLlm(
-        model="scripted-loader-cap",
+        model="scripted-loader-calls",
         responses=[
             tool_response("load_skill", {"skill_name": "source-grounding"}) for _ in range(5)
         ],
@@ -200,10 +177,10 @@ async def test_runtime_skill_loader_cap_stops_a_fifth_native_load_without_wideni
 
     assert output.decision is None
     assert output.feedback is not None
-    assert "runtime skill loader budget" in output.feedback.reason
-    assert output.usage.llm_calls == 5
-    assert output.usage.tool_calls == 4
-    assert output.usage.skills_loaded == ["source-grounding"]
+    assert "tool-call budget" in output.feedback.reason
+    assert output.usage.llm_calls == 4
+    assert output.usage.tool_calls == 3
+    assert output.usage.skills_loaded == []
 
 
 def test_role_local_skills_expose_only_text_and_admitted_names():
