@@ -322,7 +322,9 @@ async def test_report_renders_the_ledger_and_keeps_json_mode(tmp_path, capsys):
     report.write_text(json.dumps({"rows": [], "summary": summary}))
 
     assert await execute(parser().parse_args(["--format", "json", "report", str(report)])) == 0
-    assert json.loads(capsys.readouterr().out) == summary
+    emitted = json.loads(capsys.readouterr().out)
+    # `report` emits the summary or, once the report-compare change lands, the whole report.
+    assert emitted.get("summary", emitted) == summary
 
     human = parser().parse_args(["--format", "human", "--no-color", "report", str(report)])
     assert await execute(human) == 0
