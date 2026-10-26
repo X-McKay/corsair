@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
 from .recipes_java import JavaRecipe
+from .recipes_javascript import JavaScriptRecipe
+from .recipes_python import PythonCommandSentinel
+from .recipes_ruby import RubyRecipe
 
 
 class Source(Contract):
@@ -108,23 +111,33 @@ class PythonRecipe(Contract):
         return self
 
 
-def _recipe_kind(value: object) -> str:
-    """Discriminate a recipe by its ``kind`` tag, defaulting a tag-less one to Python.
+def _recipe_kind(value: Any) -> str:
+    """Discriminate recipe members by ``kind``.
 
-    Requests written before the recipe union omit ``kind`` entirely; they are Python
-    secret-disclosure recipes, so they must keep validating unchanged.
+    A request that predates the recipe union omits ``kind``; it is the original
+    Python secret-disclosure recipe, so a missing tag resolves there. This keeps the
+    frozen request fixtures (and their recorded digests) valid without a rewrite.
     """
-    if isinstance(value, dict):
-        return str(value.get("kind", "python.secret_disclosure/1"))
-    return str(getattr(value, "kind", "python.secret_disclosure/1"))
+    tag = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    return tag if isinstance(tag, str) else "python.secret_disclosure/1"
 
 
-# The recipe is a discriminated union on the ``kind`` tag: one concrete member per
-# qualified runtime. PythonRecipe stays the default (tag-less requests resolve to it);
-# JavaRecipe is the second concrete, tested recipe. A new language adds exactly one
-# member here and one image mapping.
+# The Python callable recipes: both import one stdlib module directly and invoke one
+# public function, so they share the Python-AST gates (target binding, line derivation)
+# that other languages replace with their own run-time binding gates.
+PythonCallableRecipe = PythonRecipe | PythonCommandSentinel
+PYTHON_CALLABLE_RECIPES = (PythonRecipe, PythonCommandSentinel)
+
+
+# The admitted recipe alternatives, discriminated on the stable ``kind`` tag following
+# the native ProducerDecision pattern. Each member is one concrete, tested recipe with
+# its own trusted observer and runtime image; adding a language adds a union member, not
+# a generic adapter. Every member exposes ``module_file`` so the finding binds uniformly.
 Recipe = Annotated[
     Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")]
+    | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")]
+    | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")]
     | Annotated[JavaRecipe, Tag("java.secret_disclosure/1")],
     Discriminator(_recipe_kind),
 ]

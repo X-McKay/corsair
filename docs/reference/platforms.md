@@ -6,6 +6,8 @@ Source admission checks the APIs it actually uses rather than accepting an OS na
 
 These checks do not attest an arbitrary network, FUSE, synchronized-cloud or removable filesystem. Use a dedicated disposable workspace and test the filesystem that will hold source. Native targets still run only inside the reviewed Linux container, never inside the Nix shell on the host.
 
+The Ruby recipe `ruby.secret_disclosure/1` runs in `corsair-ruby:0.1` (`deploy/ruby/Dockerfile`, Ruby 3.1 pinned by digest), selected through its `Settings.images` entry; `just images` builds it with the other reviewed images. The Ruby recipe is qualified on **Linux amd64 only**; its macOS arm64 and live-model gates are unrun. See the [Ruby corpus survey](corpus-ruby.md).
+
 ## Development and CI
 
 ```bash
@@ -18,6 +20,60 @@ just -- test-temporal -q -W error
 The common `ci.yml` runs Linux amd64 jobs and a `macos-26` Apple Silicon job. Both enter the committed flake shell. macOS runs the complete offline suite—including actual descriptor admission, immutable artifacts and fresh installed-wheel checks—and real Temporal workflow/replay tests. Linux additionally runs the actual Docker/Temporal/ADK integration chain.
 
 Hosted macOS ARM runners do not support nested virtualization. CI therefore does not pretend to run Docker Desktop/Colima there or silently substitute a mock daemon. Full Docker-chain qualification on a physical Apple Silicon Mac with its chosen VM is a separate operator gate. Tooling and host tests alone do not establish it.
+
+## Runtime images per recipe kind
+
+Each recipe kind selects its own reviewed image through `Settings.images` (see
+[configuration](configuration.md)); `just images` builds every `deploy/*/Dockerfile`.
+The Python secret-disclosure recipe uses `corsair-python:0.1`; the JavaScript
+prototype-pollution recipe uses `corsair-javascript:0.1`; the Java secret-disclosure
+recipe uses `corsair-java:0.1`. All apply the identical
+`DockerSandbox` isolation (read-only, offline, dropped capabilities, no-new-privileges,
+CPU/memory/PID limits, immutable-identity cleanup). Image selection is a one-line mapping,
+not a code path.
+
+### JavaScript prototype pollution (Linux amd64)
+
+The `javascript.prototype_pollution/1` recipe is qualified on **Linux amd64 only**, on one
+real corpus row (`prototypepollution-a`). Its evidence:
+
+- Image `corsair-javascript:0.1` from `deploy/javascript/Dockerfile`, pinned
+  `node:22.23.3-bookworm-slim` by digest; the trusted driver
+  `drivers/javascript/driver.mjs` runs `node --test` with the JUnit reporter and
+  `NODE_V8_COVERAGE` line coverage, with no npm install and no network at run time.
+- `corsair verify` on the frozen v3 row:
+  `evals/datasets/chain/javascript/prototypepollution-a-v3/` — control held (exit 0,
+  target line 2 covered), adversarial violated (exit 1, target line covered), cleanup
+  confirmed, no security verdict rendered.
+- `tests/integration/test_docker_javascript.py` (marker `docker`): control+violation,
+  safe-variant hold, unexpected-exception error, absent-coverage invalid, and cleanup.
+- Measured per-role container time ~0.16 s on the implementation host.
+
+macOS arm64 and the full live chain for this recipe are **unrun**. A `node --test` run
+produces machine-readable line coverage from V8 directly; no second test or coverage
+engine is added.
+
+### Java secret disclosure (Linux amd64)
+
+The `java.secret_disclosure/1` recipe is qualified on **Linux amd64 only** (host `x86_64`),
+on one real corpus row (`xxe-b`, fixed revision `xxe-a`). Its evidence:
+
+- Image `corsair-java:0.1` from `deploy/java/Dockerfile`, pinned
+  `eclipse-temurin:21-jdk-jammy` by digest, with the JUnit 5 console launcher (1.11.4) and
+  JaCoCo agent/CLI (0.8.12) vendored at build time and verified by SHA-256; the trusted
+  driver `drivers/java/driver.sh` compiles the admitted source with `javac` alone, runs one
+  fixed test under the JaCoCo agent, and has no network at run time.
+- `corsair verify` on the frozen v3 row `evals/datasets/chain/java/xxe-b/v3/` — control
+  held (exit 0), adversarial violated (exit 1), the parse sink (line 13) covered in both
+  runs, cleanup confirmed, no security verdict rendered.
+- `tests/integration/test_docker_java.py` (marker `docker`): control+violation,
+  neutralized hold, fixed differential, unexpected-exception error, absent-coverage
+  invalid, compile failure as operational, and cleanup.
+- Measured per-role container time ~1.1 s (JVM start-up dominates).
+
+macOS arm64 and the full live chain for this recipe are **unrun**. When the exploit is
+blocked by a thrown exception, JaCoCo reports the throwing line as missed, so a
+neutralized revision binds its target one statement earlier.
 
 ## Docker on a physical Mac
 
@@ -44,7 +100,3 @@ Python's default macOS temp tree can fall outside Colima's shared mounts. `TMPDI
 Do not use privileged targets, mount the Docker socket into target containers or relax the read-only, dropped-capability, no-new-privileges, offline-network, resource or cleanup policies to obtain a pass. Source admission remains on the host; container execution remains in the Linux VM.
 
 The implementation sandbox is Linux ARM, outside the requested matrix. Its local full-suite results are regression evidence; target-platform qualification comes from the actual Linux amd64/macOS arm64 CI jobs. See [environment setup](../development/setup.md) and [current plans](../plans/README.md) for exact receipts and remaining limits.
-
-## Trusted images per recipe kind
-
-Each recipe `kind` selects a reviewed image: `python.secret_disclosure/1` uses `corsair-python:0.1` and `java.secret_disclosure/1` uses `corsair-java:0.1`. `just images` builds every `deploy/*/Dockerfile`. The Java image pins an `eclipse-temurin:21-jdk` base by digest and vendors the JUnit 5 console launcher and JaCoCo agent/CLI at build time with pinned versions and verified SHA-256 checksums; it has no network at run time. The Java recipe is qualified on **Linux amd64 only**; each host architecture is a separate qualification, and the resolved local Docker image ID (not the tag) is what the manifest records and verification binds. JVM start-up dominates per-role container time (a few seconds per role), well within the probe deadline.

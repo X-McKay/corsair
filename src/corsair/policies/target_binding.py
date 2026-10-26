@@ -12,11 +12,10 @@ own run-time gates stay the authority and no runnable case is turned away.
 from __future__ import annotations
 
 import ast
-import re
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, JavaRecipe, LineProvenance, PythonRecipe, Recipe
+from corsair.contracts import Finding, LineProvenance, PythonCallableRecipe
 
 
 class TargetBindingReason(StrEnum):
@@ -38,11 +37,6 @@ class TargetBindingFailure:
 
     def __str__(self) -> str:
         return f"target_binding {self.reason.value}: {self.detail}"
-
-
-def _JAVA_METHOD_TOKEN(method: str) -> re.Pattern[str]:
-    """Match the method name as a whole Java identifier token (not a substring)."""
-    return re.compile(rf"(?<![A-Za-z0-9_$]){re.escape(method)}(?![A-Za-z0-9_$])")
 
 
 def _source_line_count(text: str) -> int:
@@ -120,7 +114,7 @@ def _compiles_to_nothing(statement: ast.stmt) -> bool:
     )
 
 
-def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
+def derive_target_line(recipe: PythonCallableRecipe, module_text: str) -> int | None:
     """Bind a line-less finding to the recipe function's first body statement.
 
     Trusted, deterministic and model-free: the line comes from the operator-owned
@@ -160,17 +154,16 @@ def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
 
 
 def bind_target_line(
-    finding: Finding, recipe: Recipe, module_text: str
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str
 ) -> tuple[Finding, LineProvenance]:
     """The finding prepare hands on: its declared line, else one derived from the recipe.
 
     ``module_text`` is the admitted text of ``finding.file`` (the recipe module). A
-    finding that already declares a line is returned unchanged; a line-less Python
-    recipe gets ``derive_target_line`` when that is certain, else stays line-less for
-    ``target_binding`` to report ``line_missing``. Only the Python recipe can derive a
-    line from its callable; a Java recipe binds its line only from the finding.
+    finding that already declares a line is returned unchanged; a line-less one gets
+    ``derive_target_line`` when that is certain, else stays line-less for
+    ``target_binding`` to report ``line_missing``.
     """
-    if finding.line is not None or not isinstance(recipe, PythonRecipe):
+    if finding.line is not None:
         return finding, LineProvenance.DECLARED
     derived = derive_target_line(recipe, module_text)
     if derived is None:
@@ -179,7 +172,7 @@ def bind_target_line(
 
 
 def _signature_failure(
-    function: ast.FunctionDef, recipe: PythonRecipe
+    function: ast.FunctionDef, recipe: PythonCallableRecipe
 ) -> TargetBindingFailure | None:
     """The driver calls ``function(**fixed_kwargs, payload_parameter=payload)``."""
     arguments = function.args
@@ -218,66 +211,34 @@ def _signature_failure(
     return None
 
 
-def _common_target_binding(
-    finding: Finding, recipe: Recipe, module_text: str | None
-) -> TargetBindingFailure | None:
-    """The language-independent certain reasons: absent file, line missing or out of range."""
-    module_file = recipe.module_file
-    if module_text is None:
-        return TargetBindingFailure(
-            TargetBindingReason.FILE_ABSENT, f"{module_file} is absent from the admitted snapshot"
-        )
-    # A finding with no line can never be decisive (verdict-time target binding).
-    # For a Python recipe, prepare already bound one from the recipe function where
-    # that is certain (derive_target_line), so a line-less finding here is one it
-    # could not bind; a Java recipe binds its line only from the finding.
-    if finding.line is None:
-        callable_name = recipe.function if isinstance(recipe, PythonRecipe) else recipe.method
-        return TargetBindingFailure(
-            TargetBindingReason.LINE_MISSING,
-            "finding declares no target line to bind the demonstration to, and none "
-            f"could be derived from recipe function {callable_name}",
-        )
-    line_count = _source_line_count(module_text)
-    if finding.line > line_count:
-        return TargetBindingFailure(
-            TargetBindingReason.LINE_OUT_OF_RANGE,
-            f"line {finding.line} is beyond the {line_count} lines of {module_file}",
-        )
-    return None
-
-
-def _java_target_binding(recipe: JavaRecipe, module_text: str) -> TargetBindingFailure | None:
-    """A cheap certain check for Java: the method token must appear in the module text.
-
-    There is no stdlib Java parser, so this stays deliberately shallow: it blocks only
-    the certainly-unbindable case (an absent callable name) and leaves every genuinely
-    ambiguous structure to the kernel's run-time coverage gate, exactly as the Python
-    check leaves decorated or dynamically-bound callables to run.
-    """
-    if not _JAVA_METHOD_TOKEN(recipe.method).search(module_text):
-        return TargetBindingFailure(
-            TargetBindingReason.FUNCTION_NOT_DEFINED,
-            f"{recipe.method} is not declared in {recipe.module_file}",
-        )
-    return None
-
-
 def target_binding(
-    finding: Finding, recipe: Recipe, module_text: str | None
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str | None
 ) -> TargetBindingFailure | None:
     """Return the first certain structural reason the case cannot bind, else None.
 
     ``module_text`` is the recipe module as read from the admitted snapshot (the
     request contract already requires ``finding.file == recipe.module_file``), or
-    None when the snapshot has no such member. The check dispatches on the recipe kind.
+    None when the snapshot has no such member.
     """
-    common = _common_target_binding(finding, recipe, module_text)
-    if common is not None:
-        return common
-    assert module_text is not None  # _common_target_binding returns FILE_ABSENT otherwise
-    if isinstance(recipe, JavaRecipe):
-        return _java_target_binding(recipe, module_text)
+    if module_text is None:
+        return TargetBindingFailure(
+            TargetBindingReason.FILE_ABSENT, f"{finding.file} is absent from the admitted snapshot"
+        )
+    # A finding with no line can never be decisive (verdict-time target binding).
+    # Prepare already bound one from the recipe function where that is certain
+    # (derive_target_line), so a line-less finding here is one it could not bind.
+    if finding.line is None:
+        return TargetBindingFailure(
+            TargetBindingReason.LINE_MISSING,
+            "finding declares no target line to bind the demonstration to, and none "
+            f"could be derived from recipe function {recipe.function}",
+        )
+    line_count = _source_line_count(module_text)
+    if finding.line > line_count:
+        return TargetBindingFailure(
+            TargetBindingReason.LINE_OUT_OF_RANGE,
+            f"line {finding.line} is beyond the {line_count} lines of {finding.file}",
+        )
     try:
         module = _parse(module_text, recipe.module_file)
     except (SyntaxError, ValueError) as exc:

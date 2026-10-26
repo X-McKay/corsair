@@ -38,7 +38,8 @@ _MAX_TOTAL_SKILL_BYTES = 24_000
 # lowercase keywords whose presence in a finding's title or description marks that
 # vulnerability class. Trusted code scans in this fixed priority order and selects the
 # first matching row's reference; this is a static table, not model-authored logic and
-# not a discovery registry. Both roles package the same six basenames.
+# not a discovery registry. Both roles package the same six class basenames, plus one
+# per-kind note (command-sentinel.md) selected by recipe kind below.
 _REFERENCE_CLASS_SELECTORS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "code-execution.md",
@@ -75,6 +76,9 @@ _REFERENCE_CLASS_SELECTORS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
 )
 _SELECTABLE_RECIPE_KINDS = frozenset({"python.secret_disclosure/1"})
+# A recipe kind whose property is fixed by the recipe itself, whatever the finding's
+# class words, selects its own packaged note. Checked before the class table.
+_RECIPE_KIND_REFERENCES: dict[str, str] = {"python.command_sentinel/1": "command-sentinel.md"}
 
 
 def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
@@ -310,9 +314,11 @@ def select_reference(role: str, finding: Finding, recipe_kind: str) -> tuple[str
     """
 
     validated_role = _validated_role(role)
-    if recipe_kind not in _SELECTABLE_RECIPE_KINDS:
-        return None
-    basename = _reference_class(finding)
+    basename = _RECIPE_KIND_REFERENCES.get(recipe_kind)
+    if basename is None:
+        if recipe_kind not in _SELECTABLE_RECIPE_KINDS:
+            return None
+        basename = _reference_class(finding)
     if basename is None:
         return None
     relative = f"references/{basename}"

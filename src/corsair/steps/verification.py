@@ -24,6 +24,11 @@ from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
 ROLES: tuple[SandboxRole, ...] = ("control", "adversarial")
+# The trusted in-image driver writes exactly one of these markers, and only when its
+# own recipe assertion genuinely failed on the adversarial role. Keep this in sync with
+# VIOLATION_MARKERS in adapters/sandboxing/driver.py. A target cannot forge a violation
+# by making pytest fail some other way: the driver never writes a marker in that case.
+_VIOLATION_MARKERS = frozenset({"disclosure", "sentinel_created"})
 
 
 class EvidenceVerifier:
@@ -221,7 +226,7 @@ class EvidenceVerifier:
             and junit["errors"] == 0
             and junit["skipped"] == 0,
             RoleOutcome.VIOLATION: status == "FAILURE"
-            and record.get("observation_kind") == "disclosure"
+            and record.get("observation_kind") in _VIOLATION_MARKERS
             and expected_role == "adversarial"
             and exit_code != 0
             and junit["failures"] == 1
@@ -376,8 +381,8 @@ class EvidenceVerifier:
                     "operation-reconciliation",
                     "an uncommitted labeled sandbox exists; operation will not be replayed",
                 )
-            # Ensure the recipe's image is available before starting the first role.
-            # There is no fake/non-Docker success path.
+            # Ensure image availability before starting the first role. There is no
+            # fake/non-Docker success path.
             _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))

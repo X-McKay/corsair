@@ -309,8 +309,8 @@ READER = (
 class _Sandbox:
     image_id = "sha256:" + "a" * 64
 
-    def image_id_for(self, recipe_kind: str) -> str:
-        del recipe_kind
+    def image_id_for(self, kind: str) -> str:
+        del kind
         return self.image_id
 
 

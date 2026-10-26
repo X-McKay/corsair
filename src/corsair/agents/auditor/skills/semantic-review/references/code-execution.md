@@ -13,7 +13,7 @@ each rule checks here.
   act on but the safe branch should reject.
 - R3 production logic: both run through the production reader with the recipe's
   fixed kwargs, not a stand-in.
-- R4 disclosure, not echo: the claimed violation is disclosure of the protected
+- R4 real violation, not echo: the claimed violation is disclosure of the protected
   value, not that parsing succeeded or that input was echoed.
 
 Reject on the first contradicted rule; a plausible-looking payload against the

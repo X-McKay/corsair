@@ -8,6 +8,7 @@ from temporalio.exceptions import ApplicationError
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     MAX_TERMINAL_ROUNDS,
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -60,9 +61,9 @@ class Activities:
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
-        recipe_kind = request.case.recipe.kind
+        kind = request.case.recipe.kind
         try:
-            image_id = await asyncio.to_thread(self.sandbox.image_id_for, recipe_kind)
+            image_id = await asyncio.to_thread(self.sandbox.image_id_for, kind)
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -89,16 +90,20 @@ class Activities:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
         # Pre-model target binding over the admitted bytes: a case that certainly cannot
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        failure = target_binding(prepared.finding, prepared.recipe, module_text)
-        if failure is not None:
-            raise ApplicationError(
-                format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
-            )
-        # target_binding passed, so the finding declares a line and the module exists.
-        # The coverage gate binds to the statement line coverage reports for it.
-        assert prepared.finding.line is not None
-        target_line = bind_target_line(module_text, prepared.finding.line)
-        return prepared.model_copy(update={"target_line": target_line})
+        # The structural gate and statement-line binding are Python-AST specific; other
+        # languages rely on their own run-time coverage and binding gates.
+        if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
+            failure = target_binding(prepared.finding, prepared.recipe, module_text)
+            if failure is not None:
+                raise ApplicationError(
+                    format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
+                )
+            # target_binding passed, so the finding declares a line and the module exists.
+            # The coverage gate binds to the statement line coverage reports for it.
+            assert prepared.finding.line is not None
+            target_line = bind_target_line(module_text, prepared.finding.line)
+            return prepared.model_copy(update={"target_line": target_line})
+        return prepared
 
     @staticmethod
     def _activity_window() -> float | None:
