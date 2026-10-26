@@ -103,6 +103,22 @@ Run through the Nix shell on this Linux amd64 host after every merge (`just chec
 Docker suites after any workflow, step, driver or image change. The final numbers are in the last line of the round-2
 notes above. The live chain (`just live-chain`), macOS arm64, and every non-Python runtime under a live model remain unrun.
 
+## PR review fixes (X-McKay/corsair#208, review of head `1452fc22`)
+
+Seven findings from the first review, each reproduced with a failing test before the change (two on real Docker):
+
+| Item | Finding | Fix |
+| --- | --- | --- |
+| 1 (P1) | A continuation line inside a short-circuit or conditional subexpression bound to the statement's first line, so a skipped `or b` operand counted as covered; two accepted non-demonstrating sessions could reach `EXPLOIT_NOT_DEMONSTRATED`. | `policies/line_binding.py` keeps a continuation line unbound when any part of it can be skipped (`and`/`or` operands after the first, ternary branches, chained comparisons, lambda bodies, comprehension parts, assert messages, `for` targets, `case` patterns); a real-coverage Docker test pins that such lines are never reported. 1464-line survey re-run: 0 bad bindings, one binding changed. |
+| 2 (P1) | The Perl driver counted an undefined adversarial result as injected markup, turning a safe renderer into a VIOLATION. | `drivers/perl/driver.pl`: undefined output holds (no HTML was produced); Docker tests for the undef renderer through the verifier. |
+| 3 (P2) | The Java driver queried JaCoCo with package `.` for default-package classes, so coverage was empty and both roles INVALID. | `drivers/java/driver.sh` maps `.` to JaCoCo's empty package name; a default-package Docker test fails on the old image and passes on the rebuilt one. |
+| 4 (P2) | Statement-line binding ran only in the prepare activity; `verify`, candidate replay and `agent preview` prepared without it, and replay compared `finding.line` instead of the bound line. | `prepare_case` is the one preparation path (derive, gate, bind) raising `TargetBindingBlocked`; the activity maps it to `PREPARE_BLOCKED`, the CLI to exit 2 with a remedy; replay uses `bound_line`. Tests at all four entry points. |
+| 5 (P2) | A long backtick run in the source grew the fence past its 128-byte reserve and final truncation removed `## Submission`; the producer packet could be cut into invalid JSON by a multi-byte excerpt. | Packets budget the rendered excerpt by bisection, never truncate required sections, and fail closed with an operational `packet_too_large` gate and zero model calls. |
+| 6 (P2) | `corsair dataset validate` ran the target gate before deriving a missing finding line, rejecting cases that prepare accepts. | The validator calls the shared `bind_target_line` first and reports the derived line and provenance. |
+| 7 (P2) | `PerlRecipe` defaulted `baseline_markup_chars` to 0 against an `expected_control` with four markup characters, so the default control was INVALID. | The baseline is derived from the expected control when omitted and must equal its markup count; the frozen Perl row already set it explicitly. |
+
+Also raised the test-side 20 s elapsed bounds in the Perl and Ruby Docker suites to 60 s (the reviewer's environment took 22.4 s). The reviewer's three shutdown-test failures came from zombie processes in that environment and did not reproduce here.
+
 ## Decisions for the project owner
 
 1. The C runtime image's `/work` tmpfs drops `noexec` for `c.integer_overflow/1` only (`NATIVE_EXEC_KINDS`), so a
