@@ -57,7 +57,7 @@ from corsair.agents.resources import (
     runtime_skill_digest,
 )
 from corsair.entrypoints.terminal import Terminal
-from corsair.observability.logging import LifecycleLoggingInterceptor
+from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.entrypoints.cli import parser
 from corsair.entrypoints.api import start_investigation, start_evaluation
 from corsair.entrypoints.requests import load_investigation_request

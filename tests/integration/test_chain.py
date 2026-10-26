@@ -22,7 +22,7 @@ from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import Disposition, FixStatus, Scope, Verdict, digest
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.evaluation.scoring import load_dataset
-from corsair.observability.logging import LifecycleLoggingInterceptor
+from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.investigation import InvestigationWorkflow

@@ -26,7 +26,6 @@ from corsair.contracts import (
 )
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
-from corsair.steps.verification import EvidenceVerifier
 
 RoundKey = tuple[int, int]
 
@@ -236,6 +235,9 @@ def verified_rounds(
     """Recover each round's prepared case from its own validated receipts."""
     if result.manifest is None or store is None:
         return {}
+    # Imported on use: verification loads the Docker SDK, which saved-report reads never need.
+    from corsair.steps.verification import EvidenceVerifier
+
     verifier = EvidenceVerifier(Settings(), store)
     verified: dict[RoundKey, PreparedCase] = {}
     for item in result.rounds:

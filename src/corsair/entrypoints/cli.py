@@ -1,4 +1,11 @@
-"""Finite commands; production investigations always go through Temporal."""
+"""Finite commands; production investigations always go through Temporal.
+
+Module scope imports only the standard library and the sanitized logger, so ``--help``,
+``--version`` and argument errors exit before Rich, Pydantic contracts, the scorer or any SDK
+loads. Each handler imports what its command uses.
+"""
+
+from __future__ import annotations
 
 import argparse
 import asyncio
@@ -6,26 +13,17 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 
-from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import (
-    BatchItem,
-    BatchRequest,
-    EvidenceInput,
-    InvestigationResult,
-    Submission,
-    digest,
-    validate_root_identity,
-)
-from corsair.entrypoints.requests import load_investigation_request
-from corsair.entrypoints.runs import positive_limit
-from corsair.entrypoints.terminal import Terminal
-from corsair.evaluation.comparison import compare_reports, read_report
-from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score
 from corsair.observability.logging import configure_logging, event, safe_text
-from corsair.settings import Settings, load_settings
+
+if TYPE_CHECKING:
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import BatchItem, InvestigationResult
+    from corsair.entrypoints.terminal import Terminal
+    from corsair.evaluation.scoring import Oracle
+    from corsair.settings import Settings
 
 
 class CliArguments(argparse.Namespace):
@@ -62,16 +60,22 @@ class CliArguments(argparse.Namespace):
 
 def validate_run_id(value: str) -> str:
     """Validate an operator-supplied Temporal identity before any service request."""
+    from corsair.contracts import validate_root_identity
+
     return validate_root_identity(value)
 
 
 def _settings(args: CliArguments) -> Settings:
     """Load settings only for commands that require local runtime configuration."""
+    from corsair.settings import load_settings
+
     return load_settings(args.settings)
 
 
 def _result_from_store(store: ArtifactStore, identity: str) -> InvestigationResult:
     """Read and validate the committed result receipt for one completed run."""
+    from corsair.contracts import InvestigationResult
+
     ref = store.reconcile(f"result.{identity}")
     if ref is None:
         raise ValueError("No committed result; use --online to query the Temporal workflow")
@@ -82,6 +86,8 @@ def _score_saved_result(
     store: ArtifactStore, identity: str, oracles: Mapping[str, Oracle]
 ) -> dict[str, object]:
     """Score one reconciled result while keeping unavailable receipts explicit."""
+    from corsair.evaluation.scoring import score
+
     try:
         result = _result_from_store(store, identity)
         oracle = oracles[result.case_id]
@@ -92,12 +98,16 @@ def _score_saved_result(
 
 async def _handle_report(args: CliArguments, ui: Terminal) -> int:
     """Display a saved evaluation report and its per-case rows without runtime services."""
+    from corsair.evaluation.comparison import read_report
+
     ui.emit(read_report(Path(args.report)))
     return 0
 
 
 async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
     """Compare two saved reports by case; exit 1 when the candidate regressed."""
+    from corsair.evaluation.comparison import compare_reports, read_report
+
     diff = compare_reports(
         read_report(Path(args.baseline)),
         read_report(Path(args.candidate)),
@@ -137,6 +147,9 @@ async def _handle_verify(args: CliArguments, ui: Terminal) -> int:
     """Execute one frozen native reference submission without a security verdict."""
     from corsair.adapters.sandboxing.docker import DockerSandbox
     from corsair.adapters.scm.local import prepare_case
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import EvidenceInput, Submission
+    from corsair.entrypoints.requests import load_investigation_request
     from corsair.steps.evidence import run_evidence
     from corsair.steps.manifest import build_manifest
 
@@ -206,6 +219,8 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
     settings = _settings(args)
     if not args.online:
+        from corsair.adapters.storage.filesystem import ArtifactStore
+
         store = ArtifactStore(settings.artifact_root)
         result = _result_from_store(store, identity)
         if args.evidence:
@@ -217,6 +232,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
         return 0
 
     from corsair.adapters.temporal.client import connect, wait_for_result
+    from corsair.contracts import BatchItem, InvestigationResult
     from corsair.workflows.evaluation import EvaluationWorkflow
     from corsair.workflows.investigation import InvestigationWorkflow
 
@@ -258,6 +274,7 @@ async def _handle_cancel(args: CliArguments, ui: Terminal) -> int:
 async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
     """Submit one investigation and optionally wait for its actual result."""
     from corsair.adapters.temporal.client import connect, wait_for_result
+    from corsair.entrypoints.requests import load_investigation_request
     from corsair.workflows.investigation import InvestigationWorkflow
 
     settings = _settings(args)
@@ -294,7 +311,10 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     """Run a frozen batch, score returned native receipts, and save its report."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.adapters.temporal.client import connect, wait_for_result
+    from corsair.contracts import BatchRequest, InvestigationResult, digest
+    from corsair.evaluation.scoring import load_dataset, save_report, score
     from corsair.workflows.evaluation import EvaluationWorkflow
 
     settings = _settings(args)
@@ -344,6 +364,10 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     """Rescore committed evidence locally, retaining unavailable results in the report."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import digest
+    from corsair.evaluation.scoring import load_dataset, save_report
+
     settings = _settings(args)
     store = ArtifactStore(settings.artifact_root)
     dataset, _, oracles = load_dataset(Path(args.dataset))
@@ -358,6 +382,7 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     """List committed results from the artifact store without contacting services."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.entrypoints.runs import list_runs
 
     store = ArtifactStore(_settings(args).artifact_root)
@@ -365,7 +390,7 @@ async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
-CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
+type CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
     "compare": _handle_compare,
@@ -383,12 +408,22 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
 
 async def execute(args: argparse.Namespace, terminal: Terminal | None = None) -> int:
     """Run exactly one parser-admitted command through its explicit handler."""
+    from corsair.entrypoints.terminal import Terminal
+
     command_args = cast(CliArguments, args)
     ui = terminal if terminal is not None else Terminal(command_args)
     handler = _COMMAND_HANDLERS.get(command_args.command)
     if handler is None:
         raise ValueError("Unknown command")
     return await handler(command_args, ui)
+
+
+def positive_limit(value: str) -> int:
+    """Admit a ``--limit`` of at least one row."""
+    limit = int(value)
+    if limit < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return limit
 
 
 def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = False) -> None:
@@ -494,6 +529,8 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = cast(CliArguments, parser().parse_args())
+    from corsair.entrypoints.terminal import Terminal
+
     terminal = Terminal(args)
     try:
         configure_logging(

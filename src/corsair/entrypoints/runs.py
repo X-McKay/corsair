@@ -7,7 +7,6 @@ the store through them.
 
 from __future__ import annotations
 
-import argparse
 from datetime import UTC, datetime
 from typing import Any
 
@@ -26,14 +25,6 @@ from corsair.steps.verification import EvidenceVerifier
 
 _RESULT_SCHEMA = "corsair.result/1"
 _ROLES = ("control", "adversarial")
-
-
-def positive_limit(value: str) -> int:
-    """Admit a ``--limit`` of at least one row."""
-    limit = int(value)
-    if limit < 1:
-        raise argparse.ArgumentTypeError("must be at least 1")
-    return limit
 
 
 def _recorded_at(timestamp: float) -> str:

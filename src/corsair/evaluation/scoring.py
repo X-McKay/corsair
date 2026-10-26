@@ -3,6 +3,7 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import Field
 
@@ -22,7 +23,9 @@ from corsair.contracts import (
 from corsair.evaluation.ledger import gate_ledger, ledger_counts, verified_rounds
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
-from corsair.steps.verification import EvidenceVerifier
+
+if TYPE_CHECKING:
+    from corsair.steps.verification import EvidenceVerifier
 
 # A case is "correctly resolved" only when the canonical label decided by code is a
 # decisive demonstration or non-demonstration -- never the internal disposition, and
@@ -116,10 +119,17 @@ def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[
     return dataset, requests, oracles
 
 
+def _saved_evidence_verifier(store: ArtifactStore) -> "EvidenceVerifier":
+    """Revalidate saved receipts; imported on use because verification loads the Docker SDK."""
+    from corsair.steps.verification import EvidenceVerifier
+
+    return EvidenceVerifier(Settings(), store)
+
+
 def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
     if result.manifest is None or store is None:
         return False
-    verifier = EvidenceVerifier(Settings(), store)
+    verifier = _saved_evidence_verifier(store)
     for item in result.rounds:
         observation, audit = item.observation, item.audit
         submission = item.producer.submission_for_verification()
@@ -147,7 +157,7 @@ def valid_negative_evidence(result: InvestigationResult, store: ArtifactStore | 
     evidence can never clear it."""
     if result.manifest is None or store is None:
         return False
-    verifier = EvidenceVerifier(Settings(), store)
+    verifier = _saved_evidence_verifier(store)
     clean_sessions: set[int] = set()
     for item in result.rounds:
         observation, audit = item.observation, item.audit
@@ -195,7 +205,7 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         fixed = result.fix_observation
         fixed_valid = False
         if fixed is not None and store is not None and result.manifest is not None:
-            verifier = EvidenceVerifier(Settings(), store)
+            verifier = _saved_evidence_verifier(store)
             fixed_valid = any(
                 (submission := item.producer.submission_for_verification()) is not None
                 and (
