@@ -6,7 +6,7 @@ import logging
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -451,6 +451,7 @@ _PRIVATE = (
     "PLAN-SENTINEL",
     "AUDIT-REASON-SENTINEL",
     "FEEDBACK-REASON-SENTINEL",
+    "ABSTAIN-REASON-SENTINEL",
 )
 
 
@@ -618,27 +619,33 @@ def _assert_private_content_absent(output):
         assert sentinel not in output, sentinel
 
 
-def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys):
+def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys, monkeypatch):
     output = _human(capsys, _demonstrated_result(), "--no-color")
 
     verdict = output.index("EXPLOIT_DEMONSTRATED")
     assert verdict < output.index("Rounds") < output.index("Identity")
+    # The full result digest is folded across lines at 80 columns, never ellipsized.
+    assert "9" * 64 in "".join(ch for ch in output if ch not in " │\n")
+    assert "…" not in output.split("Identity")[0]  # no fact is ellipsized at 80 columns
+    _assert_private_content_absent(output)
+
+    # Six round columns fold cells at 80 columns; read the cell facts at a wider terminal.
+    monkeypatch.setenv("COLUMNS", "120")
+    output = _human(capsys, _demonstrated_result(), "--no-color")
     assert "SUPPORTED" in output and "COMPLETED" in output and "component" in output
     assert "held" in output and "violated" in output
     assert "L12-14, 20 " in output and "L12-14, 20-21" in output
     assert "ACCEPT" in output and "differential-is-relevant" in output
     assert "3 llm · 4 tool" in output and "1200/210 tok" in output
     assert "scripted-producer" in output and "sha256:555555555555" in output
-    # The full result digest is folded across lines at 80 columns, never ellipsized.
-    assert "9" * 64 in "".join(ch for ch in output if ch not in " │\n")
     # Totals come from the shared scoring calculation: producer plus audit usage.
     assert "LLM calls       4 " in output and "Input tokens    1500" in output
     assert "Cost            unknown" in output
-    assert "…" not in output.split("Identity")[0]  # no fact is ellipsized at 80 columns
     _assert_private_content_absent(output)
 
 
-def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(capsys):
+def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(capsys, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "120")
     output = _human(capsys, _inconclusive_result(), "--no-color")
 
     assert output.index("INCONCLUSIVE") < output.index("Rounds")
@@ -709,6 +716,192 @@ def test_human_result_renders_fixed_revision_roles_and_gate(capsys):
     assert "NOT_BLOCKED" in output
     assert "cleanup NOT confirmed · gate: sandbox" in output
     _assert_private_content_absent(output)
+
+
+def _wide(capsys, monkeypatch, value, *, store=None):
+    """Human result at 160 columns, so cell facts read on one line each."""
+    monkeypatch.setenv("COLUMNS", "160")
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+    terminal.emit(value, store=store)
+    return capsys.readouterr().out
+
+
+def _line(output, label):
+    return next(line for line in output.splitlines() if label in line)
+
+
+def _cells(output, *values):
+    """The stripped table cells of the first row whose cells start with ``values``."""
+    for line in output.splitlines():
+        cells = [cell.strip() for cell in line.strip("│ ").split("│")]
+        if cells[: len(values)] == list(values):
+            return cells
+    raise AssertionError(f"no row starts with {values}")
+
+
+def test_human_result_names_each_round_stop_and_the_case_stop_without_model_text(
+    capsys, monkeypatch, tmp_path
+):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import AuditDecision, ProducerDecision
+    from corsair.contracts import ProducerOutput as Output
+    from tests.unit import test_gate_ledger as ledger_cases
+    from tests.unit.test_verdicts import _HELD, _VIOLATION
+    from tests.unit.test_verdicts import _observation as _pair
+
+    abstained = Output(
+        decision=ProducerDecision(kind="no_grounded_candidate", reason="ABSTAIN-REASON-SENTINEL")
+    )
+    result = ledger_cases._result(
+        [
+            ledger_cases._round(abstained),
+            ledger_cases._round(
+                ledger_cases._proposal(),
+                _pair(_HELD, _VIOLATION),
+                _audit(AuditDecision.REJECT, "payload-not-grounded"),
+                index=2,
+            ),
+        ],
+        reason="Investigation budget exhausted.",
+    )
+    seen = []
+
+    def verified(_result, store):
+        seen.append(store)
+        return ledger_cases._verified((1, 2))
+
+    monkeypatch.setattr(terminal_module, "verified_rounds", verified)
+    store = ArtifactStore(tmp_path / "artifacts")
+
+    output = _wide(capsys, monkeypatch, result, store=store)
+
+    assert seen == [store]
+    assert output.index("Verdict") < output.index("Case stop") < output.index("Rounds")
+    assert "budget_exhausted: Investigation budget exhausted." in _line(output, "Case stop")
+    assert "Stopped at" in output
+    assert "producer_abstained" in _line(output, "1.1")
+    assert "audit_reject" in _line(output, "1.2")
+    assert "evidence_unverified" not in output
+    _assert_private_content_absent(output)
+
+
+def test_human_result_without_receipt_verification_marks_kernel_rounds_unverified(
+    capsys, monkeypatch
+):
+    output = _wide(capsys, monkeypatch, _inconclusive_result())
+
+    assert "evidence_unverified" in _line(output, "1.1")
+    assert "evidence_unverified" in _line(output, "2.2")
+    assert "were not validated against the artifact store" in output
+    assert "budget_exhausted" in _line(output, "Case stop")
+    _assert_private_content_absent(output)
+
+
+def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_reason(
+    capsys, monkeypatch
+):
+    from corsair.contracts import AuditDecision, ExecutionStatus, Verdict
+    from tests.unit import test_gate_ledger as ledger_cases
+    from tests.unit.test_verdicts import _HELD, _VIOLATION
+    from tests.unit.test_verdicts import _observation as _pair
+
+    monkeypatch.setattr(
+        terminal_module, "verified_rounds", lambda value, store: ledger_cases._verified((1, 1))
+    )
+    demonstrated = ledger_cases._result(
+        [
+            ledger_cases._round(
+                ledger_cases._proposal(),
+                _pair(_HELD, _VIOLATION),
+                _audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+            )
+        ],
+        verdict=Verdict.EXPLOIT_DEMONSTRATED,
+    )
+    output = _wide(capsys, monkeypatch, demonstrated)
+    assert "demonstrated · kernel at 1.1" in _line(output, "Case stop")
+
+    failed = ledger_cases._result(
+        [ledger_cases._round(ledger_cases._invalid("unforeseen adapter reason"))],
+        reason="producer: RESULT-REASON-SENTINEL",
+        status=ExecutionStatus.ERROR,
+        verdict=Verdict.ERROR,
+    )
+    output = _wide(capsys, monkeypatch, failed)
+    stop = _line(output, "Case stop")
+    assert "execution_error" in stop and "RESULT-REASON-SENTINEL" not in stop
+    assert "producer_invalid" in _line(output, "1.1")
+
+
+def _transitions(*entries):
+    from corsair.contracts import PhaseTransition
+
+    start = datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
+    return [
+        PhaseTransition(
+            phase=phase,
+            session=session,
+            round=round_index,
+            at=None if offset is None else start + timedelta(seconds=offset),
+        )
+        for phase, session, round_index, offset in entries
+    ]
+
+
+def test_human_result_renders_recorded_phase_durations(capsys, monkeypatch):
+    timeline = _transitions(
+        ("prepare", 0, 0, 0),
+        ("producer", 1, 1, 2.5),
+        ("evidence", 1, 1, 40),
+        ("audit", 1, 1, 70),
+        ("producer", 1, 2, 75),
+        ("evidence", 1, 2, 150),
+        ("record", 1, 2, 160),
+    )
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert output.index("Rounds") < output.index("Phases") < output.index("Identity")
+    assert "+00:00" in _line(output, "prepare") and "2.5 s" in _line(output, "prepare")
+    second_evidence = _cells(output, "1.2", "evidence")
+    assert second_evidence[2:] == ["+02:30", "10.0 s"]
+    assert _cells(output, "1.2", "record")[3] == "-"
+    assert "totals: prepare 2.5 s · producer 01:52 · evidence 40.0 s · audit 5.0 s" in _line(
+        output, "totals"
+    )
+    assert "earlier transitions not retained" not in output
+
+
+def test_human_phases_keep_unknown_times_and_truncation_explicit(capsys, monkeypatch):
+    timeline = _transitions(("producer", 1, 4, None), ("audit", 1, 4, 3), ("record", 1, 4, 4))
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert "unknown" in _line(output, "producer")
+    assert "earlier transitions not retained; totals: producer unknown · audit 1.0 s" in output
+
+
+def test_json_result_carries_the_timeline_and_never_the_rendered_ledger(
+    capsys, monkeypatch, tmp_path
+):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    def unexpected(*_arguments):
+        raise AssertionError("JSON output must not verify receipts")
+
+    monkeypatch.setattr(terminal_module, "verified_rounds", unexpected)
+    timeline = _transitions(("prepare", 0, 0, 0), ("record", 1, 1, 1))
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+
+    terminal.emit(result, store=ArtifactStore(tmp_path / "artifacts"))
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted == result.model_dump(mode="json")
+    assert [entry["phase"] for entry in emitted["timeline"]] == ["prepare", "record"]
+    assert "gate_ledger" not in emitted and "stops" not in emitted
 
 
 _NOW = datetime(2026, 10, 25, 12, 4, 30, tzinfo=UTC)

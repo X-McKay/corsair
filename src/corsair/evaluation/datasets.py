@@ -183,10 +183,20 @@ def producer_oracle_problems(oracle: dict[str, Any]) -> list[str]:
     return problems
 
 
+_REJECTION_RULES = ("R1", "R2", "R3", "R4")
+
+
 def auditor_oracle_problems(oracle: dict[str, Any]) -> list[str]:
+    """A decision, and when the oracle names one, the decisive rule that decision allows."""
     decisions = {decision.value for decision in AuditDecision}
-    if oracle.get("decision") not in decisions:
+    decision = oracle.get("decision")
+    if decision not in decisions:
         return [f"decision must be one of {', '.join(sorted(decisions))}"]
+    if "rule" not in oracle:
+        return []
+    allowed = ("ALL",) if decision == AuditDecision.ACCEPT else _REJECTION_RULES
+    if oracle["rule"] not in allowed:
+        return [f"rule for {decision} must be one of {', '.join(allowed)}"]
     return []
 
 

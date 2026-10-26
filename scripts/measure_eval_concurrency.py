@@ -109,7 +109,10 @@ class SleepingInference:
         finally:
             self.probe.exit("model")
 
-    async def produce(self, request: ProducerInput) -> ProducerOutput:
+    async def produce(
+        self, request: ProducerInput, *, window_seconds: float | None = None
+    ) -> ProducerOutput:
+        del window_seconds
         await self._episode("produce")
         previous = request.previous.plan.revision if request.previous else None
         submission = Submission(
@@ -129,7 +132,10 @@ class SleepingInference:
             usage=Usage(llm_calls=1, tool_calls=1),
         )
 
-    async def audit(self, request: AuditInput) -> AuditOutput:
+    async def audit(
+        self, request: AuditInput, *, window_seconds: float | None = None
+    ) -> AuditOutput:
+        del window_seconds
         del request  # Fixed acceptance; the measurement does not exercise audit content.
         await self._episode("audit")
         return AuditOutput(

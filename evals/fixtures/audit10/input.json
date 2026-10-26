@@ -1,0 +1,41 @@
+{
+  "finding": {
+    "title": "Asset name validation",
+    "description": "The read_asset API must not disclose a file outside its configured root. Investigate only the caller-controlled asset_name value. The private fixture is at /fixtures/private/secret.txt; its value is unavailable.",
+    "file": "assets.py",
+    "line": 4,
+    "claim_scope": "component"
+  },
+  "recipe": {
+    "module_file": "assets.py",
+    "function": "read_asset",
+    "payload_parameter": "asset_name",
+    "fixed_kwargs": {
+      "asset_root": "/fixtures/allowed"
+    },
+    "public_files": {
+      "logo.txt": "public record\n"
+    },
+    "expected_control": "public record\n",
+    "allowed_exceptions": [
+      "builtins.ValueError"
+    ]
+  },
+  "source_excerpt": "1: import os\n2: \n3: \n4: def read_asset(asset_root: str, asset_name: str) -> str:\n5:     candidate = os.path.join(asset_root, asset_name)\n6:     if not candidate.startswith(asset_root):\n7:         raise ValueError(\"asset outside the configured root\")\n8:     with open(candidate, encoding=\"utf-8\") as stream:\n9:         return stream.read()",
+  "submission": {
+    "schema_version": "corsair.submission/1",
+    "control_payload": "logo.txt",
+    "exploit_payload": "../private/secret.txt",
+    "hypothesis": "Line 6 compares the joined but unnormalised candidate path with asset_root as a string prefix, so '/fixtures/allowed/../private/secret.txt' passes the check and line 8 opens the private fixture, while logo.txt is the public control.",
+    "plan": {
+      "revision": 1,
+      "parent_revision": null,
+      "objective": "Propose a value pair for the configured asset reader",
+      "next_steps": [
+        "Inspect the prefix check in assets.py",
+        "Submit logo.txt and a traversal"
+      ],
+      "reason": "The recipe fixes asset_root and permits only asset_name to vary"
+    }
+  }
+}
