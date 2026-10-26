@@ -29,6 +29,20 @@ def imported_modules(path: Path) -> set[str]:
     return modules
 
 
+def referenced_names(path: Path) -> set[str]:
+    """Return names a module imports from anywhere or reads as a variable or attribute."""
+
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.ImportFrom):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.Attribute):
+            names.add(node.attr)
+        elif isinstance(node, ast.Name):
+            names.add(node.id)
+    return names
+
+
 def python_files(package: str) -> list[Path]:
     """Return source files for a package without deriving rules from file counts."""
 
@@ -88,6 +102,28 @@ def test_evaluation_does_not_depend_on_entrypoints():
         assert not any(
             imports_module(module, "corsair.entrypoints") for module in imported_modules(path)
         ), path
+
+
+def test_runtime_packages_never_reference_oracles_or_dataset_loaders():
+    """Oracle and dataset schemas are canonical contracts; only evaluation/ may read them."""
+    evaluator_only = {"Oracle", "Dataset", "DatasetEntry"}
+    for package in ("agents", "steps", "adapters", "workflows"):
+        for path in python_files(package):
+            assert not any(
+                imports_module(module, "corsair.evaluation") for module in imported_modules(path)
+            ), path
+            assert not referenced_names(path) & evaluator_only, path
+
+
+@pytest.mark.parametrize("first", ["corsair.evaluation.intake", "corsair.evaluation.datasets"])
+def test_intake_and_dataset_loaders_import_in_either_order(first):
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {first}, corsair.evaluation.intake"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_agent_factories_do_not_depend_on_concrete_inference_adapters():

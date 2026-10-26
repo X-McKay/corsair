@@ -21,7 +21,8 @@ from corsair.contracts import (
     PythonRecipe,
 )
 from corsair.evaluation import agents
-from corsair.evaluation.agents import fixture_score_row, load_frozen_fixture
+from corsair.evaluation.agents import fixture_score_row
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.evaluation.ledger import agent_row_ledger
 from corsair.settings import Settings
 from tests.unit.adk import ScriptedLlm, text_response

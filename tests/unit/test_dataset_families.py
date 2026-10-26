@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from corsair.contracts import digest
+from corsair.contracts import Dataset, digest
 from corsair.evaluation import families
 from corsair.evaluation.comparison import compare_reports
 from corsair.evaluation.families import (
@@ -24,7 +24,6 @@ from corsair.evaluation.families import (
     label_rows,
     split_violations,
 )
-from corsair.evaluation.scoring import Dataset
 
 ROOT = Path(__file__).resolve().parents[2]
 PLACEHOLDER = "0" * 64

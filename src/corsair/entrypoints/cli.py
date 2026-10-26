@@ -21,9 +21,8 @@ from corsair.observability.logging import configure_logging, event, safe_text
 
 if TYPE_CHECKING:
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.contracts import BatchItem, InvestigationResult
+    from corsair.contracts import BatchItem, InvestigationResult, Oracle
     from corsair.entrypoints.terminal import Terminal
-    from corsair.evaluation.scoring import Oracle
     from corsair.settings import Settings
 
 
@@ -383,8 +382,9 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.adapters.temporal.client import connect, wait_for_result
     from corsair.contracts import BatchRequest, InvestigationResult, digest
+    from corsair.evaluation.datasets import load_dataset
     from corsair.evaluation.families import label_rows
-    from corsair.evaluation.scoring import load_dataset, save_report, score
+    from corsair.evaluation.scoring import save_report, score
     from corsair.workflows.evaluation import EvaluationWorkflow
 
     settings = _settings(args)
@@ -436,8 +436,9 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     """Rescore committed evidence locally, retaining unavailable results in the report."""
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import digest
+    from corsair.evaluation.datasets import load_dataset
     from corsair.evaluation.families import label_rows
-    from corsair.evaluation.scoring import load_dataset, save_report
+    from corsair.evaluation.scoring import save_report
 
     settings = _settings(args)
     store = ArtifactStore(settings.artifact_root)

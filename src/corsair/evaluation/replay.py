@@ -32,7 +32,7 @@ from corsair.contracts import (
     ProducerOutput,
     digest,
 )
-from corsair.evaluation.scoring import dataset_root, read_frozen
+from corsair.evaluation.datasets import dataset_root, read_frozen
 from corsair.policies.verdicts import fix_status
 from corsair.ports.sandboxing import SandboxPort
 from corsair.settings import Settings

@@ -42,7 +42,7 @@ src/corsair/
   workflows/       deterministic durable coordination of episodes and gates
   steps/           activities, differential execution, coverage and receipt verification, manifests
   observability/   sanitized lifecycle logging
-  evaluation/      isolated-agent evaluation, external scoring, dataset validation, gate ledger, comparison, replay, intake and previews
+  evaluation/      isolated-agent evaluation, external scoring, dataset loading and validation, gate ledger, comparison, replay, intake and previews
 ```
 
 Remote forge adapters, a separate HTTP API, an OpenShell sandbox adapter, additional qualified runtimes and a general repair framework are not hidden behind this layout. The Python API and CLI share the same native workflow submission functions.

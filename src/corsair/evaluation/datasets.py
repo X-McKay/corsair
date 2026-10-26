@@ -1,4 +1,11 @@
-"""Offline validation of frozen evaluation datasets; no model, target, container or service runs.
+"""Frozen evaluation datasets: digest-verified loading and offline validation.
+
+The evaluators read a manifest's request, input and oracle bytes through these loaders
+(``load_dataset``, ``load_frozen_fixture`` and the ``read_frozen`` primitive), which verify each
+declared digest and return oracle data to the evaluator caller only. Validation runs no model,
+target, container or service. The intake evaluator reads its frozen files through these loaders
+while validation runs that evaluator, so the two modules import each other as module objects and
+either may be imported first.
 
 A stale digest, a self-contradicting oracle, a moved source tree or a case the pre-model
 ``target_binding`` gate blocks is otherwise found only when an evaluation runs on the rig. Each
@@ -25,34 +32,22 @@ from corsair.contracts import (
     PYTHON_CALLABLE_RECIPES,
     AuditDecision,
     AuditInput,
+    Dataset,
+    DatasetEntry,
+    Digest,
     Disposition,
     ExecutionStatus,
     FixStatus,
     InvestigationRequest,
     InvestigationResult,
     LineProvenance,
+    Oracle,
     Source,
     Verdict,
     digest,
 )
-from corsair.evaluation.intake import (
-    INTAKE_SCHEMA,
-    IntakeDataset,
-    IntakeDatasetEntry,
-    IntakeOracle,
-    report_findings,
-    score_dataset,
-)
-from corsair.evaluation.scoring import (
-    Dataset,
-    DatasetEntry,
-    Oracle,
-    dataset_root,
-    load_dataset,
-    load_frozen_fixture,
-    resolve_frozen,
-    score,
-)
+from corsair.evaluation import intake
+from corsair.evaluation.scoring import score
 from corsair.observability.logging import safe_error_detail, safe_text
 from corsair.policies.target_binding import bind_target_line, target_binding
 from corsair.settings import Settings
@@ -66,6 +61,65 @@ _GROUP_NAME = re.compile(r"[a-z0-9][a-z0-9_.-]{0,79}")
 _AGENT_FIELDS = ("case_id", "input", "oracle", "input_digest", "oracle_digest")
 
 type Status = Literal["pass", "fail", "skip"]
+
+
+def dataset_root(path: Path) -> Path:
+    # Reference-layout manifests in evals/datasets address the enclosing evals tree.
+    parent = path.parent.resolve()
+    return parent.parent if parent.name == "datasets" else parent
+
+
+def resolve_frozen(root: Path, relative: str) -> Path:
+    """Resolve a manifest path below its dataset root; every evaluator and the validator use it."""
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError("dataset path escapes its root")
+    return path
+
+
+def read_frozen(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
+    """Read once and verify the exact bytes that the evaluator will parse."""
+    path = resolve_frozen(root, relative)
+    if not path.is_file():
+        raise ValueError("dataset path escapes its root or is missing")
+    content = path.read_bytes()
+    if digest(content) != expected:
+        raise ValueError(f"frozen {kind} digest changed")
+    return path, content
+
+
+def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
+    """Verify the frozen files first. Return oracle data only to the evaluator caller."""
+    dataset = Dataset.model_validate_json(path.read_bytes())
+    root = dataset_root(path)
+    requests, oracles = [], {}
+    family_splits: dict[str, str] = {}
+    for entry in dataset.entries:
+        if entry.case_id in oracles:
+            raise ValueError("duplicate case identity")
+        if entry.family in family_splits and family_splits[entry.family] != entry.split:
+            raise ValueError("related family variants may not cross dataset splits")
+        family_splits[entry.family] = entry.split
+        request_path, request_bytes = read_frozen(
+            root, entry.request, entry.request_digest, "request"
+        )
+        _, oracle_bytes = read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
+        request = InvestigationRequest.model_validate_json(request_bytes)
+        if request.case.case_id != entry.case_id:
+            raise ValueError("dataset and request case identities disagree")
+        requests.append(normalize_request_sources(request, request_path))
+        oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
+    return dataset, requests, oracles
+
+
+def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
+    """Read/verify an isolated-agent fixture once; the oracle remains local to the evaluator."""
+    input_path, input_bytes = read_frozen(root, entry["input"], entry["input_digest"], "input")
+    _, oracle_bytes = read_frozen(root, entry["oracle"], entry["oracle_digest"], "oracle")
+    oracle = json.loads(oracle_bytes)
+    if not isinstance(oracle, dict):
+        raise ValueError("isolated oracle must be a JSON object")
+    return input_path, input_bytes, oracle
 
 
 @dataclass
@@ -473,7 +527,7 @@ def _validate_agent_dataset(
 
 
 def _validate_intake_entry(
-    entry: EntryReport, declared: IntakeDatasetEntry, validator: _Validator
+    entry: EntryReport, declared: intake.IntakeDatasetEntry, validator: _Validator
 ) -> None:
     """Digests, report envelope, template, source snapshot and oracle length of one row."""
     report_bytes = validator.read(entry, "report", declared.report, declared.report_digest)
@@ -481,7 +535,7 @@ def _validate_intake_entry(
     findings: list[object] | None = None
     if report_bytes is not None:
         try:
-            findings = report_findings(report_bytes)
+            findings = intake.report_findings(report_bytes)
         except ValueError as error:
             entry.fail("request", safe_error_detail(error))
         else:
@@ -506,7 +560,7 @@ def _validate_intake_entry(
             entry.passed("source")
     if oracle_bytes is not None:
         try:
-            expected = IntakeOracle.model_validate_json(oracle_bytes).expected
+            expected = intake.IntakeOracle.model_validate_json(oracle_bytes).expected
         except ValueError as error:
             entry.fail("oracle", safe_error_detail(error))
         else:
@@ -524,7 +578,7 @@ def _validate_intake_dataset(
         entry = EntryReport(index=index, case_id=_entry_name(raw, index), kind="intake")
         report.entries.append(entry)
         try:
-            declared = IntakeDatasetEntry.model_validate(raw)
+            declared = intake.IntakeDatasetEntry.model_validate(raw)
         except ValueError as error:
             entry.fail("entry", safe_error_detail(error))
             continue
@@ -532,7 +586,7 @@ def _validate_intake_dataset(
         entry.passed("entry")
         _validate_intake_entry(entry, declared, validator)
     try:
-        report.dataset_digest = digest(IntakeDataset.model_validate(document))
+        report.dataset_digest = digest(intake.IntakeDataset.model_validate(document))
     except ValueError as error:
         report.problems.append(f"manifest: {safe_error_detail(error)}")
 
@@ -542,8 +596,8 @@ def _check_loader(report: DatasetReport, document: dict[str, Any], root: Path) -
     try:
         if report.schema_version == CASE_SCHEMA:
             load_dataset(report.path)
-        elif report.schema_version == INTAKE_SCHEMA:
-            score_dataset(report.path)
+        elif report.schema_version == intake.INTAKE_SCHEMA:
+            intake.score_dataset(report.path)
         else:
             for raw in document["entries"]:
                 load_frozen_fixture(root, raw)
@@ -569,11 +623,11 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         return report
     schema = document.get("schema_version")
     report.schema_version = schema if isinstance(schema, str) else None
-    if schema not in {CASE_SCHEMA, AGENT_SCHEMA, INTAKE_SCHEMA}:
+    if schema not in {CASE_SCHEMA, AGENT_SCHEMA, intake.INTAKE_SCHEMA}:
         found = "no schema_version" if schema is None else f"schema_version {safe_text(schema)!r}"
         report.problems.append(
             f"not an evaluation dataset manifest ({found}); expected {CASE_SCHEMA}, "
-            f"{AGENT_SCHEMA} or {INTAKE_SCHEMA}"
+            f"{AGENT_SCHEMA} or {intake.INTAKE_SCHEMA}"
         )
         return report
     root = dataset_root(path)
@@ -582,7 +636,7 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         validator = _Validator(root, admission, ArtifactStore(scratch))
         if schema == CASE_SCHEMA:
             _validate_case_dataset(report, document, validator)
-        elif schema == INTAKE_SCHEMA:
+        elif schema == intake.INTAKE_SCHEMA:
             _validate_intake_dataset(report, document, validator)
         else:
             _validate_agent_dataset(report, document, validator)

@@ -21,8 +21,8 @@ from corsair.evaluation.agents import (
     fixture_match_kind,
     fixture_matches_oracle,
     fixture_score_row,
-    load_frozen_fixture,
 )
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.evaluation.scoring import summarize
 from corsair.settings import Settings
 

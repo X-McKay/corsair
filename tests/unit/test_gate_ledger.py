@@ -12,6 +12,7 @@ from corsair.contracts import (
     Feedback,
     InvestigationResult,
     Observation,
+    Oracle,
     ProducerDecision,
     ProducerOutput,
     RoleOutcome,
@@ -21,7 +22,7 @@ from corsair.contracts import (
 from corsair.entrypoints.cli import execute, parser
 from corsair.evaluation import ledger
 from corsair.evaluation.ledger import gate_ledger, ledger_counts
-from corsair.evaluation.scoring import Oracle, save_report, score, summarize
+from corsair.evaluation.scoring import save_report, score, summarize
 from corsair.workflows import investigation
 from tests.unit.test_evidence import _audit, _prepared, _submission
 from tests.unit.test_verdicts import _HELD, _VIOLATION, _clean_negative, _observation, _role
