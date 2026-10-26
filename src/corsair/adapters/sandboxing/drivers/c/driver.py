@@ -12,15 +12,21 @@ length payload, or any target bytes.
 
 Trusted assertion, and the crash/violation boundary: a VIOLATION is admitted ONLY
 when AddressSanitizer emits a machine-readable report for the operator-fixed class in
-a frame that names the admitted target file. A plain crash, a signal, a non-sanitizer
-abort, a compile failure, or missing coverage is ERROR (operational), never VIOLATION.
+a frame that names the admitted target file AND the run ends with the sanitizer's own
+halt status (ASAN_EXITCODE). A plain crash, a signal, a non-sanitizer abort, report
+text with any other exit status, a compile failure, or missing coverage is ERROR
+(operational), never VIOLATION.
 The record shares the Python driver's ``corsair.driver/1`` schema so the one kernel
 verifier (`EvidenceVerifier._validate_raw`) admits it unchanged, except that the
 violation ``observation_kind`` is ``sanitizer_report`` rather than ``disclosure``.
 
 Threat limit: the target remains arbitrary C in a constrained, offline container with
-all capabilities dropped. The record is evidence of the fixed driver assertion under
-that isolation boundary, not a defence against a hostile compiler, kernel or daemon.
+all capabilities dropped. The sanitizer, gcov counters and stderr all live in the
+target's own process, so hostile source can still forge them (print the report and
+call exit(ASAN_EXITCODE), or write counters); the halt-status requirement only stops a
+target that prints the text and returns. The record is evidence of the fixed driver
+assertion under that isolation boundary, not hostile-source attestation and not a
+defence against a hostile compiler, kernel or daemon.
 """
 
 from __future__ import annotations
@@ -273,12 +279,19 @@ def _control_observation(recipe: dict, sanitizer: str | None) -> str:
 
 
 def _adversarial_observation(sanitizer: str | None, run_exit: int) -> str:
-    if sanitizer is not None:
+    """Admit a sanitizer report only together with the sanitizer's own halt status.
+
+    The report text shares stderr with the target, which can print the same text and
+    return normally, so text alone is not the sanitizer's observation. Text without
+    ``ASAN_EXITCODE``, that status without a target-bound report, or any other
+    non-zero exit is a crash, a non-sanitizer abort or a forged report: operational
+    error, never a violation and never held.
+    """
+    halted = run_exit == ASAN_EXITCODE
+    if sanitizer is not None and halted:
         return "sanitizer_report"
-    if run_exit == 0:
+    if sanitizer is None and run_exit == 0:
         return "held"
-    # A non-zero run without a parseable, target-bound sanitizer report is a crash or a
-    # non-sanitizer abort: operational error, never a violation.
     return "execution_error"
 
 

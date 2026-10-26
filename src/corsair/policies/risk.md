@@ -2,11 +2,20 @@
 
 Owner: the Corsair maintainer. Execution class: durable; deployment tier: personal-use pilot, not production qualified. This assessment is included in the wheel and its digest is included in capability manifests.
 
-The pilot accepts authorized source trees and one operator-defined Python callable secret-disclosure recipe. Agents can read admitted source files and propose JSON payloads. They cannot author execution code, change fixed arguments, install dependencies, modify trusted tooling, choose a runtime, publish results, or close security findings.
+The pilot accepts authorized source trees and operator-defined recipes, each with one fixed observer per runtime: Python callable secret disclosure and command sentinel, JavaScript prototype pollution, Ruby and Java secret disclosure, Perl HTML injection, and C integer overflow. Agents can read admitted source files and propose JSON payloads. They cannot author execution code, change fixed arguments, install dependencies, modify trusted tooling, choose a runtime, publish results, or close security findings.
 
 Untrusted source and native target execution are confined to a dedicated disposable sandbox host. Docker uses an unprivileged user, dropped capabilities, no new privileges, network isolation, read-only source/driver/fixtures, and CPU/memory/process/time/output limits. These settings do not establish a universal malicious-code boundary. Prefer a qualified gVisor runtime or dedicated VM isolation when hostile source is admitted; do not share the host with secrets or production services.
 
-Evidence risk: target code can be malicious and can interfere with an in-process Python test/coverage mechanism. The observer is protected from model-written code by admitting only data payloads, but it is not attestation of an arbitrary hostile Python interpreter. A target that detects the harness, edits its own process state, spawns uninstrumented descendants, or tampers with reporting requires a stronger observer recipe and must not be represented as universally verified. Runtime containment is independent of evidence authenticity.
+Evidence risk: target code can be malicious, and every runtime's observer runs inside the target's own process or reads files the target process can also write, so hostile source can forge what the trusted driver reads. The observer is protected from model-written code by admitting only data payloads, but it is not attestation of an arbitrary hostile interpreter or binary. A target that detects the harness, edits its own process state, spawns uninstrumented descendants, or tampers with reporting requires a stronger observer recipe and must not be represented as universally verified. Runtime containment is independent of evidence authenticity.
+
+Observer integrity per runtime, the documented boundary rather than hostile-source attestation:
+
+- Python: pytest's result, coverage.py data and the observation file live in the target's interpreter and work directory.
+- JavaScript: the `node:test` result, the V8 coverage directory and the observation file share the target's Node process and work directory.
+- Ruby: Minitest and the built-in `Coverage` module share the target's interpreter.
+- Java: the JUnit console launcher and the JaCoCo agent share the target's JVM.
+- Perl: `Test::More` and the core line tracer share the target's interpreter.
+- C: the AddressSanitizer report is read from stderr, which the target also writes, and the gcov counters are written by the target process. A C violation therefore also requires the run to end with the sanitizer's own halt status (`ASAN_EXITCODE`); report text from a target that returns normally, or that status without a target-bound report, is an operational error, never a violation. Hostile C source can still print the report and exit with that status, or write its own counters.
 
 Semantic risk: an auditor can falsely accept or reject. Its review is outcome-blind, fresh-context, and constrained by schema. It cannot authorize a result without admitted source evidence. Independent human-labelled auditor cases and whole-system evaluations are required before production use. Shared producer/auditor models have correlated failures.
 
