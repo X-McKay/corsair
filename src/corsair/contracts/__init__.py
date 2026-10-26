@@ -6,12 +6,10 @@ from .agents import AuditDecision as AuditDecision
 from .agents import AuditInput as AuditInput
 from .agents import AuditOutput as AuditOutput
 from .agents import AuditResult as AuditResult
-from .agents import NoGroundedCandidate as NoGroundedCandidate
 from .agents import PlanRevision as PlanRevision
 from .agents import ProducerDecision as ProducerDecision
 from .agents import ProducerInput as ProducerInput
 from .agents import ProducerOutput as ProducerOutput
-from .agents import ProducerProposal as ProducerProposal
 from .agents import Submission as Submission
 from .common import DIAGNOSTIC_TRUNCATION_MARKER as DIAGNOSTIC_TRUNCATION_MARKER
 from .common import MAX_DIAGNOSTIC_TEXT_CHARS as MAX_DIAGNOSTIC_TEXT_CHARS
@@ -40,11 +38,13 @@ from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
+from .results import MAX_TERMINAL_TIMELINE as MAX_TERMINAL_TIMELINE
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES
 from .results import Disposition as Disposition
 from .results import ExecutionStatus as ExecutionStatus
 from .results import FixStatus as FixStatus
 from .results import InvestigationResult as InvestigationResult
+from .results import PhaseTransition as PhaseTransition
 from .results import RoundResult as RoundResult
 from .results import Verdict as Verdict
 from .results import format_terminal_result as format_terminal_result

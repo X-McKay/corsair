@@ -15,7 +15,6 @@ from corsair.contracts import (
     AuditResult,
     Feedback,
     MatchKind,
-    NoGroundedCandidate,
     ProducerDecision,
     ProducerOutput,
 )
@@ -209,7 +208,7 @@ def test_score_rows_carry_the_ledger_and_no_oracle_content(tmp_path):
         score_row(_producer_output(), secret, "producer"),
         score_row(
             ProducerOutput(
-                decision=ProducerDecision(root=NoGroundedCandidate(reason="nothing grounded"))
+                decision=ProducerDecision(kind="no_grounded_candidate", reason="nothing grounded")
             ),
             secret,
             "producer",

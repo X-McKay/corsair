@@ -3,9 +3,7 @@
 
 The real production path (``run_producer``: factory, toolset, packet and ADK request
 processors) renders each request; a capturing ``BaseLlm`` records it and abstains, so
-no provider is called and no target code runs. With ``--after-load-skill`` the first
-scripted response is a ``load_skill`` call, and the second request shows what one
-redundant reload of the preloaded procedure adds to every later call.
+no provider is called and no target code runs.
 
 Token counts are an approximation, ``ceil(bytes / 4)``, not a provider tokenizer.
 """
@@ -48,7 +46,6 @@ class CapturingLlm(BaseLlm):
     """Record each native request and answer from a fixed script; never a provider."""
 
     structured_tools: bool = False
-    load_skill_first: bool = False
     requests: list[LlmRequest] = Field(default_factory=list)
 
     @property
@@ -60,10 +57,7 @@ class CapturingLlm(BaseLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         del stream
         self.requests.append(llm_request)
-        if self.load_skill_first and len(self.requests) == 1:
-            call = types.FunctionCall(name="load_skill", args={"skill_name": "source-grounding"})
-            part = types.Part(function_call=call)
-        elif self.structured_tools:
+        if self.structured_tools:
             part = types.Part(text=json.dumps(_ABSTAIN))
         else:
             call = types.FunctionCall(name="set_model_response", args=dict(_ABSTAIN))
@@ -119,7 +113,7 @@ def request_sections(request: LlmRequest) -> dict[str, str]:
 
 
 async def render_requests(
-    request_path: Path, content: bytes, *, structured_tools: bool, load_skill_first: bool
+    request_path: Path, content: bytes, *, structured_tools: bool
 ) -> list[LlmRequest]:
     """Render one fixture's producer requests through the production path."""
 
@@ -135,11 +129,7 @@ async def render_requests(
             store,
             build_manifest(request, settings, "fixture-only:no-native-execution"),
         )
-        model = CapturingLlm(
-            model="capturing-measurement",
-            structured_tools=structured_tools,
-            load_skill_first=load_skill_first,
-        )
+        model = CapturingLlm(model="capturing-measurement", structured_tools=structured_tools)
         await run_producer(
             ProducerInput(
                 run_id="measure-producer-request",
@@ -173,19 +163,12 @@ def dataset_fixtures(datasets: list[Path]) -> list[tuple[str, Path, bytes]]:
     return fixtures
 
 
-async def measure(
-    datasets: list[Path], *, structured_tools: bool, load_skill_first: bool = False
-) -> list[dict[str, Any]]:
+async def measure(datasets: list[Path], *, structured_tools: bool) -> list[dict[str, Any]]:
     """Measure the final rendered request of each fixture's scripted episode."""
 
     rows: list[dict[str, Any]] = []
     for case_id, input_path, content in dataset_fixtures(datasets):
-        requests = await render_requests(
-            input_path,
-            content,
-            structured_tools=structured_tools,
-            load_skill_first=load_skill_first,
-        )
+        requests = await render_requests(input_path, content, structured_tools=structured_tools)
         sections = request_sections(requests[-1])
         rows.append(
             {
@@ -207,29 +190,15 @@ def main() -> None:
         help="model declares output_schema_and_tools (response_schema replaces the "
         "set_model_response tool)",
     )
-    parser.add_argument(
-        "--after-load-skill",
-        action="store_true",
-        help="measure the request that follows one load_skill call",
-    )
     parser.add_argument("--dump", help="write the first fixture's rendered sections here")
     args = parser.parse_args()
     paths = [Path(item).resolve() for item in args.datasets]
-    rows = asyncio.run(
-        measure(
-            paths, structured_tools=args.structured_tools, load_skill_first=args.after_load_skill
-        )
-    )
+    rows = asyncio.run(measure(paths, structured_tools=args.structured_tools))
     print(json.dumps({"token_estimate": "ceil(bytes/4)", "rows": rows}, indent=2))
     if args.dump:
         _case_id, input_path, content = dataset_fixtures(paths)[0]
         requests = asyncio.run(
-            render_requests(
-                input_path,
-                content,
-                structured_tools=args.structured_tools,
-                load_skill_first=args.after_load_skill,
-            )
+            render_requests(input_path, content, structured_tools=args.structured_tools)
         )
         sections = request_sections(requests[-1])
         Path(args.dump).write_text(

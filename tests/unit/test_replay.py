@@ -18,7 +18,6 @@ from corsair.contracts import (
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     Submission,
     digest,
 )
@@ -49,7 +48,7 @@ def _output(control: str, exploit: str) -> ProducerOutput:
         hypothesis="the joined path escapes the fixed root",
         plan=PlanRevision(revision=1, objective="verify", next_steps=["run"], reason="test"),
     )
-    return ProducerOutput(decision=ProducerDecision(ProducerProposal(submission=submission)))
+    return ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission))
 
 
 def _report(settings: Settings, store: ArtifactStore, *outputs: ProducerOutput) -> dict[str, Any]:

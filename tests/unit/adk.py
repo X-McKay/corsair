@@ -1,5 +1,6 @@
 """Offline ADK test helpers using the real Runner and BaseLlm interface."""
 
+import asyncio
 from typing import Any
 
 from google.adk.models import BaseLlm
@@ -27,6 +28,16 @@ class ScriptedLlm(BaseLlm):
         if not self.responses:
             raise AssertionError("ScriptedLlm received more requests than scripted responses")
         yield self.responses.pop(0)
+
+
+class StalledLlm(ScriptedLlm):
+    """A native ADK model whose every request outlives any test bound: a slow provider."""
+
+    async def generate_content_async(self, llm_request: Any, stream: bool = False):
+        del stream
+        self.requests.append(llm_request)
+        await asyncio.sleep(3600)
+        yield LlmResponse()
 
 
 def text_response(text: str) -> LlmResponse:

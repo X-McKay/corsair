@@ -1,0 +1,54 @@
+{
+  "schema_version": "corsair.agent-dataset/1",
+  "entries": [
+    {
+      "case_id": "audit05",
+      "input": "fixtures/audit05/input.json",
+      "oracle": "fixtures/audit05/oracle.json",
+      "input_digest": "f2063756d88780fbca1fb49900b19a2d1c8e551e37e62c53c943ccae6ebde728",
+      "oracle_digest": "e86f69f25c1e1b044817dd5232c5a97ebb2a8026a59661da710b0a4e72ab2503"
+    },
+    {
+      "case_id": "audit06",
+      "input": "fixtures/audit06/input.json",
+      "oracle": "fixtures/audit06/oracle.json",
+      "input_digest": "23a39bc9adbc8536d28f5d73de03de51786ffee06555a7aa943f50b217e4145f",
+      "oracle_digest": "e685ea2f43bdd9977236f760d133115f287a504bd7534a629359bc5adb80c8f7"
+    },
+    {
+      "case_id": "audit07",
+      "input": "fixtures/audit07/input.json",
+      "oracle": "fixtures/audit07/oracle.json",
+      "input_digest": "dc7de5f77368e043276eee56c6967027eb61f7cae14d4666354ad46d791f45f8",
+      "oracle_digest": "b6d729459d95601ed1bdb3d5ee1013953dcce3816a70b2242db7d08248e275d6"
+    },
+    {
+      "case_id": "audit08",
+      "input": "fixtures/audit08/input.json",
+      "oracle": "fixtures/audit08/oracle.json",
+      "input_digest": "2417efefc6e7be10a318855635a77b1e5ce3aa425cc8e60c1f02539e65cd1cda",
+      "oracle_digest": "343fe7028605ec4beb7217c462269cbd054c8a14517d659b31be128269db924a"
+    },
+    {
+      "case_id": "audit09",
+      "input": "fixtures/audit09/input.json",
+      "oracle": "fixtures/audit09/oracle.json",
+      "input_digest": "435d66b5c88c01e356f250a664c86509254edd50069bdab2cfeebcab04d5780c",
+      "oracle_digest": "a20b35d03b166b81753623192fd958ee77ebd38d2bef9eaae6df2d93b710b26b"
+    },
+    {
+      "case_id": "audit10",
+      "input": "fixtures/audit10/input.json",
+      "oracle": "fixtures/audit10/oracle.json",
+      "input_digest": "4dd4a84f9eb2b916ff2f9839015b25d4ecf5cd7f50b6308c82ebcb074eae4c8c",
+      "oracle_digest": "682dee68acc285029c23837ee95614ad98056f9373cf3b80aef8f1b3dd2eac07"
+    },
+    {
+      "case_id": "audit11",
+      "input": "fixtures/audit11/input.json",
+      "oracle": "fixtures/audit11/oracle.json",
+      "input_digest": "31a4b4a896b103e145fac0cef8d31feab2a95e92adf6782f37426b03da2fde69",
+      "oracle_digest": "682dee68acc285029c23837ee95614ad98056f9373cf3b80aef8f1b3dd2eac07"
+    }
+  ]
+}

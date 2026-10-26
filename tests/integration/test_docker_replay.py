@@ -10,7 +10,7 @@ import pytest
 
 from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import ProducerDecision, ProducerOutput, ProducerProposal, Submission
+from corsair.contracts import ProducerDecision, ProducerOutput, Submission
 from corsair.evaluation.replay import replay_candidates
 from corsair.settings import Settings
 from tests.integration import test_docker
@@ -27,7 +27,7 @@ FROZEN = ROOT / "evals/fixtures/case01/submission.json"
 def _proposal(**payloads: object) -> ProducerOutput:
     frozen = Submission.model_validate_json(FROZEN.read_bytes())
     submission = frozen.model_copy(update=payloads)
-    return ProducerOutput(decision=ProducerDecision(ProducerProposal(submission=submission)))
+    return ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission))
 
 
 async def test_real_docker_replay_separates_demonstrating_from_non_demonstrating_candidates(

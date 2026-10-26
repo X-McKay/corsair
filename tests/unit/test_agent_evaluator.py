@@ -13,7 +13,6 @@ from corsair.contracts import (
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     Submission,
     Usage,
     digest,
@@ -38,16 +37,13 @@ def _producer_output(
         return ProducerOutput(feedback=feedback)
     return ProducerOutput(
         decision=ProducerDecision(
-            root=ProducerProposal(
-                submission=Submission(
-                    hypothesis="test",
-                    plan=PlanRevision(
-                        revision=1, objective="test", next_steps=["test"], reason="test"
-                    ),
-                    control_payload=control_payload,
-                    exploit_payload=exploit_payload,
-                )
-            )
+            kind="proposal",
+            submission=Submission(
+                hypothesis="test",
+                plan=PlanRevision(revision=1, objective="test", next_steps=["test"], reason="test"),
+                control_payload=control_payload,
+                exploit_payload=exploit_payload,
+            ),
         ),
         feedback=feedback,
     )

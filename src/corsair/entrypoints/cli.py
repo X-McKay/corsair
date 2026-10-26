@@ -59,6 +59,8 @@ class CliArguments(argparse.Namespace):
     evidence: bool
     model: bool
     dataset_command: str
+    datasets: list[str]
+    fix_digests: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -83,6 +85,16 @@ def _result_from_store(store: ArtifactStore, identity: str) -> InvestigationResu
     if ref is None:
         raise ValueError("No committed result; use --online to query the Temporal workflow")
     return InvestigationResult.model_validate(store.get_json(ref))
+
+
+def _existing_store(settings: Settings) -> ArtifactStore | None:
+    """The local artifact store only when it already exists, so opening creates nothing."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    root = Path(settings.artifact_root)
+    if not ((root / "blobs").is_dir() and (root / "operations").is_dir()):
+        return None
+    return ArtifactStore(root)
 
 
 def _score_saved_result(
@@ -234,7 +246,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
             ui.emit(inspect_evidence(store, result))
         else:
-            ui.emit(result)
+            ui.emit(result, store=store)
         return 0
 
     from corsair.adapters.temporal.client import connect, wait_for_result
@@ -305,7 +317,8 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
         f"Investigation {handle.id}",
         query=lambda: handle.query(InvestigationWorkflow.status),
     )
-    ui.emit(result)
+    # A worker sharing this host's artifact root lets the human view verify the ledger.
+    ui.emit(result, store=_existing_store(settings) if ui.human else None)
     event(
         "investigation.completed",
         run_id=handle.id,
@@ -386,6 +399,18 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
+async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
+    """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
+    from corsair.evaluation.datasets import validate_datasets
+
+    settings = _settings(args) if args.settings else None
+    report = validate_datasets(
+        [Path(path) for path in args.datasets], settings, fix=args.fix_digests
+    )
+    ui.emit(report)
+    return 0 if report["valid"] else 1
+
+
 async def _handle_replay_candidates(args: CliArguments, ui: Terminal) -> int:
     """Replay mismatching isolated producer proposals natively; never edits an oracle."""
     from corsair.adapters.sandboxing.docker import DockerSandbox
@@ -419,6 +444,8 @@ async def _handle_replay_candidates(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     """Dispatch one ``corsair dataset`` subcommand."""
+    if args.dataset_command == "validate":
+        return await _handle_dataset_validate(args, ui)
     if args.dataset_command == "replay-candidates":
         return await _handle_replay_candidates(args, ui)
     raise ValueError("Unknown dataset command")
@@ -522,7 +549,7 @@ def parser() -> argparse.ArgumentParser:
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
-        "dataset": "Frozen dataset tools; replay-candidates runs producer proposals natively",
+        "dataset": "Frozen dataset tools: validate offline; replay-candidates natively in Docker",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -578,6 +605,15 @@ def parser() -> argparse.ArgumentParser:
     )
     datasets = commands["dataset"].add_subparsers(
         dest="dataset_command", required=True, title="dataset commands"
+    )
+    validate_help = "Verify digests, requests, sources, target binding and oracle consistency"
+    validate = datasets.add_parser("validate", help=validate_help, description=validate_help)
+    _presentation_options(validate)
+    validate.add_argument("datasets", nargs="+", metavar="DATASET", help="Dataset manifest JSON")
+    validate.add_argument(
+        "--fix-digests",
+        action="store_true",
+        help="Rewrite only stale manifest digests of otherwise valid entries",
     )
     replay_help = (
         "Replay a producer report's mismatching proposals in the real sandbox; "
