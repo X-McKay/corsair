@@ -394,6 +394,89 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
     assert activities.call_counts["corsair.record"] == 1
 
 
+class _ImageOnlySandbox:
+    image_id = "sha256:" + "a" * 64
+
+
+async def _run_with_real_prepare(
+    temporal_server, tmp_path, module: str
+) -> tuple[InvestigationResult, FakeActivities]:
+    """Real source admission and pre-model gates; offline fakes for every later step."""
+    from corsair.adapters.scm.local import LocalSourceSnapshots
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.settings import Settings
+    from corsair.steps.activities import Activities
+
+    (tmp_path / "admitted").mkdir()
+    (tmp_path / "admitted" / "reader.py").write_text(module, encoding="utf-8")
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+    request = investigation_request("line-less")
+    case = request.case.model_copy(
+        update={"finding": request.case.finding.model_copy(update={"line": None})}
+    )
+    request = request.model_copy(update={"case": case})
+    fakes = FakeActivities(store)
+    prepare = Activities(
+        settings,
+        store=store,
+        inference=None,  # ty: ignore[invalid-argument-type]
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=_ImageOnlySandbox(),  # ty: ignore[invalid-argument-type]
+    ).prepare
+    queue = temporal_id("line-less-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=[prepare, fakes.produce, fakes.evidence, fakes.audit, fakes.record],
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("line-less"),
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+    return result, fakes
+
+
+async def test_a_line_less_finding_with_a_resolvable_function_now_runs(temporal_server, tmp_path):
+    """A scanner that named only the function: prepare binds the line from the recipe
+    function in trusted code, and the same exact-line gates then decide the case."""
+    from corsair.contracts import LineProvenance
+
+    module = (
+        "from pathlib import Path\n\n\n"
+        "def read_payload(root, path):\n"
+        "    return (Path(root) / path).read_text()\n"
+    )
+    result, fakes = await _run_with_real_prepare(temporal_server, tmp_path, module)
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    [producer_input] = fakes.producer_inputs
+    assert producer_input.prepared.finding.line == 5
+    assert producer_input.prepared.line_provenance is LineProvenance.RECIPE_FUNCTION
+    assert fakes.evidence_inputs[0].prepared.finding.line == 5
+    [audit_input] = fakes.audit_inputs
+    assert audit_input.finding.line == 5
+    assert audit_input.line_provenance is LineProvenance.RECIPE_FUNCTION
+
+
+async def test_a_line_less_finding_that_cannot_bind_is_still_unable_to_run(
+    temporal_server, tmp_path
+):
+    module = "def read_payload(root, path): return path\n"
+    result, fakes = await _run_with_real_prepare(temporal_server, tmp_path, module)
+
+    assert result.execution_status is ExecutionStatus.BLOCKED
+    assert result.verdict is Verdict.UNABLE_TO_RUN
+    assert "target_binding line_missing" in result.reason
+    assert fakes.call_counts["corsair.produce"] == 0
+    assert fakes.call_counts["corsair.evidence"] == 0
+
+
 async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
     temporal_server, temporal_artifact_store
 ):

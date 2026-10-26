@@ -370,6 +370,43 @@ def test_role_prompts_exclude_the_untrusted_scanner_self_assessment(tmp_path: Pa
         assert sentinel not in audit_packet
 
 
+def test_role_prompts_say_when_trusted_code_derived_the_target_line(tmp_path: Path):
+    """A line bound from the recipe function is labelled as derived in both packets;
+    a declared line adds nothing, so existing packets stay byte-identical."""
+    from corsair.contracts import LineProvenance
+
+    store = ArtifactStore(tmp_path)
+    producer_input = _producer_input(store)
+    prepared = producer_input.prepared
+
+    def packets(provenance: LineProvenance) -> tuple[str, str]:
+        derived = prepared.model_copy(update={"line_provenance": provenance})
+        return (
+            _producer_prompt(producer_input.model_copy(update={"prepared": derived})),
+            _auditor_prompt(
+                AuditInput(
+                    finding=prepared.finding,
+                    recipe=prepared.recipe,
+                    source_excerpt=prepared.source_excerpt,
+                    submission=Submission(**_submit_args()),
+                    line_provenance=provenance,
+                    max_output_tokens=512,
+                )
+            ),
+        )
+
+    declared_producer, declared_audit = packets(LineProvenance.DECLARED)
+    assert declared_producer == _producer_prompt(producer_input)
+    assert "target_line_provenance" not in declared_producer + declared_audit
+    note = (
+        f"Trusted code bound line {prepared.finding.line} as the first body statement of "
+        f"recipe function {prepared.recipe.function}."
+    )
+    for packet in packets(LineProvenance.RECIPE_FUNCTION):
+        assert '"target_line_provenance"' in packet
+        assert note in packet
+
+
 @pytest.mark.parametrize(
     "invalid_field", ["string_plan", "unknown_field", "missing_plan", "parent"]
 )

@@ -15,6 +15,7 @@ from corsair.contracts import (
     EvidenceInput,
     ExecutionStatus,
     InvestigationResult,
+    LineProvenance,
     ProducerDecision,
     ProducerOutput,
     ProducerProposal,
@@ -146,6 +147,8 @@ def test_inspect_evidence_walks_receipts_without_payloads_or_fixture(tmp_path: P
     assert item["committed"] is True
     assert item["evidence"] == "present"
     assert item["receipts_admissible"] is True
+    # The verified prepared case's target line, as declared by the request.
+    assert (item["target_line"], item["line_provenance"]) == (4, LineProvenance.DECLARED)
     assert item["cleanup_confirmed"] is True
     control, adversarial = item["roles"]["control"], item["roles"]["adversarial"]
     assert control["outcome"] is RoleOutcome.HELD and control["native_exit_code"] == 0
@@ -183,6 +186,7 @@ def test_inspect_evidence_reports_unconfirmed_cleanup_as_not_admissible(tmp_path
 
     assert item["cleanup_confirmed"] is False
     assert item["receipts_admissible"] is False
+    assert item["target_line"] is None  # only an admissible receipt names the target
     assert item["roles"]["control"]["cleanup_confirmed"] is False
     # Unconfirmed control cleanup skips the adversarial role: no receipt exists for it.
     assert item["roles"]["adversarial"]["receipt"] == "absent"
@@ -245,11 +249,13 @@ async def test_inspect_evidence_command_emits_json_and_human_views(tmp_path, mon
     )
     view = json.loads(capsys.readouterr().out)
     assert view["observations"][0]["roles"]["control"]["outcome"] == "PROPERTY_HELD"
+    assert view["observations"][0]["line_provenance"] == "declared"
 
     human = ["--format", "human", "--no-color", "inspect", "run-a", "--evidence"]
     assert await execute(parser().parse_args(human)) == 0
     output = capsys.readouterr().out
     assert "Evidence run-a" in output and "id-control" in output
+    assert "target=L4" in output and "derived" not in output
     for private in PRIVATE:
         assert private not in output
 
@@ -277,3 +283,13 @@ def test_runs_parser_defaults_to_an_unfiltered_listing():
 
     assert (args.case, args.limit) == (None, None)
     assert parser().parse_args(["inspect", "run1"]).evidence is False
+
+
+def test_evidence_caption_marks_a_derived_target_line() -> None:
+    from corsair.entrypoints.terminal import _target_caption
+
+    assert _target_caption({"target_line": None, "line_provenance": None}) == ""
+    assert _target_caption({"target_line": 4, "line_provenance": "declared"}) == " · target=L4"
+    assert _target_caption({"target_line": 6, "line_provenance": "recipe_function"}) == (
+        " · target=L6 (derived from recipe function)"
+    )
