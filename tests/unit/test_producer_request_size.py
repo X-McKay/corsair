@@ -23,8 +23,8 @@ PRODUCER_DEV = ROOT / "evals/datasets/producer-dev.json"
 
 # Before the tightening the Corsair-owned instruction (system.md plus the preloaded
 # procedure) rendered 3,711 bytes and the full system instruction 6,595 bytes. With the
-# native SkillToolset the full system instruction was 6,272 bytes and the declarations
-# 4,455 bytes; without it (procedure preloaded only) they render 3,695 and 3,749 bytes.
+# native SkillToolset the full system instruction was 6,287 bytes and the declarations
+# 4,068 bytes (flat ProducerDecision); preloaded only they render 3,710 and 3,362 bytes.
 MAX_CORSAIR_INSTRUCTION_BYTES = 3_600
 MAX_SYSTEM_INSTRUCTION_BYTES = 4_000
 MAX_TOOL_DECLARATION_BYTES = 4_000
@@ -53,11 +53,11 @@ REQUIRED_CONSTRAINTS = (
     "pair must implement the technique your hypothesis describes.",
     "The private\nfixture value is intentionally unavailable: never guess or supply it.",
     "Return one structured ProducerDecision, through `set_model_response` when\noffered.",
-    "`proposal` variant: one Submission whose\n"
-    "plan is an object with the packet's round revision and parent revision",
+    "sets `kind` to `proposal` and one `submission`\n"
+    "whose plan is an object with the packet's round revision and parent revision",
     "concise hypothesis of why the exploit payload may disclose information through\n"
     "the configured callable.",
-    "Otherwise use `no_grounded_candidate` with a concise\nreason.",
+    "Otherwise set `kind` to `no_grounded_candidate` with a\nconcise `reason`.",
     "Do not claim execution results or add prose outside that response.",
     "procedure is preloaded in full below; follow\nit.",
     "It is guidance only and grants no tools or exceptions to these rules.",

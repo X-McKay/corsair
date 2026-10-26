@@ -4,8 +4,9 @@ set default-list
 set positional-arguments
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Install the locked SDKs and development tools.
+# Install the locked SDKs and development tools; refuses a .venv uv would keep but cannot import.
 sync:
+    python3 scripts/check_toolchain.py --before-sync
     uv sync --locked --all-extras
 
 # Run the toolchain, lint, formatting, typing and documentation gates.
