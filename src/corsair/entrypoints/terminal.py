@@ -396,6 +396,27 @@ def _target_caption(item: Mapping[str, Any]) -> str:
     return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
 
 
+# Validation check keys and their compact column headings.
+_DATASET_CHECKS = (
+    ("entry", "Entry"),
+    ("digests", "Digest"),
+    ("request", "Input"),
+    ("source", "Source"),
+    ("target_binding", "Bind"),
+    ("oracle", "Oracle"),
+)
+_CHECK_WORDS = {"pass": ("ok", "green"), "fail": ("FAIL", "bold red"), "skip": ("-", "dim")}
+
+
+def _check_word(status: str) -> Text:
+    word, style = _CHECK_WORDS.get(status, (status, "cyan"))
+    return Text(safe_text(word), style=style)
+
+
+def _status_word(status: str) -> Text:
+    return Text(safe_text(status).upper(), style=_STYLES.get(status, "dim"))
+
+
 def _cleanup_text(confirmed: bool) -> Text:
     return Text("confirmed", style="green") if confirmed else Text("NOT confirmed", style="red")
 
@@ -553,6 +574,8 @@ class Terminal:
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
             self._runs(rendered)
+        elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
+            self._datasets(rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:
             self._evidence(rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
@@ -849,6 +872,65 @@ class Terminal:
             self.out.print(
                 Text(f"{value['invalid_records']} committed record(s) could not be read")
             )
+
+    def _datasets(self, value: dict[str, Any]) -> None:
+        """Render a dataset validation: identity and cohort, then one row per entry."""
+        for dataset in value["datasets"]:
+            header = _grid()
+            header.add_row(_label("Status"), _status_word(dataset["status"]))
+            header.add_row(_label("Schema"), _text(dataset["schema_version"]))
+            header.add_row(_label("Kind"), _text(dataset["kind"]))
+            header.add_row(_label("Digest"), _text(dataset["dataset_digest"]))
+            cohort = dataset["cohort"]
+            header.add_row(_label("Cohort"), _text(f"{len(cohort)}: {', '.join(cohort)}"))
+            header.add_row(_label("Loader"), _status_word(dataset["loader"]))
+            for problem in dataset["problems"]:
+                header.add_row(Text("Problem", style="red"), _text(problem))
+            parts: list[RenderableType] = [header]
+            if dataset["entries"]:
+                table = Table(expand=True)
+                table.add_column("Case", overflow="fold", ratio=1)
+                for _check, heading in _DATASET_CHECKS:
+                    table.add_column(heading, no_wrap=True)
+                findings: list[Text] = []
+                for entry in dataset["entries"]:
+                    case = _text(entry["case_id"])
+                    group = (
+                        f"{entry['family']} · {entry['split']}"
+                        if entry["family"] is not None
+                        else entry["kind"]
+                    )
+                    case.append("\n").append(Text(safe_text(group), style="dim"))
+                    table.add_row(
+                        case,
+                        *(_check_word(entry["checks"][check]) for check, _ in _DATASET_CHECKS),
+                    )
+                    for line, style in (
+                        *((problem, "red") for problem in entry["problems"]),
+                        *((note, "yellow") for note in entry["notes"]),
+                    ):
+                        findings.append(
+                            Text(f"{safe_text(entry['case_id'])} ", style=style) + _text(line)
+                        )
+                parts.extend([table, *findings])
+            for change in dataset["digest_changes"]:
+                verb = "rewrote" if change["applied"] else "left (entry has other failures)"
+                parts.append(
+                    _text(
+                        f"{verb} {change['case_id']} {change['field']}: "
+                        f"{_short(change['old'])} -> {_short(change['new'])}"
+                    )
+                )
+            title = f"Corsair · Dataset {safe_text(dataset['dataset'])}"
+            style = "green" if dataset["status"] == "pass" else "red"
+            self.out.print(Panel(Group(*parts), title=title, border_style=style))
+        for problem in value["problems"]:
+            self.out.print(Text("Problem: ", style="red") + _text(problem))
+        self.out.print(
+            Text("All datasets valid", style="green")
+            if value["valid"]
+            else Text("Dataset validation failed", style="red")
+        )
 
     def _evidence(self, value: dict[str, Any]) -> None:
         """Render per-role native receipts for one committed result, never payloads."""
