@@ -15,13 +15,13 @@ from .agents import Submission as Submission
 from .common import DIAGNOSTIC_TRUNCATION_MARKER as DIAGNOSTIC_TRUNCATION_MARKER
 from .common import MAX_DIAGNOSTIC_TEXT_CHARS as MAX_DIAGNOSTIC_TEXT_CHARS
 from .common import MAX_ROOT_IDENTIFIER_LENGTH as MAX_ROOT_IDENTIFIER_LENGTH
+from .common import MAX_USAGE_CALL_ENTRIES as MAX_USAGE_CALL_ENTRIES
 from .common import ArtifactRef as ArtifactRef
 from .common import Contract as Contract
 from .common import DiagnosticText as DiagnosticText
 from .common import Digest as Digest
 from .common import Feedback as Feedback
 from .common import Identifier as Identifier
-from .common import MAX_USAGE_CALL_ENTRIES as MAX_USAGE_CALL_ENTRIES
 from .common import ModelCall as ModelCall
 from .common import ToolCall as ToolCall
 from .common import Usage as Usage
