@@ -91,7 +91,7 @@ _TIMELINE_ROWS = 8
 class TerminalOptions(Protocol):
     """Presentation switches shared by every parsed command."""
 
-    format: Literal["auto", "human", "json"]
+    format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
     log_format: Literal["text", "json"]
@@ -506,8 +506,9 @@ class Terminal:
         options = cast(TerminalOptions, args)
         requested = options.format
         self.human = requested == "human" or (requested == "auto" and sys.stdout.isatty())
+        self.markdown = requested == "markdown"
         # JSON mode must remain free of cursor movement even when running on a TTY.
-        colors = not options.no_color and requested != "json"
+        colors = not options.no_color and requested not in {"json", "markdown"}
         animation = self.human and not options.no_animation
         animation = animation and options.log_format != "json"
         self.out = Console(
@@ -528,8 +529,13 @@ class Terminal:
         self.animate = animation and self.err.is_interactive
 
     def emit(self, value: object) -> None:
-        """Write a complete JSON receipt or a compact human rendering to stdout."""
+        """Write a complete JSON receipt, a Markdown record or a compact human rendering."""
         rendered = TypeAdapter(Any).dump_python(value, mode="json")
+        if self.markdown:
+            from corsair.entrypoints.markdown import to_markdown
+
+            sys.stdout.write(to_markdown(rendered))
+            return
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return

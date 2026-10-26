@@ -31,7 +31,7 @@ class CliArguments(argparse.Namespace):
 
     command: str
     settings: str | None
-    format: Literal["auto", "human", "json"]
+    format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
     log_format: Literal["text", "json"]
@@ -433,9 +433,9 @@ def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = F
     )
     parser.add_argument(
         "--format",
-        choices=("auto", "human", "json"),
+        choices=("auto", "human", "json", "markdown"),
         default="auto" if defaults else argparse.SUPPRESS,
-        help="auto: human on a terminal, JSON in pipes",
+        help="auto: human on a terminal, JSON in pipes; markdown: report/compare records",
     )
     parser.add_argument(
         "--no-color", action="store_true", default=False if defaults else argparse.SUPPRESS
