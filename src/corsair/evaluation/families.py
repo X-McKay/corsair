@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from corsair.contracts import digest
+from corsair.evaluation.intake import INTAKE_SCHEMA, IntakeDataset
 from corsair.evaluation.scoring import Dataset, summarize
 
 _PAIR_DIRECTORY = re.compile(r"^(?P<stem>.+)-(?P<variant>[ab])$")
@@ -87,6 +88,12 @@ def dataset_members(path: Path) -> list[Member]:
         return [
             Member(source, item["case_id"], None, None, chain_pair(item["input"]))
             for item in entries
+        ]
+    if schema == INTAKE_SCHEMA:
+        # Intake rows score scan-report findings; they carry no family or split.
+        return [
+            Member(source, entry.case_id, None, None, None)
+            for entry in IntakeDataset.model_validate(raw).entries
         ]
     if raw and all(isinstance(value, str) and _SHA256.match(value) for value in raw.values()):
         return [Member(source, family, family, path.stem, None) for family in sorted(raw)]

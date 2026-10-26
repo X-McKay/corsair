@@ -60,6 +60,8 @@ class CliArguments(argparse.Namespace):
     limit: int | None
     evidence: bool
     model: bool
+    source_root: str
+    recipe_template: str | None
     dataset_command: str
     datasets: list[str]
     fix_digests: bool
@@ -419,6 +421,18 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
+async def _handle_intake(args: CliArguments, ui: Terminal) -> int:
+    """Dry-run scanner intake: which findings would become admissible requests, and why not."""
+    from corsair.evaluation.intake import intake_receipt
+
+    template = Path(args.recipe_template) if args.recipe_template else None
+    receipt, intakes = intake_receipt(
+        Path(args.report), Path(args.source_root), _settings(args), template
+    )
+    ui.emit(receipt)
+    return 0 if intakes and all(item.admissible for item in intakes) else 1
+
+
 async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
     """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
     from corsair.evaluation.datasets import validate_datasets
@@ -494,6 +508,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "investigate": _handle_investigate,
     "eval": _handle_eval,
     "rescore": _handle_rescore,
+    "intake": _handle_intake,
     "dataset": _handle_dataset,
 }
 
@@ -569,6 +584,8 @@ def parser() -> argparse.ArgumentParser:
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
+        "intake": "Dry-run a scanner report: which findings become admissible requests; "
+        "no model or container",
         "dataset": "Frozen dataset tools: validate offline; replay-candidates natively in Docker",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
@@ -622,6 +639,17 @@ def parser() -> argparse.ArgumentParser:
         "--allow-dataset-mismatch",
         action="store_true",
         help="Compare reports over different or undeclared frozen dataset digests",
+    )
+    intake = commands["intake"]
+    intake.add_argument("report", help="Scanner report JSON (corsair.scan_report/1)")
+    intake.add_argument(
+        "--source-root",
+        required=True,
+        help="The findings' source tree (a request's source.path), admitted under source_root",
+    )
+    intake.add_argument(
+        "--recipe-template",
+        help="Operator recipe JSON without module_file; intake binds it to each finding's file",
     )
     datasets = commands["dataset"].add_subparsers(
         dest="dataset_command", required=True, title="dataset commands"

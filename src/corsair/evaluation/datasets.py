@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from corsair.adapters.scm.local import iter_snapshot_files, snapshot_source
-from corsair.adapters.scm.requests import normalize_request_sources
+from corsair.adapters.scm.requests import load_recipe_template, normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     AuditDecision,
@@ -32,6 +32,14 @@ from corsair.contracts import (
     Source,
     Verdict,
     digest,
+)
+from corsair.evaluation.intake import (
+    INTAKE_SCHEMA,
+    IntakeDataset,
+    IntakeDatasetEntry,
+    IntakeOracle,
+    report_findings,
+    score_dataset,
 )
 from corsair.evaluation.scoring import (
     Dataset,
@@ -448,11 +456,78 @@ def _validate_agent_dataset(
     report.dataset_digest = digest(document)
 
 
+def _validate_intake_entry(
+    entry: EntryReport, declared: IntakeDatasetEntry, validator: _Validator
+) -> None:
+    """Digests, report envelope, template, source snapshot and oracle length of one row."""
+    report_bytes = validator.read(entry, "report", declared.report, declared.report_digest)
+    oracle_bytes = validator.read(entry, "oracle", declared.oracle, declared.oracle_digest)
+    findings: list[object] | None = None
+    if report_bytes is not None:
+        try:
+            findings = report_findings(report_bytes)
+        except ValueError as error:
+            entry.fail("request", safe_error_detail(error))
+        else:
+            entry.passed("request")
+    if declared.recipe_template is not None:
+        if declared.recipe_template_digest is None:
+            entry.fail("entry", "recipe_template needs recipe_template_digest")
+        elif validator.read(
+            entry, "recipe_template", declared.recipe_template, declared.recipe_template_digest
+        ):
+            try:
+                load_recipe_template(resolve_frozen(validator.root, declared.recipe_template))
+            except ValueError as error:
+                entry.fail("request", f"recipe template: {safe_error_detail(error)}")
+    try:
+        source_dir = resolve_frozen(validator.root, declared.source)
+    except ValueError as error:
+        entry.fail("source", safe_text(error))
+    else:
+        source = Source(path=str(source_dir), expected_digest=declared.source_digest)
+        if validator.snapshot(entry, "source", source) is not None:
+            entry.passed("source")
+    if oracle_bytes is not None:
+        try:
+            expected = IntakeOracle.model_validate_json(oracle_bytes).expected
+        except ValueError as error:
+            entry.fail("oracle", safe_error_detail(error))
+        else:
+            if findings is not None and len(expected) != len(findings):
+                entry.fail("oracle", f"lists {len(expected)} outcomes for {len(findings)} findings")
+            entry.passed("oracle")
+
+
+def _validate_intake_dataset(
+    report: DatasetReport, document: dict[str, Any], validator: _Validator
+) -> None:
+    report.kind = "intake"
+    seen: set[str] = set()
+    for index, raw in enumerate(_raw_entries(report, document)):
+        entry = EntryReport(index=index, case_id=_entry_name(raw, index), kind="intake")
+        report.entries.append(entry)
+        try:
+            declared = IntakeDatasetEntry.model_validate(raw)
+        except ValueError as error:
+            entry.fail("entry", safe_error_detail(error))
+            continue
+        _unique(entry, seen)
+        entry.passed("entry")
+        _validate_intake_entry(entry, declared, validator)
+    try:
+        report.dataset_digest = digest(IntakeDataset.model_validate(document))
+    except ValueError as error:
+        report.problems.append(f"manifest: {safe_error_detail(error)}")
+
+
 def _check_loader(report: DatasetReport, document: dict[str, Any], root: Path) -> None:
     """Run the consuming evaluator's own loader, so its rules cannot drift from these checks."""
     try:
         if report.schema_version == CASE_SCHEMA:
             load_dataset(report.path)
+        elif report.schema_version == INTAKE_SCHEMA:
+            score_dataset(report.path)
         else:
             for raw in document["entries"]:
                 load_frozen_fixture(root, raw)
@@ -478,11 +553,11 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         return report
     schema = document.get("schema_version")
     report.schema_version = schema if isinstance(schema, str) else None
-    if schema not in {CASE_SCHEMA, AGENT_SCHEMA}:
+    if schema not in {CASE_SCHEMA, AGENT_SCHEMA, INTAKE_SCHEMA}:
         found = "no schema_version" if schema is None else f"schema_version {safe_text(schema)!r}"
         report.problems.append(
-            f"not an evaluation dataset manifest ({found}); expected {CASE_SCHEMA} or "
-            f"{AGENT_SCHEMA}"
+            f"not an evaluation dataset manifest ({found}); expected {CASE_SCHEMA}, "
+            f"{AGENT_SCHEMA} or {INTAKE_SCHEMA}"
         )
         return report
     root = dataset_root(path)
@@ -491,6 +566,8 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         validator = _Validator(root, admission, ArtifactStore(scratch))
         if schema == CASE_SCHEMA:
             _validate_case_dataset(report, document, validator)
+        elif schema == INTAKE_SCHEMA:
+            _validate_intake_dataset(report, document, validator)
         else:
             _validate_agent_dataset(report, document, validator)
     if report.entries:
