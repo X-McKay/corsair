@@ -11,7 +11,7 @@ just -- test -q -W error
 just build
 ```
 
-`just sync` installs the locked development dependencies. `just check` runs Ruff lint, Ruff format check, Just formatting, `ty check --error-on-warning` across maintained source, tests, evaluators and developer scripts, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test, which creates a fresh environment and loads the actual wheel outside the checkout. `just build` creates the source distribution and wheel.
+`just sync` installs the locked development dependencies. `just check` runs the toolchain report (see [prerequisites and failure messages](setup.md#prerequisites-and-failure-messages)), Ruff lint, Ruff format check, Just formatting, `ty check --error-on-warning` across maintained source, tests, evaluators and developer scripts, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test, which creates a fresh environment and loads the actual wheel outside the checkout. `just build` creates the source distribution and wheel.
 
 Recipe arguments after `just -- RECIPE` go directly to pytest or the CLI. Use `-W error` for a strict qualification run; the recipes forward it rather than silently changing warning policy. Report test counts, deselections, skips, and warnings with the command result. A skip is an unexecuted boundary, not a pass.
 

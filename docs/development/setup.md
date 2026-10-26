@@ -28,6 +28,20 @@ just -- eval-agent auditor evals/datasets/auditor-dev.json \
 
 Variadic recipes forward arguments literally rather than evaluating them as shell source. Run separate recipes as separate commands; do not append another recipe name after forwarded arguments. Recipes do not auto-load `.env`, create credentials, or retry a provider-policy block.
 
+## Prerequisites and failure messages
+
+`just check` starts with `just toolchain`, which runs `python3 scripts/check_toolchain.py`: a standard-library report of Just, uv, the `.venv` Python, the providers extra and the Docker client against what `nix develop` provides. A `FAIL` line exits non-zero; a `WARN` line names a divergence that otherwise surfaces later as one of the errors below. Run the script directly when `just` itself cannot parse the justfile.
+
+| Message or symptom | Cause | Remedy |
+| --- | --- | --- |
+| ``error: Unknown setting `default-list` `` from any `just` command | A Just older than the pinned 1.58.0 is first on `PATH` (outside the Nix shell). | `nix develop`, or `uv tool install rust-just==1.58.0`. `tests/unit/test_justfile.py` skips with this remedy rather than failing on the unpinned binary. |
+| `FAIL  just` or `FAIL  uv` from `just toolchain` | The tool is missing or not the pinned version. | `nix develop`. |
+| ``WARN  .venv  other python … recreates .venv`` | `UV_PYTHON` (set by the Nix shell) names another interpreter than `.venv`, so the next `uv run --locked` silently recreates `.venv` with default dependencies only. | `just sync` after entering or leaving the Nix shell; better, stay on one side. |
+| ``WARN  providers missing`` | `uv sync --locked` or a recreated `.venv` left out the optional `providers` extra (LiteLLM); only `just sync` passes `--all-extras`. | `just sync` (`uv sync --locked --all-extras`). |
+| ``connector 'litellm' requires Corsair's providers extra`` from `corsair` or a test | Same as above, at model selection. ADK's chained message suggests `pip install google-adk[extensions]`; do not follow it, because LiteLLM is pinned in Corsair's `providers` extra in `uv.lock`. | `just sync`, or `uv sync --locked --extra providers`. |
+| `ImportError: libstdc++.so.6: cannot open shared object file` while importing `duckdb` | A `.venv` created inside `nix develop` is used outside it, where the shell's `LD_LIBRARY_PATH` is absent (`WARN  .venv  Nix python`). | Re-enter `nix develop`, or recreate it outside with `uv venv --clear` and `uv sync --locked --all-extras`. |
+| ``warning: `build_system.requires = ["uv-build>=0.12.19,<0.13"]` does not contain the current uv version`` | The Nix uv is newer than the build-backend range; uv fetches the locked `uv_build` separately. | None needed; the build still uses the declared backend. |
+
 ## Local environment and file lifecycle
 
 `just sync` creates/updates the canonical root `.venv/`; do not keep using a dated task environment. Private/generated roots, local credentials, databases and delivery archives are Git-ignored. Ongoing settings and Temporal persistence belong under `.state/`, immutable evidence under `.runs/`, and disposable or explicitly retained investigation material under `.work/`. See [local files and retention](local-files.md) before cleanup or moving state.

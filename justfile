@@ -1,4 +1,5 @@
-# Developer tasks. Install: uv tool install rust-just==1.58.0
+# Developer tasks for Just 1.58.0 from `nix develop` (or: uv tool install rust-just==1.58.0).
+# Another Just fails to parse this file; `python3 scripts/check_toolchain.py` names the remedy.
 set default-list
 set positional-arguments
 set shell := ["bash", "-euo", "pipefail", "-c"]
@@ -7,8 +8,12 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 sync:
     uv sync --locked --all-extras
 
-# Run every lint, formatting, typing and documentation gate.
-check: lint format-check typecheck docs-check
+# Run the toolchain, lint, formatting, typing and documentation gates.
+check: toolchain lint format-check typecheck docs-check
+
+# Report tool, .venv and extra versions against the Nix shell; runs before uv touches .venv.
+toolchain:
+    python3 scripts/check_toolchain.py
 
 # Lint maintained source, tests and evaluators.
 lint:
