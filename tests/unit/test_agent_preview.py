@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import Feedback, Submission
 from corsair.entrypoints import cli
 from corsair.entrypoints.terminal import Terminal, failure_remedy
@@ -216,6 +217,22 @@ async def test_preview_refuses_a_case_the_workflow_stops_before_any_model(tmp_pa
         )
     assert "target_binding" in str(refused.value)
     assert "corsair dataset validate" in (failure_remedy(refused.value) or "")
+
+
+def test_preview_prepares_the_bound_line_the_workflow_prepares(tmp_path: Path):
+    shutil.copytree(CASE01 / "source", tmp_path / "source")
+    request = json.loads(REQUEST.read_text())
+    request["case"]["finding"]["line"] = 3  # case01's ``def`` line; its body is line 4
+    del request["case"]["fixed_source"]
+    path = tmp_path / "request.json"
+    path.write_text(json.dumps(request))
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+
+    prepared = preview._prepare(
+        preview.load_request(path), settings, ArtifactStore(settings.artifact_root)
+    )
+
+    assert (prepared.finding.line, prepared.target_line, prepared.bound_line) == (3, 4, 4)
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,6 @@ from temporalio.exceptions import ApplicationError
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     MAX_TERMINAL_ROUNDS,
-    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -21,8 +20,7 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
-from corsair.policies.line_binding import bind_target_line
-from corsair.policies.target_binding import target_binding
+from corsair.policies.target_binding import TargetBindingBlocked
 from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
@@ -79,31 +77,16 @@ class Activities:
                 non_retryable=True,
             )
         try:
-            prepared = await asyncio.to_thread(self.sources.prepare, request.case, manifest)
-            module_text = await asyncio.to_thread(
-                self.sources.read_text,
-                prepared.source,
-                prepared.recipe.module_file,
-                max_bytes=self.settings.source_limit_bytes,
-            )
+            # Preparation also binds the target, over the admitted bytes: a case that
+            # certainly cannot bind stops here as UNABLE_TO_RUN, before any model or
+            # container cost (Python callable recipes; see prepare_case).
+            return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
+        except TargetBindingBlocked as exc:
+            raise ApplicationError(
+                format_diagnostic(str(exc)), type="PREPARE_BLOCKED", non_retryable=True
+            ) from None
         except (ValueError, FileNotFoundError, PermissionError) as exc:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
-        # Pre-model target binding over the admitted bytes: a case that certainly cannot
-        # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        # The structural gate and statement-line binding are Python-AST specific; other
-        # languages rely on their own run-time coverage and binding gates.
-        if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
-            failure = target_binding(prepared.finding, prepared.recipe, module_text)
-            if failure is not None:
-                raise ApplicationError(
-                    format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
-                )
-            # target_binding passed, so the finding declares a line and the module exists.
-            # The coverage gate binds to the statement line coverage reports for it.
-            assert prepared.finding.line is not None
-            target_line = bind_target_line(module_text, prepared.finding.line)
-            return prepared.model_copy(update={"target_line": target_line})
-        return prepared
 
     @staticmethod
     def _activity_window() -> float | None:

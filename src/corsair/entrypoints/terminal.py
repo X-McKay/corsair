@@ -40,6 +40,7 @@ from corsair.evaluation.comparison import row_label, row_stop
 from corsair.evaluation.ledger import RoundKey, gate_ledger, verified_rounds
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_error_detail, safe_text
+from corsair.policies.target_binding import TargetBindingBlocked
 from corsair.ports.sandboxing import SandboxUnavailable
 from corsair.ports.scm import SourceAdmissionError
 
@@ -226,7 +227,9 @@ def failure_remedy(error: BaseException) -> str | None:
         return (
             "A service did not answer in time; run `corsair doctor` to check Temporal and Docker."
         )
-    if isinstance(error, ValueError) and text.startswith("agent preview: the workflow stops"):
+    if isinstance(error, TargetBindingBlocked) or (
+        isinstance(error, ValueError) and text.startswith("agent preview: the workflow stops")
+    ):
         return (
             "The case cannot bind its target, so no model would see it; correct finding.line "
             "or the recipe, or run `corsair dataset validate` on its dataset."

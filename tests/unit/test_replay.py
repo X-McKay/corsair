@@ -7,6 +7,7 @@ the shared ``_FakeSandbox`` double, so these tests prove replay mechanics, never
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -15,20 +16,25 @@ import pytest
 from corsair.adapters.sandboxing import docker
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    FixStatus,
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
+    RoleOutcome,
     Submission,
+    Verdict,
     digest,
 )
 from corsair.entrypoints import cli
 from corsair.entrypoints.markdown import to_markdown
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.agents import fixture_score_row
-from corsair.evaluation.replay import replay_candidates
+from corsair.evaluation.replay import replay_candidates, replay_demonstrates
 from corsair.evaluation.scoring import summarize
+from corsair.policies.verdicts import session_verdict
 from corsair.settings import Settings
-from tests.unit.test_evidence import _FakeSandbox
+from tests.unit.test_evidence import _audit, _FakeSandbox, _prepared
+from tests.unit.test_verdicts import _observation, _role
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "evals/datasets/producer-dev.json"
@@ -167,6 +173,54 @@ async def test_an_unreadable_producer_artifact_is_unavailable_not_demonstrated(t
     assert replayed["rows"][0]["replay"]["status"] == "unavailable"
     assert replayed["rows"][0]["replay"]["demonstrated"] is None
     assert sandbox.calls == 0
+
+
+def _def_line_dataset(tmp_path: Path) -> Path:
+    """case01 with its finding declared on the ``def`` line (3), which binds to line 4."""
+    shutil.copytree(ROOT / "evals/fixtures/case01", tmp_path / "evals/fixtures/case01")
+    request_path = tmp_path / "evals/fixtures/case01/request.json"
+    request = json.loads(request_path.read_bytes())
+    request["case"]["finding"]["line"] = 3
+    request_path.write_text(json.dumps(request))
+    dataset = json.loads(DATASET.read_bytes())
+    dataset["entries"][0]["input_digest"] = digest(request_path.read_bytes())
+    path = tmp_path / "evals/datasets/def-line.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(dataset))
+    return path
+
+
+async def test_replay_binds_a_def_line_finding_to_the_line_the_kernel_requires(tmp_path):
+    # The sandbox double reports line 4 in both runs, as coverage.py does for case01: the
+    # workflow binds the declared ``def`` line 3 to it and the kernel demonstrates.
+    dataset = _def_line_dataset(tmp_path)
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+    report = _report(settings, store, _output("hello.txt", UNLISTED))
+    report["dataset_digest"] = digest(json.loads(dataset.read_bytes()))
+
+    replayed = await replay_candidates(
+        report, dataset, settings, store, _FakeSandbox(store), replay_id="replay-unit"
+    )
+
+    replay = replayed["rows"][0]["replay"]
+    assert (replay["status"], replay["covered"]) == ("demonstrated", True)
+
+
+def test_replay_classifies_coverage_of_the_bound_line_as_the_kernel_does():
+    prepared = _prepared()
+    bound = prepared.model_copy(
+        update={"finding": prepared.finding.model_copy(update={"line": 3}), "target_line": 4}
+    )
+    observation = _observation(
+        _role(RoleOutcome.HELD, [1, 4], 0), _role(RoleOutcome.VIOLATION, [1, 4], 1)
+    )
+    observation = observation.model_copy(update={"source_digest": bound.source.sha256})
+    kernel = session_verdict(bound, observation, _audit(), FixStatus.NOT_REQUESTED)
+    assert kernel.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    assert replay_demonstrates(bound, observation)["status"] == "demonstrated"
+    unbound = bound.model_copy(update={"target_line": None})
+    assert replay_demonstrates(unbound, observation)["covered"] is False
 
 
 @pytest.mark.parametrize(

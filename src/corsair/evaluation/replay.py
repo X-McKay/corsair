@@ -5,7 +5,7 @@ oracle, so a semantically valid alternative payload is a retained mismatch. This
 replays each mismatching proposal through the real verification path (source admission,
 ``run_evidence`` and the configured sandbox) on the fixture's frozen request, and records
 whether the pair demonstrates: a healthy control, a violating adversarial run and the
-declared target line covered in both. The result is evidence for a human deciding whether
+bound target line covered in both. The result is evidence for a human deciding whether
 to admit a candidate into the oracle's allowed list. It never reads or writes an oracle,
 never changes a row's pass/fail, and never reaches an agent, tool or workflow input.
 """
@@ -68,10 +68,11 @@ def replay_demonstrates(prepared: PreparedCase, observation: Observation) -> dic
 
     ``fix_status`` classifies any validated pair: NOT_BLOCKED is a healthy control with a
     native violation, cleanup confirmed and the evidence artifact committed (the gate
-    ledger reads it the same way). Coverage is the kernel's both-runs target-line gate.
+    ledger reads it the same way). Coverage is the kernel's both-runs target-line gate, on
+    the bound line (``PreparedCase.bound_line``) the kernel requires.
     """
     control, adversarial = observation.control, observation.adversarial
-    line = prepared.finding.line
+    line = prepared.bound_line
     covered = bool(
         line is not None
         and control is not None

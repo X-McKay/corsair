@@ -13,7 +13,7 @@ import pytest
 from pydantic import ValidationError
 from temporalio.testing import ActivityEnvironment
 
-from corsair.adapters.scm.local import LocalSourceSnapshots
+from corsair.adapters.scm.local import LocalSourceSnapshots, prepare_case
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     Case,
@@ -28,7 +28,7 @@ from corsair.contracts import (
     Verdict,
 )
 from corsair.policies.line_binding import bind_target_line
-from corsair.policies.target_binding import derive_target_line
+from corsair.policies.target_binding import TargetBindingBlocked, derive_target_line
 from corsair.policies.verdicts import session_verdict
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
@@ -178,7 +178,6 @@ def test_a_function_whose_body_cannot_be_decided_keeps_its_line():
         (23, 22),  # multi-line assignment
         (24, 22),
         (25, 22),
-        (27, 26),  # if header continuation
         (52, 51),  # class bases continuation
         (53, 51),  # class header colon line
         (76, 75),  # with header continuation
@@ -215,6 +214,7 @@ def test_a_continuation_line_binds_to_its_statement_first_line(line, bound):
         72,  # a ``match`` header
         73,  # a ``case`` line
         75,  # the first line of a multi-line ``with`` header
+        27,  # an ``if`` header continuation that holds the second ``and`` operand
     ],
 )
 def test_other_lines_are_kept(line):
@@ -351,6 +351,41 @@ async def test_prepare_records_the_declared_and_the_bound_line(tmp_path):
     assert (derived.finding.line, derived.target_line) == (4, 4)
 
 
+async def test_the_shared_preparation_binds_exactly_as_the_prepare_activity(tmp_path):
+    """verify, replay, preview and the isolated producer call prepare_case directly."""
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "reader.py").write_text(READER, encoding="utf-8")
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+    recipe = PythonRecipe(
+        module_file="reader.py",
+        function="read_file",
+        payload_parameter="path",
+        fixed_kwargs={"root": "/fixtures/allowed"},
+    )
+    finding = Finding(title="read", description="test", file="reader.py", line=3)
+    case = Case(case_id="line-case", finding=finding, source=Source(path="project"), recipe=recipe)
+    activities = Activities(
+        settings,
+        store=store,
+        inference=None,  # ty: ignore[invalid-argument-type]
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=_Sandbox(),  # ty: ignore[invalid-argument-type]
+    )
+
+    direct = prepare_case(case, settings, store, _prepared().manifest)
+    request = InvestigationRequest(case=case)
+    via_activity = await ActivityEnvironment().run(activities.prepare, request)
+
+    assert (direct.finding.line, direct.target_line, direct.bound_line) == (3, 4, 4)
+    assert (via_activity.target_line, via_activity.bound_line) == (4, 4)
+
+    unbound = case.model_copy(update={"recipe": recipe.model_copy(update={"function": "load"})})
+    with pytest.raises(TargetBindingBlocked, match="target_binding function_not_defined"):
+        prepare_case(unbound, settings, store, _prepared().manifest)
+
+
 def _def_line_case() -> PreparedCase:
     """A finding declared on the ``def`` line (3) and bound to its body (4)."""
     prepared = _prepared()
@@ -399,3 +434,95 @@ def test_the_verifier_admits_coverage_of_the_bound_line(tmp_path):
     unbound = verifier.evaluate(_input("unbound").model_copy(update={"prepared": unbound_case}))
     assert unbound.control and unbound.control.outcome is RoleOutcome.INVALID
     assert unbound.control.reason == "relevant source coverage was not observed"
+
+
+# --- conditional subexpressions: a line that can be skipped is never rebound ----------
+
+# coverage.py reports only line 2 of each multi-line ``return`` below (checked with the
+# image's pinned 7.13 under COVERAGE_CORE=sysmon): it reports the statement whether or
+# not a short-circuit, conditional or lazy part on a later line ran. Binding such a line
+# to line 2 would call it covered when it never executed.
+CONDITIONAL = """\
+def either(a, b):
+    return (a
+        or b)
+
+
+def both(a, b):
+    return (a
+        and b)
+
+
+def choose(a, b, c):
+    return (a
+        if b
+        else c)
+
+
+def kept(xs):
+    return [x
+        for x in xs
+        if x]
+
+
+def chained(a, b, c):
+    return (a <
+        b <
+        c)
+
+
+def deferred(a):
+    return (lambda: (
+        a))
+
+
+def checked(a):
+    assert a, (
+        "message")
+
+
+def called(a, b):
+    return max(a,
+        b)
+"""
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        3,  # ``or`` operand after the first: skipped when ``a`` is truthy
+        8,  # ``and`` operand after the first: skipped when ``a`` is falsy
+        14,  # ternary ``else`` branch
+        19,  # comprehension ``for`` clause: its target is assigned per element only
+        20,  # comprehension ``if``: skipped on an empty iterable
+        26,  # chained comparison operand after the first comparison
+        31,  # lambda body: runs only when the lambda is called
+        36,  # assert message: evaluated only when the assertion fails
+    ],
+)
+def test_a_line_inside_a_skippable_subexpression_is_kept(line):
+    assert bind_target_line(CONDITIONAL, line) == line
+
+
+@pytest.mark.parametrize(
+    ("line", "bound"),
+    [
+        (13, 12),  # the ternary test always runs
+        (25, 24),  # the first comparison always runs
+        (41, 40),  # a plain multi-line call: every argument runs with the statement
+    ],
+)
+def test_a_line_that_always_runs_with_its_statement_still_binds(line, bound):
+    assert bind_target_line(CONDITIONAL, line) == bound
+
+
+def test_a_ternary_body_on_a_continuation_line_is_kept():
+    text = "def f(a, b, c):\n    return (\n        a\n        if b\n        else c)\n"
+    assert bind_target_line(text, 3) == 3
+    assert bind_target_line(text, 4) == 2
+
+
+def test_a_lazy_lambda_default_in_a_signature_continuation_is_kept():
+    text = "def f(a,\n      check=lambda value: (\n          value.run())):\n    return a\n"
+    assert bind_target_line(text, 3) == 3  # the lambda body may never run
+    assert bind_target_line(text, 2) == 4  # the default itself is part of the header

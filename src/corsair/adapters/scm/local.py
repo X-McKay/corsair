@@ -25,7 +25,12 @@ from corsair.contracts import (
     Source,
     safe_path,
 )
-from corsair.policies.target_binding import bind_target_line
+from corsair.policies import line_binding
+from corsair.policies.target_binding import (
+    TargetBindingBlocked,
+    bind_target_line,
+    target_binding,
+)
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
@@ -428,7 +433,15 @@ def _excerpt(text: str, line: int | None) -> str:
 def prepare_case(
     case: Case, settings: Settings, store: ArtifactStore, manifest: RunManifest
 ) -> PreparedCase:
-    """Freeze source revisions before an agent is given only a pinned source excerpt."""
+    """Freeze source revisions and bind the target before an agent sees a source excerpt.
+
+    The one preparation every entry point shares (the prepare activity, ``corsair
+    verify``, candidate replay, agent preview and the isolated producer evaluation), so
+    each requires the same exact line. For a Python callable recipe it derives a missing
+    line from the recipe function, raises ``TargetBindingBlocked`` for a case the
+    pre-model ``target_binding`` gate certainly blocks, and records in ``target_line``
+    the statement line coverage reports for the finding's line (``policies.line_binding``).
+    """
     source = snapshot_source(case.source, settings, store)
     read_source(source, case.recipe.module_file, store, settings.source_limit_bytes)
     finding_text = read_source(source, case.finding.file, store, settings.source_limit_bytes)
@@ -439,12 +452,19 @@ def prepare_case(
     )
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
-    finding, provenance = case.finding, LineProvenance.DECLARED
+    finding, provenance, target_line = case.finding, LineProvenance.DECLARED, None
     if isinstance(case.recipe, PYTHON_CALLABLE_RECIPES):
-        # Python-AST derivation only; other recipes must declare their line.
+        # Python-AST derivation and binding only; other recipes must declare their line
+        # and rely on their own run-time coverage and binding gates.
         # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
         # admitted text. A missing line comes from the trusted recipe, never the narrative.
         finding, provenance = bind_target_line(case.finding, case.recipe, finding_text)
+        failure = target_binding(finding, case.recipe, finding_text)
+        if failure is not None:
+            raise TargetBindingBlocked(failure)
+        # target_binding passed, so the finding has a line within the module.
+        assert finding.line is not None
+        target_line = line_binding.bind_target_line(finding_text, finding.line)
     return PreparedCase(
         case_id=case.case_id,
         finding=finding,
@@ -454,6 +474,7 @@ def prepare_case(
         source_excerpt=_excerpt(finding_text, finding.line),
         manifest=manifest,
         line_provenance=provenance,
+        target_line=target_line,
     )
 
 
