@@ -2,12 +2,16 @@
 
 import json
 import os
+import re
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from corsair.contracts import ArtifactRef, digest
+
+_OPERATION_KEY = re.compile(r"[0-9a-f]{64}")
 
 
 class ArtifactStore:
@@ -66,18 +70,46 @@ class ArtifactStore:
     def get_json(self, ref: ArtifactRef):
         return json.loads(self.get(ref))
 
+    @staticmethod
+    def operation_key(operation_id: str) -> str:
+        """Operation names are hashed: callers cannot escape the operations directory."""
+        return digest(operation_id)
+
     def commit(self, operation_id: str, ref: ArtifactRef) -> None:
-        # Operation names are hashed: callers cannot escape the operations directory.
         self.get(ref)
-        self._publish(self.operations / digest(operation_id), ref.model_dump_json().encode())
+        self._publish(
+            self.operations / self.operation_key(operation_id), ref.model_dump_json().encode()
+        )
 
     def claim(self, operation_id: str, ref: ArtifactRef) -> bool:
         """Create an immutable execution intent; only the first writer may proceed."""
         self.get(ref)
-        return self._publish(self.operations / digest(operation_id), ref.model_dump_json().encode())
+        return self._publish(
+            self.operations / self.operation_key(operation_id), ref.model_dump_json().encode()
+        )
+
+    def operation_records(self) -> Iterator[tuple[str, float, ArtifactRef | None]]:
+        """Read-only enumeration of committed records as (key, recorded time, reference).
+
+        Names are stored hashed, so a record yields its key rather than its name; callers
+        bind a referenced document to a name with :meth:`operation_key`. Records are
+        newest first by filesystem time, which is operational metadata, never evidence.
+        An unparseable record yields ``None`` rather than ending the enumeration.
+        """
+        records: list[tuple[float, str, Path]] = []
+        for path in self.operations.iterdir():
+            if _OPERATION_KEY.fullmatch(path.name) and path.is_file():
+                records.append((path.stat().st_mtime, path.name, path))
+        records.sort(key=lambda record: (-record[0], record[1]))
+        for recorded, key, path in records:
+            try:
+                ref: ArtifactRef | None = ArtifactRef.model_validate_json(path.read_bytes())
+            except (OSError, ValueError):
+                ref = None
+            yield key, recorded, ref
 
     def reconcile(self, operation_id: str) -> ArtifactRef | None:
-        path = self.operations / digest(operation_id)
+        path = self.operations / self.operation_key(operation_id)
         if not path.exists():
             return None
         ref = ArtifactRef.model_validate_json(path.read_bytes())

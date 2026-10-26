@@ -10,7 +10,7 @@ from contextlib import nullcontext
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import TypeAdapter
-from rich.console import Console
+from rich.console import Console, Group
 from rich.json import JSON
 from rich.panel import Panel
 from rich.table import Table
@@ -79,6 +79,10 @@ class Terminal:
             return
         if isinstance(rendered, dict) and "disposition" in rendered:
             self._result(rendered)
+        elif isinstance(rendered, dict) and "runs" in rendered:
+            self._runs(rendered)
+        elif isinstance(rendered, dict) and "observations" in rendered:
+            self._evidence(rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
             table = Table("Check", "Status", "Details", expand=True)
             for check in rendered["checks"]:
@@ -157,6 +161,58 @@ class Terminal:
         self.out.print(
             Panel(table, title="Corsair · Investigation", border_style=_STYLES.get(label, "cyan"))
         )
+
+    def _runs(self, value: dict[str, Any]) -> None:
+        """Render a committed-run listing, newest first; identities fold, never truncate."""
+        table = Table(expand=True)
+        for column in ("Recorded (UTC)", "Run", "Case", "Verdict", "Status"):
+            table.add_column(column, overflow="fold")
+        for row in value["runs"]:
+            status = row["execution_status"]
+            table.add_row(
+                _text(row["recorded_at"][:16].replace("T", " ")),
+                _text(row["run_id"]),
+                _text(row["case_id"]),
+                _text(row["verdict"]),
+                Text(safe_text(status), style=_STYLES.get(status, "cyan")),
+            )
+        self.out.print(Panel(table, title="Corsair · Committed runs", border_style="cyan"))
+        if value["invalid_records"]:
+            self.out.print(
+                Text(f"{value['invalid_records']} committed record(s) could not be read")
+            )
+
+    def _evidence(self, value: dict[str, Any]) -> None:
+        """Render per-role native receipts for one committed result, never payloads."""
+        tables: list[Table] = []
+        for item in value["observations"]:
+            name = "Fixed revision" if item["fixed"] else f"Session {item['session']}"
+            name = name if item["fixed"] else f"{name} round {item['round']}"
+            table = Table(
+                title=_text(f"{name} · {item['operation_id']}"),
+                caption=_text(
+                    f"committed={item['committed']} · evidence={item['evidence']} · "
+                    f"admissible={item['receipts_admissible']} · gate={item['gate']}"
+                ),
+                expand=True,
+            )
+            for column in ("Role", "Outcome", "Ran", "Exit", "Lines", "Cleanup", "Container"):
+                # Enum labels stay whole; identities and line lists fold, never truncate.
+                table.add_column(column, overflow="fold", no_wrap=column in {"Role", "Outcome"})
+            for role, entry in item["roles"].items():
+                table.add_row(
+                    _text(role),
+                    _text(entry["outcome"]),
+                    _text(entry["target_executed"]),
+                    _text(entry["native_exit_code"]),
+                    _text(",".join(str(line) for line in entry["covered_lines"]) or None),
+                    _text(entry.get("cleanup_confirmed")),
+                    _text((entry.get("container_id") or "")[:12] or entry["receipt"]),
+                )
+            tables.append(table)
+        title = f"Corsair · Evidence {safe_text(value['run_id'])} · {safe_text(value['verdict'])}"
+        body = Group(*tables) if tables else Text("No observations were recorded")
+        self.out.print(Panel(body, title=title, border_style="cyan"))
 
     async def wait(
         self,
