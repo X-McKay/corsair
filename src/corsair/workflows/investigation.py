@@ -63,6 +63,9 @@ def _retry_feedback(audit: AuditOutput) -> Feedback:
     encodes it. The only corrective signal it may carry is the auditor's own
     rejection, which the auditor formed without seeing any run result; a round the
     auditor accepted leaves nothing the producer may see, so it retries blind.
+    Control-role or coverage facts are excluded too: given that a retry follows
+    only a non-decisive round, reporting a healthy control would reveal the
+    exploit outcome by elimination (ADR 0005).
     """
     if audit.review is not None and audit.review.decision is not AuditDecision.ACCEPT:
         return Feedback(gate="audit", reason=audit.review.reason)
