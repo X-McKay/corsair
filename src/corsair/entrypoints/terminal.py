@@ -388,6 +388,15 @@ def _roles_table(observation: Observation, title: str, *, caption: bool = False)
     return table
 
 
+def _target_caption(item: Mapping[str, Any]) -> str:
+    """The kernel's target line, and that it was derived when prepare bound it."""
+    line = item.get("target_line")
+    if line is None:
+        return ""
+    derived = item.get("line_provenance") == "recipe_function"
+    return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
+
+
 def _cleanup_text(confirmed: bool) -> Text:
     return Text("confirmed", style="green") if confirmed else Text("NOT confirmed", style="red")
 
@@ -853,6 +862,7 @@ class Terminal:
                 caption=_text(
                     f"committed={item['committed']} · evidence={item['evidence']} · "
                     f"admissible={item['receipts_admissible']} · gate={item['gate']}"
+                    + _target_caption(item)
                 ),
                 expand=True,
             )

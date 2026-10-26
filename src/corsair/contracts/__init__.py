@@ -52,6 +52,7 @@ from .sources import Budget as Budget
 from .sources import Case as Case
 from .sources import Finding as Finding
 from .sources import InvestigationRequest as InvestigationRequest
+from .sources import LineProvenance as LineProvenance
 from .sources import PreparedCase as PreparedCase
 from .sources import PythonRecipe as PythonRecipe
 from .sources import RunManifest as RunManifest

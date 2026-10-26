@@ -376,6 +376,7 @@ class InvestigationWorkflow:
                             recipe=prepared.recipe,
                             source_excerpt=prepared.source_excerpt,
                             submission=previous,
+                            line_provenance=prepared.line_provenance,
                             max_output_tokens=budget.max_output_tokens,
                             llm_call_limit=audit_llm_call_limit,
                             tool_call_limit=audit_tool_call_limit,

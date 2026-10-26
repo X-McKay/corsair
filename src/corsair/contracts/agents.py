@@ -9,7 +9,14 @@ from typing import Annotated, Literal
 from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
 
 from .common import Contract, Feedback, Identifier, Usage
-from .sources import DEFAULT_MAX_OUTPUT_TOKENS, Budget, Finding, PreparedCase, PythonRecipe
+from .sources import (
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    Budget,
+    Finding,
+    LineProvenance,
+    PreparedCase,
+    PythonRecipe,
+)
 
 # Explicit JSON shapes keep native output schemas informative; JsonValue alone emits {}.
 JsonPayload = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
@@ -113,6 +120,9 @@ class AuditInput(Contract):
     recipe: PythonRecipe
     source_excerpt: str
     submission: Submission
+    # Copied from PreparedCase: whether finding.line was declared or bound by trusted
+    # prepare code to the recipe function. Defaulted so recorded inputs still decode.
+    line_provenance: LineProvenance = LineProvenance.DECLARED
     # The per-request output cap, reasoning tokens included.  The workflow copies the
     # request's Budget.max_output_tokens; a standalone review uses the Budget default.
     max_output_tokens: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=256, le=16384)
