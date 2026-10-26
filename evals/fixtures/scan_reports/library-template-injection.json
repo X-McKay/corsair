@@ -1,0 +1,34 @@
+{
+  "schema_version": "corsair.scan_report/1",
+  "scan_completed": true,
+  "vulnerabilities_found": true,
+  "findings": [
+    {
+      "title": "Triple-stash this.key/this.value renders notification data unescaped in emails",
+      "description": "The notification email template renders caller-provided key/value pairs with a Handlebars triple-stash ({{{ }}}), which disables HTML escaping. A value containing markup is emitted verbatim into the rendered email body, allowing HTML injection into messages delivered to recipients.",
+      "file": "configs/email-templates/pm-target-added.hbs",
+      "line": 41,
+      "category": "HTML injection",
+      "severity": "LOW",
+      "confidence": 0.6,
+      "impact": "An attacker-controlled free-text field is rendered as raw HTML in notification emails, enabling content spoofing or phishing against recipients.",
+      "exploit_scenario": "An authenticated user sets a free-text field to markup. When a target-added notification is generated, the triple-stash renders the markup unescaped in the recipient's email.",
+      "recommendation": "Render the value with a double-stash ({{ }}) so Handlebars escapes it, or sanitize the field before templating.",
+      "preconditions": [
+        "An authenticated user can set the free-text field that feeds this template value.",
+        "The getValuePairData helper that populates key/value pairs is defined in the consuming email service, which is not part of this repository."
+      ],
+      "scope": {
+        "application": "[Library] Notification email templates consumed by downstream email services",
+        "repositories": [
+          {
+            "name": "notification-templates",
+            "url": "https://github.com/example-org/notification-templates",
+            "branch": "main",
+            "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9001122334"
+          }
+        ]
+      }
+    }
+  ]
+}

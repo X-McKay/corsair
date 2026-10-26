@@ -24,7 +24,7 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 | Boundary | Control | Limit |
 | --- | --- | --- |
 | Source admission | Operator-scoped local root; descriptor/no-follow traversal; regular-file, size, count, sensitive-name, and digest checks; deterministic immutable archive | Not remote-SCM trust, malware scanning, or a general secret detector. |
-| Pre-model gates | `target_binding`, `ast_guard`, and `build_replay` run before any model call; a case that cannot be exercised is `UNABLE_TO_RUN` | These gates prove reachability of the recipe, not absence of other weaknesses. |
+| Request binding and target gate | Request load binds `finding.file` to the recipe's module; a finding with no target line, or whose line does not execute in both runs, cannot be decisive (`UNABLE_TO_RUN` / `INCONCLUSIVE`) | The binding proves the demonstration is about the named target, not absence of other weaknesses. A pre-model `target_binding` gate is planned follow-up; today the line binding is enforced at verdict time. |
 | Producer episode | Canonical structured output; bounded model/tool/time budgets; read-only `read_file`/`list_files` and the skills toolset over an immutable snapshot; data-only payload pair | A valid pair can still be the wrong pair; model roles can share correlated failure. |
 | Auditor episode | No tools; outcome-blind packet; structured reject-only output | A non-rejection is not an endorsement and never raises a label. |
 | Probe authoring | The kernel writes the probe from the operator-owned recipe and the proposed payloads; agents cannot alter the recipe, fixed arguments, or assertions | The recipe set is the pilot's scope; it does not generalize to arbitrary findings. |

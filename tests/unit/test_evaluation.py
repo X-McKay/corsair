@@ -65,9 +65,11 @@ def test_negative_abstention_is_not_counted_as_resolution():
     assert row["input_tokens"] is None
 
 
-def test_resolution_keys_on_the_final_verdict_not_the_disposition():
-    """A decisive disposition with no decisive canonical verdict is not a resolution;
-    resolution follows the code-decided label, including the component-scoped one."""
+def test_a_decisive_label_with_no_validated_evidence_is_never_a_resolution():
+    """Resolution follows the code-decided label, but a decisive label with no
+    validated evidence must NOT pass: an empty result (no manifest, no receipts)
+    carrying any decisive verdict fails validation rather than being credited as a
+    resolution. This closes the bypass where a negative label skipped validation."""
     from corsair.contracts import Verdict
 
     # SUPPORTED disposition but no final label recorded -> not resolved.
@@ -85,8 +87,9 @@ def test_resolution_keys_on_the_final_verdict_not_the_disposition():
             resolved,
             Oracle(acceptable=[Disposition.INCONCLUSIVE], acceptable_verdicts=[verdict]),
         )
-        assert row["status"] == "pass"
-        assert row["correctly_resolved"] is True
+        assert row["status"] == "fail"
+        assert row["evidence_valid"] is False
+        assert row["correctly_resolved"] is False
 
     for verdict in (Verdict.INCONCLUSIVE, Verdict.UNABLE_TO_RUN, Verdict.ERROR):
         row = score(
@@ -94,6 +97,117 @@ def test_resolution_keys_on_the_final_verdict_not_the_disposition():
             Oracle(acceptable=[Disposition.INCONCLUSIVE], acceptable_verdicts=[verdict]),
         )
         assert row["correctly_resolved"] is False
+
+
+def test_a_positive_disposition_can_never_aggregate_to_a_negative_label():
+    """A SUPPORTED/CONDITIONAL disposition paired with EXPLOIT_NOT_DEMONSTRATED is a
+    combination the kernel can never produce; evidence validation rejects it."""
+    from corsair.contracts import Verdict
+    from corsair.evaluation.scoring import valid_evidence
+
+    inconsistent = result(Disposition.SUPPORTED).model_copy(
+        update={"verdict": Verdict.EXPLOIT_NOT_DEMONSTRATED}
+    )
+    assert valid_evidence(inconsistent, None) is False
+
+
+def _negative_result(sessions):
+    """Build an EXPLOIT_NOT_DEMONSTRATED result whose rounds carry genuine
+    clean-negative observations (control and exploit both hold, target line covered
+    in both runs, audit accepted), one round per entry of ``sessions`` carrying that
+    entry's session number. The receipt verification that ``validate_saved`` performs
+    is tested in test_evidence; these tests stub it to isolate the new session
+    grouping and admitted-threshold logic in valid_negative_evidence."""
+    from corsair.contracts import (
+        AuditDecision,
+        AuditOutput,
+        AuditResult,
+        ProducerDecision,
+        ProducerOutput,
+        ProducerProposal,
+        RoundResult,
+        Verdict,
+    )
+    from tests.unit.test_evidence import _prepared, _submission
+    from tests.unit.test_verdicts import _clean_negative
+
+    rounds = [
+        RoundResult(
+            index=1,
+            session=session,
+            producer=ProducerOutput(
+                decision=ProducerDecision(root=ProducerProposal(submission=_submission()))
+            ),
+            observation=_clean_negative(),
+            audit=AuditOutput(
+                review=AuditResult(decision=AuditDecision.ACCEPT, rule="ok", reason="clean")
+            ),
+        )
+        for session in sessions
+    ]
+    return InvestigationResult(
+        run_id="neg",
+        case_id=_prepared().case_id,
+        disposition=Disposition.INCONCLUSIVE,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="independent clean negatives",
+        verdict=Verdict.EXPLOIT_NOT_DEMONSTRATED,
+        manifest=_prepared().manifest,
+        rounds=rounds,
+    )
+
+
+def _negative_oracle():
+    from corsair.contracts import Verdict
+
+    return Oracle(
+        acceptable=[Disposition.INCONCLUSIVE],
+        acceptable_verdicts=[Verdict.EXPLOIT_NOT_DEMONSTRATED],
+    )
+
+
+def _accept_saved_receipts(monkeypatch):
+    """Stub validate_saved to accept the receipts (returning the fixture prepared
+    case); the clean-negative determination still runs the real session_verdict."""
+    from corsair.steps.verification import EvidenceVerifier
+    from tests.unit.test_evidence import _prepared
+
+    monkeypatch.setattr(
+        EvidenceVerifier, "validate_saved", lambda self, obs, sub, man, **k: _prepared()
+    )
+
+
+def test_a_negative_label_needs_the_admitted_threshold_of_clean_sessions(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    row = score(_negative_result([1, 2]), _negative_oracle(), store)
+    assert row["status"] == "pass"
+    assert row["evidence_valid"] is True
+    assert row["correctly_resolved"] is True
+
+
+def test_a_single_clean_session_cannot_clear_a_negative_label(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    row = score(_negative_result([1]), _negative_oracle(), store)
+    assert row["status"] == "fail"
+    assert row["evidence_valid"] is False
+
+
+def test_duplicate_session_identity_is_not_counted_as_two_clean_sessions(tmp_path, monkeypatch):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    _accept_saved_receipts(monkeypatch)
+    store = ArtifactStore(tmp_path / "artifacts")
+    # Two clean-negative rounds, but both labelled session 1: one independent
+    # session, so it cannot reach the admitted threshold of two.
+    row = score(_negative_result([1, 1]), _negative_oracle(), store)
+    assert row["status"] == "fail"
+    assert row["evidence_valid"] is False
 
 
 def test_unavailable_cases_remain_in_denominator():

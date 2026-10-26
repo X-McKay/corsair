@@ -1,0 +1,34 @@
+{
+  "schema_version": "corsair.scan_report/1",
+  "scan_completed": true,
+  "vulnerabilities_found": true,
+  "findings": [
+    {
+      "title": "Local template preview server concatenates raw URL into filesystem path",
+      "description": "The developer-only template preview server builds a filesystem path by concatenating the raw request URL onto a base directory without normalization or containment. A request URL containing traversal segments resolves outside the intended template directory, disclosing arbitrary files readable by the server process.",
+      "file": "support/scripts/server.mjs",
+      "line": 5,
+      "category": "Path traversal",
+      "severity": "MEDIUM",
+      "confidence": 0.7,
+      "impact": "An attacker with network reach to the dev preview host can read files outside the template directory on the developer's machine.",
+      "exploit_scenario": "A developer runs the dev-only preview server. An attacker on the same network requests a URL with ../ segments, and the server returns a file outside the template root.",
+      "recommendation": "Resolve the requested path against the template root and reject any resolved path that escapes it; bind the preview server to localhost only.",
+      "preconditions": [
+        "A developer is running the dev-only preview server.",
+        "The attacker has network reachability to the dev host on port 3000."
+      ],
+      "scope": {
+        "application": "Developer template preview tooling",
+        "repositories": [
+          {
+            "name": "notification-templates",
+            "url": "https://github.com/example-org/notification-templates",
+            "branch": "main",
+            "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9001122334"
+          }
+        ]
+      }
+    }
+  ]
+}

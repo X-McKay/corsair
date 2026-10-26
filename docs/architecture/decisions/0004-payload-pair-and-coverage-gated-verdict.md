@@ -21,7 +21,7 @@ Three constraints shape the design. The repository's rules forbid an agent from 
 
 **One ADK episode per Temporal activity.** Each producer or auditor episode is one ordinary activity with a single attempt ([ADR 0001](0001-sdk-owned-durable-rounds.md)); the experimental ADK Temporal plugin is not used.
 
-The verdict is decided by [`policies/verdicts.py`](../../../src/corsair/policies/verdicts.py) in the fixed gate order `target_binding`, `ast_guard`, `build_replay`, `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, `fixed_differential`. The auditor has no tools and can only reject.
+The verdict is decided by [`policies/verdicts.py`](../../../src/corsair/policies/verdicts.py) in the fixed gate order `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation. (Request load already binds `finding.file` to the recipe's module; a pre-model `target_binding` gate that maps a missing/out-of-range line to `UNABLE_TO_RUN` before the first model call is planned follow-up — today that binding is enforced at verdict time.) The auditor has no tools and can only reject.
 
 ## Alternatives considered
 

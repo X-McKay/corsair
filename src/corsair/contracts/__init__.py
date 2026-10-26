@@ -34,6 +34,11 @@ from .evidence import EvidenceInput as EvidenceInput
 from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation
 from .evidence import RoleOutcome as RoleOutcome
+from .intake import Repository as Repository
+from .intake import ScannerClaim as ScannerClaim
+from .intake import ScannerFinding as ScannerFinding
+from .intake import ScannerScope as ScannerScope
+from .intake import ScanReport as ScanReport
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES
 from .results import Disposition as Disposition

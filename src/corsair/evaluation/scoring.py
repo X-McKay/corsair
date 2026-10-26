@@ -19,7 +19,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
-from corsair.policies.verdicts import decide, fix_status
+from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
 
@@ -134,10 +134,60 @@ def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | 
     return False
 
 
+def valid_negative_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
+    """A negative label is only valid when it rests on at least the admitted
+    ``negative_threshold`` of independent, validated clean sessions.
+
+    Each qualifying session must revalidate: its committed receipts verify, the
+    finding's exact line was covered in both runs, the audit accepted, the control
+    held, and the exploit did NOT violate. Receipts are grouped by independent
+    session; a missing manifest, store, or receipt is a validation failure, never a
+    free pass. This is the costliest error to get wrong, so empty or partial
+    evidence can never clear it."""
+    if result.manifest is None or store is None:
+        return False
+    verifier = EvidenceVerifier(Settings(), store)
+    clean_sessions: set[int] = set()
+    for item in result.rounds:
+        observation, audit = item.observation, item.audit
+        submission = item.producer.submission_for_verification()
+        if observation is None or submission is None or audit is None:
+            continue
+        prepared = verifier.validate_saved(observation, submission, result.manifest)
+        if prepared is None or prepared.case_id != result.case_id:
+            continue
+        # The fixed revision is irrelevant to a clean negative; NOT_REQUESTED keeps
+        # the clean-negative gate independent of any fix differential.
+        if session_verdict(prepared, observation, audit, FixStatus.NOT_REQUESTED).clean_negative:
+            clean_sessions.add(item.session)
+    return len(clean_sessions) >= result.manifest.negative_threshold
+
+
+def valid_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
+    """Validate a result's evidence against its code-decided canonical verdict.
+
+    Evidence validation is dispatched by the verdict, not the internal disposition,
+    and disposition/verdict combinations the kernel can never produce are rejected:
+    a positive disposition never aggregates to a negative label, and a positive
+    disposition that did not yield a positive label is inconsistent. Non-decisive
+    labels assert nothing about demonstration, so there is nothing to validate."""
+    verdict = result.verdict
+    positive_disposition = result.disposition in {Disposition.SUPPORTED, Disposition.CONDITIONAL}
+    if verdict in {Verdict.EXPLOIT_DEMONSTRATED, Verdict.COMPONENT_EXPLOIT_DEMONSTRATED}:
+        return positive_disposition and valid_positive_evidence(result, store)
+    if verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED:
+        return not positive_disposition and valid_negative_evidence(result, store)
+    # No decisive label. A positive disposition still asserts a demonstration and must
+    # carry validated positive evidence (the legacy disposition-only path); any other
+    # non-decisive outcome asserts nothing to validate.
+    if positive_disposition:
+        return valid_positive_evidence(result, store)
+    return True
+
+
 def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | None = None) -> dict:
     """One final-policy result, including invalid evidence and operational failures."""
-    positive = result.disposition in {Disposition.SUPPORTED, Disposition.CONDITIONAL}
-    evidence_valid = valid_positive_evidence(result, store) if positive else True
+    evidence_valid = valid_evidence(result, store)
     allowed = result.disposition in oracle.acceptable and result.disposition not in oracle.forbidden
     fix_correct = oracle.expected_fix is None or result.fix_status == oracle.expected_fix
     if result.fix_status in {FixStatus.DEMONSTRATION_BLOCKED, FixStatus.NOT_BLOCKED}:

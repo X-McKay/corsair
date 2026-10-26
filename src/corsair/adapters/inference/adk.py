@@ -227,7 +227,11 @@ def _producer_prompt(producer_input: ProducerInput) -> str:
 
     prepared = producer_input.prepared
     packet = {
-        "finding": prepared.finding.model_dump(mode="json"),
+        # The scanner's untrusted self-assessment (severity, confidence, its own
+        # exploit narrative) is excluded: the producer is grounded only in the
+        # finding's title/description/file/line and the admitted source, never in
+        # what the upstream scanner claimed about the finding.
+        "finding": prepared.finding.model_dump(mode="json", exclude={"scanner"}),
         "recipe_public_configuration": prepared.recipe.model_dump(mode="json"),
         "source_excerpt": _bounded_text(prepared.source_excerpt),
         "round": {
@@ -253,7 +257,9 @@ def _auditor_prompt(audit_input: AuditInput) -> str:
     """Build the auditor's exact outcome-blind whitelist packet."""
 
     packet = {
-        "finding": audit_input.finding.model_dump(mode="json"),
+        # As for the producer, the scanner's self-assessment never reaches the
+        # outcome-blind auditor; it judges the pair on the finding and source alone.
+        "finding": audit_input.finding.model_dump(mode="json", exclude={"scanner"}),
         "recipe_public_configuration": audit_input.recipe.model_dump(mode="json"),
         "source_excerpt": _bounded_text(audit_input.source_excerpt),
         "submission": audit_input.submission.model_dump(mode="json"),
