@@ -74,6 +74,7 @@ assert files('corsair.agents.producer').joinpath('skills/source-grounding/SKILL.
 assert files('corsair.agents.auditor').joinpath('skills/semantic-review/SKILL.md').is_file()
 assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()
 assert files('corsair.adapters.sandboxing').joinpath('driver.py').is_file()
+assert files('corsair.adapters.sandboxing').joinpath('drivers/javascript/driver.mjs').is_file()
 assert parser().parse_args(['report', 'report.json']).command == 'report'
 assert callable(load_investigation_request)
 assert callable(normalize_request_sources)

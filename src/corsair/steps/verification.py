@@ -377,7 +377,7 @@ class EvidenceVerifier:
                 )
             # Ensure image availability before starting the first role. There is no
             # fake/non-Docker success path.
-            _ = self.sandbox.image_id
+            _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:

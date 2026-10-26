@@ -23,7 +23,8 @@ All contracts are frozen, reject unknown fields, and disallow non-finite floats.
 | `temporal_address` | `localhost:7233` | Temporal SDK connection address. |
 | `temporal_namespace` | `default` | Temporal namespace passed to the SDK client. |
 | `task_queue` | `corsair` | Queue used when workflows are started and when the worker polls. |
-| `image` | `corsair-python:0.1` | Docker image reference used by the trusted sandbox adapter. |
+| `image` | `corsair-python:0.1` | Default Docker image for the trusted sandbox adapter; the fallback for a recipe kind absent from `images`. |
+| `images` | Python and JavaScript image tags keyed by recipe kind | Maps each recipe `kind` to its trusted image tag (e.g. `javascript.prototype_pollution/1` → `corsair-javascript:0.1`). `DockerSandbox` resolves the tag by the case's recipe kind; `just images` builds every `deploy/*/Dockerfile`. |
 | `runtime` | `runc` | Docker runtime name used by the sandbox adapter. |
 | `memory_limit` | `512m` | Docker memory-limit string. |
 | `nano_cpus` | `1000000000` | Integer, at least `100000000`. |

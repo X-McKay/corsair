@@ -33,11 +33,13 @@ def _directory(path: str, *, writable=False) -> str:
 def _docker(settings: Settings) -> str:
     with closing(docker.from_env(timeout=5)) as client:
         client.ping()
-        image = client.images.get(settings.image)
+        tags = sorted({settings.image, *settings.images.values()})
+        resolved = {tag: str(client.images.get(tag).id) for tag in tags}
         runtimes = client.info().get("Runtimes", {})
         if settings.runtime not in runtimes:
             raise ValueError(f"configured runtime {settings.runtime} is not registered")
-        return f"Daemon reachable; runtime={settings.runtime}; image={image.id}"
+        images = "; ".join(f"{tag}={image_id}" for tag, image_id in resolved.items())
+        return f"Daemon reachable; runtime={settings.runtime}; images={images}"
 
 
 def _failed_check(name: str, error: Exception) -> dict:

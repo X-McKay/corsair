@@ -19,6 +19,37 @@ The common `ci.yml` runs Linux amd64 jobs and a `macos-26` Apple Silicon job. Bo
 
 Hosted macOS ARM runners do not support nested virtualization. CI therefore does not pretend to run Docker Desktop/Colima there or silently substitute a mock daemon. Full Docker-chain qualification on a physical Apple Silicon Mac with its chosen VM is a separate operator gate. Tooling and host tests alone do not establish it.
 
+## Runtime images per recipe kind
+
+Each recipe kind selects its own reviewed image through `Settings.images` (see
+[configuration](configuration.md)); `just images` builds every `deploy/*/Dockerfile`.
+The Python secret-disclosure recipe uses `corsair-python:0.1`; the JavaScript
+prototype-pollution recipe uses `corsair-javascript:0.1`. Both apply the identical
+`DockerSandbox` isolation (read-only, offline, dropped capabilities, no-new-privileges,
+CPU/memory/PID limits, immutable-identity cleanup). Image selection is a one-line mapping,
+not a code path.
+
+### JavaScript prototype pollution (Linux amd64)
+
+The `javascript.prototype_pollution/1` recipe is qualified on **Linux amd64 only**, on one
+real corpus row (`prototypepollution-a`). Its evidence:
+
+- Image `corsair-javascript:0.1` from `deploy/javascript/Dockerfile`, pinned
+  `node:22.23.3-bookworm-slim` by digest; the trusted driver
+  `drivers/javascript/driver.mjs` runs `node --test` with the JUnit reporter and
+  `NODE_V8_COVERAGE` line coverage, with no npm install and no network at run time.
+- `corsair verify` on the frozen v3 row:
+  `evals/datasets/chain/javascript/prototypepollution-a-v3/` — control held (exit 0,
+  target line 2 covered), adversarial violated (exit 1, target line covered), cleanup
+  confirmed, no security verdict rendered.
+- `tests/integration/test_docker_javascript.py` (marker `docker`): control+violation,
+  safe-variant hold, unexpected-exception error, absent-coverage invalid, and cleanup.
+- Measured per-role container time ~0.16 s on the implementation host.
+
+macOS arm64 and the full live chain for this recipe are **unrun**. A `node --test` run
+produces machine-readable line coverage from V8 directly; no second test or coverage
+engine is added.
+
 ## Docker on a physical Mac
 
 Docker Desktop or Colima supplies the Linux VM/daemon. Nix provides the Docker client, not the daemon. If using Colima:

@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the running runtime; a first JavaScript recipe (`javascript.prototype_pollution/1`) is qualified on Linux amd64 on one corpus row (`prototypepollution-a`); Java, Ruby and Perl rows are carried in the corpus matrix only | Capability depth comes from concrete, tested operator-owned recipes; a new language is a discriminated `Case.recipe` union member with its own trusted driver and image, not a generic adapter. macOS arm64 and the live chain for JavaScript are unrun. |
 
 ## Gates and environment
 
@@ -33,6 +33,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 | `just test-docker`, `just test-temporal` | rig | not yet recorded |
 | `just test-live`, composed live batch | rig | not yet recorded |
 | Isolated producer/auditor baselines on the six labels | rig | not yet promoted |
+| JavaScript recipe `corsair verify` + `test_docker_javascript.py` (Linux amd64) | rig | run: control held / adversarial violated on `prototypepollution-a`, 4 Docker tests pass, cleanup confirmed, ~0.16 s/role; live chain unrun ([platforms](../../reference/platforms.md#javascript-prototype-pollution-linux-amd64)) |
 
 ## Open decisions awaiting the owner
 
