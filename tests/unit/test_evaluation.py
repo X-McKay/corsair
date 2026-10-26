@@ -123,6 +123,7 @@ def _negative_result(sessions):
         AuditDecision,
         AuditOutput,
         AuditResult,
+        AuditRule,
         ProducerDecision,
         ProducerOutput,
         RoundResult,
@@ -140,7 +141,9 @@ def _negative_result(sessions):
             ),
             observation=_clean_negative(),
             audit=AuditOutput(
-                review=AuditResult(decision=AuditDecision.ACCEPT, rule="ok", reason="clean")
+                review=AuditResult(
+                    decision=AuditDecision.ACCEPT, rule=AuditRule.ALL, reason="clean"
+                )
             ),
         )
         for session in sessions
@@ -294,6 +297,7 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
         AuditDecision,
         AuditOutput,
         AuditResult,
+        AuditRule,
         Observation,
         ProducerDecision,
         ProducerOutput,
@@ -344,7 +348,7 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
                     observation=observation,
                     audit=AuditOutput(
                         review=AuditResult(
-                            decision=AuditDecision.ACCEPT, rule="fabricated", reason="fabricated"
+                            decision=AuditDecision.ACCEPT, rule=AuditRule.ALL, reason="fabricated"
                         )
                     ),
                 )

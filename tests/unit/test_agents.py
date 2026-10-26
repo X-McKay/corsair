@@ -33,6 +33,7 @@ from corsair.contracts import (
     AuditDecision,
     AuditInput,
     AuditResult,
+    AuditRule,
     Budget,
     Finding,
     PlanRevision,
@@ -434,6 +435,66 @@ async def test_auditor_is_fresh_tool_free_one_request_and_rejects_malformed_outp
     assert model.requests[0].config.max_output_tokens == 512
 
 
+# Pairs whose rule is not a rubric id or does not match the decision: ACCEPT names ALL, and
+# REJECT or INSUFFICIENT_CONTEXT names the single decisive id R1 to R4.
+_INCOHERENT_AUDITS = [
+    ("ACCEPT", "R1"),
+    ("ACCEPT", "made-up"),
+    ("REJECT", "R2, R3"),
+    ("REJECT", "R2 differential"),
+    ("REJECT", "ALL"),
+    ("INSUFFICIENT_CONTEXT", "ALL"),
+    ("INSUFFICIENT_CONTEXT", "grounded"),
+]
+
+
+@pytest.mark.parametrize(("decision", "rule"), _INCOHERENT_AUDITS)
+def test_audit_result_rejects_a_rule_that_is_not_bound_to_its_decision(decision, rule):
+    with pytest.raises(ValidationError):
+        AuditResult.model_validate({"decision": decision, "rule": rule, "reason": "line 2"})
+
+
+@pytest.mark.parametrize(
+    ("decision", "rule"),
+    [("ACCEPT", "ALL")]
+    + [(decision, f"R{n}") for decision in ("REJECT", "INSUFFICIENT_CONTEXT") for n in range(1, 5)],
+)
+def test_audit_result_admits_each_coherent_decision_and_rubric_id(decision, rule):
+    review = AuditResult.model_validate({"decision": decision, "rule": rule, "reason": "line 2"})
+    assert review.rule is AuditRule(rule)
+
+
+def test_audit_result_schema_declares_the_closed_rubric_ids():
+    # The enum reaches the declared output_schema, so constrained decoding can only emit
+    # a rubric id; the decision binding is enforced when the output is validated.
+    schema = AuditResult.model_json_schema()
+    assert schema["properties"]["rule"] == {"$ref": "#/$defs/AuditRule"}
+    assert schema["$defs"]["AuditRule"]["enum"] == ["R1", "R2", "R3", "R4", "ALL"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("decision", "rule"), _INCOHERENT_AUDITS)
+async def test_auditor_incoherent_rule_is_invalid_audit_feedback_not_a_review(
+    tmp_path: Path, decision: str, rule: str
+):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted",
+        responses=[
+            text_response(json.dumps({"decision": decision, "rule": rule, "reason": "line 2"}))
+        ],
+    )
+
+    output = await run_auditor(_audit_input(store, max_output_tokens=512), ModelSettings(), model)
+
+    # Fail closed on the existing non-operational path; the episode is not repaired.
+    assert output.review is None
+    assert output.feedback is not None
+    assert output.feedback.gate == "audit_invalid"
+    assert output.feedback.operational is False
+    assert output.usage.llm_calls == 1
+
+
 def test_role_prompts_exclude_oracles_case_paths_private_secret_and_audit_outcomes(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     producer_input = _producer_input(store)
@@ -757,9 +818,7 @@ async def test_standalone_audit_cap_defaults_to_the_request_budget_default(tmp_p
         model="scripted",
         responses=[
             text_response(
-                json.dumps(
-                    {"decision": AuditDecision.ACCEPT, "rule": "grounded", "reason": "grounded"}
-                )
+                json.dumps({"decision": AuditDecision.ACCEPT, "rule": "ALL", "reason": "grounded"})
             )
         ],
     )

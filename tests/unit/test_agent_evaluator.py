@@ -8,6 +8,7 @@ from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     AuditResult,
+    AuditRule,
     Feedback,
     MatchKind,
     PlanRevision,
@@ -79,7 +80,7 @@ def test_frozen_fixture_is_read_once_and_returns_verified_bytes(tmp_path, monkey
 
 def test_auditor_fixture_acceptance_does_not_claim_native_evidence():
     output = AuditOutput(
-        review=AuditResult(decision=AuditDecision.ACCEPT, rule="test", reason="test")
+        review=AuditResult(decision=AuditDecision.ACCEPT, rule=AuditRule.ALL, reason="test")
     )
     assert fixture_matches_oracle(output, {"decision": "ACCEPT"})
     assert not fixture_matches_oracle(output, {"decision": "REJECT"})
@@ -191,7 +192,9 @@ def test_auditor_row_attributes_the_decisive_rubric_rule_without_changing_the_pa
         )
 
     rejected = AuditOutput(
-        review=AuditResult(decision=AuditDecision.REJECT, rule="R1", reason="false mechanism")
+        review=AuditResult(
+            decision=AuditDecision.REJECT, rule=AuditRule.R1, reason="false mechanism"
+        )
     )
     # A model-chosen rule never decides the pass: a REJECT matches a REJECT oracle
     # whatever id it cites, and mismatches an ACCEPT oracle.

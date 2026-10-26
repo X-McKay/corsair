@@ -81,7 +81,7 @@ class ReferenceModel(BaseLlm):
                 json.dumps(
                     {
                         "decision": "ACCEPT",
-                        "rule": "source-grounded-fixture",
+                        "rule": "ALL",
                         "reason": "The paired payloads exercise the configured file-access seam",
                     }
                 )

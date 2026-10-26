@@ -11,6 +11,7 @@ from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     AuditResult,
+    AuditRule,
     Budget,
     EvidenceInput,
     Finding,
@@ -155,7 +156,8 @@ def _input(operation_id: str = "operation") -> EvidenceInput:
 
 
 def _audit(decision: AuditDecision = AuditDecision.ACCEPT) -> AuditOutput:
-    return AuditOutput(review=AuditResult(decision=decision, rule="evidence", reason="reviewed"))
+    rule = AuditRule.ALL if decision is AuditDecision.ACCEPT else AuditRule.R1
+    return AuditOutput(review=AuditResult(decision=decision, rule=rule, reason="reviewed"))
 
 
 def test_evidence_reconciles_committed_result_without_rerunning(tmp_path: Path) -> None:

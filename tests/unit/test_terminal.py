@@ -654,6 +654,7 @@ def _demonstrated_result():
     from corsair.contracts import (
         ArtifactRef,
         AuditDecision,
+        AuditRule,
         Disposition,
         ExecutionStatus,
         InvestigationResult,
@@ -682,7 +683,7 @@ def _demonstrated_result():
                     ),
                 ),
                 observation=_observation(RoleOutcome.VIOLATION),
-                audit=_audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+                audit=_audit(AuditDecision.ACCEPT, AuditRule.ALL),
             )
         ],
         result_artifact=ArtifactRef(sha256="9" * 64, size=2048),
@@ -692,6 +693,7 @@ def _demonstrated_result():
 def _inconclusive_result():
     from corsair.contracts import (
         AuditDecision,
+        AuditRule,
         Disposition,
         ExecutionStatus,
         Feedback,
@@ -707,7 +709,7 @@ def _inconclusive_result():
         index=1,
         producer=ProducerOutput(decision=_proposal(), usage=Usage(llm_calls=2, tool_calls=1)),
         observation=_observation(RoleOutcome.VIOLATION),
-        audit=_audit(AuditDecision.REJECT, "payload-not-grounded"),
+        audit=_audit(AuditDecision.REJECT, AuditRule.R2),
     )
     held = RoundResult(
         index=2,
@@ -718,7 +720,7 @@ def _inconclusive_result():
             feedback=Feedback(gate="audit", reason="FEEDBACK-REASON-SENTINEL"),
         ),
         observation=_observation(RoleOutcome.HELD, operation_id="run2.s2.r2"),
-        audit=_audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+        audit=_audit(AuditDecision.ACCEPT, AuditRule.ALL),
     )
     return InvestigationResult(
         run_id="run2",
@@ -760,7 +762,7 @@ def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys,
     assert "SUPPORTED" in output and "COMPLETED" in output and "component" in output
     assert "held" in output and "violated" in output
     assert "L12-14, 20 " in output and "L12-14, 20-21" in output
-    assert "ACCEPT" in output and "differential-is-relevant" in output
+    assert "ACCEPT" in output and "ALL" in output
     assert "3 llm · 4 tool" in output and "1200/210 tok" in output
     assert "scripted-producer" in output and "sha256:555555555555" in output
     # Totals come from the shared scoring calculation: producer plus audit usage.
@@ -774,7 +776,7 @@ def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(caps
     output = _human(capsys, _inconclusive_result(), "--no-color")
 
     assert output.index("INCONCLUSIVE") < output.index("Rounds")
-    assert "REJECT" in output and "payload-not-grounded" in output
+    assert "REJECT" in output and "R2" in output
     assert "gate: audit" in output
     assert "2.2" in output  # session 2, round 2
     assert "tokens unknown" in output
@@ -954,7 +956,7 @@ def test_human_result_names_each_round_stop_and_the_case_stop_without_model_text
     capsys, monkeypatch, tmp_path
 ):
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.contracts import AuditDecision, ProducerDecision
+    from corsair.contracts import AuditDecision, AuditRule, ProducerDecision
     from corsair.contracts import ProducerOutput as Output
     from tests.unit import test_gate_ledger as ledger_cases
     from tests.unit.test_verdicts import _HELD, _VIOLATION
@@ -969,7 +971,7 @@ def test_human_result_names_each_round_stop_and_the_case_stop_without_model_text
             ledger_cases._round(
                 ledger_cases._proposal(),
                 _pair(_HELD, _VIOLATION),
-                _audit(AuditDecision.REJECT, "payload-not-grounded"),
+                _audit(AuditDecision.REJECT, AuditRule.R2),
                 index=2,
             ),
         ],
@@ -1011,7 +1013,7 @@ def test_human_result_without_receipt_verification_marks_kernel_rounds_unverifie
 def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_reason(
     capsys, monkeypatch
 ):
-    from corsair.contracts import AuditDecision, ExecutionStatus, Verdict
+    from corsair.contracts import AuditDecision, AuditRule, ExecutionStatus, Verdict
     from tests.unit import test_gate_ledger as ledger_cases
     from tests.unit.test_verdicts import _HELD, _VIOLATION
     from tests.unit.test_verdicts import _observation as _pair
@@ -1024,7 +1026,7 @@ def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_rea
             ledger_cases._round(
                 ledger_cases._proposal(),
                 _pair(_HELD, _VIOLATION),
-                _audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+                _audit(AuditDecision.ACCEPT, AuditRule.ALL),
             )
         ],
         verdict=Verdict.EXPLOIT_DEMONSTRATED,

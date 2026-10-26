@@ -12,6 +12,7 @@ from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     AuditResult,
+    AuditRule,
     Budget,
     Disposition,
     EvidenceInput,
@@ -39,15 +40,16 @@ from tests.unit.test_verdicts import _HELD, _VIOLATION, _clean_negative, _observ
 
 # Model-authored or free-text fields that must never appear in an explanation.
 AUDIT_REASON = "auditor-private-reason-7f3"
-AUDIT_RULE = "auditor-private-rule-7f3"
 ABSTENTION = "producer-private-abstention-7f3"
 FEEDBACK = "adapter-private-feedback-7f3"
 RESULT_REASON = "result-private-reason-7f3"
-MARKERS = (AUDIT_REASON, AUDIT_RULE, ABSTENTION, FEEDBACK, RESULT_REASON, *PRIVATE)
+MARKERS = (AUDIT_REASON, ABSTENTION, FEEDBACK, RESULT_REASON, *PRIVATE)
 
 
 def _audit(decision: AuditDecision = AuditDecision.ACCEPT) -> AuditOutput:
-    return AuditOutput(review=AuditResult(decision=decision, rule=AUDIT_RULE, reason=AUDIT_REASON))
+    # The rule is a closed rubric id bound to the decision, so it carries no model text.
+    rule = AuditRule.ALL if decision is AuditDecision.ACCEPT else AuditRule.R1
+    return AuditOutput(review=AuditResult(decision=decision, rule=rule, reason=AUDIT_REASON))
 
 
 def _explain(result: InvestigationResult, *keys: tuple[int, int]) -> list[dict]:

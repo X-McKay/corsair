@@ -145,10 +145,30 @@ class AuditDecision(StrEnum):
     INSUFFICIENT = "INSUFFICIENT_CONTEXT"
 
 
+class AuditRule(StrEnum):
+    """The auditor rubric's decisive rule ids; ``ALL`` marks an acceptance."""
+
+    R1 = "R1"
+    R2 = "R2"
+    R3 = "R3"
+    R4 = "R4"
+    ALL = "ALL"
+
+
 class AuditResult(Contract):
     decision: AuditDecision
-    rule: str = Field(min_length=1, max_length=200)
+    # A closed enum in the declared output schema, bound to the decision below: ACCEPT
+    # names ALL; REJECT and INSUFFICIENT_CONTEXT name the single decisive id R1 to R4.
+    rule: AuditRule
     reason: str = Field(min_length=1, max_length=4000)
+
+    @model_validator(mode="after")
+    def rule_matches_decision(self) -> AuditResult:
+        if (self.decision is AuditDecision.ACCEPT) != (self.rule is AuditRule.ALL):
+            raise ValueError(
+                "rule must be ALL for ACCEPT and one of R1 to R4 for REJECT or INSUFFICIENT_CONTEXT"
+            )
+        return self
 
 
 class AuditInput(Contract):
