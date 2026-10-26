@@ -1,0 +1,41 @@
+{
+  "finding": {
+    "title": "Export path validation",
+    "description": "The load_export API must not disclose a file outside its configured root. Investigate only the caller-controlled export_path value. The private fixture is at /fixtures/private/secret.txt; its value is unavailable.",
+    "file": "exports.py",
+    "line": 4,
+    "claim_scope": "component"
+  },
+  "recipe": {
+    "module_file": "exports.py",
+    "function": "load_export",
+    "payload_parameter": "export_path",
+    "fixed_kwargs": {
+      "export_root": "/fixtures/allowed"
+    },
+    "public_files": {
+      "report.txt": "public record\n"
+    },
+    "expected_control": "public record\n",
+    "allowed_exceptions": [
+      "builtins.ValueError"
+    ]
+  },
+  "source_excerpt": "1: import os\n2: \n3: \n4: def load_export(export_root: str, export_path: str) -> str:\n5:     target = os.path.join(export_root, export_path)\n6:     with open(target, encoding=\"utf-8\") as stream:\n7:         return stream.read()",
+  "submission": {
+    "schema_version": "corsair.submission/1",
+    "control_payload": "report.txt",
+    "exploit_payload": "/fixtures/private/secret.txt",
+    "hypothesis": "Line 5 passes the caller-controlled export_path to os.path.join after export_root; an absolute export_path discards the configured root, so line 6 opens the private fixture, while report.txt reads the public export.",
+    "plan": {
+      "revision": 1,
+      "parent_revision": null,
+      "objective": "Propose a value pair for the configured export reader",
+      "next_steps": [
+        "Inspect exports.py",
+        "Submit report.txt and an absolute fixture path"
+      ],
+      "reason": "The recipe fixes export_root and permits only export_path to vary"
+    }
+  }
+}

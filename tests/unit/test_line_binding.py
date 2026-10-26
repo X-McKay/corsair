@@ -20,6 +20,7 @@ from corsair.contracts import (
     Finding,
     FixStatus,
     InvestigationRequest,
+    LineProvenance,
     PreparedCase,
     PythonRecipe,
     RoleOutcome,
@@ -27,6 +28,7 @@ from corsair.contracts import (
     Verdict,
 )
 from corsair.policies.line_binding import bind_target_line
+from corsair.policies.target_binding import derive_target_line
 from corsair.policies.verdicts import session_verdict
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
@@ -253,6 +255,27 @@ def test_the_frozen_case01_line_binds_to_itself():
     assert bind_target_line(text, 4) == 4
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "def read(root, path):\n    return path\n",
+        (
+            'def read(root, path):\n    """Doc."""\n    global STATE\n'
+            "    value = (\n        path\n    )\n"
+        ),
+        (
+            "import os\n\n\ndef read(\n    root,\n    path,\n):\n"
+            "    # note\n\n    return os.path.join(root, path)\n"
+        ),
+    ],
+)
+def test_a_line_derived_for_a_line_less_finding_passes_through_unchanged(text):
+    recipe = PythonRecipe(module_file="reader.py", function="read", payload_parameter="path")
+    derived = derive_target_line(recipe, text)
+    assert derived is not None
+    assert bind_target_line(text, derived) == derived
+
+
 # --- the contract: declared and bound lines are both recorded -------------------------
 
 
@@ -307,7 +330,7 @@ async def test_prepare_records_the_declared_and_the_bound_line(tmp_path):
         fixed_kwargs={"root": "/fixtures/allowed"},
     )
 
-    def request(line: int) -> InvestigationRequest:
+    def request(line: int | None) -> InvestigationRequest:
         finding = Finding(title="read", description="test", file="reader.py", line=line)
         return InvestigationRequest(
             case=Case(
@@ -319,6 +342,9 @@ async def test_prepare_records_the_declared_and_the_bound_line(tmp_path):
     assert (on_def.finding.line, on_def.target_line, on_def.bound_line) == (3, 4, 4)
     on_body = await ActivityEnvironment().run(activities.prepare, request(4))
     assert (on_body.finding.line, on_body.target_line) == (4, 4)
+    derived = await ActivityEnvironment().run(activities.prepare, request(None))
+    assert derived.line_provenance is LineProvenance.RECIPE_FUNCTION
+    assert (derived.finding.line, derived.target_line) == (4, 4)
 
 
 def _def_line_case() -> PreparedCase:

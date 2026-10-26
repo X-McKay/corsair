@@ -5,15 +5,16 @@ from corsair.contracts import (
     DIAGNOSTIC_TRUNCATION_MARKER,
     MAX_DIAGNOSTIC_TEXT_CHARS,
     MAX_TERMINAL_ROUNDS,
+    MAX_TERMINAL_TIMELINE,
     ArtifactRef,
     Disposition,
     ExecutionStatus,
     InvestigationResult,
     Observation,
+    PhaseTransition,
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -66,7 +67,7 @@ def _result() -> InvestigationResult:
             RoundResult(
                 index=1,
                 producer=ProducerOutput(
-                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    decision=ProducerDecision(kind="proposal", submission=submission)
                 ),
                 observation=observation,
             )
@@ -103,7 +104,7 @@ def test_terminal_formatter_revalidates_model_copy_without_truncating_operation_
     oversized_round = result.rounds[0].model_copy(
         update={
             "producer": ProducerOutput(
-                decision=ProducerDecision(root=ProducerProposal(submission=oversized_submission))
+                decision=ProducerDecision(kind="proposal", submission=oversized_submission)
             )
         }
     )
@@ -152,3 +153,29 @@ def test_terminal_formatter_preserves_valid_empty_observation_diagnostics():
     formatted = format_terminal_result(altered).rounds[0].observation
     assert formatted is not None and formatted.control is not None
     assert formatted.control.reason == ""
+
+
+def test_a_result_recorded_before_the_timeline_field_decodes_to_an_empty_timeline():
+    legacy = _result().model_dump(mode="json")
+    legacy.pop("timeline")
+
+    decoded = InvestigationResult.model_validate(legacy)
+
+    assert decoded.timeline == []
+    assert decoded.model_dump(mode="json") == {**legacy, "timeline": []}
+
+
+def test_terminal_formatter_keeps_a_bounded_phase_timeline():
+    transitions = [
+        {"phase": "producer", "session": 1, "round": index, "at": "2026-10-25T12:00:00+00:00"}
+        for index in range(1, MAX_TERMINAL_TIMELINE + 1)
+    ]
+    timeline = [PhaseTransition.model_validate(entry) for entry in transitions]
+
+    formatted = format_terminal_result(_result().model_copy(update={"timeline": timeline}))
+
+    assert formatted.timeline == timeline
+    with pytest.raises(ValueError, match="timeline"):
+        format_terminal_result(_result().model_copy(update={"timeline": [*timeline, timeline[-1]]}))
+    with pytest.raises(ValidationError):
+        PhaseTransition(phase="free text with spaces", session=1, round=1)

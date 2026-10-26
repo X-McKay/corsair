@@ -31,7 +31,7 @@ class CliArguments(argparse.Namespace):
 
     command: str
     settings: str | None
-    format: Literal["auto", "human", "json"]
+    format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
     log_format: Literal["text", "json"]
@@ -56,6 +56,10 @@ class CliArguments(argparse.Namespace):
     case: str | None
     limit: int | None
     evidence: bool
+    model: bool
+    dataset_command: str
+    datasets: list[str]
+    fix_digests: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -80,6 +84,16 @@ def _result_from_store(store: ArtifactStore, identity: str) -> InvestigationResu
     if ref is None:
         raise ValueError("No committed result; use --online to query the Temporal workflow")
     return InvestigationResult.model_validate(store.get_json(ref))
+
+
+def _existing_store(settings: Settings) -> ArtifactStore | None:
+    """The local artifact store only when it already exists, so opening creates nothing."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    root = Path(settings.artifact_root)
+    if not ((root / "blobs").is_dir() and (root / "operations").is_dir()):
+        return None
+    return ArtifactStore(root)
 
 
 def _score_saved_result(
@@ -128,9 +142,12 @@ async def _handle_doctor(args: CliArguments, ui: Terminal) -> int:
     """Run the read-only infrastructure diagnosis."""
     from corsair.entrypoints.diagnostics import diagnose
 
-    report = await ui.wait(
-        diagnose(_settings(args)), "Checking real Docker and Temporal infrastructure"
+    message = (
+        "Checking real Docker, Temporal and model provider routes"
+        if args.model
+        else "Checking real Docker and Temporal infrastructure"
     )
+    report = await ui.wait(diagnose(_settings(args), model=args.model), message)
     ui.emit(report)
     return 0 if report["ready"] else 1
 
@@ -228,7 +245,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
             ui.emit(inspect_evidence(store, result))
         else:
-            ui.emit(result)
+            ui.emit(result, store=store)
         return 0
 
     from corsair.adapters.temporal.client import connect, wait_for_result
@@ -299,7 +316,8 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
         f"Investigation {handle.id}",
         query=lambda: handle.query(InvestigationWorkflow.status),
     )
-    ui.emit(result)
+    # A worker sharing this host's artifact root lets the human view verify the ledger.
+    ui.emit(result, store=_existing_store(settings) if ui.human else None)
     event(
         "investigation.completed",
         run_id=handle.id,
@@ -380,6 +398,18 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
+async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
+    """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
+    from corsair.evaluation.datasets import validate_datasets
+
+    settings = _settings(args) if args.settings else None
+    report = validate_datasets(
+        [Path(path) for path in args.datasets], settings, fix=args.fix_digests
+    )
+    ui.emit(report)
+    return 0 if report["valid"] else 1
+
+
 async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     """List committed results from the artifact store without contacting services."""
     from corsair.adapters.storage.filesystem import ArtifactStore
@@ -403,6 +433,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "investigate": _handle_investigate,
     "eval": _handle_eval,
     "rescore": _handle_rescore,
+    "dataset": _handle_dataset,
 }
 
 
@@ -433,9 +464,9 @@ def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = F
     )
     parser.add_argument(
         "--format",
-        choices=("auto", "human", "json"),
+        choices=("auto", "human", "json", "markdown"),
         default="auto" if defaults else argparse.SUPPRESS,
-        help="auto: human on a terminal, JSON in pipes",
+        help="auto: human on a terminal, JSON in pipes; markdown: report/compare records",
     )
     parser.add_argument(
         "--no-color", action="store_true", default=False if defaults else argparse.SUPPRESS
@@ -465,7 +496,8 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--version", action="version", version="%(prog)s 0.1.0")
     sub = root.add_subparsers(dest="command", required=True, title="commands")
     descriptions = {
-        "doctor": "Check actual Docker, namespace and worker poller readiness; no model calls",
+        "doctor": "Check actual Docker, namespace and worker poller readiness; "
+        "--model also probes the model routes",
         "worker": "Run the native Temporal worker; Ctrl+C stops gracefully",
         "investigate": "Submit a durable investigation; use --wait for live phase updates",
         "inspect": "Read a committed result or query/watch the native Temporal workflow",
@@ -476,11 +508,17 @@ def parser() -> argparse.ArgumentParser:
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
+        "dataset": "Check frozen evaluation datasets offline; no model, target or services",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
         commands[name] = sub.add_parser(name, help=description, description=description)
         _presentation_options(commands[name])
+    commands["doctor"].add_argument(
+        "--model",
+        action="store_true",
+        help="Also send minimal requests (32-token text, one trivial tool) to each role model",
+    )
     investigate = commands["investigate"]
     investigate.add_argument(
         "request", help="Case request JSON; source paths relative to this file"
@@ -523,6 +561,18 @@ def parser() -> argparse.ArgumentParser:
         "--allow-dataset-mismatch",
         action="store_true",
         help="Compare reports over different or undeclared frozen dataset digests",
+    )
+    datasets = commands["dataset"].add_subparsers(
+        dest="dataset_command", required=True, title="dataset commands"
+    )
+    validate_help = "Verify digests, requests, sources, target binding and oracle consistency"
+    validate = datasets.add_parser("validate", help=validate_help, description=validate_help)
+    _presentation_options(validate)
+    validate.add_argument("datasets", nargs="+", metavar="DATASET", help="Dataset manifest JSON")
+    validate.add_argument(
+        "--fix-digests",
+        action="store_true",
+        help="Rewrite only stale manifest digests of otherwise valid entries",
     )
     return root
 

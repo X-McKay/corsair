@@ -1,16 +1,15 @@
-"""Producer agent construction with episode-private source tools and skills."""
+"""Producer agent construction with episode-private source tools and a preloaded procedure."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, cast
+from typing import Any
 
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
 from google.adk.skills import Skill
-from google.adk.tools.skill_toolset import SkillToolset
 
-from corsair.agents.resources import load_agent_spec, prompt_text
+from corsair.agents.resources import load_agent_spec, load_runtime_skills, prompt_text
 
 from .contracts import ProducerDecision
 
@@ -34,33 +33,24 @@ def producer_instruction(skills: Sequence[Skill]) -> str:
     )
 
 
-def build_producer(
-    model: str | BaseLlm,
-    tools: Sequence[Callable[..., Any] | SkillToolset],
-) -> LlmAgent:
-    """Build the producer from its two bound source tools and native skill loader."""
+def build_producer(model: str | BaseLlm, tools: Sequence[Callable[..., Any]]) -> LlmAgent:
+    """Build the producer from exactly its two bound source tools and preloaded procedure."""
 
     selected_tools = list(tools)
     spec = load_agent_spec("producer")
-    source_count = len(spec.source_tools)
-    source_candidates = selected_tools[:source_count]
-    loader_tools = selected_tools[source_count:]
-    if len(loader_tools) != 1 or not isinstance(loader_tools[0], SkillToolset):
-        raise ValueError("producer must receive exactly one native SkillToolset")
-    if any(not callable(tool) for tool in source_candidates):
+    if spec.loader_tools or spec.tools != spec.source_tools:
+        raise ValueError("producer metadata must grant only its source tools")
+    if any(not callable(tool) for tool in selected_tools):
         raise ValueError("producer source tools must be native callables")
-    source_tools = [cast(Callable[..., Any], tool) for tool in source_candidates]
-    names = [_tool_name(tool) for tool in source_tools]
-    if names != spec.source_tools:
+    names = [_tool_name(tool) for tool in selected_tools]
+    if names != spec.tools:
         raise ValueError(
-            "producer source tools must exactly match approved metadata "
-            f"{spec.source_tools!r}; received {names!r}"
+            "producer tools must exactly match approved metadata "
+            f"{spec.tools!r}; received {names!r}"
         )
-    loader = loader_tools[0]
-    if [skill.name for skill in loader.skills] != spec.runtime_skills:
-        raise ValueError("producer SkillToolset skills do not match approved metadata")
-    if loader.tool_filter != spec.loader_tools:
-        raise ValueError("producer SkillToolset tools do not match approved metadata")
+    skills = load_runtime_skills("producer")
+    if [skill.name for skill in skills] != spec.runtime_skills:
+        raise ValueError("producer preloaded skills do not match approved metadata")
     if spec.instruction_resource != "corsair.agents.producer.instructions:system.md":
         raise ValueError("producer instruction resource metadata is not canonical")
     if spec.schema_ref != "corsair.contracts.ProducerDecision":
@@ -70,7 +60,7 @@ def build_producer(
         name=spec.name,
         description="Proposes one declarative payload pair for trusted verification.",
         model=model,
-        instruction=producer_instruction(loader.skills),
+        instruction=producer_instruction(skills),
         tools=selected_tools,
         output_schema=ProducerDecision,
         disallow_transfer_to_parent=True,

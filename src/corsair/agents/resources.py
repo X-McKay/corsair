@@ -2,7 +2,9 @@
 
 Role factories own concrete ADK construction. This module supplies immutable
 prompt text, validates declared role capabilities, and admits only the two
-small packaged procedural skills before native ADK receives them.
+small packaged procedural skills before native ADK receives them. Each role's
+procedure is preloaded into its instruction; no role exposes a native skill
+loader. The producer declares only its two source reads and the auditor no tools.
 """
 
 from __future__ import annotations
@@ -26,8 +28,6 @@ _RESOURCE_PACKAGES: dict[RoleName, str] = {
     "producer": "corsair.agents.producer",
     "auditor": "corsair.agents.auditor",
 }
-_LOADER_TOOLS = ("load_skill", "load_skill_resource")
-_MAX_LOADER_CALLS = 4
 _MAX_SKILL_BYTES = 12_000
 _MAX_REFERENCE_BYTES = 8_000
 _MAX_REFERENCE_COUNT = 4
@@ -56,7 +56,7 @@ class AgentSpec(Contract):
     source_tools: list[str]
     loader_tools: list[str]
     runtime_skills: list[str]
-    loader_call_limit: int = Field(ge=1, le=_MAX_LOADER_CALLS)
+    loader_call_limit: int = Field(ge=0)
     llm_call_limit: int | None = Field(default=None, ge=1, le=4)
     instruction_resource: str = Field(min_length=1, max_length=240)
     schema_ref: str = Field(min_length=1, max_length=240)
@@ -70,8 +70,14 @@ class AgentSpec(Contract):
 
     @model_validator(mode="after")
     def validated_runtime_layout(self) -> AgentSpec:
-        if tuple(self.loader_tools) != _LOADER_TOOLS:
-            raise ValueError(f"loader_tools must exactly equal {list(_LOADER_TOOLS)!r}")
+        # Each procedure is preloaded into the instruction. A loader would only
+        # re-offer that text and make ADK add its generic "load the skill first"
+        # guidance and loader declarations to every request.
+        if self.loader_tools or self.loader_call_limit:
+            raise ValueError(
+                f"{self.name} procedure is preloaded; loader_tools must be empty "
+                "and loader_call_limit 0"
+            )
         if tuple(self.runtime_skills) != _admitted_skill_slugs(self.name):
             raise ValueError("runtime_skills must exactly equal the role-local admitted skill")
         if self.tools != [*self.source_tools, *self.loader_tools]:
@@ -81,8 +87,8 @@ class AgentSpec(Contract):
                 raise ValueError("producer source_tools must exactly expose source reads")
             if self.llm_call_limit is not None:
                 raise ValueError("producer LLM calls are bounded by the input and budget")
-        elif self.source_tools:
-            raise ValueError("auditor must not expose source tools")
+        elif self.tools:
+            raise ValueError("auditor must not expose any tools")
         elif self.llm_call_limit is None:
             raise ValueError("auditor must declare its finite native LLM-call limit")
         return self

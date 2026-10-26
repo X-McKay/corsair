@@ -16,6 +16,8 @@ class MatchKind(StrEnum):
     EXACT_MATCH = "exact_match"
     CANDIDATE_EXACT_MISMATCH = "candidate_exact_mismatch"
     CONTROL_MISMATCH = "control_mismatch"
+    # Auditor only: the decision matched but the oracle's decisive rubric rule did not.
+    RULE_MISMATCH = "rule_mismatch"
     NO_VALID_OUTPUT = "no_valid_output"
     OPERATIONAL_FAILURE = "operational_failure"
 

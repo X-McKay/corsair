@@ -10,14 +10,15 @@ import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    AuditOutput,
     Budget,
     Disposition,
     EvidenceInput,
     ExecutionStatus,
     InvestigationResult,
+    LineProvenance,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -26,7 +27,7 @@ from corsair.entrypoints.cli import execute, parser
 from corsair.entrypoints.runs import inspect_evidence, list_runs
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
-from tests.unit.test_evidence import _FakeSandbox, _prepared, _submission
+from tests.unit.test_evidence import _audit, _FakeSandbox, _prepared, _submission
 
 PRIVATE = ("hello.txt", "../private/secret.txt", "return read(path)", "component finding")
 
@@ -38,6 +39,7 @@ def _commit_run(
     *,
     recorded: float = 1_700_000_000,
     cleanup_confirmed: bool = True,
+    audit: AuditOutput | None = None,
     declared_line: int = 4,
 ) -> InvestigationResult:
     """Commit one result whose round observation was produced by the trusted verifier."""
@@ -71,9 +73,10 @@ def _commit_run(
             RoundResult(
                 index=1,
                 producer=ProducerOutput(
-                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    decision=ProducerDecision(kind="proposal", submission=submission)
                 ),
                 observation=observation,
+                audit=audit,
             )
         ],
     )
@@ -150,9 +153,11 @@ def test_inspect_evidence_walks_receipts_without_payloads_or_fixture(tmp_path: P
     assert item["committed"] is True
     assert item["evidence"] == "present"
     assert item["receipts_admissible"] is True
+    # The verified prepared case's target line, as declared by the request.
+    assert (item["target_line"], item["line_provenance"]) == (4, LineProvenance.DECLARED)
     assert item["cleanup_confirmed"] is True
     # A record made before line binding reports the declared line as the bound one.
-    assert item["target_line"] == {"declared": 4, "bound": 4}
+    assert item["declared_line"] == item["target_line"] == 4
     control, adversarial = item["roles"]["control"], item["roles"]["adversarial"]
     assert control["outcome"] is RoleOutcome.HELD and control["native_exit_code"] == 0
     assert adversarial["outcome"] is RoleOutcome.VIOLATION
@@ -185,7 +190,8 @@ def test_inspect_evidence_reports_the_declared_and_the_bound_target_line(tmp_pat
     store = ArtifactStore(tmp_path / "artifacts")
     result = _commit_run(store, "run-bound", declared_line=3)
     [item] = inspect_evidence(store, result)["observations"]
-    assert item["target_line"] == {"declared": 3, "bound": 4}
+    assert (item["declared_line"], item["target_line"]) == (3, 4)
+    assert item["line_provenance"] == LineProvenance.DECLARED
     assert item["receipts_admissible"] is True
 
 
@@ -197,6 +203,7 @@ def test_inspect_evidence_reports_unconfirmed_cleanup_as_not_admissible(tmp_path
 
     assert item["cleanup_confirmed"] is False
     assert item["receipts_admissible"] is False
+    assert item["target_line"] is None  # only an admissible receipt names the target
     assert item["roles"]["control"]["cleanup_confirmed"] is False
     # Unconfirmed control cleanup skips the adversarial role: no receipt exists for it.
     assert item["roles"]["adversarial"]["receipt"] == "absent"
@@ -259,16 +266,56 @@ async def test_inspect_evidence_command_emits_json_and_human_views(tmp_path, mon
     )
     view = json.loads(capsys.readouterr().out)
     assert view["observations"][0]["roles"]["control"]["outcome"] == "PROPERTY_HELD"
+    assert view["observations"][0]["line_provenance"] == "declared"
 
     human = ["--format", "human", "--no-color", "inspect", "run-a", "--evidence"]
     assert await execute(parser().parse_args(human)) == 0
     output = capsys.readouterr().out
     assert "Evidence run-a" in output and "id-control" in output
+    assert "target=L4" in output and "derived" not in output
     for private in PRIVATE:
         assert private not in output
 
     assert await execute(parser().parse_args(["--format", "human", "--no-color", "runs"])) == 0
     assert "run-a" in capsys.readouterr().out
+
+
+async def test_inspect_names_round_stops_from_the_committed_receipts(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("COLUMNS", "160")
+    store = ArtifactStore(tmp_path / "artifacts")
+    _commit_run(store, "run-verified", audit=_audit())
+    _commit_run(store, "run-unaudited")
+    _settings_for(store, monkeypatch)
+    before = _snapshot(store.root)
+
+    human = ["--format", "human", "--no-color", "inspect"]
+    assert await execute(parser().parse_args([*human, "run-verified"])) == 0
+    output = capsys.readouterr().out
+    stop = next(line for line in output.splitlines() if line.startswith("│ 1.1"))
+    assert "demonstrated" in stop and "evidence_unverified" not in output
+    assert "demonstrated · kernel at 1.1" in output
+
+    assert await execute(parser().parse_args([*human, "run-unaudited"])) == 0
+    assert "audit_not_run" in capsys.readouterr().out
+    for private in PRIVATE:
+        assert private not in output
+    assert _snapshot(store.root) == before, "inspect must never write to the store"
+
+    # JSON stays the committed result itself.
+    assert await execute(parser().parse_args(["--format", "json", "inspect", "run-verified"])) == 0
+    emitted = json.loads(capsys.readouterr().out)
+    assert set(emitted) == set(InvestigationResult.model_fields)
+
+
+def test_existing_store_never_creates_an_absent_artifact_root(tmp_path):
+    from corsair.entrypoints.cli import _existing_store
+
+    absent = tmp_path / "absent"
+    assert _existing_store(Settings(artifact_root=str(absent))) is None
+    assert not absent.exists()
+    store = ArtifactStore(tmp_path / "artifacts")
+    opened = _existing_store(Settings(artifact_root=str(store.root)))
+    assert opened is not None and opened.root == store.root
 
 
 async def test_inspect_evidence_rejects_online_before_runtime_state():
@@ -291,3 +338,22 @@ def test_runs_parser_defaults_to_an_unfiltered_listing():
 
     assert (args.case, args.limit) == (None, None)
     assert parser().parse_args(["inspect", "run1"]).evidence is False
+
+
+def test_evidence_caption_marks_a_derived_target_line() -> None:
+    from corsair.entrypoints.terminal import _target_caption
+
+    assert _target_caption({"target_line": None, "line_provenance": None}) == ""
+    assert _target_caption({"target_line": 4, "line_provenance": "declared"}) == " · target=L4"
+    assert _target_caption({"target_line": 6, "line_provenance": "recipe_function"}) == (
+        " · target=L6 (derived from recipe function)"
+    )
+
+
+def test_evidence_caption_names_the_declared_line_a_binding_moved() -> None:
+    from corsair.entrypoints.terminal import _target_caption
+
+    moved = {"target_line": 4, "declared_line": 3, "line_provenance": "declared"}
+    assert _target_caption(moved) == " · target=L4 (declared L3, bound to its reported statement)"
+    kept = {"target_line": 4, "declared_line": 4, "line_provenance": "declared"}
+    assert _target_caption(kept) == " · target=L4"

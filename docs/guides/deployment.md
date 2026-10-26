@@ -49,6 +49,20 @@ uv run --locked corsair doctor --settings .state/settings.json
 
 A ready report confirms Docker, paths, Temporal namespace, and worker pollers; it neither tests provider credentials nor proves that a future investigation will succeed.
 
+## Size worker concurrency
+
+`corsair eval --concurrency N` bounds how many child investigations a batch starts at once; the worker's `max_concurrent_activities` setting bounds how many activities it runs at once. Each investigation runs its activities (prepare, produce, evidence, audit, record) one at a time, so a batch progresses at `min(N, max_concurrent_activities)` investigations, less any single investigations sharing the worker. The default of four slots therefore caps `--concurrency 8` at four. Work above the slot count waits in the task queue, and that wait counts against each activity's schedule-to-close deadline, so a long queue behind slow model episodes can time out an activity rather than only slow it.
+
+Set `max_concurrent_activities` to at least the largest `--concurrency` you run (plus investigations run alongside), and no higher than the host can carry: every slot can hold an evidence activity running one target container with the configured `nano_cpus` and `memory_limit`. Restart the worker after changing it; its `worker.ready` log line reports both slot counts. `max_concurrent_workflow_tasks` (default `100`, the SDK default) rarely needs changing.
+
+`scripts/measure_eval_concurrency.py` measures the curve on a real local Temporal test server with the production worker composition and timed fake model and sandbox ports (no model call, no container); it starts its own server and never connects to a configured address:
+
+```bash
+uv run --locked python scripts/measure_eval_concurrency.py --slots 4 16
+```
+
+Its figures measure coordination and slot limits only. Real speedup is lower when model endpoints rate-limit or host CPUs saturate under concurrent containers.
+
 ## Preserve native isolation and permissions
 
 The Docker daemon/socket is a high-trust host capability. Point the Python Docker SDK only at a trusted local/rootless socket using the operator's environment, and verify it with `docker info`. On macOS, the SDK reads `DOCKER_HOST`, not merely the Docker CLI context; keep source/artifact staging and `TMPDIR` inside a reviewed VM-shared directory. Do not make a daemon reachable by broadening socket permissions just to pass a check.
