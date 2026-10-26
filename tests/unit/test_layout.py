@@ -29,6 +29,20 @@ def imported_modules(path: Path) -> set[str]:
     return modules
 
 
+def referenced_names(path: Path) -> set[str]:
+    """Return names a module imports from anywhere or reads as a variable or attribute."""
+
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.ImportFrom):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.Attribute):
+            names.add(node.attr)
+        elif isinstance(node, ast.Name):
+            names.add(node.id)
+    return names
+
+
 def python_files(package: str) -> list[Path]:
     """Return source files for a package without deriving rules from file counts."""
 
@@ -90,6 +104,28 @@ def test_evaluation_does_not_depend_on_entrypoints():
         ), path
 
 
+def test_runtime_packages_never_reference_oracles_or_dataset_loaders():
+    """Oracle and dataset schemas are canonical contracts; only evaluation/ may read them."""
+    evaluator_only = {"Oracle", "Dataset", "DatasetEntry"}
+    for package in ("agents", "steps", "adapters", "workflows"):
+        for path in python_files(package):
+            assert not any(
+                imports_module(module, "corsair.evaluation") for module in imported_modules(path)
+            ), path
+            assert not referenced_names(path) & evaluator_only, path
+
+
+@pytest.mark.parametrize("first", ["corsair.evaluation.intake", "corsair.evaluation.datasets"])
+def test_intake_and_dataset_loaders_import_in_either_order(first):
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {first}, corsair.evaluation.intake"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_agent_factories_do_not_depend_on_concrete_inference_adapters():
     factories = sorted((ROOT / "src/corsair/agents").glob("*/factory.py"))
     for path in factories:
@@ -107,7 +143,9 @@ def test_role_local_agent_layout_has_only_concrete_source_tools_and_native_tools
     assert (producer / "tools/read_file.py").is_file()
     assert (producer / "tools/list_files.py").is_file()
     assert (producer / "toolsets.py").is_file()
-    assert (auditor / "toolsets.py").is_file()
+    # The auditor is tool-free: no toolset module, no tools package.
+    assert not (auditor / "toolsets.py").exists()
+    assert not (auditor / "tools").exists()
     assert (producer / "contracts.py").is_file()
     assert (auditor / "contracts.py").is_file()
 
@@ -128,3 +166,17 @@ def test_explicit_json_payload_types_preserve_all_supported_wire_values(value):
     schema = Submission.model_json_schema()
     assert "anyOf" in schema["properties"]["control_payload"]
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False
+
+
+def test_render_package_has_exactly_the_view_modules_the_components_page_names():
+    page = (ROOT / "docs/architecture/components.md").read_text()
+    section = page.split("## Terminal presentation", 1)[1]
+    documented = {
+        line.split("|")[1].strip().strip("`")
+        for line in section.splitlines()
+        if line.startswith("| `")
+    }
+    package = ROOT / "src/corsair/entrypoints/render"
+    modules = {path.stem for path in package.glob("*.py") if path.stem != "__init__"}
+
+    assert documented == modules

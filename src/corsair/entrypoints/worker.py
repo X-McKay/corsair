@@ -4,6 +4,7 @@ import asyncio
 import signal
 from datetime import timedelta
 
+from temporalio.client import Client
 from temporalio.worker import Worker
 
 from corsair.adapters.inference.adk import AdkInference
@@ -11,7 +12,8 @@ from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.adapters.temporal.client import connect
-from corsair.observability.logging import LifecycleLoggingInterceptor, event
+from corsair.observability.lifecycle import LifecycleLoggingInterceptor
+from corsair.observability.logging import event
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.evaluation import EvaluationWorkflow
@@ -31,6 +33,21 @@ def compose_worker_activities(settings: Settings) -> Activities:
     )
 
 
+def compose_worker(client: Client, settings: Settings, activities: Activities) -> Worker:
+    """Construct the one Temporal worker, with task slots taken from settings."""
+
+    return Worker(
+        client,
+        task_queue=settings.task_queue,
+        workflows=[InvestigationWorkflow, EvaluationWorkflow],
+        activities=activities.registered(),
+        max_concurrent_activities=settings.max_concurrent_activities,
+        max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
+        interceptors=[LifecycleLoggingInterceptor()],
+        graceful_shutdown_timeout=timedelta(seconds=45),
+    )
+
+
 async def run_worker(settings: Settings) -> None:
     event(
         "worker.connecting", namespace=settings.temporal_namespace, task_queue=settings.task_queue
@@ -46,19 +63,13 @@ async def run_worker(settings: Settings) -> None:
     else:
         signal_installed = True
     try:
-        async with Worker(
-            client,
-            task_queue=settings.task_queue,
-            workflows=[InvestigationWorkflow, EvaluationWorkflow],
-            activities=activities.registered(),
-            max_concurrent_activities=4,
-            interceptors=[LifecycleLoggingInterceptor()],
-            graceful_shutdown_timeout=timedelta(seconds=45),
-        ):
+        async with compose_worker(client, settings, activities):
             event(
                 "worker.ready",
                 namespace=settings.temporal_namespace,
                 task_queue=settings.task_queue,
+                max_concurrent_activities=settings.max_concurrent_activities,
+                max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
             )
             try:
                 await stopped.wait()

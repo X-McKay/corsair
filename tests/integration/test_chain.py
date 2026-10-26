@@ -21,8 +21,8 @@ from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import Disposition, FixStatus, Scope, Verdict, digest
 from corsair.entrypoints.requests import load_investigation_request
-from corsair.evaluation.scoring import load_dataset
-from corsair.observability.logging import LifecycleLoggingInterceptor
+from corsair.evaluation.datasets import load_dataset
+from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.investigation import InvestigationWorkflow
@@ -36,28 +36,37 @@ class ReferenceModel(BaseLlm):
         return LlmCapabilities(output_schema_and_tools=True)
 
     requests: list = Field(default_factory=list)
+    proposals: int = 0
 
     async def generate_content_async(self, llm_request, stream=False):
         del stream  # Native ADK interface; this labelled fixture returns one complete response.
         self.requests.append(llm_request)
         user_message = next(content for content in llm_request.contents if content.role == "user")
         if user_message.parts[0].text.startswith("Investigate this admitted work packet."):
-            packet = json.loads(user_message.parts[0].text.split("\n", maxsplit=1)[1])
+            # The packet is the JSON object after the header line; trusted code may append a
+            # data-only class reference section after it.
+            packet, _ = json.JSONDecoder().raw_decode(
+                user_message.parts[0].text.split("\n", maxsplit=1)[1]
+            )
             revision = packet["round"]["revision"]
             if not any(
-                part.function_response and part.function_response.name == "load_skill"
+                part.function_response and part.function_response.name == "read_file"
                 for content in llm_request.contents
                 for part in content.parts
             ):
-                yield tool_response("load_skill", {"skill_name": "source-grounding"})
+                yield tool_response("read_file", {"path": "target.py"})
                 return
+            # Each proposal is a distinct candidate (an equivalent traversal spelled
+            # differently), as independent sessions must be to count separately.
+            exploit = "./" * self.proposals + "../private/secret.txt"
+            self.proposals += 1
             yield text_response(
                 json.dumps(
                     {
                         "kind": "proposal",
                         "submission": {
                             "control_payload": "hello.txt",
-                            "exploit_payload": "../private/secret.txt",
+                            "exploit_payload": exploit,
                             "hypothesis": (
                                 "Caller-controlled path joins the root without containment."
                             ),
@@ -77,7 +86,7 @@ class ReferenceModel(BaseLlm):
                 json.dumps(
                     {
                         "decision": "ACCEPT",
-                        "rule": "source-grounded-fixture",
+                        "rule": "ALL",
                         "reason": "The paired payloads exercise the configured file-access seam",
                     }
                 )
@@ -129,13 +138,9 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.fix_observation.cleanup_confirmed
     assert result.result_artifact and store.reconcile(f"result.{identity}")
     assert len(model.requests) == 3
-    assert result.manifest.capabilities["producer"]["tools"] == [
-        "read_file",
-        "list_files",
-        "load_skill",
-        "load_skill_resource",
-    ]
-    from corsair.evaluation.scoring import Oracle, score
+    assert result.manifest.capabilities["producer"]["tools"] == ["read_file", "list_files"]
+    from corsair.contracts import Oracle
+    from corsair.evaluation.scoring import score
 
     relabelled = result.model_copy(update={"case_id": "different-case"})
     row = score(relabelled, Oracle(acceptable=[Disposition.SUPPORTED]), store)
@@ -206,7 +211,17 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         assert json.loads(capsys.readouterr().out)["summary"]["attempts"] == 3
         inspection = ["inspect", args.run_id, "--online", "--settings", str(config)]
         assert await execute(parser().parse_args(inspection)) == 0
-        assert json.loads(capsys.readouterr().out) == {"completed": 3, "total": 3}
+        batch_status = json.loads(capsys.readouterr().out)
+        rows = batch_status.pop("children")
+        assert batch_status.pop("started")
+        assert batch_status == {
+            "completed": 3,
+            "total": 3,
+            "running": 0,
+            "errors": 0,
+            "children_omitted": 0,
+        }
+        assert [row["state"] for row in rows] == ["completed"] * 3
         assert await execute(parser().parse_args([*inspection, "--watch"])) == 0
         children = json.loads(capsys.readouterr().out)
         assert len(children) == 3
@@ -225,13 +240,23 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         "case03": "CONDITIONAL",
     }
     # Canonical labels: case01 demonstrates with no fixed-revision precondition;
-    # case02's guarded target yields a clean negative in each of two independent
-    # sessions that its budget admits, so it is EXPLOIT_NOT_DEMONSTRATED; case03's
-    # application-scope claim is only proven at the component seam, so it is the
-    # explicit COMPONENT_EXPLOIT_DEMONSTRATED label, not the full one.
+    # case02's guarded target yields a clean negative on a distinct candidate in each
+    # of the two independent sessions its budget admits, so it is
+    # EXPLOIT_NOT_DEMONSTRATED; case03's application-scope claim is only proven at the
+    # component seam, so it is the explicit COMPONENT_EXPLOIT_DEMONSTRATED label, not
+    # the full one.
     assert {row["case_id"]: row["verdict"] for row in rows} == {
         "case01": "EXPLOIT_DEMONSTRATED",
         "case02": "EXPLOIT_NOT_DEMONSTRATED",
         "case03": "COMPONENT_EXPLOIT_DEMONSTRATED",
     }
     assert all(row["status"] == "pass" for row in rows)
+    # `explain` reads each committed native result offline, re-validates its receipts
+    # and names the kernel gate that decided every session, never evidence_unverified.
+    for row in rows:
+        explained = ["--format", "json", "explain", row["run_id"], "--settings", str(config)]
+        assert await execute(parser().parse_args(explained)) == 0
+        statements = json.loads(capsys.readouterr().out)["statements"]
+        assert statements[0]["text"].startswith(f"Verdict {row['verdict']}:")
+        sessions = [item["text"] for item in statements if item["kind"] == "session"]
+        assert sessions and not any("evidence_unverified" in text for text in sessions)

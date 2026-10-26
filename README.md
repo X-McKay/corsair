@@ -33,16 +33,16 @@ The [documentation index](docs/index.md) is the main navigation page.
 
 ```text
 src/corsair/
-  agents/          producer and auditor ADK factories, instructions, toolsets and packaged skills
-  contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels
+  agents/          producer and auditor ADK factories, instructions, source tools and packaged skills with per-class references
+  contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels, recipes/<language>.py per runtime
   ports/           narrow inference, source-snapshot and sandbox interfaces
-  adapters/        ADK inference, local SCM, Docker sandboxing, filesystem storage and Temporal
-  entrypoints/     CLI, typed Python API, worker, terminal and diagnostics
-  policies/        the deterministic kernel: gate order, verdict table, fix decisions, risk assessment
+  adapters/        ADK inference, local SCM, Docker sandboxing with one trusted driver per runtime (sandboxing/drivers/<language>/), filesystem storage and Temporal
+  entrypoints/     CLI, typed Python API, worker, diagnostics; terminal.py dispatches human output to render/, one module per view family
+  policies/        the deterministic kernel: gate order, verdict table, fix decisions, target and line binding, time bounds, explanations, risk assessment
   workflows/       deterministic durable coordination of episodes and gates
   steps/           activities, differential execution, coverage and receipt verification, manifests
   observability/   sanitized lifecycle logging
-  evaluation/      isolated-agent evaluation and external scoring
+  evaluation/      isolated-agent evaluation, external scoring, dataset loading and validation, gate ledger, comparison, replay, intake and previews
 ```
 
 Remote forge adapters, a separate HTTP API, an OpenShell sandbox adapter, additional qualified runtimes and a general repair framework are not hidden behind this layout. The Python API and CLI share the same native workflow submission functions.

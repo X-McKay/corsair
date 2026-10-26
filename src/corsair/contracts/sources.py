@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import json
-import re
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes import Recipe
 
 
 class Source(Contract):
@@ -42,77 +41,12 @@ class Finding(Contract):
     _safe_file = field_validator("file")(safe_path)
 
 
-class PythonRecipe(Contract):
-    """Operator-owned secret-disclosure check at a Python callable's real API.
-
-    The investigator controls ONLY the value of payload_parameter. Fixed keyword
-    arguments, fixtures, expected benign value, and exception policy are not editable.
-    The private fixture's actual random content never appears in an agent prompt.
-    """
-
-    kind: Literal["python.secret_disclosure/1"] = "python.secret_disclosure/1"
-    module_file: str
-    function: str
-    payload_parameter: str
-    fixed_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
-    public_files: dict[str, str] = Field(default_factory=lambda: {"hello.txt": "hello"})
-    expected_control: JsonValue = "hello"
-    allowed_exceptions: list[str] = Field(default_factory=lambda: ["builtins.ValueError"])
-
-    _safe_module = field_validator("module_file")(safe_path)
-
-    @field_validator("module_file")
-    @classmethod
-    def python_file(cls, value: str) -> str:
-        if not value.endswith(".py"):
-            raise ValueError("the initial recipe supports Python source files only")
-        return value
-
-    @field_validator("function", "payload_parameter")
-    @classmethod
-    def identifier(cls, value: str) -> str:
-        if not value.isidentifier() or value.startswith("_"):
-            raise ValueError("expected a public Python identifier")
-        return value
-
-    @field_validator("fixed_kwargs")
-    @classmethod
-    def keyword_arguments(cls, value: dict) -> dict:
-        if len(value) > 16 or any(not key.isidentifier() for key in value):
-            raise ValueError("invalid fixed keyword arguments")
-        if len(json.dumps(value)) > 16000:
-            raise ValueError("fixed arguments exceed the recipe limit")
-        return value
-
-    @field_validator("public_files")
-    @classmethod
-    def fixtures(cls, value: dict[str, str]) -> dict[str, str]:
-        if len(value) > 16 or sum(len(text.encode()) for text in value.values()) > 65536:
-            raise ValueError("public fixtures exceed the recipe limit")
-        for name in value:
-            safe_path(name)
-        return value
-
-    @field_validator("allowed_exceptions")
-    @classmethod
-    def exceptions(cls, value: list[str]) -> list[str]:
-        if any(not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", item) for item in value):
-            raise ValueError("exceptions must have fully qualified names")
-        return value
-
-    @model_validator(mode="after")
-    def payload_not_fixed(self):
-        if self.payload_parameter in self.fixed_kwargs:
-            raise ValueError("payload_parameter may not override an operator-fixed argument")
-        return self
-
-
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
 
     @model_validator(mode="after")
@@ -122,17 +56,30 @@ class Case(Contract):
         return self
 
 
+DEFAULT_MAX_OUTPUT_TOKENS = 12288
+
+
 class Budget(Contract):
-    # Defaults are sized for a thinking model on a live provider: a producer episode
-    # must cover reading several files AND submitting a pair (episode_llm_calls), the
-    # case budget must leave room for a second independent session (max_llm_calls),
-    # and the answer budget must sit well above a model's reasoning spend
-    # (max_output_tokens) or the submission is truncated to MAX_TOKENS.
+    """Bounded per-request limits for one investigation.
+
+    Defaults are sized for a thinking model on a live provider: a producer episode
+    must cover reading several files AND submitting a pair (``episode_llm_calls``),
+    and the case budget must leave room for a second independent session
+    (``max_llm_calls``).
+
+    ``max_output_tokens`` caps every individual model request, for the producer and
+    for the auditor alike (the workflow passes the same value into ``AuditInput``).
+    On a thinking model the provider counts reasoning tokens against that same cap,
+    so it must sit well above the model's reasoning spend plus the structured answer.
+    A final response that stops at the cap is reported as the operational
+    ``provider_max_tokens`` gate, never parsed into a decision or review.
+    """
+
     max_rounds: int = Field(default=3, ge=1, le=16)
     max_llm_calls: int = Field(default=48, ge=2, le=128)
     episode_llm_calls: int = Field(default=12, ge=1, le=32)
     max_tool_calls: int = Field(default=48, ge=1, le=256)
-    max_output_tokens: int = Field(default=12288, ge=256, le=16384)
+    max_output_tokens: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=256, le=16384)
     max_elapsed_seconds: int = Field(default=900, ge=30, le=3600)
     probe_timeout_seconds: int = Field(default=30, ge=1, le=300)
     tool_output_bytes: int = Field(default=32768, ge=1024, le=131072)
@@ -160,11 +107,43 @@ class RunManifest(Contract):
     max_sessions: int = Field(default=2, ge=1, le=8)
 
 
+class LineProvenance(StrEnum):
+    """Where a prepared finding's target line came from.
+
+    ``declared``: the request (or scanner) supplied it, or none was supplied.
+    ``recipe_function``: the finding declared no line and trusted prepare code bound
+    it, with ``ast`` over the admitted module, to the first body statement of the
+    operator-owned recipe function. Never derived from model or narrative text.
+    """
+
+    DECLARED = "declared"
+    RECIPE_FUNCTION = "recipe_function"
+
+
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str
     manifest: RunManifest
+    # Defaulted so prepared cases recorded before line derivation still decode.
+    line_provenance: LineProvenance = LineProvenance.DECLARED
+    # The line the coverage gate binds to, chosen in code at prepare from finding.line
+    # (declared, or derived when line_provenance is recipe_function) over the admitted
+    # module (corsair.policies.line_binding). finding.line keeps the declared or
+    # derived line. None in records made before line binding: the kernel then binds to
+    # finding.line itself.
+    target_line: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def target_line_needs_a_declared_line(self):
+        if self.target_line is not None and self.finding.line is None:
+            raise ValueError("a bound target line needs a declared finding line")
+        return self
+
+    @property
+    def bound_line(self) -> int | None:
+        """The exact line the kernel requires in both runs: bound, else declared."""
+        return self.finding.line if self.target_line is None else self.target_line

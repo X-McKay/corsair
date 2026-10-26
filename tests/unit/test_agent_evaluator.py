@@ -8,12 +8,12 @@ from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     AuditResult,
+    AuditRule,
     Feedback,
     MatchKind,
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     Submission,
     Usage,
     digest,
@@ -22,8 +22,8 @@ from corsair.evaluation.agents import (
     fixture_match_kind,
     fixture_matches_oracle,
     fixture_score_row,
-    load_frozen_fixture,
 )
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.evaluation.scoring import summarize
 from corsair.settings import Settings
 
@@ -38,16 +38,13 @@ def _producer_output(
         return ProducerOutput(feedback=feedback)
     return ProducerOutput(
         decision=ProducerDecision(
-            root=ProducerProposal(
-                submission=Submission(
-                    hypothesis="test",
-                    plan=PlanRevision(
-                        revision=1, objective="test", next_steps=["test"], reason="test"
-                    ),
-                    control_payload=control_payload,
-                    exploit_payload=exploit_payload,
-                )
-            )
+            kind="proposal",
+            submission=Submission(
+                hypothesis="test",
+                plan=PlanRevision(revision=1, objective="test", next_steps=["test"], reason="test"),
+                control_payload=control_payload,
+                exploit_payload=exploit_payload,
+            ),
         ),
         feedback=feedback,
     )
@@ -83,7 +80,7 @@ def test_frozen_fixture_is_read_once_and_returns_verified_bytes(tmp_path, monkey
 
 def test_auditor_fixture_acceptance_does_not_claim_native_evidence():
     output = AuditOutput(
-        review=AuditResult(decision=AuditDecision.ACCEPT, rule="test", reason="test")
+        review=AuditResult(decision=AuditDecision.ACCEPT, rule=AuditRule.ALL, reason="test")
     )
     assert fixture_matches_oracle(output, {"decision": "ACCEPT"})
     assert not fixture_matches_oracle(output, {"decision": "REJECT"})
@@ -175,3 +172,42 @@ def test_match_kind_does_not_change_exact_pass_rule_or_totals(tmp_path):
     assert summarize(rows)["attempts"] == 6
     assert summarize(rows)["passed"] == 2
     assert summarize(rows)["failed"] == 4
+
+
+def test_auditor_row_attributes_the_decisive_rubric_rule_without_changing_the_pass_rule(
+    tmp_path,
+):
+    store = ArtifactStore(tmp_path)
+
+    def row(output: AuditOutput | ProducerOutput, agent: str, oracle: dict) -> dict:
+        return fixture_score_row(
+            output,
+            oracle,
+            identity="run1",
+            case_id="audit02",
+            repeat=0,
+            agent=agent,
+            settings=Settings(),
+            store=store,
+        )
+
+    rejected = AuditOutput(
+        review=AuditResult(
+            decision=AuditDecision.REJECT, rule=AuditRule.R1, reason="false mechanism"
+        )
+    )
+    # A model-chosen rule never decides the pass: a REJECT matches a REJECT oracle
+    # whatever id it cites, and mismatches an ACCEPT oracle.
+    assert row(rejected, "auditor", {"decision": "REJECT"})["status"] == "pass"
+    mismatch = row(rejected, "auditor", {"decision": "ACCEPT"})
+    assert mismatch["status"] == "fail"
+    assert (mismatch["audit_decision"], mismatch["audit_rule"]) == ("REJECT", "R1")
+    invalid = row(AuditOutput(usage=Usage(llm_calls=2)), "auditor", {"decision": "ACCEPT"})
+    assert invalid["audit_decision"] is None and invalid["audit_rule"] is None
+    produced = row(
+        _producer_output(),
+        "producer",
+        {"control_payload": "control", "candidate_payloads": ["candidate"]},
+    )
+    assert produced["audit_decision"] is None and produced["audit_rule"] is None
+    assert json.loads(json.dumps({"rows": [mismatch]}))["rows"][0]["audit_rule"] == "R1"

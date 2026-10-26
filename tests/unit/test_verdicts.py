@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
 from corsair.contracts import (
@@ -10,17 +12,19 @@ from corsair.contracts import (
     Feedback,
     FixStatus,
     Observation,
+    PreparedCase,
     RoleObservation,
     RoleOutcome,
     Verdict,
 )
 from corsair.policies.verdicts import (
     SessionOutcome,
+    candidate_key,
     case_verdict,
     session_verdict,
     status_outcome,
 )
-from tests.unit.test_evidence import SOURCE_DIGEST, _audit, _prepared
+from tests.unit.test_evidence import SOURCE_DIGEST, _audit, _prepared, _submission
 
 _ARTIFACT = ArtifactRef(sha256="d" * 64, size=0, media_type="application/json")
 
@@ -198,8 +202,15 @@ def _le() -> SessionOutcome:
     return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, "le")
 
 
-def _neg() -> SessionOutcome:
-    return SessionOutcome(Verdict.INCONCLUSIVE, "clean_negative", clean_negative=True)
+_CANDIDATES = itertools.count()
+
+
+def _neg(candidate: str | None = None) -> SessionOutcome:
+    """A clean-negative session; each call is a distinct candidate unless one is named."""
+    key = candidate or f"candidate-{next(_CANDIDATES)}"
+    return SessionOutcome(
+        Verdict.INCONCLUSIVE, "clean_negative", clean_negative=True, candidate_key=key
+    )
 
 
 def _unable() -> SessionOutcome:
@@ -249,6 +260,36 @@ def test_negative_threshold_is_honoured():
     assert verdict is Verdict.INCONCLUSIVE
 
 
+def test_a_repeated_candidate_is_not_a_second_independent_negative():
+    """Two clean sessions that ran the same exploit payload are one candidate: the
+    second adds no independent evidence, so the case stays INCONCLUSIVE."""
+    verdict, reason = case_verdict([_neg("same"), _neg("same")], negative_threshold=2)
+    assert verdict is Verdict.INCONCLUSIVE
+    assert "distinct" in reason
+    verdict, _ = case_verdict([_neg("same"), _neg("same"), _neg("other")], negative_threshold=2)
+    assert verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+
+
+def test_a_clean_negative_without_a_candidate_identity_never_counts():
+    unkeyed = SessionOutcome(Verdict.INCONCLUSIVE, "clean_negative", clean_negative=True)
+    verdict, _ = case_verdict([unkeyed, unkeyed, _neg()], negative_threshold=2)
+    assert verdict is Verdict.INCONCLUSIVE
+
+
+def test_the_candidate_key_is_the_exploit_payload_alone():
+    """A different benign control, hypothesis or plan adds no diversity; a different
+    exploit payload does, even a near-duplicate one (the exact-digest floor)."""
+    base = _submission()
+    other_control = base.model_copy(
+        update={"control_payload": "other.txt", "hypothesis": "a different story"}
+    )
+    assert candidate_key(other_control) == candidate_key(base)
+    near_duplicate = base.model_copy(update={"exploit_payload": "./../private/secret.txt"})
+    assert candidate_key(near_duplicate) != candidate_key(base)
+    structured = base.model_copy(update={"exploit_payload": {"path": "../x"}})
+    assert candidate_key(structured) != candidate_key(base)
+
+
 def test_all_unable_sessions_aggregate_to_unable_to_run():
     verdict, _ = case_verdict([_unable(), _unable()])
     assert verdict is Verdict.UNABLE_TO_RUN
@@ -278,3 +319,54 @@ def test_status_outcome_maps_non_evaluated_sessions(status_reason, expected):
 
     status, reason = status_reason
     assert status_outcome(ExecutionStatus(status), reason).verdict is expected
+
+
+# --- interim guard: the clean-negative path needs a qualified auditor rubric ----
+
+
+def _prepared_for(kind_recipe) -> PreparedCase:
+    base = _prepared()
+    value = base.model_dump(mode="json")
+    value["recipe"] = kind_recipe.model_dump(mode="json")
+    value["finding"]["file"] = kind_recipe.module_file
+    return PreparedCase.model_validate(value)
+
+
+def _javascript_case() -> PreparedCase:
+    from corsair.contracts import JavaScriptRecipe
+
+    return _prepared_for(JavaScriptRecipe(module_file="reader.js", function="merge"))
+
+
+def test_clean_negative_is_withheld_for_a_kind_without_a_qualified_auditor_rubric():
+    """The clean-negative path's only semantic check is the auditor's ACCEPT, and the
+    rubric is qualified for the Python kinds only: any other kind stays INCONCLUSIVE."""
+    from corsair.contracts.recipes import CLEAN_NEGATIVE_QUALIFIED_KINDS
+
+    prepared = _javascript_case()
+    assert prepared.recipe.kind not in CLEAN_NEGATIVE_QUALIFIED_KINDS
+    outcome = session_verdict(prepared, _clean_negative(), _audit(), FixStatus.NOT_REQUESTED)
+    assert outcome.verdict is Verdict.INCONCLUSIVE
+    assert outcome.clean_negative is False
+    assert outcome.reason == (
+        "clean negative withheld: auditor rubric not qualified for javascript.prototype_pollution/1"
+    )
+
+
+def test_the_clean_negative_guard_leaves_positives_and_python_kinds_alone():
+    from corsair.contracts import PythonCommandSentinel
+    from corsair.contracts.recipes import CLEAN_NEGATIVE_QUALIFIED_KINDS
+
+    assert {
+        "python.secret_disclosure/1",
+        "python.command_sentinel/1",
+    } == CLEAN_NEGATIVE_QUALIFIED_KINDS
+    demonstrated = session_verdict(
+        _javascript_case(), _demonstrated(), _audit(), FixStatus.NOT_REQUESTED
+    )
+    assert demonstrated.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    sentinel = _prepared_for(
+        PythonCommandSentinel(module_file="reader.py", function="run", payload_parameter="cmd")
+    )
+    clean = session_verdict(sentinel, _clean_negative(), _audit(), FixStatus.NOT_REQUESTED)
+    assert clean.clean_negative is True

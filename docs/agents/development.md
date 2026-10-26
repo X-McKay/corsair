@@ -7,20 +7,20 @@ Change an agent as one bounded component: keep its objective, typed contract, to
 | Concern | Canonical location | Change boundary |
 | --- | --- | --- |
 | Producer behavior | [`src/corsair/agents/producer/`](../../src/corsair/agents/producer/) | Prompt, source-read tools, role toolset, source-grounding procedure, and `ProducerDecision` factory configuration. |
-| Auditor behavior | [`src/corsair/agents/auditor/`](../../src/corsair/agents/auditor/) | Prompt, role toolset, semantic-review procedure, and `AuditResult` factory configuration. |
+| Auditor behavior | [`src/corsair/agents/auditor/`](../../src/corsair/agents/auditor/) | Prompt, preloaded semantic-review procedure, and tool-free `AuditResult` factory configuration. |
 | Role metadata and packaged resources | [`src/corsair/agents/resources.py`](../../src/corsair/agents/resources.py) and each role's `agent.json`, `instructions/system.md`, and `skills/` | Metadata validates the factory's approved surface; resources load from the installed package, not the checkout. |
 | Wire contracts | [`src/corsair/contracts/agents.py`](../../src/corsair/contracts/agents.py) | Define or change a Pydantic model once; role-local `contracts.py` modules are object-identity re-exports for role-local imports, not schemas. |
 | Native episodes | [`src/corsair/adapters/inference/adk.py`](../../src/corsair/adapters/inference/adk.py) | Fresh ADK runner, callbacks, accounting, packet construction, output validation, and bounded skill-load accounting. |
-| Isolated evaluation and scoring | [`src/corsair/evaluation/`](../../src/corsair/evaluation/) | Frozen fixture loading, agent invocation, and external scoring. |
+| Isolated evaluation and scoring | [`src/corsair/evaluation/`](../../src/corsair/evaluation/) | Frozen fixture loading, agent invocation, external scoring, and the model-free request preview. |
 
 `agent.json` is Corsair's validated JSON role metadata. The `SKILL.md` YAML frontmatter names and describes a packaged procedure for native ADK loading. Neither replaces the other, and neither is an ADK YAML Agent Config or a new Corsair configuration DSL. Factories remain ordinary native Python construction with the installed ADK APIs.
 
 ## Preserve these role invariants
 
-- The producer has exactly its episode-local source readers plus the private native skill-loading surface. The auditor has only its private native skill-loading surface, remains fresh-context and outcome-blind, and never receives a source, execution, network, or external tool.
-- Skill catalogs are explicitly role-filtered, initialized by native `SkillToolset` in `EAGER` mode, and load only built-package `SKILL.md` bodies or admitted resources through `load_skill` and `load_skill_resource`. A skill is guidance loaded into context, not executable code, a state injector, or an additional tool registry.
+- The producer has exactly its episode-local source readers and a preloaded procedure, with no skill loader. The auditor has no tools (its procedure is preloaded), remains fresh-context and outcome-blind, and never receives a source, execution, network, external, or skill-loading tool.
+- Neither role composes a native `SkillToolset`; `AgentSpec` rejects any loader tool. Each factory parses only built-package `SKILL.md` bodies through the admitted native loader path and preloads them into the instruction. A skill is guidance in context, not executable code, a state injector, or an additional tool registry.
 - Factories use native `LlmAgent.output_schema` with canonical `ProducerDecision` or `AuditResult`. A producer decision is either a `proposal` containing the unchanged `Submission` or `no_grounded_candidate` with a bounded reason. Do not reintroduce a custom `submit` function, termination state, string decoder, or schema-repair layer.
-- Model capability determines whether ADK can combine schema output and ordinary tools directly or uses its own schema-completion fallback. Keep native callbacks, call/output/tool budgets, and post-generation Pydantic plus round/parent validation in force for both paths. Count skill loading within the established finite ceilings.
+- Model capability determines whether ADK can combine schema output and ordinary tools directly or uses its own schema-completion fallback. Keep native callbacks, call/output/tool budgets, and post-generation Pydantic plus round/parent validation in force for both paths. Neither role has a skill loader to count.
 - Provider credentials stay in the worker environment. A model setting selects the native Gemini or LiteLLM route; it is not a credential broker or an invitation to add provider-specific placeholders.
 - The model episode is an ordinary bounded Temporal activity. Do not substitute an upstream Google ADK Temporal integration, invent an agent graph, or add an implicit retry/fallback loop.
 - A `no_grounded_candidate` decision is an explicit terminal abstention for a newly recorded workflow history: it records the producer usage and prepared provenance, executes no target or audit, and remains `INCONCLUSIVE`. The Temporal patch marker preserves the preceding command path for old histories. It never establishes negative clearance.
@@ -31,7 +31,7 @@ The producer's snapshot reader, the Docker sandbox, evidence verifier, artifact 
 
 1. Read the relevant factory, prompt, metadata, role contract re-export, toolset, procedural skill, native runner, and frozen evaluation before changing role behavior. Keep the public packet outcome-blind and keep labels/oracles external.
 2. Make the smallest role-local change. Add a procedural skill only for reusable guidance; do not add scripts, assets, code execution, mutable state, remote loading, or a placeholder policy/registry. If a contract changes, update actual consumers rather than creating a duplicate documentation or compatibility schema.
-3. For any skill content or capability change, qualify the new resource digest and capability identity and ensure the resource loads from an installed wheel outside the checkout. Record successful loader names through the sanitized bounded accounting path; record unavailable usage or cost as unknown.
+3. For any skill content or capability change, qualify the new resource digest and capability identity and ensure the resource loads from an installed wheel outside the checkout. Record preloaded procedure names through the sanitized bounded accounting path; record unavailable usage or cost as unknown.
 4. Run proportionate offline checks from the repository root:
 
    ```bash
@@ -46,4 +46,22 @@ Nix and `uv.lock` pin the development tools and Python dependencies, but they do
 
 ## Core preload versus optional progressive loading
 
-The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. Optional native load_skill refreshes and load_skill_resource reference requests remain available within finite root/episode budgets; only successful model-requested loads populate Usage.skills_loaded, and their dispatches count as tool calls. A provider that never requests an optional load is reported as such; it is not rewritten as successful tool use.
+The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. Neither role offers optional progressive loading any more (no `load_skill` or `load_skill_resource`), so Usage.skills_loaded is always empty; it is not rewritten as successful tool use.
+
+## Previewing a role's request
+
+`corsair agent preview ROLE REQUEST` shows exactly what a role would receive, without a model: the production factory, toolset and packet builder render the request and a capturing model records it. It lists the role prompt, each preloaded procedure, the text ADK appends, every declared tool with its parameter schema, the response schema and the packet, with bytes and a `ceil(bytes/4)` token estimate per part ([CLI reference](../reference/cli.md#agent-preview-role-request)). Use it as the inner loop for prompt, skill, schema and packet changes:
+
+```bash
+corsair agent preview producer evals/fixtures/case01/request.json --output .work/before.json
+# edit instructions/system.md, a SKILL.md, a contract or the packet builder
+corsair agent preview producer evals/fixtures/case01/request.json --diff .work/before.json --full
+```
+
+The diff names every part that changed and by how many bytes and tokens; attach the `--format json` preview (or diff) to the review. A preview proves what is sent, never how a model behaves: the change still needs the frozen isolated evaluation below.
+
+### Request-size measurements
+
+The producer has no `SkillToolset`: a reload returned the same text, spent a model call and kept about 1.7 KB of tool response in every later request, and the toolset itself added ADK's generic "load the skill first" instruction and two loader declarations (about 3.3 KB) to every request. `corsair agent preview producer REQUEST` reports bytes and a `ceil(bytes/4)` token approximation for each part of the request (the role prompt, each preloaded procedure, ADK-appended instruction, each tool declaration, response schema and packet) and the episode's request, LLM-call and tool-call counts; each frozen producer row's input is a request file, so `corsair agent preview producer evals/fixtures/case01/request.json --format json` measures that row. `--structured-tools` measures the response-schema path and `--no-structured-tools` the `set_model_response` one. [`test_producer_request_size.py`](../../tests/unit/test_producer_request_size.py) renders the frozen `case01` producer row through the same renderer and pins the instruction and declaration byte bounds, every producer rule, and the absence of loader declarations and ADK skill text.
+
+The auditor has no tools, so its review is one request. `corsair agent preview auditor REQUEST --submission FILE` renders it with the same parts and episode counts; `--no-structured-tools` models the LiteLLM route (no schema-with-tools support) and `--structured-tools` the native Gemini one. The frozen auditor rows hold a complete `AuditInput` rather than a request, so [`test_auditor_request_size.py`](../../tests/unit/test_auditor_request_size.py) renders every one of them through the preview renderer on both routes. With the former `SkillToolset` the system instruction plus tool declarations rendered 7,683 bytes on the LiteLLM route (6,806 natively), declared `set_model_response`, `load_skill` and `load_skill_resource`, and charged one `set_model_response` tool call; tool-free it renders 3,481 bytes on both routes, declares no tool and charges none. The test pins that shape and byte bound.

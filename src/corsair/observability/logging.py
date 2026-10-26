@@ -1,21 +1,21 @@
-"""Standard logging and native Temporal lifecycle hooks; never log agent content."""
+"""Standard logging configuration and sanitizers; never log agent content.
 
-import asyncio
+Only the standard library is imported at module scope so finite CLI commands do not pay for
+Rich or Pydantic before they need them; Temporal lifecycle hooks live in ``lifecycle``.
+"""
+
+from __future__ import annotations
+
 import json
 import logging
 import os
 import re
-import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
 
-from pydantic import ValidationError
-from rich.console import Console
-from rich.logging import RichHandler
-from temporalio import activity
-from temporalio.worker import ActivityInboundInterceptor, ExecuteActivityInput, Interceptor
-from typing_extensions import TypedDict
+if TYPE_CHECKING:
+    from rich.console import Console
 
 logger = logging.getLogger("corsair")
 type LogValue = str | int | float | bool | None
@@ -50,6 +50,9 @@ _FIELDS = frozenset(
         "message",
         "role",
         "skill_name",
+        "remedy",
+        "max_concurrent_activities",
+        "max_concurrent_workflow_tasks",
     ]
 )
 
@@ -68,6 +71,8 @@ def safe_text(value: object) -> str:
 
 def safe_error_detail(error: Exception) -> str:
     """Explain validation failures without reflecting rejected input values."""
+    from pydantic import ValidationError
+
     if isinstance(error, ValidationError):
         return safe_text(
             "; ".join(
@@ -123,8 +128,11 @@ class JsonFormatter(logging.Formatter):
 
 class TextFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        fields = " ".join(f"{key}={value}" for key, value in getattr(record, "fields", {}).items())
-        return f"{record.getMessage()} {fields}".rstrip()
+        fields = dict(getattr(record, "fields", {}))
+        remedy = fields.pop("remedy", None)
+        line = f"{record.getMessage()} {' '.join(f'{k}={v}' for k, v in fields.items())}".rstrip()
+        # A remedy is a next step for a person, so it gets its own line rather than a key=value.
+        return f"{line}\nremedy: {remedy}" if remedy else line
 
 
 def _set_log_handlers(handlers: list[logging.Handler], level: str) -> None:
@@ -143,6 +151,8 @@ def _set_log_handlers(handlers: list[logging.Handler], level: str) -> None:
 
 
 def _console_log_handler(console: Console, format: Literal["text", "json"]) -> logging.Handler:
+    from rich.logging import RichHandler
+
     handler = (
         logging.StreamHandler(console.file)
         if format == "json"
@@ -181,52 +191,3 @@ def configure_logging(
         file_handler.addFilter(MetadataFilter())
         handlers.append(file_handler)
         _set_log_handlers(handlers, level)
-
-
-class _ActivityIdentity(TypedDict, closed=True):
-    run_id: str | None
-    activity: str
-    attempt: int
-
-
-class _ActivityLogging(ActivityInboundInterceptor):
-    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        info = activity.info()
-        identity: _ActivityIdentity = {
-            "run_id": info.workflow_id,
-            "activity": info.activity_type,
-            "attempt": info.attempt,
-        }
-        started = time.monotonic()
-        event("activity.started", **identity)
-        try:
-            result = await self.next.execute_activity(input)
-        except asyncio.CancelledError:
-            event("activity.cancelled", level=logging.WARNING, **identity)
-            raise
-        except Exception as error:
-            event(
-                "activity.failed", level=logging.ERROR, error_type=type(error).__name__, **identity
-            )
-            raise
-        usage, feedback = getattr(result, "usage", None), getattr(result, "feedback", None)
-        event(
-            "activity.completed",
-            **identity,
-            seconds=round(time.monotonic() - started, 3),
-            gate=feedback.gate if feedback else None,
-            cleanup_confirmed=getattr(result, "cleanup_confirmed", None),
-            llm_calls=usage.llm_calls if usage else None,
-            tool_calls=usage.tool_calls if usage else None,
-            input_tokens=usage.input_tokens if usage else None,
-            output_tokens=usage.output_tokens if usage else None,
-            usage_complete=getattr(result, "usage_complete", None),
-            execution_status=getattr(result, "execution_status", None),
-            disposition=getattr(result, "disposition", None),
-        )
-        return result
-
-
-class LifecycleLoggingInterceptor(Interceptor):
-    def intercept_activity(self, next: ActivityInboundInterceptor) -> ActivityInboundInterceptor:
-        return _ActivityLogging(next)

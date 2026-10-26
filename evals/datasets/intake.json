@@ -1,0 +1,69 @@
+{
+  "schema_version": "corsair.intake-dataset/1",
+  "entries": [
+    {
+      "case_id": "scan-library-template",
+      "report": "fixtures/scan_reports/library-template-injection.json",
+      "report_digest": "16b12db6850d3602adfa9461ad441820958d241578f7d694960f7fc1fdc349db",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "recipe_template": "datasets/intake/recipe-read-file.json",
+      "recipe_template_digest": "11812a8cf180e69e031adf5620734e25ffa685cf4b2bd20615b72fa128967857",
+      "oracle": "datasets/intake/oracles/scan-library-template.json",
+      "oracle_digest": "465860b8db7ab95077051e8d43d3b5f945c066faec3a3826446945e15cf927d9"
+    },
+    {
+      "case_id": "scan-preview-server",
+      "report": "fixtures/scan_reports/preview-server-path-traversal.json",
+      "report_digest": "6b3fe92cc95ed88316f188051eccc74927965bd75c9d9259d76e6a7e1a2ecd66",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "recipe_template": "datasets/intake/recipe-read-file.json",
+      "recipe_template_digest": "11812a8cf180e69e031adf5620734e25ffa685cf4b2bd20615b72fa128967857",
+      "oracle": "datasets/intake/oracles/scan-preview-server.json",
+      "oracle_digest": "465860b8db7ab95077051e8d43d3b5f945c066faec3a3826446945e15cf927d9"
+    },
+    {
+      "case_id": "scan-reader-no-line",
+      "report": "fixtures/scan_reports/python-reader-no-line.json",
+      "report_digest": "a878c9a2edd789a5ced52d869b86ae5355c0a5207d65933dad4a8fca04ca8e6a",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "recipe_template": "datasets/intake/recipe-read-file.json",
+      "recipe_template_digest": "11812a8cf180e69e031adf5620734e25ffa685cf4b2bd20615b72fa128967857",
+      "oracle": "datasets/intake/oracles/scan-reader-no-line.json",
+      "oracle_digest": "184d1a3978e9391d7d82219d69d824163131f2bb4d0ac929be061ec291f3cd06"
+    },
+    {
+      "case_id": "scan-reader-no-recipe",
+      "report": "fixtures/scan_reports/python-reader-no-line.json",
+      "report_digest": "a878c9a2edd789a5ced52d869b86ae5355c0a5207d65933dad4a8fca04ca8e6a",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "oracle": "datasets/intake/oracles/scan-reader-no-recipe.json",
+      "oracle_digest": "3ee6a6c86de754372c4c7be23600fdbbdd52f3a36620f595c2b6e4813b992fbb"
+    },
+    {
+      "case_id": "scan-reader-mixed",
+      "report": "fixtures/scan_reports/python-reader-mixed.json",
+      "report_digest": "dfd708027c42be431f5f225b56d8c3d658c72f4a644788235155920ae2f7a35b",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "recipe_template": "datasets/intake/recipe-read-file.json",
+      "recipe_template_digest": "11812a8cf180e69e031adf5620734e25ffa685cf4b2bd20615b72fa128967857",
+      "oracle": "datasets/intake/oracles/scan-reader-mixed.json",
+      "oracle_digest": "524568d9fb346c240f653aacec61f59bf8e7ecd2d56bb8d6c117258644577fbc"
+    },
+    {
+      "case_id": "scan-reader-path-escape",
+      "report": "fixtures/scan_reports/python-reader-path-escape.json",
+      "report_digest": "26501d9000a5f8402d1da23194ade6aafa01feb4612aa41ee2b1a5e359026ba2",
+      "source": "datasets/intake/reader-source",
+      "source_digest": "ae9534cd4a826cecbc55c778cfffefd521aa90654419adbb473b8f4aa25d361f",
+      "recipe_template": "datasets/intake/recipe-read-file.json",
+      "recipe_template_digest": "11812a8cf180e69e031adf5620734e25ffa685cf4b2bd20615b72fa128967857",
+      "oracle": "datasets/intake/oracles/scan-reader-path-escape.json",
+      "oracle_digest": "befc5f6f38d4178c34a07de373eebab881c0ae9aec9140bceefd9b0883074b19"
+    }
+  ]
+}

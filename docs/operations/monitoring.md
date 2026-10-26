@@ -32,7 +32,19 @@ uv run --locked corsair inspect "$RUN_ID" --online --settings .state/settings.js
 uv run --locked corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
 ```
 
-For an investigation, the native query returns its actual phase and round. For an evaluation batch, it returns actual completed and total child work. `--watch` requires `--online`; it waits for the workflow’s real final result and may be interrupted locally without cancelling work. It is not a heartbeating status service and must not be treated as proof that a security conclusion has been reached.
+For an investigation, the native query returns its actual phase, session and round with their admitted maxima, the last feedback gate name, the start time and elapsed-time deadline, and a bounded timeline of recent phase transitions. For an evaluation batch, it returns actual completed, total, running and errored child work, the batch start time, and a bounded list of child rows with each child's state and its start and finish times. `--watch` requires `--online`; it waits for the workflow’s real final result and may be interrupted locally without cancelling work. It is not a heartbeating status service and must not be treated as proof that a security conclusion has been reached.
+
+### Reading the live view
+
+While `investigate --wait`, `inspect --online --watch` or `eval` waits, a human terminal shows that query as a live panel on stderr (or, with `--no-animation`, one line per status change). Read it as follows:
+
+- **Session n/max and round n/max** show how much of the admitted schedule has been used. A second session appears only after a first session ended in an independent clean negative, and a later one only while enough sessions remain to reach the threshold of clean negatives on distinct exploit payloads.
+- **Last gate** names the most recent feedback gate (for example `retry` after a non-decisive audit, or an operational gate from evidence). It is a gate name, never a reason or a verdict.
+- **Deadline** is the elapsed-time budget; when little time is left the workflow will stop scheduling rounds and record an honest non-decisive result.
+- **Timeline** offsets show where time went, for example a long `evidence` step points at image build or probe time and a long `producer` step at model latency.
+- **Evaluation child rows** list running children first, then failed, pending and completed ones, with each child's elapsed time. A running row with a much longer elapsed time than its completed peers is the slow case; inspect it with `corsair inspect RUN_ID --online` on that row's run id to see its phase and round. A `failed` row means the child workflow itself failed (an operational error), not that the case was scored as failing; scoring happens only after the batch returns.
+
+The view adds only local elapsed time. It does not show model content and does not predict a disposition; the final result on stdout is the only outcome. See the [CLI reference](../reference/cli.md#live-progress-while-waiting) for the exact fields and modes.
 
 Use Docker only as a supplemental host observation. A currently retained Corsair container can be listed without modifying it:
 
@@ -52,6 +64,15 @@ uv run --locked corsair inspect "$RUN_ID" --settings .state/settings.json
 
 Offline inspection validates the immutable result receipt and does not contact Temporal. If it reports no committed result, use online inspection to learn whether the workflow is still live; do not rerun the same ID or delete an intent. The [disaster-recovery guide](disaster-recovery.md) covers the different case where the artifact root itself is lost.
 
+List what the artifact root holds, newest first, and drill into one run's native receipts:
+
+```bash
+uv run --locked corsair runs --case case01 --limit 10 --settings .state/settings.json
+uv run --locked corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
+```
+
+`runs` admits only results committed under their own `result.<run_id>` name and counts unreadable or unbound records as `invalid_records`; a nonzero count is an integrity lead to investigate, not something to delete. `inspect --evidence` reports, per observation and role, the outcome, target execution, covered lines, native exit code, cleanup confirmation, container ID and image ID, plus whether the saved receipts still pass the trusted verifier (`receipts_admissible`) and, when they do, the checked `target_line` (the bound line), the finding's `declared_line` and its `line_provenance`. It never prints payloads or the rest of the prepared case. Use the container ID and labels from a receipt with `cleanup_confirmed: false` when following up with the Docker container listing above. See the [CLI reference](../reference/cli.md#runs) for every field.
+
 The final result retains `execution_status`, disposition, reason, rounds, artifact identities, and a manifest. Check operational state first:
 
 - `COMPLETED` means the workflow reached final recording; it is not automatically a supported finding.
@@ -65,7 +86,7 @@ A round’s observation records control/adversarial outcomes, target execution, 
 
 The immutable manifest binds a run to the Docker image ID; selected producer/auditor model names; and request, configuration, prompt, output-schema, capability, and budget digests. It intentionally does not copy provider credentials or endpoint URLs into the run metadata. Round outputs and sanitized lifecycle logs may include model/tool call counts, reported token counts when the provider returned them, elapsed time, provider feedback gates, and whether usage is complete. Missing token metadata is unknown, not zero or an exact cost figure.
 
-A provider feedback gate such as `provider_policy_blocked`, `provider_temporary`, or `provider_permanent` is operational evidence. Preserve the result and redacted gate; do not silently swap providers, remove policy checks, or replay an uncertain episode to obtain a different answer.
+A provider feedback gate such as `provider_policy_blocked`, `provider_temporary`, or `provider_permanent` is operational evidence. Preserve the result and redacted gate; do not silently swap providers, remove policy checks, or replay an uncertain episode to obtain a different answer. `provider_max_tokens` means the episode's final response stopped at the per-request `max_output_tokens` cap named in its reason; on a thinking model reasoning tokens count against that cap, so it signals budget starvation rather than a provider fault. The truncated response is never parsed into a decision or review. `packet_too_large` means a role packet's required sections (for the auditor: header, finding, recipe, submission and any class reference; for the producer: every packet field but the source excerpt) alone exceed the 32,768-byte prompt cap, so no model call was made; only the source excerpt is ever shortened to fit, with a `[truncated by Corsair]` marker.
 
 ## Logs and retention
 

@@ -1,5 +1,6 @@
 """Offline ADK test helpers using the real Runner and BaseLlm interface."""
 
+import asyncio
 from typing import Any
 
 from google.adk.models import BaseLlm
@@ -29,6 +30,16 @@ class ScriptedLlm(BaseLlm):
         yield self.responses.pop(0)
 
 
+class StalledLlm(ScriptedLlm):
+    """A native ADK model whose every request outlives any test bound: a slow provider."""
+
+    async def generate_content_async(self, llm_request: Any, stream: bool = False):
+        del stream
+        self.requests.append(llm_request)
+        await asyncio.sleep(3600)
+        yield LlmResponse()
+
+
 def text_response(text: str) -> LlmResponse:
     return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=text)]))
 
@@ -51,4 +62,24 @@ def tool_batch_response(calls: list[tuple[str, dict[str, Any]]]) -> LlmResponse:
                 for name, args in calls
             ],
         )
+    )
+
+
+def truncated_response(text: str | None = None) -> LlmResponse:
+    """A final response that stopped at the output cap, as each ADK route reports it.
+
+    With ``text`` it is ADK's native Gemini shape: the truncated content is kept and
+    only ``finish_reason`` says MAX_TOKENS.  Without it, it is the LiteLLM shape for an
+    OpenAI-style ``length`` finish, which also stamps the reason as ``error_code``.
+    """
+
+    if text is not None:
+        return LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=text)]),
+            finish_reason=types.FinishReason.MAX_TOKENS,
+        )
+    return LlmResponse(
+        error_code=types.FinishReason.MAX_TOKENS,
+        error_message="Maximum tokens reached",
+        finish_reason=types.FinishReason.MAX_TOKENS,
     )

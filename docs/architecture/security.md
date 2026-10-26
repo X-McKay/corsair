@@ -16,15 +16,15 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 3. The producer proposes JSON payload data only. It never authors a probe or any executable code; the kernel owns the recipe and materializes it at run time ([ADR 0004](decisions/0004-payload-pair-and-coverage-gated-verdict.md)).
 4. Control and exploit come from one differential run pair that differs only in payload.
 5. Exact target-line coverage is required in both runs before an observation counts toward any label.
-6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`).
+6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`) on distinct exploit payloads, of a recipe kind whose auditor rubric is qualified for the clean-negative path (currently the Python kinds).
 7. `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision differential; a supplied fix revision is optional confirmation and only withholds the label when the exploit still demonstrates on it.
 
 ## Trust boundaries and controls
 
 | Boundary | Control | Limit |
 | --- | --- | --- |
-| Source admission | Operator-scoped local root; descriptor/no-follow traversal; regular-file, size, count, sensitive-name, and digest checks; deterministic immutable archive | Not remote-SCM trust, malware scanning, or a general secret detector. |
-| Request binding and target gate | Request load binds `finding.file` to the recipe's module; a finding with no target line, or whose line does not execute in both runs, cannot be decisive (`UNABLE_TO_RUN` / `INCONCLUSIVE`) | The binding proves the demonstration is about the named target, not absence of other weaknesses. A pre-model `target_binding` gate is planned follow-up; today the line binding is enforced at verdict time. |
+| Source admission | Operator-scoped local root; descriptor/no-follow traversal; regular-file, size, count, sensitive-name, and digest checks; repository-private state (`.runs`, `.state`, `.work`, `.venv`, `.git`, tool caches) and the configured `artifact_root` (by device and inode) skipped wherever they occur; deterministic immutable archive | Not remote-SCM trust, malware scanning, or a general secret detector. |
+| Request binding and target gate | Request load binds `finding.file` to the recipe's module; the pre-model `target_binding` gate blocks a target that certainly cannot bind (`UNABLE_TO_RUN`); a finding with no target line (after `prepare` derives one from the recipe function where that is certain), or whose line does not execute in both runs, cannot be decisive (`UNABLE_TO_RUN` / `INCONCLUSIVE`) | The binding proves the demonstration is about the named target, not absence of other weaknesses. The pre-model gate only saves cost on structural facts; the verdict-time line binding and coverage gates remain the authority. |
 | Producer episode | Canonical structured output; bounded model/tool/time budgets; read-only `read_file`/`list_files` and the skills toolset over an immutable snapshot; data-only payload pair | A valid pair can still be the wrong pair; model roles can share correlated failure. |
 | Auditor episode | No tools; outcome-blind packet; structured reject-only output | A non-rejection is not an endorsement and never raises a label. |
 | Probe authoring | The kernel writes the probe from the operator-owned recipe and the proposed payloads; agents cannot alter the recipe, fixed arguments, or assertions | The recipe set is the pilot's scope; it does not generalize to arbitrary findings. |

@@ -35,6 +35,5 @@
       ],
       "reason": "The source and reported property specify a direct file-access API"
     }
-  },
-  "max_output_tokens": 2048
+  }
 }

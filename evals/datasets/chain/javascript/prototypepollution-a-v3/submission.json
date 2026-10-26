@@ -1,0 +1,15 @@
+{
+  "control_payload": { "theme": { "color": "dark" } },
+  "exploit_payload": { "__proto__": { "polluted": "corsair" } },
+  "hypothesis": "The parsed-JSON merge source reaches the shared object prototype: a __proto__ key in the source is merged onto Object.prototype, while an ordinary nested object merges cleanly.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Show whether a crafted merge source pollutes Object.prototype while a benign source does not",
+    "next_steps": [
+      "Read src/merge.js",
+      "Submit a benign nested object and a __proto__ payload against mergePreferences"
+    ],
+    "reason": "mergePreferences iterates Object.keys(source) and recurses, so a JSON __proto__ key is an own enumerable property that reaches the prototype"
+  }
+}

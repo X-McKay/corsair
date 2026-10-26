@@ -20,11 +20,18 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.target_binding import TargetBindingBlocked
+from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
 from corsair.ports.scm import SourceSnapshotPort
 from corsair.settings import Settings
 from corsair.steps.manifest import build_manifest
+
+# Seconds between heartbeats while an activity awaits blocking work. Well inside every
+# heartbeat timeout the workflow schedules (heartbeat_seconds), so a slow Docker daemon,
+# source admission or model episode is never mistaken for a lost worker.
+HEARTBEAT_INTERVAL_SECONDS = 2.0
 
 
 class Activities:
@@ -56,9 +63,11 @@ class Activities:
 
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
-        activity.heartbeat("preparing")
+        kind = request.case.recipe.kind
         try:
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id)
+            image_id = await self._with_heartbeats(
+                asyncio.to_thread(self.sandbox.image_id_for, kind), "preparing"
+            )
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -74,15 +83,42 @@ class Activities:
                 non_retryable=True,
             )
         try:
-            return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
+            # Preparation also binds the target, over the admitted bytes: a case that
+            # certainly cannot bind stops here as UNABLE_TO_RUN, before any model or
+            # container cost (Python callable recipes; see prepare_case).
+            return await self._with_heartbeats(
+                asyncio.to_thread(self.sources.prepare, request.case, manifest), "preparing"
+            )
+        except TargetBindingBlocked as exc:
+            raise ApplicationError(
+                format_diagnostic(str(exc)), type="PREPARE_BLOCKED", non_retryable=True
+            ) from None
         except (ValueError, FileNotFoundError, PermissionError) as exc:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
 
-    async def _model_episode(self, awaitable):
+    @staticmethod
+    def _activity_window() -> float | None:
+        """Time left to this activity attempt, from the bounds the workflow scheduled."""
+        info = activity.info()
+        queued = (info.started_time - info.current_attempt_scheduled_time).total_seconds()
+        start_to_close, schedule_to_close = (
+            info.start_to_close_timeout,
+            info.schedule_to_close_timeout,
+        )
+        return activity_window_seconds(
+            start_to_close.total_seconds() if start_to_close else None,
+            schedule_to_close.total_seconds() if schedule_to_close else None,
+            queued,
+        )
+
+    @staticmethod
+    async def _with_heartbeats(awaitable, detail: str):
+        """Await ``awaitable`` while heartbeating ``detail`` every interval until it ends."""
+
         async def heartbeats():
             while True:
-                activity.heartbeat("agent episode")
-                await asyncio.sleep(2)
+                activity.heartbeat(detail)
+                await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
 
         heartbeat_task = asyncio.create_task(heartbeats())
         try:
@@ -94,14 +130,20 @@ class Activities:
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
         try:
-            return await self._model_episode(self.inference.produce(request))
+            window = self._activity_window()
+            return await self._with_heartbeats(
+                self.inference.produce(request, window_seconds=window), "agent episode"
+            )
         except Exception as exc:
             raise self._activity_error(exc, "PRODUCER_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.audit")
     async def audit(self, request: AuditInput) -> AuditOutput:
         try:
-            return await self._model_episode(self.inference.audit(request))
+            window = self._activity_window()
+            return await self._with_heartbeats(
+                self.inference.audit(request, window_seconds=window), "agent episode"
+            )
         except Exception as exc:
             raise self._activity_error(exc, "AUDITOR_FAILED", non_retryable=True) from None
 

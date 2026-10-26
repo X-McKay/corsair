@@ -1,0 +1,14 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "js-prototypepollution-a",
+      "family": "js-prototypepollution",
+      "split": "chain",
+      "request": "datasets/chain/javascript/prototypepollution-a-v3/request.json",
+      "oracle": "datasets/chain/javascript/prototypepollution-a-v3/oracle.json",
+      "request_digest": "0742a78f9a5e5ff694ca5d021c5a581d66016235224af132d39fd884daad6cd9",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    }
+  ]
+}

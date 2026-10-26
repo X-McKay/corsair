@@ -1,0 +1,15 @@
+{
+  "control_payload": "readme.txt",
+  "exploit_payload": "../private/secret.txt",
+  "hypothesis": "The caller-controlled name reaches File.join(root, name) and File.read without validation, so a traversal path escapes the fixed public root. The benign name should retain normal public file access.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Verify whether the name input can disclose data outside the fixed public root",
+    "next_steps": [
+      "Read lib/attachments.rb",
+      "Submit a benign name and a traversal name against Attachments.read"
+    ],
+    "reason": "The source and reported property specify a direct file-access API over a fixed root"
+  }
+}

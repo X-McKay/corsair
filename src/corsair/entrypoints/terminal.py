@@ -1,48 +1,64 @@
-"""Presentation only. Rich owns color/animation; Temporal owns execution and waiting."""
+"""Presentation only. Rich owns color/animation; Temporal owns execution and waiting.
+
+``Terminal`` chooses JSON, Markdown or human output and dispatches each human view to its
+family module under :mod:`corsair.entrypoints.render`.
+"""
 
 import argparse
 import asyncio
 import json
 import logging
 import sys
+import time
 from collections.abc import Awaitable, Callable, Mapping
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
+from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import TypeAdapter
 from rich.console import Console
 from rich.json import JSON
+from rich.live import Live
 from rich.panel import Panel
-from rich.table import Table
 from rich.text import Text
 
-from corsair.contracts import InvestigationResult
-from corsair.evaluation.scoring import usage_metrics
-from corsair.observability.logging import event, safe_text
+from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.contracts import InvestigationResult, Observation
+from corsair.entrypoints.render.checks import print_checks, print_datasets, print_intake
+from corsair.entrypoints.render.preview import print_preview, print_preview_diff
+from corsair.entrypoints.render.progress import (
+    child_changes,
+    child_line,
+    progress_fields,
+    progress_line,
+    progress_panel,
+)
+from corsair.entrypoints.render.remedies import failure_remedy
+from corsair.entrypoints.render.reports import print_comparison, print_evaluation
+from corsair.entrypoints.render.result import (
+    print_explanation,
+    print_observation,
+    print_result,
+)
+from corsair.entrypoints.render.runs import print_evidence, print_runs
+from corsair.observability.logging import event, safe_error_detail
 
-_STYLES: dict[str, str] = {
-    "SUPPORTED": "green",
-    "CONDITIONAL": "yellow",
-    "INCONCLUSIVE": "yellow",
-    "ERROR": "red",
-    "BLOCKED": "red",
-    "CANCELLED": "yellow",
-    "COMPLETED": "green",
-}
 T = TypeVar("T")
+# Seconds between native status queries while a durable workflow remains open.
+_POLL_SECONDS = 1.0
 
 
 class TerminalOptions(Protocol):
     """Presentation switches shared by every parsed command."""
 
-    format: Literal["auto", "human", "json"]
+    format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
     log_format: Literal["text", "json"]
 
 
-def _text(value: object) -> Text:
-    return Text("unknown" if value is None else safe_text(value))
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class Terminal:
@@ -50,8 +66,9 @@ class Terminal:
         options = cast(TerminalOptions, args)
         requested = options.format
         self.human = requested == "human" or (requested == "auto" and sys.stdout.isatty())
+        self.markdown = requested == "markdown"
         # JSON mode must remain free of cursor movement even when running on a TTY.
-        colors = not options.no_color and requested != "json"
+        colors = not options.no_color and requested not in {"json", "markdown"}
         animation = self.human and not options.no_animation
         animation = animation and options.log_format != "json"
         self.out = Console(
@@ -71,35 +88,42 @@ class Terminal:
         )
         self.animate = animation and self.err.is_interactive
 
-    def emit(self, value: object) -> None:
-        """Write a complete JSON receipt or a compact human rendering to stdout."""
+    def emit(self, value: object, *, store: ArtifactStore | None = None) -> None:
+        """Write a complete JSON receipt, a Markdown record or a compact human rendering.
+
+        ``store`` lets the human result view verify each round's receipts for its gate
+        ledger; without it, rounds that reached the kernel show ``evidence_unverified``.
+        JSON output never depends on it.
+        """
         rendered = TypeAdapter(Any).dump_python(value, mode="json")
+        if self.markdown:
+            from corsair.entrypoints.markdown import to_markdown
+
+            sys.stdout.write(to_markdown(rendered))
+            return
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
-        if isinstance(rendered, dict) and "disposition" in rendered:
-            self._result(rendered)
+        if isinstance(rendered, dict) and "statements" in rendered:
+            print_explanation(self.out, rendered, store)
+        elif isinstance(rendered, dict) and "disposition" in rendered:
+            print_result(self.out, InvestigationResult.model_validate(rendered), store)
+        elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
+            print_observation(self.out, Observation.model_validate(rendered))
+        elif isinstance(rendered, dict) and "runs" in rendered:
+            print_runs(self.out, rendered)
+        elif isinstance(rendered, dict) and {"intake", "findings"} <= set(rendered):
+            print_intake(self.out, rendered)
+        elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
+            print_datasets(self.out, rendered)
+        elif isinstance(rendered, dict) and "observations" in rendered:
+            print_evidence(self.out, rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
-            table = Table("Check", "Status", "Details", expand=True)
-            for check in rendered["checks"]:
-                style = {"pass": "green", "fail": "red", "warn": "yellow"}.get(
-                    check["status"], "cyan"
-                )
-                table.add_row(
-                    _text(check["name"]),
-                    Text(check["status"].upper(), style=style),
-                    _text(check["detail"]),
-                )
-            self.out.print(Panel(table, title="Corsair · Environment checks", border_style="cyan"))
-            self.out.print(_text(rendered["qualification"]))
+            print_checks(self.out, rendered)
+        elif isinstance(rendered, dict) and "cases" in rendered and "regression" in rendered:
+            print_comparison(self.out, rendered)
         elif isinstance(rendered, dict) and ("summary" in rendered or "attempts" in rendered):
-            summary = rendered.get("summary", rendered)
-            table = Table.grid(padding=(0, 2))
-            for key, detail in summary.items():
-                table.add_row(Text(key.replace("_", " "), style="cyan"), _text(detail))
-            self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
-            if "report" in rendered:
-                self.out.print(Text("Report: ") + _text(rendered["report"]))
+            print_evaluation(self.out, rendered)
         else:
             self.out.print(
                 Panel(
@@ -109,54 +133,35 @@ class Terminal:
                 )
             )
 
-    def _result(self, value: dict[str, Any]) -> None:
-        """Render a validated investigation result without exposing model content."""
-        table = Table.grid(padding=(0, 2), expand=True)
-        label = value["disposition"]
-        table.add_row(
-            Text("Disposition", style="cyan"), Text(label, style=_STYLES.get(label, "cyan"))
+    def preview(self, value: dict[str, Any], *, full: bool) -> None:
+        """Render an agent preview or preview diff; JSON and Markdown keep every byte."""
+        if not self.human:
+            self.emit(value)
+        elif "baseline" in value:
+            print_preview_diff(self.out, value, full=full)
+        else:
+            print_preview(self.out, value, full=full)
+
+    def report_failure(self, error: Exception) -> None:
+        """Log a failed command with its sanitized detail and, when known, a fixed remedy."""
+        remedy = failure_remedy(error)
+        event(
+            "cli.failed",
+            level=logging.ERROR,
+            error_type=type(error).__name__,
+            message=safe_error_detail(error),
+            **({} if remedy is None else {"remedy": remedy}),
         )
-        for key in ("run_id", "case_id", "execution_status", "scope", "reason", "fix_status"):
-            table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(value.get(key)))
-        for item in value.get("rounds", []):
-            observation = item.get("observation") or {}
-            session = item.get("session", 1)
-            name = (
-                f"Round {item['index']}"
-                if session == 1
-                else f"Session {session} round {item['index']}"
-            )
-            for role in ("control", "adversarial"):
-                evidence = observation.get(role) or {}
-                detail = (
-                    f"{evidence.get('outcome', 'not observed')} · "
-                    f"exit={evidence.get('native_exit_code')} · "
-                    f"coverage={evidence.get('covered_lines', [])}"
-                )
-                table.add_row(_text(f"{name} {role}"), _text(detail))
-            audit = (item.get("audit") or {}).get("review") or {}
-            table.add_row(_text(f"{name} audit"), _text(audit.get("decision")))
-            usage = item["producer"]["usage"]
-            table.add_row(
-                _text(f"{name} producer"),
-                _text(f"{usage['llm_calls']} LLM / {usage['tool_calls']} tool calls"),
-            )
-            feedback = item["producer"].get("feedback") or observation.get("feedback")
-            if feedback:
-                table.add_row(Text("Gate", style="yellow"), _text(feedback["gate"]))
-        table.add_row(
-            Text("Usage complete", style="cyan"), _text(value.get("usage_complete", True))
-        )
-        for key, total in usage_metrics(InvestigationResult.model_validate(value)).items():
-            table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(total))
-        for role, model in (value.get("manifest") or {}).get("models", {}).items():
-            table.add_row(Text(f"{role.title()} model", style="cyan"), _text(model))
-        table.add_row(Text("Cost", style="cyan"), Text("unknown"))
-        artifact = value.get("result_artifact") or {}
-        table.add_row(Text("Result SHA-256", style="cyan"), _text(artifact.get("sha256")))
-        self.out.print(
-            Panel(table, title="Corsair · Investigation", border_style=_STYLES.get(label, "cyan"))
-        )
+
+    def _print_progress(
+        self, label: str, status: Mapping[str, object], seen: dict[str, str], begun: float
+    ) -> None:
+        """Plain mode: one line per evaluation child state change, else one status line."""
+        now = _utcnow()
+        fields = progress_fields(status, now, time.monotonic() - begun)
+        lines = [child_line(label, row, fields, now) for row in child_changes(seen, status)]
+        for line in lines or [progress_line(label, fields)]:
+            self.err.print(line, soft_wrap=True)
 
     async def wait(
         self,
@@ -165,16 +170,31 @@ class Terminal:
         *,
         query: Callable[[], Awaitable[Mapping[str, object]]] | None = None,
     ) -> T:
-        """Observe actual SDK completion; query failures never invent success or progress."""
-        status = (
-            self.err.status(Text(label), spinner="dots", spinner_style="cyan")
-            if self.animate
-            else None
-        )
-        task = asyncio.ensure_future(awaitable)
+        """Observe actual SDK completion; query failures never invent success or progress.
+
+        With a status query, an animated terminal shows a live panel, a plain human terminal
+        prints one line per status change (per child state change for an evaluation), and
+        JSON mode writes nothing beyond the logs.
+        """
+        begun = time.monotonic()
         last: Mapping[str, object] | None = None
+        seen: dict[str, str] = {}
+
+        def frame() -> Panel:
+            now = _utcnow()
+            fields = progress_fields(last, now, time.monotonic() - begun)
+            return progress_panel(label, last, fields, now=now)
+
+        display: AbstractContextManager[object] = nullcontext()
+        if self.animate and query is not None:
+            display = Live(
+                console=self.err, get_renderable=frame, refresh_per_second=4, transient=False
+            )
+        elif self.animate:
+            display = self.err.status(Text(label), spinner="dots", spinner_style="cyan")
+        task = asyncio.ensure_future(awaitable)
         query_failed = False
-        with status if status is not None else nullcontext():
+        with display:
             try:
                 while not task.done():
                     if query is not None:
@@ -186,9 +206,6 @@ class Terminal:
                                 round_index = actual.get("round")
                                 completed = actual.get("completed")
                                 total = actual.get("total")
-                                detail = " · ".join(
-                                    f"{key}={value}" for key, value in actual.items()
-                                )
                                 event(
                                     "workflow.progress",
                                     phase=phase if isinstance(phase, str) else None,
@@ -196,9 +213,9 @@ class Terminal:
                                     completed=completed if isinstance(completed, int) else None,
                                     total=total if isinstance(total, int) else None,
                                 )
-                                if status:
-                                    status.update(Text(f"{label} · {detail}"))
                                 last = actual
+                                if self.human and not self.animate:
+                                    self._print_progress(label, last, seen, begun)
                             query_failed = False
                         except Exception as error:
                             if not query_failed:
@@ -208,7 +225,7 @@ class Terminal:
                                     error_type=type(error).__name__,
                                 )
                             query_failed = True
-                    await asyncio.wait({task}, timeout=1)
+                    await asyncio.wait({task}, timeout=_POLL_SECONDS)
                 return await task
             finally:
                 if not task.done():

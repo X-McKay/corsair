@@ -4,11 +4,11 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 
 ## What the pilot implements
 
-- **Producer agent** (`agents/producer/`): read-only `read_file`/`list_files` over an admitted immutable snapshot plus the role-filtered skills toolset. Returns a `ProducerDecision`: a `Submission` holding one benign/exploit payload pair as JSON, or an explicit abstention. Never runs code, never writes a probe, never sees an outcome.
+- **Producer agent** (`agents/producer/`): exactly the read-only `read_file`/`list_files` over an admitted immutable snapshot; its `source-grounding` procedure is preloaded into the instruction, with no skill loader (removing the `SkillToolset` cut about 3.3 KB, ~820 approximate tokens, from every producer request; live eval unrun). Returns a `ProducerDecision`: a `Submission` holding one benign/exploit payload pair as JSON, or an explicit abstention. Never runs code, never writes a probe, never sees an outcome.
 - **Auditor agent** (`agents/auditor/`): no tools, native structured `AuditResult`, outcome-blind, reject-only.
-- **Kernel** (`policies/verdicts.py`, `steps/verification.py`, `workflows/investigation.py`): gates in the fixed order `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation (request load already binds `finding.file` to the recipe's module; a pre-model `target_binding` gate is planned follow-up); verdict table producing `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`.
+- **Kernel** (`policies/verdicts.py`, `steps/verification.py`, `workflows/investigation.py`): gates in the fixed order `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation (request load binds `finding.file` to the recipe's module, and the prepare activity runs the pre-model `target_binding` gate in `policies/target_binding.py` over the admitted module, blocking a certainly unbindable target as `UNABLE_TO_RUN` before any model call, then binds the declared line to the line coverage reports for it with `policies/line_binding.py`, recorded as `PreparedCase.target_line`); verdict table producing `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`.
 - **Ports and adapters**: typed inference, source-snapshot and sandbox ports; ADK, local-source, Docker, filesystem and Temporal adapters. The sandbox port is answered by Docker only.
-- **Evaluation**: isolated producer/auditor evaluation (`just eval-agent`), durable dataset evaluation (`just eval`), frozen datasets under `evals/datasets/` including the independent paired corpus and per-language chain rows.
+- **Evaluation**: isolated producer/auditor evaluation (`just eval-agent`), durable dataset evaluation (`just eval`), frozen datasets under `evals/datasets/` including the independent paired corpus and per-language chain rows. Scanner intake is measured offline: `corsair intake` dry-runs a scan report into candidate requests with per-finding admissibility, and `just eval-intake evals/datasets/intake.json` scores 12 frozen findings against per-finding oracles (no model, container or service).
 - **Tooling**: `just check` (Ruff lint/format, Just format, ty, docs links), `just test` (offline), `just test-docker`, `just test-temporal`, `just test-live`, `just verify`, `just eval`, `just eval-agent`.
 
 ## Decisions taken for the pilot
@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the running runtime, with two recipes (`python.secret_disclosure/1`, `python.command_sentinel/1`); one corpus row each is qualified on Linux amd64 for JavaScript (`javascript.prototype_pollution/1`, `prototypepollution-a`), Ruby (`ruby.secret_disclosure/1`, `pathtraversal-b`, see the [Ruby corpus survey](../../reference/corpus/ruby.md)), Java (`java.secret_disclosure/1`, `xxe-b`, see the [Java corpus survey](../../reference/corpus/java.md)), Perl (`perl.html_injection/1`, `perl-xss-b`, see the [Perl corpus survey](../../reference/corpus/perl.md)) and C (`c.integer_overflow/1`, `c-intoverflow-a`, see the [C corpus survey](../../reference/corpus/c.md)); the remaining rows of every language are carried in the corpus matrix only | Capability depth comes from concrete, tested operator-owned recipes; a new language is a discriminated `Case.recipe` union member with its own trusted driver and image, not a generic adapter. macOS arm64 and the live chain are unrun for every non-Python runtime. |
 
 ## Gates and environment
 
@@ -33,6 +33,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 | `just test-docker`, `just test-temporal` | rig | not yet recorded |
 | `just test-live`, composed live batch | rig | not yet recorded |
 | Isolated producer/auditor baselines on the six labels | rig | not yet promoted |
+| JavaScript recipe `corsair verify` + `test_docker_javascript.py` (Linux amd64) | rig | run: control held / adversarial violated on `prototypepollution-a`, 4 Docker tests pass, cleanup confirmed, ~0.16 s/role; live chain unrun ([platforms](../../reference/platforms.md#javascript-prototype-pollution-linux-amd64)) |
 
 ## Open decisions awaiting the owner
 
@@ -40,7 +41,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 2. **Probe module versus payload pair.** The pilot keeps the payload-pair contract because the standing rules forbid agent-authored executable exploit code. If the owner wants the producer to write a probe module instead, that rule changes first and [ADR 0004](../../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md) is revisited.
 3. **Per-call Temporal plugin versus one episode per activity.** The pilot runs one ADK episode per activity. Adopting the ADK Temporal plugin needs a separate decision, conformance review and qualification.
 4. **`negative_threshold`.** Set to 2 for the pilot. Raising it costs more sessions per negative; lowering it to 1 is not acceptable under the false-negative rule.
-5. **Perl corpus licence.** The Perl rows under `evals/datasets/chain/perl/` need a licence decision before they are treated as redistributable corpus material.
+5. **Perl corpus licence.** The Perl rows under `evals/datasets/chain/perl/` need a licence decision before they are treated as redistributable corpus material. The qualified `perl-xss-b` row does not copy Perl source: its request points at the existing frozen corpus tree in place, so the licence decision is still outstanding and gates any redistribution.
 
 ## Blockers
 

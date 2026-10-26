@@ -31,6 +31,8 @@ uv owns dependency/download/build caching. The normal uv cache is acceptable; if
 | `.work/tmp/` | VM-shared disposable staging | Only clear once owning tests/containers have completed. |
 | `outputs/` | Complete generated deliverables and sanitized reports | Share deliberately; do not commit built archives by default. |
 
+Source admission never snapshots this private state. A directory named `.runs`, `.state`, `.work` or `.venv` (or `.git` and the Python tool caches `__pycache__`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`) is silently skipped wherever it occurs in an admitted tree, and so is the configured `artifact_root` under any name, matched by device and inode, so the default `source_root` `"."` with `artifact_root` `".runs"` never admits prior evidence, settings, scratch or the virtualenv to an agent or a container ([`adapters/scm/local.py`](../../src/corsair/adapters/scm/local.py)). `.cache/` and `outputs/` are not on that list: keep them out of a directory you admit as source, or admit a narrower path.
+
 Provider bridges, trust bundles and private keys have an owner and potentially active consumers. Their small size or old timestamp is not proof they can be deleted.
 
 ## Shared native staging on macOS

@@ -23,6 +23,7 @@ Recorded architecture decisions describe implemented choices:
 2. [Canonical Pydantic contracts and narrow ports](architecture/decisions/0002-pydantic-contracts-and-ports.md).
 3. [Immutable native evidence](architecture/decisions/0003-immutable-native-evidence.md).
 4. [Payload pair, coverage-gated kernel, and six labels](architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md).
+5. [Outcome-blind retry feedback carries no role-attributed run fact](architecture/decisions/0005-outcome-blind-retry-feedback.md) (proposed).
 
 ## Development
 
@@ -62,6 +63,13 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Schemas](reference/schemas.md): canonical Pydantic models and schema inspection.
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
+- [Corpus surveys](reference/corpus/README.md): one page per language and its chain dataset.
+  - [C corpus survey](reference/corpus/c.md): the C rows and the qualified `c.integer_overflow/1` recipe.
+  - [Java corpus survey](reference/corpus/java.md): per-row fit for the Java secret-disclosure recipe and the one qualified row.
+  - [JavaScript corpus survey](reference/corpus/javascript.md): the JavaScript rows and why the prototype-pollution recipe is qualified first.
+  - [Perl corpus survey](reference/corpus/perl.md): the Perl rows, their properties, and the qualified `perl.html_injection/1` row.
+  - [Python corpus map](reference/corpus/python.md): which recipe each Python corpus row's property needs.
+  - [Ruby corpus survey](reference/corpus/ruby.md): the Ruby rows, their properties, and the one migrated, qualified row.
 
 ## Agents
 

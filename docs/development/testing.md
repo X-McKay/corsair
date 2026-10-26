@@ -11,7 +11,7 @@ just -- test -q -W error
 just build
 ```
 
-`just sync` installs the locked development dependencies. `just check` runs Ruff lint, Ruff format check, Just formatting, `ty check --error-on-warning` across maintained source, tests, evaluators and developer scripts, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test, which creates a fresh environment and loads the actual wheel outside the checkout. `just build` creates the source distribution and wheel.
+`just sync` installs the locked development dependencies. `just check` runs the toolchain report (see [prerequisites and failure messages](setup.md#prerequisites-and-failure-messages)), Ruff lint, Ruff format check, Just formatting, `ty check --error-on-warning` across maintained source, tests, evaluators and developer scripts, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test, which creates a fresh environment and loads the actual wheel outside the checkout. `just build` creates the source distribution and wheel.
 
 Recipe arguments after `just -- RECIPE` go directly to pytest or the CLI. Use `-W error` for a strict qualification run; the recipes forward it rather than silently changing warning policy. Report test counts, deselections, skips, and warnings with the command result. A skip is an unexecuted boundary, not a pass.
 
@@ -27,8 +27,17 @@ Recipe arguments after `just -- RECIPE` go directly to pytest or the CLI. Use `-
 | Durable workflows and replay | `just -- test-temporal -q -W error` | `test-temporal` sets `CORSAIR_TEST_TEMPORAL=1`; the fixture starts a real local Temporal test environment and runs ordinary typed activities. It does not run Docker target execution or a live model. |
 | All native gates | `CORSAIR_LIVE_CONFIG=/operator/settings.json just -- test-all -q -W error` | `test-all` enables Docker and Temporal and installs the optional provider dependency. A real-provider smoke still requires the explicit operator settings path; without it, that test skips. |
 | Isolated producer/auditor diagnostic | `just -- eval-agent AGENT DATASET --settings /operator/settings.json --repeats N` | Requires an operator-configured provider. Runs the production role factory against frozen inputs without target execution; it is not a whole-system result. |
+| Recorded live run | `just -- live-agent ROLE DATASET [BASELINE] --dry-run`, `just -- live-chain DATASET [BASELINE] --dry-run` | Without `--dry-run`, requires `.state/settings.json` naming a connector and its provider environment (and, for the chain, a ready worker). Writes the report, `identity.json`, comparison and a README draft under `.runs/live/`; see [recording a live run](../agents/evaluations.md#recording-a-live-run-in-one-step). |
 
-`test-docker` also selects tests marked `temporal`; set `CORSAIR_TEST_TEMPORAL=1` as shown so those fixture-backed durable tests execute instead of skip. `test-live` selects only the live marker and installs the provider extra, but it neither creates credentials nor sets `CORSAIR_LIVE_CONFIG`.
+`test-docker` also selects tests marked `temporal`; set `CORSAIR_TEST_TEMPORAL=1` as shown so those fixture-backed durable tests execute instead of skip.
+
+### Concurrent suites on one daemon
+
+Several worktrees may run `test-docker` against one Docker daemon at the same time. An operation id becomes the `corsair.operation` container label, and the operation-reconciliation gate refuses any operation whose label already exists on the daemon (`an uncommitted labeled sandbox exists; operation will not be replayed`, with `cleanup_confirmed` false). That gate is the behaviour under test, so the tests keep identities apart instead of relaxing it:
+
+- Every operation id in [test_docker.py](../../tests/integration/test_docker.py) comes from the session-scoped `session_operation` fixture as `pytest-<12 hex>.<label>`, one random prefix per pytest session. Tests assert that format, not a literal id.
+- Temporal workflow ids, run ids and task queues come from `temporal_id` in [workflow/temporal.py](../../tests/workflow/temporal.py), which is unique per call; each session also starts its own Temporal test server. Operation ids in the chain and CLI tests derive from those run ids.
+- At session teardown the fixture lists labelled sandboxes whose operation id carries its own prefix, removes them by immutable id, and fails with their names, so a leak is never silent. It never touches another prefix, because another suite may still hold that identity. A start-of-session sweep would be a no-op for a fresh prefix. Containers left by older fixed-id runs are not removed and no longer collide. `test-live` selects only the live marker and installs the provider extra, but it neither creates credentials nor sets `CORSAIR_LIVE_CONFIG`.
 
 The CI workflow uses the locked Nix shell. Linux amd64 covers offline/package, Docker/Temporal native conformance, and durable workflow jobs; macOS arm64 covers offline/package and Temporal. Hosted macOS does not stand in for physical Docker Desktop/Colima nested virtualization. See [platforms](../reference/platforms.md) for the support and host-qualification boundary.
 
@@ -56,6 +65,8 @@ Record the exact command, environment gates (without secrets), result, elapsed t
 ## Directory ownership
 
 `tests/` has only unit, integration, workflow, replay and security category directories. Root `conftest.py` and `__init__.py` are standard discovery/package files. Shared ADK test doubles live in [unit/adk.py](../../tests/unit/adk.py); real Temporal fixture registration and typed workflow doubles live in [workflow/temporal.py](../../tests/workflow/temporal.py). Integration/replay consumers import those single implementations; there is no separate tests/fixtures compatibility package.
+
+`scripts/` holds four operator scripts, each behind a `just` recipe: [`check_toolchain.py`](../../scripts/check_toolchain.py) (`just toolchain` and the `just sync` pre-check), [`check_docs.py`](../../scripts/check_docs.py) (`just docs-check`), [`local_stack.py`](../../scripts/local_stack.py) (`just settings-init`, `temporal-up`, `temporal-down`, `worker-up`, `worker-down` and `demo`) and [`live_eval.py`](../../scripts/live_eval.py) (`just live-agent` and `live-chain`). One-off measurement harnesses whose results are recorded in a plan live under [`scripts/benchmarks/`](../../scripts/benchmarks/README.md); a role's request size is measured with `corsair agent preview`, not a script.
 
 `evals/` has datasets, evaluators, experiments, fixtures and baselines. The [evaluator guide](../../evals/evaluators/README.md) points to installed canonical evaluator/scorer code rather than duplicating it. Dataset/fixture/oracle/baseline bytes must survive organization-only changes unchanged. Ignored bytecode and obsolete cache-only folders are not components and are excluded from delivery.
 

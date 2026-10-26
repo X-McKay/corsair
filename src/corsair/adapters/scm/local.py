@@ -15,11 +15,39 @@ from collections.abc import Generator, Iterable, Iterator
 from pathlib import Path, PurePosixPath
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import ArtifactRef, Case, PreparedCase, RunManifest, Source, safe_path
+from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
+    ArtifactRef,
+    Case,
+    LineProvenance,
+    PreparedCase,
+    RunManifest,
+    Source,
+    safe_path,
+)
+from corsair.policies import line_binding
+from corsair.policies.target_binding import (
+    TargetBindingBlocked,
+    bind_target_line,
+    target_binding,
+)
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
-_EXCLUDED_DIRECTORIES = {".git", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+# Silently skipped wherever they occur: version-control metadata, caches, and the
+# repository-private evidence, configuration, scratch and virtualenv directories that the
+# shipped defaults (source_root ".", artifact_root ".runs") place inside a source tree.
+_EXCLUDED_DIRECTORIES = {
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".runs",
+    ".state",
+    ".work",
+    ".venv",
+}
 _SENSITIVE_BASENAMES = {
     "oracle.json",
     "expected.json",
@@ -195,11 +223,28 @@ def _directory_entries(directory_fd: int) -> list[os.DirEntry[str]]:
         raise SourceAdmissionError("source changed while it was being admitted") from exc
 
 
+def _artifact_root_identity(settings: Settings) -> tuple[int, int] | None:
+    """The configured artifact root's (st_dev, st_ino), or None while it does not exist."""
+    try:
+        metadata = os.stat(Path(settings.artifact_root).absolute())
+    except OSError:
+        return None
+    return metadata.st_dev, metadata.st_ino
+
+
+def _excluded_directory(
+    name: str, metadata: os.stat_result, artifact_root: tuple[int, int] | None
+) -> bool:
+    """Skip excluded names, and the artifact root under any name, without admitting them."""
+    return name in _EXCLUDED_DIRECTORIES or (metadata.st_dev, metadata.st_ino) == artifact_root
+
+
 def _iter_regular_files(
     directory_fd: int, settings: Settings
 ) -> Generator[tuple[PurePosixPath, int, str, os.stat_result], None, None]:
     """Walk pinned descriptors in lexical order, rejecting every unadmitted entry."""
     directory_flags = _require_secure_source_support()
+    artifact_root = _artifact_root_identity(settings)
     emitted = 0
 
     def walk(
@@ -217,7 +262,7 @@ def _iter_regular_files(
             except OSError as exc:
                 raise SourceAdmissionError("cannot inspect admitted source entry") from exc
             if stat.S_ISDIR(metadata.st_mode):
-                if entry.name not in _EXCLUDED_DIRECTORIES:
+                if not _excluded_directory(entry.name, metadata, artifact_root):
                     directories.append((entry.name, relative, metadata))
             else:
                 files.append((entry.name, relative, metadata))
@@ -329,11 +374,15 @@ def snapshot_source(source: Source, settings: Settings, store: ArtifactStore) ->
     return ref
 
 
-def _archive_members(ref: ArtifactRef, store: ArtifactStore) -> dict[str, tarfile.TarInfo]:
-    """Validate a pinned artifact as a safe, bounded regular-file source snapshot."""
+def _snapshot_bytes(ref: ArtifactRef, store: ArtifactStore) -> bytes:
+    """Fetch a snapshot artifact once per read; the store verifies its digest and size."""
     if ref.media_type != "application/x-tar":
         raise SourceAdmissionError("source artifact has an unexpected media type")
-    content = store.get(ref)
+    return store.get(ref)
+
+
+def _archive_members(content: bytes) -> dict[str, tarfile.TarInfo]:
+    """Validate verified snapshot bytes as a safe, bounded regular-file source snapshot."""
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:") as archive:
             members: dict[str, tarfile.TarInfo] = {}
@@ -359,8 +408,8 @@ def _archive_members(ref: ArtifactRef, store: ArtifactStore) -> dict[str, tarfil
         raise SourceAdmissionError("source artifact is not a valid uncompressed tar") from exc
 
 
-def _read_member(ref: ArtifactRef, store: ArtifactStore, member: tarfile.TarInfo) -> bytes:
-    content = store.get(ref)
+def _read_member(content: bytes, member: tarfile.TarInfo) -> bytes:
+    """Read one validated member from the same verified bytes its listing came from."""
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:") as archive:
             stream = archive.extractfile(member)
@@ -379,22 +428,24 @@ def read_source(ref: ArtifactRef, path: str, store: ArtifactStore, max_bytes: in
     if max_bytes < 1:
         raise ValueError("max_bytes must be positive")
     normalized = _safe_relative(path).as_posix()
-    member = _archive_members(ref, store).get(normalized)
+    content = _snapshot_bytes(ref, store)
+    member = _archive_members(content).get(normalized)
     if member is None:
         raise SourceAdmissionError("requested source path is absent from snapshot")
     if member.size > max_bytes:
         raise SourceAdmissionError("requested source excerpt exceeds byte limit")
     try:
-        return _read_member(ref, store, member).decode("utf-8")
+        return _read_member(content, member).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise SourceAdmissionError("source excerpts must be valid UTF-8") from exc
 
 
 def iter_snapshot_files(ref: ArtifactRef, store: ArtifactStore) -> Iterable[tuple[str, bytes]]:
     """Yield only members accepted by the shared immutable snapshot validator."""
-    members = _archive_members(ref, store)
+    content = _snapshot_bytes(ref, store)
+    members = _archive_members(content)
     for name in sorted(members):
-        yield name, _read_member(ref, store, members[name])
+        yield name, _read_member(content, members[name])
 
 
 def _excerpt(text: str, line: int | None) -> str:
@@ -412,7 +463,15 @@ def _excerpt(text: str, line: int | None) -> str:
 def prepare_case(
     case: Case, settings: Settings, store: ArtifactStore, manifest: RunManifest
 ) -> PreparedCase:
-    """Freeze source revisions before an agent is given only a pinned source excerpt."""
+    """Freeze source revisions and bind the target before an agent sees a source excerpt.
+
+    The one preparation every entry point shares (the prepare activity, ``corsair
+    verify``, candidate replay, agent preview and the isolated producer evaluation), so
+    each requires the same exact line. For a Python callable recipe it derives a missing
+    line from the recipe function, raises ``TargetBindingBlocked`` for a case the
+    pre-model ``target_binding`` gate certainly blocks, and records in ``target_line``
+    the statement line coverage reports for the finding's line (``policies.line_binding``).
+    """
     source = snapshot_source(case.source, settings, store)
     read_source(source, case.recipe.module_file, store, settings.source_limit_bytes)
     finding_text = read_source(source, case.finding.file, store, settings.source_limit_bytes)
@@ -423,14 +482,29 @@ def prepare_case(
     )
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
+    finding, provenance, target_line = case.finding, LineProvenance.DECLARED, None
+    if isinstance(case.recipe, PYTHON_CALLABLE_RECIPES):
+        # Python-AST derivation and binding only; other recipes must declare their line
+        # and rely on their own run-time coverage and binding gates.
+        # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
+        # admitted text. A missing line comes from the trusted recipe, never the narrative.
+        finding, provenance = bind_target_line(case.finding, case.recipe, finding_text)
+        failure = target_binding(finding, case.recipe, finding_text)
+        if failure is not None:
+            raise TargetBindingBlocked(failure)
+        # target_binding passed, so the finding has a line within the module.
+        assert finding.line is not None
+        target_line = line_binding.bind_target_line(finding_text, finding.line)
     return PreparedCase(
         case_id=case.case_id,
-        finding=case.finding,
+        finding=finding,
         recipe=case.recipe,
         source=source,
         fixed_source=fixed_source,
-        source_excerpt=_excerpt(finding_text, case.finding.line),
+        source_excerpt=_excerpt(finding_text, finding.line),
         manifest=manifest,
+        line_provenance=provenance,
+        target_line=target_line,
     )
 
 

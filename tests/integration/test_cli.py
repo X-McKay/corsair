@@ -181,7 +181,7 @@ async def test_real_cli_reference_in_pseudo_terminal_has_animation(tmp_path):
     assert "\x1b[?25l" in rendered  # Rich hides/restores cursor around a real status animation.
     assert "\x1b[?25h" in rendered
     assert "\x1b[" in rendered
-    assert "Native receipt" in rendered and "VIOLATION" in rendered
+    assert "Native reference observation" in rendered and "violated" in rendered
     assert "reference.started" in rendered and "reference.completed" in rendered
 
 

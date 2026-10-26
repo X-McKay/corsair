@@ -29,7 +29,7 @@ src/corsair/
   contracts/       canonical SDK-free Pydantic models, including the payload pair and labels
   ports/           typed inference, source-snapshot, and sandbox boundaries
   adapters/        ADK, local-source, Docker, filesystem, and Temporal SDK code
-  entrypoints/     CLI, typed Python API, worker, diagnostics, terminal rendering
+  entrypoints/     CLI, typed Python API, worker, diagnostics, terminal rendering (render/)
   policies/        the deterministic kernel gates and verdict table; packaged risk assessment
   workflows/       deterministic Temporal coordination of episodes and gates
   steps/           activities, manifests, differential execution, receipt verification
@@ -54,7 +54,7 @@ There is no application-owned agent graph, scheduler, generic provider protocol,
 
 - **Producer.** Read-only source tools (`read_file`, `list_files`) over the admitted snapshot plus the role-filtered skills toolset. It returns one JSON payload **pair**: a benign payload and an exploit payload for the same target seam. It never runs code, never writes a probe, and never sees an exploit outcome. See [`src/corsair/agents/producer/`](../../src/corsair/agents/producer/).
 - **Auditor.** No tools, native structured output, outcome-blind. It reviews the finding, source excerpt, and proposed pair and may only **reject**; it cannot accept its way to a label. See [`src/corsair/agents/auditor/`](../../src/corsair/agents/auditor/).
-- **Kernel.** Trusted code owns the recipe, writes the probe at run time from the proposed payloads, runs the differential pair, verifies coverage and receipts, and applies the verdict table. Gates run in a fixed order: `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation. (Request load already binds `finding.file` to the recipe's module; a cheap pre-model `target_binding` gate is planned follow-up.) The policy module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py).
+- **Kernel.** Trusted code owns the recipe, writes the probe at run time from the proposed payloads, runs the differential pair, verifies coverage and receipts, and applies the verdict table. Gates run in a fixed order: `control_run` + `control_coverage`, `exploit_run` + `exploit_coverage`, `evidence_agreement`, `blind_audit`, the target-line binding and both-runs coverage gate, and an optional `fixed_differential` confirmation. (Before them, request load binds `finding.file` to the recipe's module and `prepare` runs the pre-model `target_binding` gate, [`src/corsair/policies/target_binding.py`](../../src/corsair/policies/target_binding.py), over the admitted module.) The policy module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py).
 
 ## Design invariants
 
@@ -62,7 +62,7 @@ There is no application-owned agent graph, scheduler, generic provider protocol,
 - The auditor never sees an outcome. Its packet excludes execution receipts, coverage, fixtures, oracles, and prior labels.
 - Control and exploit come from one differential run pair that differs only in payload. The same snapshot, recipe, image, and fixed arguments apply to both.
 - **Exact target-line coverage is required in both runs before any observation counts.** A run that did not execute the finding's target line proves nothing about it; this is the primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`.
-- `EXPLOIT_NOT_DEMONSTRATED` requires at least two independent producer sessions (`negative_threshold = 2`) whose coverage-valid exploit runs all failed to demonstrate the condition. One miss is `INCONCLUSIVE`.
+- `EXPLOIT_NOT_DEMONSTRATED` requires at least two independent producer sessions (`negative_threshold = 2`) on distinct exploit payloads whose coverage-valid exploit runs all failed to demonstrate the condition. One miss, or the same exploit payload repeated in a fresh session, is `INCONCLUSIVE`; so is a held pair of a recipe kind whose auditor rubric is not yet qualified (currently every non-Python kind).
 - `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision differential (healthy control, covered exploit demonstration, non-rejecting audit). A fix revision is optional confirmation: when supplied it confirms the label if the benign control still passes and the exploit no longer demonstrates, and withholds it only if the exploit still demonstrates on the fix.
 - Each ADK episode is one Temporal activity with a single attempt; Corsair does not use the experimental ADK Temporal plugin ([ADR 0001](decisions/0001-sdk-owned-durable-rounds.md)). Uncertain side effects are reconciled by identity, not replayed.
 - Shared artifacts are required for worker/client inspection and recovery. A local artifact host remains a single-host durability limit.

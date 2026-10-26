@@ -28,13 +28,35 @@ just -- eval-agent auditor evals/datasets/auditor-dev.json \
 
 Variadic recipes forward arguments literally rather than evaluating them as shell source. Run separate recipes as separate commands; do not append another recipe name after forwarded arguments. Recipes do not auto-load `.env`, create credentials, or retry a provider-policy block.
 
+## Prerequisites and failure messages
+
+`just check` starts with `just toolchain`, which runs `python3 scripts/check_toolchain.py`: a standard-library report of Just, uv, the `.venv` Python, the providers extra and the Docker client against what `nix develop` provides. A `FAIL` line exits non-zero; a `WARN` line names a divergence that otherwise surfaces later as one of the errors below. Run the script directly when `just` itself cannot parse the justfile. `just sync` first runs it with `--before-sync`, which refuses only a `.venv` that `uv sync` would keep although it cannot import the locked native wheels, and the test suite's `tests/conftest.py` stops with the same `FAIL` line before collection.
+
+| Message or symptom | Cause | Remedy |
+| --- | --- | --- |
+| ``error: Unknown setting `default-list` `` from any `just` command | A Just older than the pinned 1.58.0 is first on `PATH` (outside the Nix shell). | `nix develop`, or `uv tool install rust-just==1.58.0`. `tests/unit/test_justfile.py` skips with this remedy rather than failing on the unpinned binary. |
+| `FAIL  just` or `FAIL  uv` from `just toolchain` | The tool is missing or not the pinned version. | `nix develop`. |
+| ``FAIL  .venv  Nix python expected libstdc++ on LD_LIBRARY_PATH`` from `just toolchain`, `just sync` or pytest (`Exit:` before collection) | A `.venv` created inside `nix develop` is used outside it. Nix's loader never searches the host's library directories, so the manylinux wheels with C++ extensions (protobuf, used by google-adk and temporalio, and frozenlist) cannot find `libstdc++.so.6` without the shell's `LD_LIBRARY_PATH`. uv keeps this `.venv` (it satisfies `.python-version`), so without the check the symptom is the `ImportError` below. | Re-enter `nix develop`, or recreate it outside with `uv venv --clear && uv sync --locked --all-extras`; that `.venv` then also works inside the shell. |
+| ``WARN  python … recreates .venv for .python-version`` | `.venv` is not Python 3.12 (for example a 3.13 `.venv` from before the pin), so the next `uv run --locked` silently recreates it with default dependencies only. | `just sync`. |
+| ``WARN  .venv  other python … recreates .venv`` | `UV_PYTHON` in your environment names another interpreter than `.venv`; the Nix shell no longer sets it. | Unset `UV_PYTHON`, or `just sync` to accept the recreation with all extras. |
+| ``WARN  providers missing`` | `uv sync --locked` or a recreated `.venv` left out the optional `providers` extra (LiteLLM); only `just sync` passes `--all-extras`. | `just sync` (`uv sync --locked --all-extras`). |
+| ``connector 'litellm' requires Corsair's providers extra`` from `corsair` or a test | Same as above, at model selection. ADK's chained message suggests `pip install google-adk[extensions]`; do not follow it, because LiteLLM is pinned in Corsair's `providers` extra in `uv.lock`. | `just sync`, or `uv sync --locked --extra providers`. |
+| `ImportError: libstdc++.so.6: cannot open shared object file` while importing `google._upb._message` (protobuf) or `frozenlist` | Code ran on a Nix-built `.venv` outside the shell without going through the checks above (for example `.venv/bin/python` directly). | As for `FAIL  .venv  Nix python`. |
+| ``warning: `build_system.requires = ["uv-build>=0.12.19,<0.13"]` does not contain the current uv version`` | The Nix uv is newer than the build-backend range; uv fetches the locked `uv_build` separately. | None needed; the build still uses the declared backend. |
+
 ## Local environment and file lifecycle
 
 `just sync` creates/updates the canonical root `.venv/`; do not keep using a dated task environment. Private/generated roots, local credentials, databases and delivery archives are Git-ignored. Ongoing settings and Temporal persistence belong under `.state/`, immutable evidence under `.runs/`, and disposable or explicitly retained investigation material under `.work/`. See [local files and retention](local-files.md) before cleanup or moving state.
 
+## One `.venv` in and out of the Nix shell
+
+The interpreter is requested the same way on both sides: the committed `.python-version` (`3.12`). The Nix shell adds `UV_PYTHON_PREFERENCE=system` and `UV_PYTHON_DOWNLOADS=never`, so a new `.venv` inside it uses the shell's Python 3.12 (first on `PATH`, as in CI), and an existing 3.12 `.venv` is kept instead of being recreated without extras. Outside the shell uv picks a 3.12 it has or downloads, never 3.13.
+
+The supported path is `nix develop` for everything, as CI does. If you must also work outside the shell on Linux, build `.venv` outside it (`uv venv --clear && uv sync --locked --all-extras`): that `.venv` passes the offline suite on both sides, because a non-Nix interpreter finds the host's C++ runtime outside the shell and the shell's `libstdc++` inside it. The reverse is not possible: a Nix-built `.venv` cannot import protobuf outside the shell, and the checks above fail on it. Inside the shell, a non-Nix `.venv` loads the shell's `libstdc++` through `LD_LIBRARY_PATH`, which with this `flake.lock` needs a host glibc of at least 2.38 (Ubuntu 24.04 has 2.39); on an older host keep to one side.
+
 ## What is pinned—and what is not
 
-`flake.lock` pins the Nixpkgs input. The shell provides Python 3.12, uv, Just, Bash, the Docker client, and the Temporal CLI. It sets `UV_PYTHON` to the Nix Python and `UV_PYTHON_DOWNLOADS=never`; `uv.lock` pins Python dependencies and artifacts. Python recipes use `uv --locked`, and CI enters the same shell with `--no-update-lock-file`.
+`flake.lock` pins the Nixpkgs input. The shell provides Python 3.12, uv, Just, Bash, the Docker client, and the Temporal CLI. `.python-version` selects Python 3.12 for uv in and out of the shell; `uv.lock` pins Python dependencies and artifacts. Python recipes use `uv --locked`, and CI enters the same shell with `--no-update-lock-file`.
 
 This is reproducible tool and dependency selection, not a fully offline or bit-for-bit-hermetic application/image build. Initial setup may fetch the pinned Nix closure and locked Python artifacts. Docker daemon or VM configuration, the observer image build, local filesystem behavior, Temporal, and any provider response are external state. Interpret a passing command within those boundaries.
 

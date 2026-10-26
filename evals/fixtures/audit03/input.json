@@ -37,6 +37,5 @@
       ],
       "reason": "The recipe fixes document_root and permits only relative_path to vary"
     }
-  },
-  "max_output_tokens": 2048
+  }
 }

@@ -3,25 +3,33 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from pydantic import Field
-
-from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
-    Contract,
     Digest,
     Disposition,
     ExecutionStatus,
     FixStatus,
-    InvestigationRequest,
     InvestigationResult,
+    Oracle,
+    PreparedCase,
+    RoundResult,
     Verdict,
-    digest,
 )
-from corsair.policies.verdicts import decide, fix_status, session_verdict
+from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
+from corsair.policies.operations import round_operation_id
+from corsair.policies.verdicts import (
+    decide,
+    distinct_clean_negatives,
+    fix_status,
+    terminal_outcome,
+    terminal_round,
+)
 from corsair.settings import Settings
-from corsair.steps.verification import EvidenceVerifier
+
+if TYPE_CHECKING:
+    from corsair.steps.verification import EvidenceVerifier
 
 # A case is "correctly resolved" only when the canonical label decided by code is a
 # decisive demonstration or non-demonstration -- never the internal disposition, and
@@ -35,132 +43,88 @@ _DECISIVE_VERDICTS = frozenset(
 )
 
 
-class Oracle(Contract):
-    acceptable: list[Disposition] = Field(min_length=1)
-    forbidden: list[Disposition] = Field(default_factory=list)
-    expected_execution: ExecutionStatus = ExecutionStatus.COMPLETED
-    expected_fix: FixStatus | None = None
-    # Canonical case-label expectations. Omitted means the oracle does not score
-    # the verdict (older Disposition-only oracles keep passing unchanged).
-    expected_verdict: Verdict | None = None
-    acceptable_verdicts: list[Verdict] | None = None
-    forbidden_verdicts: list[Verdict] = Field(default_factory=list)
+def _saved_evidence_verifier(store: ArtifactStore) -> "EvidenceVerifier":
+    """Revalidate saved receipts; imported on use because verification loads the Docker SDK."""
+    from corsair.steps.verification import EvidenceVerifier
 
-    def verdict_allowed(self, verdict: Verdict | None) -> bool:
-        """Whether a result's canonical verdict satisfies this oracle."""
-        if self.acceptable_verdicts is None and self.expected_verdict is None:
-            return verdict not in self.forbidden_verdicts
-        if verdict is None:
-            return False
-        if self.acceptable_verdicts is not None and verdict not in self.acceptable_verdicts:
-            return False
-        if self.expected_verdict is not None and verdict != self.expected_verdict:
-            return False
-        return verdict not in self.forbidden_verdicts
+    return EvidenceVerifier(Settings(), store)
 
 
-class DatasetEntry(Contract):
-    case_id: str
-    family: str
-    request: str
-    oracle: str
-    request_digest: Digest
-    oracle_digest: Digest
-    split: str
+def _validated_round(
+    verifier: "EvidenceVerifier", result: InvestigationResult, item: RoundResult
+) -> PreparedCase | None:
+    """The prepared case of one evaluated round whose receipts revalidate for this case.
 
-
-class Dataset(Contract):
-    schema_version: str = "corsair.dataset/1"
-    entries: list[DatasetEntry] = Field(min_length=1, max_length=64)
-
-
-def dataset_root(path: Path) -> Path:
-    # Reference-layout manifests in evals/datasets address the enclosing evals tree.
-    parent = path.parent.resolve()
-    return parent.parent if parent.name == "datasets" else parent
-
-
-def _read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
-    """Read once and verify the exact bytes that the evaluator will parse."""
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
-        raise ValueError("dataset path escapes its root or is missing")
-    content = path.read_bytes()
-    if digest(content) != expected:
-        raise ValueError(f"frozen {kind} digest changed")
-    return path, content
-
-
-def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
-    """Verify the frozen files first. Return oracle data only to the evaluator caller."""
-    dataset = Dataset.model_validate_json(path.read_bytes())
-    root = dataset_root(path)
-    requests, oracles = [], {}
-    family_splits: dict[str, str] = {}
-    for entry in dataset.entries:
-        if entry.case_id in oracles:
-            raise ValueError("duplicate case identity")
-        if entry.family in family_splits and family_splits[entry.family] != entry.split:
-            raise ValueError("related family variants may not cross dataset splits")
-        family_splits[entry.family] = entry.split
-        request_path, request_bytes = _read_frozen_file(
-            root, entry.request, entry.request_digest, "request"
-        )
-        _, oracle_bytes = _read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
-        request = InvestigationRequest.model_validate_json(request_bytes)
-        if request.case.case_id != entry.case_id:
-            raise ValueError("dataset and request case identities disagree")
-        requests.append(normalize_request_sources(request, request_path))
-        oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
-    return dataset, requests, oracles
+    The receipt counts only under the operation id the workflow assigned to this
+    run, session and round, so a receipt cannot be relabelled as another session or
+    round, or spliced in from another run of the same case. The scorer does not
+    reconcile ``result.{run_id}`` or compare ``result_artifact`` with the supplied
+    result: ``corsair eval`` and rescoring read that immutable record themselves, and
+    a caller who scores any other result object vouches for its round list.
+    """
+    observation, audit = item.observation, item.audit
+    submission = item.producer.submission_for_verification()
+    if observation is None or submission is None or audit is None or result.manifest is None:
+        return None
+    if observation.operation_id != round_operation_id(result.run_id, item.session, item.index):
+        return None
+    prepared = verifier.validate_saved(observation, submission, result.manifest)
+    if prepared is None or prepared.case_id != result.case_id:
+        return None
+    return prepared
 
 
 def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
     if result.manifest is None or store is None:
         return False
-    verifier = EvidenceVerifier(Settings(), store)
+    verifier = _saved_evidence_verifier(store)
     for item in result.rounds:
-        observation, audit = item.observation, item.audit
-        submission = item.producer.submission_for_verification()
-        if observation is None or submission is None or audit is None:
+        prepared = _validated_round(verifier, result, item)
+        if prepared is None:
             continue
-        prepared = verifier.validate_saved(observation, submission, result.manifest)
-        if (
-            prepared is not None
-            and prepared.case_id == result.case_id
-            and decide(prepared, observation, audit)[0] == result.disposition
-        ):
+        assert item.observation is not None and item.audit is not None
+        if decide(prepared, item.observation, item.audit)[0] == result.disposition:
             return True
     return False
 
 
 def valid_negative_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
     """A negative label is only valid when it rests on at least the admitted
-    ``negative_threshold`` of independent, validated clean sessions.
+    ``negative_threshold`` of independent, validated clean sessions on distinct
+    candidates.
 
-    Each qualifying session must revalidate: its committed receipts verify, the
-    finding's exact line was covered in both runs, the audit accepted, the control
-    held, and the exploit did NOT violate. Receipts are grouped by independent
-    session; a missing manifest, store, or receipt is a validation failure, never a
+    Each session is decided by its terminal (highest-index evaluated) round, as the
+    workflow decides it, and that round must revalidate: its receipts are committed
+    under the round's own operation id, the finding's exact line was covered in both
+    runs, the audit accepted, the control held, and the exploit did NOT violate.
+    Sessions that ran the same exploit payload count once. A repeated (session,
+    round), a missing manifest, store, or receipt is a validation failure, never a
     free pass. This is the costliest error to get wrong, so empty or partial
     evidence can never clear it."""
     if result.manifest is None or store is None:
         return False
-    verifier = EvidenceVerifier(Settings(), store)
-    clean_sessions: set[int] = set()
-    for item in result.rounds:
-        observation, audit = item.observation, item.audit
-        submission = item.producer.submission_for_verification()
-        if observation is None or submission is None or audit is None:
+    keys = [(item.session, item.index) for item in result.rounds]
+    if len(keys) != len(set(keys)):
+        return False
+    sessions: dict[int, list[RoundResult]] = {}
+    for item in sorted(result.rounds, key=lambda item: (item.session, item.index)):
+        sessions.setdefault(item.session, []).append(item)
+    if result.execution_status is not ExecutionStatus.COMPLETED and result.rounds:
+        # A terminal operational failure overrides the last session's outcome.
+        sessions.pop(result.rounds[-1].session, None)
+    verifier = _saved_evidence_verifier(store)
+    outcomes = []
+    for rounds in sessions.values():
+        terminal = terminal_round(rounds)
+        if terminal is None:
             continue
-        prepared = verifier.validate_saved(observation, submission, result.manifest)
-        if prepared is None or prepared.case_id != result.case_id:
+        prepared = _validated_round(verifier, result, terminal)
+        if prepared is None:
             continue
         # The fixed revision is irrelevant to a clean negative; NOT_REQUESTED keeps
         # the clean-negative gate independent of any fix differential.
-        if session_verdict(prepared, observation, audit, FixStatus.NOT_REQUESTED).clean_negative:
-            clean_sessions.add(item.session)
-    return len(clean_sessions) >= result.manifest.negative_threshold
+        outcomes.append(terminal_outcome(prepared, terminal, FixStatus.NOT_REQUESTED))
+    return distinct_clean_negatives(outcomes) >= result.manifest.negative_threshold
 
 
 def valid_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
@@ -194,7 +158,7 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         fixed = result.fix_observation
         fixed_valid = False
         if fixed is not None and store is not None and result.manifest is not None:
-            verifier = EvidenceVerifier(Settings(), store)
+            verifier = _saved_evidence_verifier(store)
             fixed_valid = any(
                 (submission := item.producer.submission_for_verification()) is not None
                 and (
@@ -230,6 +194,7 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         **usage_metrics(result),
         "config_digest": result.manifest.config_digest if result.manifest else None,
         "reason": result.reason,
+        "gate_ledger": gate_ledger(result, verified_rounds(result, store)),
     }
 
 
@@ -284,6 +249,13 @@ def summarize(rows: list[dict]) -> dict:
         "input_tokens": _sum_known_counts(row.get("input_tokens") for row in rows),
         "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
+        # Every recorded stop, then the final stop of each failed row: where accuracy
+        # was lost. Isolated agent rows saved without a ledger derive their one entry;
+        # rows without either (unavailable results) contribute nothing.
+        "gate_ledger": ledger_counts(row_ledger(row) for row in rows),
+        "failure_stops": ledger_counts(
+            row_ledger(row)[-1:] for row in rows if row.get("status") == "fail"
+        ),
     }
 
 
