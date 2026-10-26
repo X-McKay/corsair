@@ -11,7 +11,7 @@ The implementation also needs real extension seams without speculative modules f
 
 ## Decision
 
-`src/corsair/contracts/` is the canonical, SDK-free Pydantic contract package. The producer uses `ProducerDecision`, a native Pydantic discriminated proposal-or-abstention model whose proposal carries `Submission` (the payload pair) with `PlanRevision`, and the auditor uses `AuditResult`; both are native ADK `output_schema` values. Canonical validation, dynamic round/parent checks, and trusted evidence gates remain after generation. Documentation links to these models rather than maintaining a second field-by-field schema authority.
+`src/corsair/contracts/` is the canonical, SDK-free Pydantic contract package. The producer uses `ProducerDecision`, a native Pydantic proposal-or-abstention model (one flat object whose `kind` selects the required field) whose proposal carries `Submission` (the payload pair) with `PlanRevision`, and the auditor uses `AuditResult`; both are native ADK `output_schema` values. Canonical validation, dynamic round/parent checks, and trusted evidence gates remain after generation. Documentation links to these models rather than maintaining a second field-by-field schema authority.
 
 `ports/` defines only the three implemented domain boundaries: typed producer/auditor inference, admitted source snapshots, and sandbox role execution returning an artifact reference. Ports import contracts and standard-library types, never ADK, Docker, Temporal, or a concrete adapter. The ordinary worker composes the implemented adapters: native ADK/Gemini/LiteLLM paths, local source snapshots, Docker SDK execution, filesystem artifacts, and Temporal client support.
 

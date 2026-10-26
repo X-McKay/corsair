@@ -70,7 +70,7 @@ class DockerSandbox:
 
     def _image_tag(self, kind: str) -> str:
         """Resolve the configured image tag for a recipe kind, Python being the default."""
-        return self.settings.images.get(kind, self.settings.image)
+        return self.settings.image_for(kind)
 
     @property
     def image_id(self) -> str:

@@ -6,12 +6,20 @@ from corsair.agents.resources import RoleName
 from corsair.settings import ModelSettings, Settings
 
 
-def model_for_role(settings: Settings | ModelSettings, role: RoleName) -> str | BaseLlm:
+def model_for_role(
+    settings: Settings | ModelSettings,
+    role: RoleName,
+    *,
+    request_timeout_seconds: float | None = None,
+) -> str | BaseLlm:
     """Resolve a role model without reading or accepting provider credentials.
 
     Gemini model IDs are left for ADK to resolve natively. LiteLLM receives
     only the allowlisted endpoint and generation controls from ModelSettings;
     provider API keys remain in the worker process environment.
+    ``request_timeout_seconds`` is the per-request bound already lowered to the
+    episode (``policies.time_bounds.episode_bounds``); without it the configured
+    ``request_timeout_seconds`` applies.
     """
 
     model_settings = settings.models if isinstance(settings, Settings) else settings
@@ -36,7 +44,11 @@ def model_for_role(settings: Settings | ModelSettings, role: RoleName) -> str | 
     return LiteLlm(
         model=model_name,
         api_base=model_settings.api_base,
-        timeout=model_settings.request_timeout_seconds,
+        timeout=(
+            model_settings.request_timeout_seconds
+            if request_timeout_seconds is None
+            else request_timeout_seconds
+        ),
         num_retries=0,
         extra_body=dict(model_settings.extra_body),
     )

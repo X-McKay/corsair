@@ -15,7 +15,17 @@ from collections.abc import Generator, Iterable, Iterator
 from pathlib import Path, PurePosixPath
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import ArtifactRef, Case, PreparedCase, RunManifest, Source, safe_path
+from corsair.contracts import (
+    ArtifactRef,
+    Case,
+    LineProvenance,
+    PreparedCase,
+    PythonRecipe,
+    RunManifest,
+    Source,
+    safe_path,
+)
+from corsair.policies.target_binding import derive_target_line
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
@@ -329,11 +339,15 @@ def snapshot_source(source: Source, settings: Settings, store: ArtifactStore) ->
     return ref
 
 
-def _archive_members(ref: ArtifactRef, store: ArtifactStore) -> dict[str, tarfile.TarInfo]:
-    """Validate a pinned artifact as a safe, bounded regular-file source snapshot."""
+def _snapshot_bytes(ref: ArtifactRef, store: ArtifactStore) -> bytes:
+    """Fetch a snapshot artifact once per read; the store verifies its digest and size."""
     if ref.media_type != "application/x-tar":
         raise SourceAdmissionError("source artifact has an unexpected media type")
-    content = store.get(ref)
+    return store.get(ref)
+
+
+def _archive_members(content: bytes) -> dict[str, tarfile.TarInfo]:
+    """Validate verified snapshot bytes as a safe, bounded regular-file source snapshot."""
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:") as archive:
             members: dict[str, tarfile.TarInfo] = {}
@@ -359,8 +373,8 @@ def _archive_members(ref: ArtifactRef, store: ArtifactStore) -> dict[str, tarfil
         raise SourceAdmissionError("source artifact is not a valid uncompressed tar") from exc
 
 
-def _read_member(ref: ArtifactRef, store: ArtifactStore, member: tarfile.TarInfo) -> bytes:
-    content = store.get(ref)
+def _read_member(content: bytes, member: tarfile.TarInfo) -> bytes:
+    """Read one validated member from the same verified bytes its listing came from."""
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:") as archive:
             stream = archive.extractfile(member)
@@ -379,22 +393,24 @@ def read_source(ref: ArtifactRef, path: str, store: ArtifactStore, max_bytes: in
     if max_bytes < 1:
         raise ValueError("max_bytes must be positive")
     normalized = _safe_relative(path).as_posix()
-    member = _archive_members(ref, store).get(normalized)
+    content = _snapshot_bytes(ref, store)
+    member = _archive_members(content).get(normalized)
     if member is None:
         raise SourceAdmissionError("requested source path is absent from snapshot")
     if member.size > max_bytes:
         raise SourceAdmissionError("requested source excerpt exceeds byte limit")
     try:
-        return _read_member(ref, store, member).decode("utf-8")
+        return _read_member(content, member).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise SourceAdmissionError("source excerpts must be valid UTF-8") from exc
 
 
 def iter_snapshot_files(ref: ArtifactRef, store: ArtifactStore) -> Iterable[tuple[str, bytes]]:
     """Yield only members accepted by the shared immutable snapshot validator."""
-    members = _archive_members(ref, store)
+    content = _snapshot_bytes(ref, store)
+    members = _archive_members(content)
     for name in sorted(members):
-        yield name, _read_member(ref, store, members[name])
+        yield name, _read_member(content, members[name])
 
 
 def _excerpt(text: str, line: int | None) -> str:
@@ -423,14 +439,25 @@ def prepare_case(
     )
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
+    finding, provenance = case.finding, LineProvenance.DECLARED
+    if finding.line is None and isinstance(case.recipe, PythonRecipe):
+        # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
+        # admitted text. The line comes from the trusted recipe, never the narrative.
+        # The derivation reads a Python AST; other runtimes keep a line-less finding,
+        # which the target-binding gates report as line_missing.
+        derived = derive_target_line(case.recipe, finding_text)
+        if derived is not None:
+            finding = finding.model_copy(update={"line": derived})
+            provenance = LineProvenance.RECIPE_FUNCTION
     return PreparedCase(
         case_id=case.case_id,
-        finding=case.finding,
+        finding=finding,
         recipe=case.recipe,
         source=source,
         fixed_source=fixed_source,
-        source_excerpt=_excerpt(finding_text, case.finding.line),
+        source_excerpt=_excerpt(finding_text, finding.line),
         manifest=manifest,
+        line_provenance=provenance,
     )
 
 

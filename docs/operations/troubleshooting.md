@@ -76,11 +76,37 @@ docker inspect "$CONTAINER_ID"
 
 Compare the actual ID and labels to the run’s operation/role before taking any host-level action. Corsair has no separate cleanup command and does not certify a manually removed or label-wide-pruned container as clean. Keep the run operationally unresolved and follow local incident controls; do not rerun the operation automatically.
 
+## A model route fails, times out, or returns no tool calls
+
+Probe the configured routes before a batch rather than after it:
+
+```bash
+uv run --locked corsair doctor --model --settings .state/settings.json
+```
+
+This sends a few minimal requests per role model and no agent content (see the [CLI reference](../reference/cli.md#doctor)). Read the failed check and its `remedy`:
+
+- `model_credentials` fails: the named variable is not set in the environment that runs the worker and `doctor`. Export it there; never put it in `--settings`.
+- A `model_*` request fails with a timeout: the endpoint did not answer within `models.request_timeout_seconds`. Check the endpoint's load before raising the timeout (at most 300 seconds); the roles use the same value.
+- A `model_*` request fails with an unknown model or an authentication error: correct the model name, the route prefix, or the credential; do not switch providers silently.
+- `model_producer_tools` fails because the model answered in text: the route does not return native function calls, so every producer episode would end without using its tools. A LiteLLM `openai/` route on vLLM behaves this way, and settings already reject it for the producer; use a route that returns tool calls, such as `hosted_vllm/` with tool calling enabled on the server.
+- `model_producer_tools` warns that it stopped at the probe cap: a reasoning model spent the cap before calling the tool. The result is inconclusive, not a failure; confirm the route with an isolated producer evaluation.
+
+A passing probe does not show that role-sized requests fit the role output caps; `provider_max_tokens` feedback in a result still means a role's cap was too small for its response.
+
 ## Provider feedback or native observation reports an error
 
 Inspect the final result’s rounds, feedback gate, usage metadata, and manifest before changing any provider setting. Provider failures are classified as redacted operational feedback, including policy blocks, temporary failures, and permanent failures. Credentials and raw provider responses are intentionally unavailable to the CLI result/log stream. Do not put them into a report to debug the issue, bypass policy, or silently select another provider.
 
 For a native `ERROR` or `INVALID` observation, preserve the raw evidence artifact and Docker receipt. A native error does not establish a safe application, an unsupported finding, or a failed fix; the result stays `ERROR` and is never relabelled.
+
+## A model episode stops with `episode_timeout`
+
+The producer or auditor episode ran out of its elapsed-time bound before a structured response. The round records the operational `episode_timeout` feedback with its accounted model calls; the investigation ends as `ERROR` (producer) or `BLOCKED` (auditor), and the reason names the episode bound in seconds. It is not evidence about the finding. The bounds nest as described in [time bounds](../reference/configuration.md#time-bounds): a provider request never outlives its episode, and the episode ends inside its Temporal activity.
+
+- A single slow request is the usual cause on a thinking model. Inspect the round's usage: one model call that used the whole episode points at provider latency, many calls at an episode spending its call budget on reads.
+- Raising `request_timeout_seconds` above the episode bound has no effect: the adapter lowers it to the episode. The producer episode is at most `285` s and the auditor episode `165` s, and less when the investigation deadline is near.
+- An `ActivityError` naming a StartToClose or ScheduleToClose timeout in the `producer` or `audit` phase, with `usage_complete: false`, means the activity bound fired before the episode, which the nested bounds should prevent; report it with the run's history.
 
 ## Exit status is not the security verdict
 

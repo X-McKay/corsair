@@ -204,6 +204,19 @@ class RunManifest(Contract):
     max_sessions: int = Field(default=2, ge=1, le=8)
 
 
+class LineProvenance(StrEnum):
+    """Where a prepared finding's target line came from.
+
+    ``declared``: the request (or scanner) supplied it, or none was supplied.
+    ``recipe_function``: the finding declared no line and trusted prepare code bound
+    it, with ``ast`` over the admitted module, to the first body statement of the
+    operator-owned recipe function. Never derived from model or narrative text.
+    """
+
+    DECLARED = "declared"
+    RECIPE_FUNCTION = "recipe_function"
+
+
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
@@ -212,3 +225,5 @@ class PreparedCase(Contract):
     fixed_source: ArtifactRef | None = None
     source_excerpt: str
     manifest: RunManifest
+    # Defaulted so prepared cases recorded before line derivation still decode.
+    line_provenance: LineProvenance = LineProvenance.DECLARED

@@ -7,7 +7,7 @@
       "split": "chain",
       "request": "datasets/chain/ruby/pathtraversal-b/v3/request.json",
       "oracle": "datasets/chain/ruby/pathtraversal-b/v3/oracle.json",
-      "request_digest": "8784c3a912c1c7388138187705b4e58eedb075103533210fe6a9951bd242f5a3",
+      "request_digest": "6f8f1a582c13d0bf41b2c497daa5cc63e22f187524e09a0809d3f511dd348705",
       "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
     }
   ]

@@ -9,7 +9,8 @@
       "claim_scope": "component"
     },
     "source": {
-      "path": "source"
+      "path": "source",
+      "expected_digest": "955f6eaeaa189d980ce2fc5e680bdb91b83f0ab4bc0b17fd5f3cc86aa3ed9139"
     },
     "recipe": {
       "kind": "ruby.secret_disclosure/1",
@@ -29,7 +30,8 @@
       ]
     },
     "fixed_source": {
-      "path": "fixed"
+      "path": "fixed",
+      "expected_digest": "60f146e317c7f070ad8431dddc5043748b544f4383a244439a21b8b9245cba27"
     }
   },
   "budget": {
