@@ -7,6 +7,10 @@ checkout) and fails only when a structural fact is *certainly* violated. Anythin
 static analysis cannot decide -- a decorated callable, a name bound more than once or
 by assignment/import, a star import, a module ``__getattr__`` -- passes, so the kernel's
 own run-time gates stay the authority and no runnable case is turned away.
+
+One structural fact concerns the line rather than the callable: a bound target line
+that the module import itself executes (module or class-body level) is covered in
+both runs whatever the recipe call did, so it can never show the call reached it.
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from corsair.contracts import Finding, LineProvenance, PythonCallableRecipe
+from corsair.policies import line_binding
 
 
 class TargetBindingReason(StrEnum):
@@ -28,6 +33,7 @@ class TargetBindingReason(StrEnum):
     PAYLOAD_PARAMETER_UNKNOWN = "payload_parameter_unknown"
     FIXED_KWARG_UNKNOWN = "fixed_kwarg_unknown"
     REQUIRED_PARAMETER_UNBOUND = "required_parameter_unbound"
+    LINE_RUNS_AT_IMPORT = "line_runs_at_import"
 
 
 @dataclass(frozen=True)
@@ -256,6 +262,15 @@ def target_binding(
         )
     except RecursionError:
         return None  # Too deep for this parser; the run-time gates decide.
+    return _callable_failure(module, recipe) or _import_time_failure(
+        finding.line, recipe, module_text
+    )
+
+
+def _callable_failure(
+    module: ast.Module, recipe: PythonCallableRecipe
+) -> TargetBindingFailure | None:
+    """A certain reason the recipe callable cannot be called as the driver calls it."""
     bindings = _bindings(module, recipe.function)
     if bindings is None:
         return None
@@ -277,3 +292,17 @@ def target_binding(
             f"{recipe.function} is a coroutine function; the recipe calls it synchronously",
         )
     return _signature_failure(binding, recipe)
+
+
+def _import_time_failure(
+    line: int, recipe: PythonCallableRecipe, module_text: str
+) -> TargetBindingFailure | None:
+    """The bound line runs on import, so both runs cover it whatever the call did."""
+    bound = line_binding.bind_target_line(module_text, line)
+    if not line_binding.runs_at_import(module_text, bound):
+        return None
+    return TargetBindingFailure(
+        TargetBindingReason.LINE_RUNS_AT_IMPORT,
+        f"line {line} of {recipe.module_file} runs at module or class-body level when the "
+        "module is imported, so its coverage cannot show that the recipe call reached it",
+    )

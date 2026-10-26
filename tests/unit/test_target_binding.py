@@ -19,6 +19,7 @@ from corsair.contracts import (
     PythonRecipe,
     Source,
 )
+from corsair.policies import line_binding
 from corsair.policies.target_binding import (
     TargetBindingReason,
     bind_target_line,
@@ -301,6 +302,105 @@ def test_an_underivable_line_missing_reason_names_the_recipe_function():
     assert "could be derived from recipe function read_file" in str(failure)
 
 
+# --- a line the module import executes cannot show the recipe call ran ----------
+
+SCOPES = (
+    "import os\n"  # 1  module
+    "TABLE = {'a': os.environ.get('X')}\n"  # 2  module
+    "\n"
+    "class Config:\n"  # 4  module
+    "    LIMIT = 3\n"  # 5  class body
+    "\n"
+    "    def method(self):\n"  # 7  header, binds to 8
+    "        return self.LIMIT\n"  # 8  method body
+    "\n"
+    "def traced(function):\n"  # 10 header, binds to 11
+    "    return function\n"  # 11
+    "\n"
+    "@traced\n"  # 13 decorator, binds to 15
+    "def helper(path):\n"  # 14 header, binds to 15
+    "    return TABLE.get(path)\n"  # 15 a helper the entry calls
+    "\n"
+    "def read_file(root, path):\n"  # 17 header, binds to 18
+    "    def nested(value):\n"  # 18 runs on the call
+    "        return helper(value)\n"  # 19 nested function body
+    "    class Local:\n"  # 20 a class statement inside the entry
+    "        SIZE = 1\n"  # 21 its body runs on the call, not at import
+    "    return nested(path)\n"  # 22
+    "\n"
+    "def one_line(x): return x\n"  # 24 module: the body shares the def line
+    "if TABLE:\n"  # 25 module
+    "    FLAG = True\n"  # 26 module, inside a compound statement
+)
+
+
+@pytest.mark.parametrize(
+    ("line", "scope"),
+    [(1, "module"), (2, "module"), (4, "module"), (5, "class body"), (24, "module")]
+    + [(25, "module"), (26, "module")],
+)
+def test_a_line_that_runs_at_import_is_blocked(line: int, scope: str):
+    failure = target_binding(_finding(line), _recipe(), SCOPES)
+    assert failure is not None, scope
+    assert failure.reason is TargetBindingReason.LINE_RUNS_AT_IMPORT
+    assert f"line {line}" in failure.detail
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        7,  # a method header binds to the method body
+        8,  # a method body
+        13,  # a decorator binds to the decorated function's body
+        14,
+        15,  # a helper the entry calls: lexical containment in the entry is not required
+        17,
+        18,
+        19,  # a nested function body
+        20,
+        21,  # a class body inside a function runs on the call
+        22,
+        3,  # a blank line is never reported: the run-time gates keep it INCONCLUSIVE
+    ],
+)
+def test_a_line_inside_any_function_is_allowed(line: int):
+    assert target_binding(_finding(line), _recipe(), SCOPES) is None
+
+
+def test_the_import_time_gate_agrees_with_the_interpreter_line_events():
+    """Every blocked line is a line event of the import itself, and the only import-time
+    line events allowed are function bodies the import calls (here ``traced``, applied
+    as a decorator): the gate decides by static scope and never follows calls."""
+    imported, _called = _executed_lines(SCOPES, "read_file")
+    allowed_at_import: set[int] = set()
+    for line in range(1, SCOPES.count("\n") + 1):
+        bound = line_binding.bind_target_line(SCOPES, line)
+        failure = target_binding(_finding(line), _recipe(), SCOPES)
+        blocked = failure is not None and failure.reason is TargetBindingReason.LINE_RUNS_AT_IMPORT
+        if blocked:
+            assert bound in imported, line
+        elif bound in imported:
+            allowed_at_import.add(bound)
+    assert allowed_at_import == {11}
+
+
+def test_the_verifier_review_case_line_is_blocked():
+    """The external review's reproduction: a module-level table the entry reads."""
+    text = (
+        "import os\nTABLE = {'a': os.environ.get('X')}\n\ndef unrelated():\n    return 2\n\n"
+        "def entry(payload):\n    return TABLE.get(payload)\n"
+    )
+    recipe = PythonRecipe(module_file="reader.py", function="entry", payload_parameter="payload")
+    failures = {line: target_binding(_finding(line), recipe, text) for line in (2, 5, 7, 8)}
+    reasons = {line: failure and failure.reason for line, failure in failures.items()}
+    assert reasons == {
+        2: TargetBindingReason.LINE_RUNS_AT_IMPORT,
+        5: None,
+        7: None,
+        8: None,
+    }
+
+
 # --- the prepare activity turns a failure into a non-retryable PREPARE_BLOCKED ----
 
 
@@ -349,6 +449,15 @@ async def test_prepare_blocks_an_unbound_target_before_any_model_call(tmp_path):
     assert rejected.value.type == "PREPARE_BLOCKED"
     assert rejected.value.non_retryable
     assert "target_binding function_not_defined" in str(rejected.value)
+
+
+async def test_prepare_blocks_an_import_time_line_before_any_model_call(tmp_path):
+    activities, request = _activities(tmp_path, "ROOT = '/srv'\n" + READER, line=1)
+    with pytest.raises(ApplicationError) as rejected:
+        await ActivityEnvironment().run(activities.prepare, request)
+    assert rejected.value.type == "PREPARE_BLOCKED"
+    assert rejected.value.non_retryable
+    assert "target_binding line_runs_at_import" in str(rejected.value)
 
 
 async def test_prepare_binds_a_line_less_finding_to_the_recipe_function(tmp_path):
