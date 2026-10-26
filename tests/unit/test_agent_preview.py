@@ -179,7 +179,7 @@ async def test_producer_retry_preview_carries_previous_submission_and_feedback()
         structured_tools=False,
     )
 
-    packet = json.loads(value["parts"][-1]["text"].split("\n", 1)[1])
+    packet, _ = json.JSONDecoder().raw_decode(value["parts"][-1]["text"].split("\n", 1)[1])
     assert packet["round"] == {"revision": 2, "parent_revision": 1}
     assert packet["previous_submission"] == _submission().model_dump(mode="json")
     assert packet["previous_feedback"]["reason"] == "the exploit payload never reaches open"
