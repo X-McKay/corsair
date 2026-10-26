@@ -40,11 +40,13 @@ from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
+from .results import MAX_TERMINAL_TIMELINE as MAX_TERMINAL_TIMELINE
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES
 from .results import Disposition as Disposition
 from .results import ExecutionStatus as ExecutionStatus
 from .results import FixStatus as FixStatus
 from .results import InvestigationResult as InvestigationResult
+from .results import PhaseTransition as PhaseTransition
 from .results import RoundResult as RoundResult
 from .results import Verdict as Verdict
 from .results import format_terminal_result as format_terminal_result

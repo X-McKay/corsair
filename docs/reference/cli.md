@@ -36,13 +36,14 @@ In human mode, the CLI uses compact Rich output when the terminal supports it. `
 
 ## Result and log confidentiality
 
-A completed human investigation rendering leads with the canonical verdict, coloured by meaning (red: exploit demonstrated, green: exploit not demonstrated, yellow: inconclusive, magenta: unable to run or error), followed by execution status, disposition, scope, fix status, the result reason and run/case identity. A rounds table then lists, per session and round, the producer's decision kind (proposal, abstained or no decision), the gate name that stopped or redirected it, its LLM/tool calls and tokens, the control and adversarial outcomes with their covered target lines, and the audit decision with its rule name. A fixed-revision observation, when present, gets its own role table. The last panel shows the manifest identity (package, abbreviated image and prompt/config digests, models, evidence policy), the full result SHA-256 and the usage totals; missing usage and cost stay `unknown`.
+A completed human investigation rendering leads with the canonical verdict, coloured by meaning (red: exploit demonstrated, green: exploit not demonstrated, yellow: inconclusive, magenta: unable to run or error), followed by the case stop, execution status, disposition, scope, fix status, the result reason and run/case identity. A rounds table then lists, per session and round, the producer's decision kind (proposal, abstained or no decision), the gate name that stopped or redirected it, its LLM/tool calls and tokens, the control and adversarial outcomes with their covered target lines, the audit decision with its rule name, and **Stopped at**: the round's [gate-ledger](../agents/evaluations.md) stage and gate. The **case stop** names the case-level policy stops (`budget_exhausted`, `negative_threshold_unmet`, `fix_not_blocked`, `execution_*`), or else the last round's gate with its stage and session.round. Both come from the evaluator's pure [`gate_ledger`](../../src/corsair/evaluation/ledger.py), which describes the recorded verdict and never decides one; only gate and stage names are shown, plus the fixed sentence of a budget, threshold or fix stop, never a ledger reason that can carry model text. A fixed-revision observation, when present, gets its own role table. A **Phases** table follows when the result recorded a timeline: each phase transition's session.round, offset from the first retained transition and duration until the next one (the final `record` has no recorded end, so it shows `-`), with per-phase totals; an unknown time stays `unknown`, and a timeline whose first entry is not `prepare` says that earlier transitions were not retained. The last panel shows the manifest identity (package, abbreviated image and prompt/config digests, models, evidence policy), the full result SHA-256 and the usage totals; missing usage and cost stay `unknown`.
 
-It never shows payloads, the hypothesis or plan, the auditor's reason, feedback reasons (which can carry model text) or any oracle data. Values are rendered as plain text, never as Rich markup, and long values wrap instead of being cut. It does not invent an intermediate stage or claim unobserved work. JSON output is unchanged and remains the complete record.
+It never shows payloads, the hypothesis or plan, the auditor's reason, feedback reasons (which can carry model text) or any oracle data. Values are rendered as plain text, never as Rich markup, and long values wrap instead of being cut. It does not invent an intermediate stage or claim unobserved work. JSON output remains the complete record; its only addition is the result's `timeline` field (see [`inspect`](#inspect-run_id)).
 
 ```text
 ╭────────────────────────── Corsair · Investigation ───────────────────────────╮
 │ Verdict      EXPLOIT_DEMONSTRATED                                            │
+│ Case stop    demonstrated · kernel at 1.1                                    │
 │ Execution    COMPLETED                                                       │
 │ Disposition  SUPPORTED                                                       │
 │ Scope        component                                                       │
@@ -52,17 +53,26 @@ It never shows payloads, the hypothesis or plan, the auditor's reason, feedback 
 │ Case         case01                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Rounds
-┏━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ S.R ┃ Producer       ┃ Control    ┃ Adversarial   ┃ Audit                    ┃
-┡━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ 1.1 │ proposal       │ held       │ violated      │ ACCEPT                   │
-│     │ 3 llm · 4 tool │ L12-14, 20 │ L12-14, 20-21 │ differential-is-relevant │
-│     │ 1200/210 tok   │            │               │                          │
-└─────┴────────────────┴────────────┴───────────────┴──────────────────────────┘
+┏━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ S.R ┃ Producer     ┃ Control    ┃ Adversarial  ┃ Audit        ┃ Stopped at   ┃
+┡━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ 1.1 │ proposal     │ held       │ violated     │ ACCEPT       │ demonstrated │
+│     │ 3 llm · 4    │ L12-14, 20 │ L12-14,      │ differential │ kernel       │
+│     │ tool         │            │ 20-21        │ -is-relevant │              │
+│     │ 1200/210 tok │            │              │              │              │
+└─────┴──────────────┴────────────┴──────────────┴──────────────┴──────────────┘
+Phases
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ S.R        ┃ Phase                 ┃ At               ┃ Duration             ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ 0.0        │ prepare               │ +00:00           │ 1.8 s                │
+│ 1.1        │ producer              │ +00:01           │ 39.5 s               │
+│ 1.1        │ evidence              │ +00:41           │ 11.3 s               │
+│ 1.1        │ audit                 │ +00:52           │ 5.5 s                │
+│ 1.1        │ record                │ +00:58           │ -                    │
+└────────────┴───────────────────────┴──────────────────┴──────────────────────┘
+totals: prepare 1.8 s · producer 39.5 s · evidence 11.3 s · audit 5.5 s
 ╭───────────────────────────── Identity · Totals ──────────────────────────────╮
-│ Package          0.1.0                        Usage complete  true           │
-│ Image            sha256:555555555555…         LLM calls       4              │
-│ Request          111111111111…                Tool calls      4              │
 │ ...                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -153,7 +163,9 @@ corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
 corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
 ```
 
-Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one.
+Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one. In human mode it renders the result with its gate ledger verified: each round that reached the kernel is classified from that round's own committed receipts, revalidated with the trusted verifier's admission rules, so **Stopped at** names the kernel or audit gate (`demonstrated`, `clean_negative`, `coverage`, `audit_reject`, ...). A round whose receipts do not validate shows `evidence_unverified`, never a gate read from unverified fields. The same view after `investigate --wait` verifies against the local artifact root only when it already exists; otherwise, and after `inspect --online --watch`, which never opens a local store, kernel rounds show `evidence_unverified` with a caption saying so. The verdict shown is always the recorded one.
+
+The result's `timeline` (in JSON too) is the workflow's bounded phase timeline, recorded at finalization: up to the last 32 transitions, each with `phase`, `session`, `round` and the deterministic workflow time `at`. It is the same data the live status query reports, persisted so durations can be read after the workflow has closed; it is presentation metadata and never an input to a verdict. Results recorded before the field existed read as an empty timeline, and the Phases table is then omitted. JSON output is otherwise unchanged: the ledger is computed for display only and is not added to the result.
 
 With `--online`, it uses the workflow’s native status query without opening or creating a local artifact store. `--watch` without `--online` is rejected before runtime I/O. For an investigation, the reported phase and round come from the actual Temporal workflow state, not a CLI estimate. For an evaluation, the status reports actual completed and total child work. `--watch` repeats the native status query while the workflow remains open, then waits for and returns the workflow’s actual final result. It does not fabricate a percentage, infer model progress, or turn an activity heartbeat into a security conclusion.
 

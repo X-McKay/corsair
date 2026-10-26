@@ -46,6 +46,9 @@ async def test_fetched_history_replays_without_repeating_completed_activities(
         calls_before_replay = dict(activities.call_counts)
 
     assert result.result_artifact is not None
+    # The recorded result's phase timeline rides in the record activity input; replay
+    # must accept it (and histories recorded without it, below).
+    assert [entry.phase for entry in result.timeline][-1] == "record"
     assert completed == [
         "corsair.prepare",
         "corsair.produce",

@@ -12,6 +12,7 @@ from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
+        MAX_TERMINAL_TIMELINE,
         AuditDecision,
         AuditInput,
         AuditOutput,
@@ -24,6 +25,7 @@ with workflow.unsafe.imports_passed_through():
         InvestigationResult,
         NoGroundedCandidate,
         Observation,
+        PhaseTransition,
         PreparedCase,
         ProducerInput,
         ProducerOutput,
@@ -52,10 +54,6 @@ DEFAULT_NEGATIVE_THRESHOLD = 2
 # no outcome and no structural claim (a prior round may have been rejected or marked
 # invalid): it only asks for a fresh source-grounded candidate.
 _BLIND_RETRY_REASON = "Propose a different source-grounded candidate payload pair."
-
-# The status query keeps only the most recent phase transitions; it is read-only
-# presentation state and never feeds a command, so replay is unaffected.
-_TIMELINE_LIMIT = 32
 
 
 def _retry_feedback(audit: AuditOutput) -> Feedback:
@@ -157,14 +155,20 @@ class InvestigationWorkflow:
 
     @phase.setter
     def phase(self, value: str) -> None:
-        """Record each transition at deterministic workflow time for the status query."""
+        """Record each transition at deterministic workflow time.
+
+        The status query and the recorded result keep only the most recent
+        MAX_TERMINAL_TIMELINE transitions. They are presentation state that never feeds
+        a command or a verdict; in the result they ride in the record activity's input,
+        which replay does not compare, so recorded histories replay unchanged.
+        """
         self._phase = value
         # Unit tests drive finalization outside a workflow loop, where there is no clock.
         at = workflow.now().isoformat() if workflow.in_workflow() else None
         self.timeline.append(
             {"phase": value, "session": self.session_index, "round": self.round_index, "at": at}
         )
-        del self.timeline[:-_TIMELINE_LIMIT]
+        del self.timeline[:-MAX_TERMINAL_TIMELINE]
 
     @workflow.query
     def status(self) -> dict:
@@ -205,7 +209,8 @@ class InvestigationWorkflow:
         """Persist the final receipt within its separate retry/finalization allowance."""
         self.phase = "record"
         try:
-            result = format_terminal_result(result)
+            timeline = [PhaseTransition.model_validate(entry) for entry in self.timeline]
+            result = format_terminal_result(result.model_copy(update={"timeline": timeline}))
         except ValueError:
             # An unbounded validation exception must not become another failure payload.
             raise ApplicationError(
