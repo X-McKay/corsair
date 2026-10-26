@@ -37,7 +37,7 @@ corsair rescore evals/datasets/dev.json RUN_ID_ONE RUN_ID_TWO \
 corsair report .runs/evaluations/rescored.json
 ```
 
-`rescore` reads committed artifacts and evaluator-owned oracles locally. It does not submit a workflow, call a model, contact Temporal, regenerate evidence, or convert an absent artifact into a pass. An unavailable artifact stays an explicit unavailable row. `report` only summarizes a saved report; it does not rescore or repair it.
+`rescore` reads committed artifacts and evaluator-owned oracles locally. It does not submit a workflow, call a model, contact Temporal, regenerate evidence, or convert an absent artifact into a pass. An unavailable artifact stays an explicit unavailable row. `report` only displays a saved report and its rows, and `compare` only diffs two saved reports; neither rescores or repairs a report.
 
 ## Cancel, reconnect, and recover honestly
 

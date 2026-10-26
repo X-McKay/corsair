@@ -189,7 +189,118 @@ async def test_execute_dispatches_report_without_runtime_services(tmp_path, caps
     args = parser().parse_args(["--format", "json", "report", str(report)])
 
     assert await execute(args) == 0
-    assert json.loads(capsys.readouterr().out) == {"attempts": 1, "failed": 0}
+    assert json.loads(capsys.readouterr().out) == {"summary": {"attempts": 1, "failed": 0}}
+
+
+def _comparable_report(path, *, status="pass", digest_value="sha256:frozen", reason="done"):
+    rows = [
+        {
+            "run_id": "eval-1.c0.r0",
+            "case_id": "case01",
+            "status": status,
+            "verdict": "EXPLOIT_DEMONSTRATED" if status == "pass" else "INCONCLUSIVE",
+            "execution_status": "COMPLETED",
+            "forbidden_label": False,
+            "llm_calls": 3,
+            "input_tokens": 120,
+            "output_tokens": 30,
+            "agent_seconds": 2.5,
+            "reason": reason,
+        }
+    ]
+    path.write_text(
+        json.dumps({"rows": rows, "summary": {"attempts": 1}, "dataset_digest": digest_value})
+    )
+    return path
+
+
+def test_human_report_renders_one_row_per_case(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
+    report = _comparable_report(tmp_path / "report.json", reason="[red]not markup[/red]")
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+
+    terminal.emit(json.loads(report.read_text()))
+
+    output = capsys.readouterr().out
+    assert "Corsair · Cases" in output
+    assert "case01" in output and "EXPLOIT_DEMONSTRATED" in output
+    assert "3 LLM" in output and "120/30 tok" in output
+    assert "[red]not markup[/red]" in output
+    assert "sha256:frozen" in output
+
+
+async def test_execute_compare_exits_by_regression_and_emits_the_structured_diff(tmp_path, capsys):
+    baseline = _comparable_report(tmp_path / "baseline.json")
+    same = _comparable_report(tmp_path / "same.json")
+    worse = _comparable_report(tmp_path / "worse.json", status="fail")
+
+    args = parser().parse_args(["--format", "json", "compare", str(baseline), str(same)])
+    assert await execute(args) == 0
+    assert json.loads(capsys.readouterr().out)["regression"] is False
+
+    args = parser().parse_args(["--format", "json", "compare", str(baseline), str(worse)])
+    assert await execute(args) == 1
+    diff = json.loads(capsys.readouterr().out)
+    assert diff["baseline_report"] == str(baseline)
+    assert diff["regressions"] == [{"case_id": "case01", "repeat": 0, "reason": "pass_to_fail"}]
+
+
+async def test_execute_compare_refuses_mismatched_datasets_without_the_flag(tmp_path, capsys):
+    baseline = _comparable_report(tmp_path / "baseline.json")
+    other = _comparable_report(tmp_path / "other.json", digest_value="sha256:other")
+
+    args = parser().parse_args(["--format", "json", "compare", str(baseline), str(other)])
+    with pytest.raises(ValueError, match="--allow-dataset-mismatch"):
+        await execute(args)
+    assert capsys.readouterr().out == ""
+
+    args = parser().parse_args(
+        ["--format", "json", "compare", str(baseline), str(other), "--allow-dataset-mismatch"]
+    )
+    assert await execute(args) == 0
+    assert json.loads(capsys.readouterr().out)["dataset_match"] is False
+
+
+async def test_human_compare_warns_on_dataset_mismatch_and_lists_changed_cases(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("COLUMNS", "200")
+    baseline = _comparable_report(tmp_path / "baseline.json")
+    worse = _comparable_report(tmp_path / "worse.json", status="fail", digest_value="sha256:b")
+    args = parser().parse_args(
+        [
+            "--format",
+            "human",
+            "--no-color",
+            "compare",
+            str(baseline),
+            str(worse),
+            "--allow-dataset-mismatch",
+        ]
+    )
+
+    assert await execute(args) == 1
+
+    output = capsys.readouterr().out
+    assert "Dataset mismatch" in output
+    assert "sha256:frozen" in output and "sha256:b" in output
+    assert "REGRESSION" in output
+    assert "pass to fail" in output
+    assert "Changed cases" in output
+
+
+async def test_human_compare_of_identical_reports_reports_no_changes(tmp_path, capsys):
+    baseline = _comparable_report(tmp_path / "baseline.json")
+    args = parser().parse_args(
+        ["--format", "human", "--no-color", "compare", str(baseline), str(baseline)]
+    )
+
+    assert await execute(args) == 0
+
+    output = capsys.readouterr().out
+    assert "NO REGRESSION" in output
+    assert "No per-case status or label changes" in output
+    assert "Dataset mismatch" not in output
 
 
 async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):

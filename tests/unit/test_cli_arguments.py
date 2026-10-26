@@ -45,3 +45,21 @@ def test_parser_rejects_malformed_commands_with_usage_exit(capsys, arguments, me
     captured = capsys.readouterr()
     assert captured.out == ""
     assert message in captured.err
+
+
+def test_compare_parser_requires_two_reports_and_defaults_to_refusing_mismatches():
+    args = parser().parse_args(["compare", "baseline.json", "candidate.json"])
+
+    assert (args.command, args.baseline, args.candidate) == (
+        "compare",
+        "baseline.json",
+        "candidate.json",
+    )
+    assert args.allow_dataset_mismatch is False
+    allowed = parser().parse_args(
+        ["compare", "baseline.json", "candidate.json", "--allow-dataset-mismatch"]
+    )
+    assert allowed.allow_dataset_mismatch is True
+    with pytest.raises(SystemExit) as error:
+        parser().parse_args(["compare", "baseline.json"])
+    assert error.value.code == 2
