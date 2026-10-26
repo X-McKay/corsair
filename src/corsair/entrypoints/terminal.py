@@ -33,7 +33,7 @@ from corsair.contracts import (
     Usage,
     Verdict,
 )
-from corsair.evaluation.comparison import row_label
+from corsair.evaluation.comparison import row_label, row_stop
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_error_detail, safe_text
 from corsair.ports.sandboxing import SandboxUnavailable
@@ -603,7 +603,7 @@ class Terminal:
     def _report_rows(self, rows: list[dict[str, Any]]) -> None:
         """Render one table row per scored attempt; unknown usage stays unknown."""
         table = Table(expand=True)
-        for column in ("Case", "Run", "Status", "Label", "Usage", "Reason"):
+        for column in ("Case", "Run", "Status", "Label", "Stop", "Usage", "Reason"):
             table.add_column(column, overflow="fold")
         for row in rows:
             status = row.get("status")
@@ -616,6 +616,7 @@ class Terminal:
                 _text(row.get("run_id")),
                 Text(detail, style=_STYLES.get(str(status), "cyan")),
                 _text(row_label(row)),
+                _text(row_stop(row) or "-"),
                 _text(_usage(row, _plain)),
                 _text(row.get("reason") or ""),
             )
@@ -646,6 +647,14 @@ class Terminal:
         )
         if value["dataset_match"]:
             grid.add_row(Text("Dataset", style="cyan"), _text(digests["baseline"]))
+        gates = value.get("gate_delta", {})
+        moved = [entry for entry in gates.get("gate_ledger", []) if entry["delta"]]
+        grid.add_row(
+            Text("gates moved", style="cyan"),
+            _text(
+                ", ".join(f"{entry['gate']} {_signed(entry['delta'])}" for entry in moved) or "none"
+            ),
+        )
         for key, count in value["counts"].items():
             grid.add_row(Text(key.replace("_", " "), style="cyan"), _text(count))
         for key, delta in value["summary_delta"].items():
@@ -662,6 +671,7 @@ class Terminal:
                 _text(f"{_plain(item['case_id'])} #{_plain(item['repeat'])}: {item['reason']}"),
             )
         self.out.print(Panel(grid, title="Corsair · Comparison", border_style="cyan"))
+        self._gate_delta(gates)
         changed = [
             case
             for case in value["cases"]
@@ -674,7 +684,7 @@ class Terminal:
             self.out.print(Text(f"No per-case status or label changes in {len(value['cases'])}."))
             return
         table = Table(expand=True)
-        for column in ("Case", "#", "Status", "Label", "Change", "Usage Δ"):
+        for column in ("Case", "#", "Status", "Label", "Stop", "Change", "Usage Δ"):
             table.add_column(column, overflow="fold")
         for case in changed:
             regressed = (
@@ -690,10 +700,35 @@ class Terminal:
                 _text(case["repeat"]),
                 _text(f"{_plain(case['baseline_status'])} -> {_plain(case['candidate_status'])}"),
                 _text(f"{_plain(case['baseline_label'])} -> {_plain(case['candidate_label'])}"),
+                _text(
+                    f"{_plain(case.get('baseline_stop'))} -> {_plain(case.get('candidate_stop'))}"
+                ),
                 Text(safe_text(change.replace("_", " ")), style="red" if regressed else "cyan"),
                 _text(_usage(case["usage_delta"], _signed) if case["presence"] == "both" else "-"),
             )
         self.out.print(Panel(table, title="Corsair · Changed cases", border_style="cyan"))
+
+    def _gate_delta(self, gates: Mapping[str, list[dict[str, Any]]]) -> None:
+        """Per-gate counts on both sides, with the failing-row final stops beside them."""
+        stops = {entry["gate"]: entry for entry in gates.get("failure_stops", [])}
+        entries = gates.get("gate_ledger", [])
+        if not entries:
+            return
+        table = Table("Gate", "Baseline", "Candidate", "Δ", "Failing stops", expand=True)
+        for entry in entries:
+            failing = stops.get(entry["gate"])
+            table.add_row(
+                _text(entry["gate"]),
+                _text(entry["baseline"]),
+                _text(entry["candidate"]),
+                Text(_signed(entry["delta"]), style="cyan" if entry["delta"] else "dim"),
+                _text(
+                    f"{failing['baseline']} -> {failing['candidate']} ({_signed(failing['delta'])})"
+                    if failing
+                    else "-"
+                ),
+            )
+        self.out.print(Panel(table, title="Corsair · Gate ledger Δ", border_style="cyan"))
 
     def _result(self, result: InvestigationResult) -> None:
         """Verdict first, then rounds, identity and totals; never model or payload content."""

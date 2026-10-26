@@ -6,10 +6,11 @@ matches the deterministic case-major, repeat-minor order of a composed batch.
 """
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from corsair.evaluation.ledger import row_ledger
 from corsair.evaluation.scoring import summarize
 
 USAGE_FIELDS = ("llm_calls", "tool_calls", "input_tokens", "output_tokens", "agent_seconds")
@@ -26,6 +27,8 @@ SUMMARY_FIELDS = (
     "unavailable_results",
     *USAGE_FIELDS,
 )
+# Per-gate summary counts compared side by side: every stop, and failed rows' final stop.
+LEDGER_FIELDS = ("gate_ledger", "failure_stops")
 
 
 def read_report(path: Path) -> dict[str, Any]:
@@ -46,6 +49,13 @@ def row_label(row: dict[str, Any]) -> str | None:
         if isinstance(value, str):
             return value
     return None
+
+
+def row_stop(row: dict[str, Any]) -> str | None:
+    """The gate of a row's final ledger entry: what stopped it, in one name."""
+    ledger = row_ledger(row)
+    gate = ledger[-1].get("gate") if ledger and isinstance(ledger[-1], dict) else None
+    return gate if isinstance(gate, str) else None
 
 
 def _number(value: object) -> int | float | None:
@@ -124,6 +134,10 @@ def _case(
         and (before is None or before.get("forbidden_label") is not True)
     )
     presence = "candidate_only" if before is None else "baseline_only" if after is None else "both"
+    stops = (
+        row_stop(before) if before is not None else None,
+        row_stop(after) if after is not None else None,
+    )
     return {
         "case_id": case_id,
         "repeat": repeat,
@@ -133,6 +147,8 @@ def _case(
         "baseline_label": labels[0],
         "candidate_label": labels[1],
         "label_changed": before is not None and after is not None and labels[0] != labels[1],
+        "baseline_stop": stops[0],
+        "candidate_stop": stops[1],
         "flip": flip,
         "new_forbidden_label": new_forbidden,
         "usage_delta": {
@@ -140,6 +156,22 @@ def _case(
             for field in USAGE_FIELDS
         },
     }
+
+
+def _gate_delta(baseline: object, candidate: object) -> list[dict[str, Any]]:
+    """Per-gate counts on both sides; moved gates first by size, then by name."""
+    before = baseline if isinstance(baseline, Mapping) else {}
+    after = candidate if isinstance(candidate, Mapping) else {}
+    entries = [
+        {
+            "gate": gate,
+            "baseline": before.get(gate, 0),
+            "candidate": after.get(gate, 0),
+            "delta": after.get(gate, 0) - before.get(gate, 0),
+        }
+        for gate in before.keys() | after.keys()
+    ]
+    return sorted(entries, key=lambda entry: (-abs(entry["delta"]), entry["gate"]))
 
 
 def _regressions(cases: list[dict[str, Any]], unidentified: dict[str, int]) -> list[dict]:
@@ -204,6 +236,11 @@ def compare_reports(
                 ),
             }
             for field in SUMMARY_FIELDS
+        },
+        # Gate movement attributes a change; it never decides a regression.
+        "gate_delta": {
+            field: _gate_delta(summaries["baseline"].get(field), summaries["candidate"].get(field))
+            for field in LEDGER_FIELDS
         },
         "counts": {
             "joined": sum(case["presence"] == "both" for case in cases),
