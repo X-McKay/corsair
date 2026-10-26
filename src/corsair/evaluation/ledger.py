@@ -29,7 +29,14 @@ from corsair.contracts import (
     Verdict,
     format_diagnostic,
 )
-from corsair.policies.verdicts import decide, fix_status, session_verdict
+from corsair.policies.operations import round_operation_id
+from corsair.policies.verdicts import (
+    candidate_key,
+    clean_negative_withheld,
+    decide,
+    fix_status,
+    session_verdict,
+)
 from corsair.settings import Settings
 
 RoundKey = tuple[int, int]
@@ -116,6 +123,8 @@ def _kernel_entry(item: RoundResult, prepared: PreparedCase) -> dict:
         return _entry(session, index, "kernel", "component_demonstrated", outcome.reason)
     if outcome.clean_negative:
         return _entry(session, index, "kernel", "clean_negative", outcome.reason)
+    if outcome.reason == clean_negative_withheld(prepared.recipe.kind):
+        return _entry(session, index, "kernel", "clean_negative_unqualified", outcome.reason)
     if outcome.verdict is Verdict.UNABLE_TO_RUN:
         return _entry(session, index, "kernel", "target_unbound", outcome.reason)
     assert observation.control is not None and observation.adversarial is not None
@@ -180,18 +189,21 @@ def _round_entry(item: RoundResult, prepared: PreparedCase | None) -> tuple[dict
 
 
 def _clean_sessions(result: InvestigationResult, entries: Mapping[RoundKey, dict]) -> int:
-    """Independent sessions whose last evaluated round was a clean negative."""
-    last_evaluated: dict[int, dict] = {}
+    """Independent clean negatives: sessions whose last evaluated round was a clean
+    negative, counted once per distinct candidate (exploit payload)."""
+    last_evaluated: dict[int, RoundResult] = {}
     for item in result.rounds:
         if item.observation is not None and item.audit is not None:
-            last_evaluated[item.session] = entries[(item.session, item.index)]
-    clean = {
-        session for session, entry in last_evaluated.items() if entry["gate"] == "clean_negative"
-    }
+            last_evaluated[item.session] = item
     if result.execution_status is not ExecutionStatus.COMPLETED and result.rounds:
         # A terminal operational failure overrides the last session's outcome.
-        clean.discard(result.rounds[-1].session)
-    return len(clean)
+        last_evaluated.pop(result.rounds[-1].session, None)
+    candidates = set()
+    for session, item in last_evaluated.items():
+        submission = item.producer.submission_for_verification()
+        if entries[(session, item.index)]["gate"] == "clean_negative" and submission is not None:
+            candidates.add(candidate_key(submission))
+    return len(candidates)
 
 
 def gate_ledger(
@@ -246,7 +258,7 @@ def gate_ledger(
 def verified_rounds(
     result: InvestigationResult, store: ArtifactStore | None
 ) -> dict[RoundKey, PreparedCase]:
-    """Recover each round's prepared case from its own validated receipts."""
+    """Recover each round's prepared case from its own validated, round-bound receipts."""
     if result.manifest is None or store is None:
         return {}
     # Imported on use: verification loads the Docker SDK, which saved-report reads never need.
@@ -257,6 +269,10 @@ def verified_rounds(
     for item in result.rounds:
         submission = item.producer.submission_for_verification()
         if item.observation is None or item.audit is None or submission is None:
+            continue
+        # A receipt verifies a round only under the operation id assigned to that round.
+        operation_id = round_operation_id(result.run_id, item.session, item.index)
+        if item.observation.operation_id != operation_id:
             continue
         prepared = verifier.validate_saved(item.observation, submission, result.manifest)
         if prepared is not None and prepared.case_id == result.case_id:

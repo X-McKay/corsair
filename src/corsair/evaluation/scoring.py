@@ -6,9 +6,26 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import Digest, Disposition, FixStatus, InvestigationResult, Oracle, Verdict
+from corsair.contracts import (
+    Digest,
+    Disposition,
+    ExecutionStatus,
+    FixStatus,
+    InvestigationResult,
+    Oracle,
+    PreparedCase,
+    RoundResult,
+    Verdict,
+)
 from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
-from corsair.policies.verdicts import decide, fix_status, session_verdict
+from corsair.policies.operations import round_operation_id
+from corsair.policies.verdicts import (
+    decide,
+    distinct_clean_negatives,
+    fix_status,
+    terminal_outcome,
+    terminal_round,
+)
 from corsair.settings import Settings
 
 if TYPE_CHECKING:
@@ -33,52 +50,81 @@ def _saved_evidence_verifier(store: ArtifactStore) -> "EvidenceVerifier":
     return EvidenceVerifier(Settings(), store)
 
 
+def _validated_round(
+    verifier: "EvidenceVerifier", result: InvestigationResult, item: RoundResult
+) -> PreparedCase | None:
+    """The prepared case of one evaluated round whose receipts revalidate for this case.
+
+    The receipt counts only under the operation id the workflow assigned to this
+    run, session and round, so a receipt cannot be relabelled as another session or
+    round, or spliced in from another run of the same case. The scorer does not
+    reconcile ``result.{run_id}`` or compare ``result_artifact`` with the supplied
+    result: ``corsair eval`` and rescoring read that immutable record themselves, and
+    a caller who scores any other result object vouches for its round list.
+    """
+    observation, audit = item.observation, item.audit
+    submission = item.producer.submission_for_verification()
+    if observation is None or submission is None or audit is None or result.manifest is None:
+        return None
+    if observation.operation_id != round_operation_id(result.run_id, item.session, item.index):
+        return None
+    prepared = verifier.validate_saved(observation, submission, result.manifest)
+    if prepared is None or prepared.case_id != result.case_id:
+        return None
+    return prepared
+
+
 def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
     if result.manifest is None or store is None:
         return False
     verifier = _saved_evidence_verifier(store)
     for item in result.rounds:
-        observation, audit = item.observation, item.audit
-        submission = item.producer.submission_for_verification()
-        if observation is None or submission is None or audit is None:
+        prepared = _validated_round(verifier, result, item)
+        if prepared is None:
             continue
-        prepared = verifier.validate_saved(observation, submission, result.manifest)
-        if (
-            prepared is not None
-            and prepared.case_id == result.case_id
-            and decide(prepared, observation, audit)[0] == result.disposition
-        ):
+        assert item.observation is not None and item.audit is not None
+        if decide(prepared, item.observation, item.audit)[0] == result.disposition:
             return True
     return False
 
 
 def valid_negative_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
     """A negative label is only valid when it rests on at least the admitted
-    ``negative_threshold`` of independent, validated clean sessions.
+    ``negative_threshold`` of independent, validated clean sessions on distinct
+    candidates.
 
-    Each qualifying session must revalidate: its committed receipts verify, the
-    finding's exact line was covered in both runs, the audit accepted, the control
-    held, and the exploit did NOT violate. Receipts are grouped by independent
-    session; a missing manifest, store, or receipt is a validation failure, never a
+    Each session is decided by its terminal (highest-index evaluated) round, as the
+    workflow decides it, and that round must revalidate: its receipts are committed
+    under the round's own operation id, the finding's exact line was covered in both
+    runs, the audit accepted, the control held, and the exploit did NOT violate.
+    Sessions that ran the same exploit payload count once. A repeated (session,
+    round), a missing manifest, store, or receipt is a validation failure, never a
     free pass. This is the costliest error to get wrong, so empty or partial
     evidence can never clear it."""
     if result.manifest is None or store is None:
         return False
+    keys = [(item.session, item.index) for item in result.rounds]
+    if len(keys) != len(set(keys)):
+        return False
+    sessions: dict[int, list[RoundResult]] = {}
+    for item in sorted(result.rounds, key=lambda item: (item.session, item.index)):
+        sessions.setdefault(item.session, []).append(item)
+    if result.execution_status is not ExecutionStatus.COMPLETED and result.rounds:
+        # A terminal operational failure overrides the last session's outcome.
+        sessions.pop(result.rounds[-1].session, None)
     verifier = _saved_evidence_verifier(store)
-    clean_sessions: set[int] = set()
-    for item in result.rounds:
-        observation, audit = item.observation, item.audit
-        submission = item.producer.submission_for_verification()
-        if observation is None or submission is None or audit is None:
+    outcomes = []
+    for rounds in sessions.values():
+        terminal = terminal_round(rounds)
+        if terminal is None:
             continue
-        prepared = verifier.validate_saved(observation, submission, result.manifest)
-        if prepared is None or prepared.case_id != result.case_id:
+        prepared = _validated_round(verifier, result, terminal)
+        if prepared is None:
             continue
         # The fixed revision is irrelevant to a clean negative; NOT_REQUESTED keeps
         # the clean-negative gate independent of any fix differential.
-        if session_verdict(prepared, observation, audit, FixStatus.NOT_REQUESTED).clean_negative:
-            clean_sessions.add(item.session)
-    return len(clean_sessions) >= result.manifest.negative_threshold
+        outcomes.append(terminal_outcome(prepared, terminal, FixStatus.NOT_REQUESTED))
+    return distinct_clean_negatives(outcomes) >= result.manifest.negative_threshold
 
 
 def valid_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:

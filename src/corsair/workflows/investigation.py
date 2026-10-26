@@ -35,6 +35,7 @@ with workflow.unsafe.imports_passed_through():
         Verdict,
         format_terminal_result,
     )
+    from corsair.policies.operations import operation_prefix, round_operation_id
     from corsair.policies.time_bounds import (
         AUDITOR_ACTIVITY_SECONDS,
         PREPARE_ACTIVITY_SECONDS,
@@ -48,9 +49,11 @@ with workflow.unsafe.imports_passed_through():
         SessionOutcome,
         case_verdict,
         decide,
+        distinct_clean_negatives,
         fix_status,
-        session_verdict,
         status_outcome,
+        terminal_outcome,
+        terminal_round,
     )
 
 
@@ -96,20 +99,16 @@ def _session_outcome(
 ) -> SessionOutcome:
     """Pure outcome of ONE session from its own rounds and terminal status.
 
-    The last evaluated round decides a demonstration, but a later terminal
-    operational failure (an ERROR/BLOCKED/CANCELLED round after it) must not be
-    masked by an earlier non-decisive round: unless the earlier round positively
-    demonstrated the exploit (at application or component scope), the operational
-    failure carries into the outcome so the canonical result keeps its
-    operational-error signal.
+    The last evaluated round decides a demonstration and names the session's
+    candidate, but a later terminal operational failure (an ERROR/BLOCKED/CANCELLED
+    round after it) must not be masked by an earlier non-decisive round: unless the
+    earlier round positively demonstrated the exploit (at application or component
+    scope), the operational failure carries into the outcome so the canonical result
+    keeps its operational-error signal.
     """
-    terminal = next(
-        (r for r in reversed(rounds) if r.observation is not None and r.audit is not None),
-        None,
-    )
+    terminal = terminal_round(rounds)
     if prepared is not None and terminal is not None:
-        assert terminal.observation is not None and terminal.audit is not None
-        outcome = session_verdict(prepared, terminal.observation, terminal.audit, result.fix_status)
+        outcome = terminal_outcome(prepared, terminal, result.fix_status)
     else:
         outcome = status_outcome(result.execution_status, result.reason)
     if (
@@ -136,11 +135,6 @@ def _aggregate_case_verdict(
     outcomes = [*earlier, _session_outcome(prepared, rounds, result)]
     verdict, _reason = case_verdict(outcomes, negative_threshold)
     return verdict
-
-
-def _operation_prefix(run_id: str, session: int) -> str:
-    """Session 1 keeps the original operation ids so earlier histories replay."""
-    return run_id if session == 1 else f"{run_id}.s{session}"
 
 
 def _submission_or_feedback(producer: ProducerOutput) -> Submission | Feedback:
@@ -172,11 +166,19 @@ def _clean_negatives_admit_another_session(
     threshold: int,
     session: int,
     max_sessions: int,
+    *,
+    distinct: bool,
 ) -> bool:
-    """Another session runs only while every earlier one ended in an independent clean
-    negative and the threshold is still unmet but reachable; any other outcome is
-    already final for case_verdict."""
-    clean = sum(o.clean_negative for o in finished) + outcome.clean_negative
+    """Another session runs only while every earlier one ended in a clean negative and
+    the threshold of clean negatives on distinct candidates is still unmet but
+    reachable; any other outcome is already final for case_verdict.
+
+    ``distinct`` is False only when replaying a history recorded before
+    distinct-candidates-v1, which counted every clean session."""
+    if distinct:
+        clean = distinct_clean_negatives([*finished, outcome])
+    else:
+        clean = sum(o.clean_negative for o in finished) + outcome.clean_negative
     if not outcome.clean_negative or clean >= threshold:
         return False
     # The remaining sessions must still be able to reach the threshold.
@@ -312,20 +314,27 @@ class InvestigationWorkflow:
                 type="TERMINAL_PAYLOAD_INVALID",
                 non_retryable=True,
             ) from None
-        recorded = await asyncio.shield(
-            workflow.execute_activity(
-                "corsair.record",
-                result,
-                result_type=InvestigationResult,
-                start_to_close_timeout=timedelta(seconds=RECORD_ATTEMPT_SECONDS),
-                schedule_to_close_timeout=(
-                    timedelta(seconds=RECORD_FINALIZATION_SECONDS)
-                    if workflow.patched("bounded-finalization-v1")
-                    else None
-                ),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
+        record = workflow.start_activity(
+            "corsair.record",
+            result,
+            result_type=InvestigationResult,
+            start_to_close_timeout=timedelta(seconds=RECORD_ATTEMPT_SECONDS),
+            schedule_to_close_timeout=(
+                timedelta(seconds=RECORD_FINALIZATION_SECONDS)
+                if workflow.patched("bounded-finalization-v1")
+                else None
+            ),
+            retry_policy=RetryPolicy(maximum_attempts=3),
         )
+        try:
+            recorded = await asyncio.shield(record)
+        except asyncio.CancelledError:
+            # The terminal decision was made before the cancel arrived and the shield
+            # kept the record activity running: await that same activity so the run
+            # closes with its committed result.{run_id} rather than none.
+            if not workflow.patched("record-survives-cancel-v1"):
+                raise
+            recorded = await record
         self.phase = "complete"
         return recorded
 
@@ -457,7 +466,8 @@ class InvestigationWorkflow:
             return self._reject(state, session, step)
         session.previous = step
         self.phase = "evidence"
-        observation = await self._evidence(state, prepared, step, f"{session.prefix}.r{index}")
+        operation_id = round_operation_id(state.run_id, session.index, index)
+        observation = await self._evidence(state, prepared, step, operation_id)
         session.amend_last(observation=observation)
         if observation.feedback is not None:
             return self._reject(state, session, observation.feedback)
@@ -492,6 +502,7 @@ class InvestigationWorkflow:
             manifest.negative_threshold,
             session.index,
             manifest.max_sessions,
+            distinct=workflow.patched("distinct-candidates-v1"),
         ):
             return False
         elapsed = (workflow.now() - state.started).total_seconds()
@@ -536,7 +547,7 @@ class InvestigationWorkflow:
             self.max_sessions = max_sessions
             for index in range(1, max_sessions + 1):
                 self.session_index = index
-                session = _Session(index, _operation_prefix(run_id, index))
+                session = _Session(index, operation_prefix(run_id, index))
                 state.sessions.append(session)
                 if index > 1:
                     # Fresh, blind session: nothing from an earlier one is carried

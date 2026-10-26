@@ -16,7 +16,7 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 3. The producer proposes JSON payload data only. It never authors a probe or any executable code; the kernel owns the recipe and materializes it at run time ([ADR 0004](decisions/0004-payload-pair-and-coverage-gated-verdict.md)).
 4. Control and exploit come from one differential run pair that differs only in payload.
 5. Exact target-line coverage is required in both runs before an observation counts toward any label.
-6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`).
+6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`) on distinct exploit payloads, of a recipe kind whose auditor rubric is qualified for the clean-negative path (currently the Python kinds).
 7. `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision differential; a supplied fix revision is optional confirmation and only withholds the label when the exploit still demonstrates on it.
 
 ## Trust boundaries and controls

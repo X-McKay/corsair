@@ -60,3 +60,13 @@ Recipe = Annotated[
 # size, mode and ownership stay); every interpreter recipe keeps /work noexec, /tmp is
 # always noexec, and every other container control is unchanged.
 NATIVE_EXEC_KINDS = frozenset({"c.integer_overflow/1"})
+
+
+# Interim guard (round 4): the recipe kinds whose clean-negative path is qualified.
+# A clean negative's only semantic check is the outcome-blind auditor's ACCEPT, and the
+# auditor rubric is qualified for the Python kinds only, so a held pair of any other
+# kind stays INCONCLUSIVE. Positives rest on trusted observations and are unaffected.
+# A kind joins this set only with a qualified per-kind auditor cohort.
+CLEAN_NEGATIVE_QUALIFIED_KINDS = frozenset(
+    {"python.secret_disclosure/1", "python.command_sentinel/1"}
+)

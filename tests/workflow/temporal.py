@@ -68,6 +68,11 @@ class ActivityScenario:
     block_prepare: bool = False
     pause_prepare: bool = False
     pause_produce: bool = False
+    # Hold the terminal record activity until the test releases it.
+    pause_record: bool = False
+    # Every producer episode proposes the same exploit payload (one candidate). By
+    # default each episode proposes a distinct one, as independent sessions should.
+    repeat_candidate: bool = False
     fail_evidence_reason: str | None = None
     fail_fixed_evidence: bool = False
     fail_record_case_ids: frozenset[str] = frozenset()
@@ -98,6 +103,8 @@ class FakeActivities:
         self.prepare_completed = asyncio.Event()
         self.release_prepare = asyncio.Event()
         self.recorded = asyncio.Event()
+        self.record_started = asyncio.Event()
+        self.release_record = asyncio.Event()
 
     def _manifest(self, request: InvestigationRequest) -> RunManifest:
         return RunManifest(
@@ -162,9 +169,13 @@ class FakeActivities:
                 self.produce_cancelled.set()
                 raise
         previous_revision = request.previous.plan.revision if request.previous else None
+        episode = self.call_counts["corsair.produce"]
+        exploit = "../private/secret.txt"
+        if not self.scenario.repeat_candidate and episode > 1:
+            exploit = f"../private/secret-{episode}.txt"
         submission = Submission(
             control_payload="hello.txt",
-            exploit_payload="../private/secret.txt",
+            exploit_payload=exploit,
             hypothesis="The configured target returns an attacker-controlled payload.",
             plan=PlanRevision(
                 revision=request.round_index,
@@ -251,6 +262,11 @@ class FakeActivities:
     async def record(self, result: InvestigationResult) -> InvestigationResult:
         self.call_counts["corsair.record"] += 1
         self.record_inputs.append(result)
+        self.record_started.set()
+        if self.scenario.pause_record:
+            while not self.release_record.is_set():
+                activity.heartbeat("waiting for the test to release the record")
+                await asyncio.sleep(0.1)
         if result.case_id in self.scenario.fail_record_case_ids:
             raise ApplicationError("test result recording failed", type="RECORD_FAILED")
         from corsair.contracts import format_terminal_result

@@ -53,7 +53,7 @@ uv run --locked corsair inspect "$RUN_ID" --online --watch --settings .state/set
 uv run --locked corsair inspect "$RUN_ID" --settings .state/settings.json
 ```
 
-The latter commands may report that a workflow/result is unavailable; preserve that fact rather than replacing it with a rerun. For a native operation, cleanup is valid only when its raw receipt shows cleanup of the exact immutable container ID with matching Corsair operation/role labels and subsequent absence of that ID. A cancellation request or broad host cleanup is not equivalent evidence.
+A cancellation that reaches the workflow while its final `record` activity is pending completes that record and returns it rather than closing without `result.{run_id}`; earlier cancellations record a `CANCELLED` result. The latter commands may report that a workflow/result is unavailable; preserve that fact rather than replacing it with a rerun. For a native operation, cleanup is valid only when its raw receipt shows cleanup of the exact immutable container ID with matching Corsair operation/role labels and subsequent absence of that ID. A cancellation request or broad host cleanup is not equivalent evidence.
 
 If a retained container must be examined, record its exact identity before any host-level action:
 

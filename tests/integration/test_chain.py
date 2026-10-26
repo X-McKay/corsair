@@ -36,6 +36,7 @@ class ReferenceModel(BaseLlm):
         return LlmCapabilities(output_schema_and_tools=True)
 
     requests: list = Field(default_factory=list)
+    proposals: int = 0
 
     async def generate_content_async(self, llm_request, stream=False):
         del stream  # Native ADK interface; this labelled fixture returns one complete response.
@@ -55,13 +56,17 @@ class ReferenceModel(BaseLlm):
             ):
                 yield tool_response("read_file", {"path": "target.py"})
                 return
+            # Each proposal is a distinct candidate (an equivalent traversal spelled
+            # differently), as independent sessions must be to count separately.
+            exploit = "./" * self.proposals + "../private/secret.txt"
+            self.proposals += 1
             yield text_response(
                 json.dumps(
                     {
                         "kind": "proposal",
                         "submission": {
                             "control_payload": "hello.txt",
-                            "exploit_payload": "../private/secret.txt",
+                            "exploit_payload": exploit,
                             "hypothesis": (
                                 "Caller-controlled path joins the root without containment."
                             ),
@@ -235,10 +240,11 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         "case03": "CONDITIONAL",
     }
     # Canonical labels: case01 demonstrates with no fixed-revision precondition;
-    # case02's guarded target yields a clean negative in each of two independent
-    # sessions that its budget admits, so it is EXPLOIT_NOT_DEMONSTRATED; case03's
-    # application-scope claim is only proven at the component seam, so it is the
-    # explicit COMPONENT_EXPLOIT_DEMONSTRATED label, not the full one.
+    # case02's guarded target yields a clean negative on a distinct candidate in each
+    # of the two independent sessions its budget admits, so it is
+    # EXPLOIT_NOT_DEMONSTRATED; case03's application-scope claim is only proven at the
+    # component seam, so it is the explicit COMPONENT_EXPLOIT_DEMONSTRATED label, not
+    # the full one.
     assert {row["case_id"]: row["verdict"] for row in rows} == {
         "case01": "EXPLOIT_DEMONSTRATED",
         "case02": "EXPLOIT_NOT_DEMONSTRATED",

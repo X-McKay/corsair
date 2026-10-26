@@ -7,7 +7,8 @@ accepted audit; all negative or incomplete evidence remains inconclusive.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, replace
 
 from corsair.contracts import (
     AuditDecision,
@@ -19,9 +20,13 @@ from corsair.contracts import (
     PreparedCase,
     RoleObservation,
     RoleOutcome,
+    RoundResult,
     Scope,
+    Submission,
     Verdict,
+    digest,
 )
+from corsair.contracts.recipes import CLEAN_NEGATIVE_QUALIFIED_KINDS
 
 
 def _blocked(observation: Observation) -> bool:
@@ -152,13 +157,68 @@ class SessionOutcome:
     """The canonical outcome of one independent investigation session.
 
     ``clean_negative`` is a session-level signal, not a verdict: a single clean
-    negative is never decisive. The aggregator counts independent clean negatives
-    and only promotes them to EXPLOIT_NOT_DEMONSTRATED once the threshold is met.
+    negative is never decisive. The aggregator counts clean negatives with DISTINCT
+    ``candidate_key`` values and only promotes them to EXPLOIT_NOT_DEMONSTRATED once
+    the threshold is met. ``candidate_key`` is the session's terminal-round candidate
+    (``candidate_key(submission)``); an outcome without one cannot show independence.
     """
 
     verdict: Verdict
     reason: str
     clean_negative: bool = False
+    candidate_key: str | None = None
+
+
+def candidate_key(submission: Submission) -> str:
+    """The canonical identity of a session's candidate: the exploit payload's digest.
+
+    Only the adversarial payload is evidence about the finding; a different benign
+    control, hypothesis or plan adds no diversity. The floor is an exact digest of the
+    canonical JSON value, so near-duplicates (``../x`` and ``./../x``) still count as
+    distinct candidates (ADR 0004, distinct candidates addendum).
+    """
+    return digest({"exploit_payload": submission.exploit_payload})
+
+
+def terminal_round(rounds: Sequence[RoundResult]) -> RoundResult | None:
+    """A session's deciding round: its last round with both an observation and an audit."""
+    return next(
+        (
+            item
+            for item in reversed(rounds)
+            if item.observation is not None and item.audit is not None
+        ),
+        None,
+    )
+
+
+def terminal_outcome(
+    prepared: PreparedCase, terminal: RoundResult, fix: FixStatus
+) -> SessionOutcome:
+    """``session_verdict`` of a session's terminal round, keyed by that round's candidate."""
+    assert terminal.observation is not None and terminal.audit is not None
+    outcome = session_verdict(prepared, terminal.observation, terminal.audit, fix)
+    submission = terminal.producer.submission_for_verification()
+    if submission is None:
+        return outcome
+    return replace(outcome, candidate_key=candidate_key(submission))
+
+
+def distinct_clean_negatives(sessions: Iterable[SessionOutcome]) -> int:
+    """Clean-negative sessions counted once per distinct candidate; a repeated exploit
+    payload adds no independent negative and an unkeyed clean negative adds none."""
+    return len(
+        {
+            session.candidate_key
+            for session in sessions
+            if session.clean_negative and session.candidate_key is not None
+        }
+    )
+
+
+def clean_negative_withheld(kind: str) -> str:
+    """The fixed reason a held, covered, accepted pair is not a clean negative."""
+    return f"clean negative withheld: auditor rubric not qualified for {kind}"
 
 
 def _audit_accepts(audit: AuditOutput) -> bool:
@@ -257,8 +317,13 @@ def session_verdict(
         return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, reason)
 
     # 7. Clean negative: healthy control, the exploit did NOT violate, accepted
-    #    audit, coverage gate passed. A session-level signal, never itself a label.
+    #    audit, coverage gate passed. A session-level signal, never itself a label,
+    #    and withheld for a kind whose auditor rubric is not qualified: the audit is
+    #    the clean-negative path's only semantic check.
     if control_held and adversarial_held and accepted:
+        kind = prepared.recipe.kind
+        if kind not in CLEAN_NEGATIVE_QUALIFIED_KINDS:
+            return SessionOutcome(Verdict.INCONCLUSIVE, clean_negative_withheld(kind))
         return SessionOutcome(Verdict.INCONCLUSIVE, "clean_negative", clean_negative=True)
 
     # 8. Anything else is non-decisive.
@@ -280,9 +345,9 @@ def case_verdict(
     """Aggregate independent sessions into one canonical case verdict. Pure.
 
     EXPLOIT_NOT_DEMONSTRATED is deliberately the hardest verdict to reach: it needs
-    at least ``negative_threshold`` independent clean negatives and no exploitable
-    session, and it is only ever scoped to the exact finding/payloads/revision/
-    runtime that were exercised (sensitivity:unverified).
+    at least ``negative_threshold`` independent clean negatives on distinct candidates
+    and no exploitable session, and it is only ever scoped to the exact finding/
+    payloads/revision/runtime that were exercised (sensitivity:unverified).
     """
     if not sessions:
         return Verdict.INCONCLUSIVE, "no sessions"
@@ -296,8 +361,8 @@ def case_verdict(
             Verdict.COMPONENT_EXPLOIT_DEMONSTRATED,
             "a session reproduced the differential at component scope only",
         )
-    clean_negatives = sum(1 for session in sessions if session.clean_negative)
-    if clean_negatives >= negative_threshold:
+    distinct = distinct_clean_negatives(sessions)
+    if distinct >= negative_threshold:
         return (
             Verdict.EXPLOIT_NOT_DEMONSTRATED,
             "independent clean negatives scoped to finding/payloads/revision/runtime "
@@ -307,4 +372,10 @@ def case_verdict(
         return Verdict.UNABLE_TO_RUN, "no session could run"
     if any(session.verdict is Verdict.ERROR for session in sessions):
         return Verdict.ERROR, "a session faulted without any decisive signal"
+    if sum(session.clean_negative for session in sessions) > distinct:
+        return (
+            Verdict.INCONCLUSIVE,
+            f"{distinct} of {negative_threshold} required clean negatives on distinct candidates; "
+            "a repeated exploit payload is not independent",
+        )
     return Verdict.INCONCLUSIVE, "no decisive signal across sessions"
