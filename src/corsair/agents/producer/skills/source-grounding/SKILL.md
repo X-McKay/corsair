@@ -12,4 +12,4 @@ description: Derive one declarative Corsair producer payload pair from an admitt
 5. Select one payload pair whose candidate implements the stated hypothesis. Keep the hypothesis tied to the observed source mechanism.
 6. Copy the revision and parent values from the packet into the plan exactly. Do not manufacture workflow history.
 7. Return `no_grounded_candidate` with a concise reason when the packet and admissible source cannot ground a valid pair. Do not guess a candidate.
-8. When the recipe `kind` is `python.command_sentinel/1`, load the `command-sentinel` reference: the pair is grounded in an execution sink and the operator sentinel path, not in a returned secret.
+8. Per-class notes under `references/` refine this procedure; when the finding's class (or recipe `kind`) is clear, the packet already carries the matching note under `## Class reference`.

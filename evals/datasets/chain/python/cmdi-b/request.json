@@ -5,7 +5,7 @@
       "title": "OS command injection in count_lines",
       "description": "`path` reaches subprocess.run with shell=True in count_lines. The operator sentinel file is /work/corsair-sentinel; a payload that reaches command or code execution creates it, while benign input never does. Only the payload argument is caller controlled.",
       "file": "app.py",
-      "line": 4,
+      "line": 6,
       "claim_scope": "component"
     },
     "source": {

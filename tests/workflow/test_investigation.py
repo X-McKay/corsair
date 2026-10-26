@@ -23,13 +23,11 @@ from corsair.contracts import (
     ExecutionStatus,
     FixStatus,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
     PlanRevision,
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     Scope,
     Submission,
@@ -123,30 +121,44 @@ async def test_audit_input_episode_limits_are_bounded_and_allow_exhausted_admiss
     await asyncio.sleep(0)
 
 
-async def test_native_auditor_does_not_overrun_exhausted_loader_budget():
-    """Run the native ADK runner directly; no Temporal service or live model."""
+async def test_native_auditor_charges_one_call_and_no_tool_within_its_admitted_budget():
+    """Run the native ADK runner directly; no Temporal service or live model.
+
+    The workflow still admits up to two calls and four tools to an audit; the
+    tool-free auditor charges one request and no tool against that sub-budget, and
+    a model naming a tool anyway gets nothing executed.
+    """
 
     from corsair.adapters.inference.adk import run_auditor
     from corsair.settings import ModelSettings
     from tests.unit.adk import ScriptedLlm, text_response, tool_response
 
-    audit_input = _audit_input(llm_call_limit=1, tool_call_limit=0)
-    model = ScriptedLlm(
+    audit_input = _audit_input()
+    reviewed = ScriptedLlm(
         model="scripted",
         responses=[
-            tool_response("load_skill", {"skill_name": "semantic-review"}),
             text_response(
-                '{"decision":"ACCEPT","rule":"independent-evidence-review",'
-                '"reason":"the packet is semantically coherent"}'
-            ),
+                '{"decision":"ACCEPT","rule":"ALL","reason":"the packet is semantically coherent"}'
+            )
         ],
     )
+    output = await run_auditor(audit_input, ModelSettings(), reviewed)
 
-    output = await run_auditor(audit_input, ModelSettings(), model)
+    assert output.feedback is None and output.review is not None
+    assert (output.usage.llm_calls, output.usage.tool_calls) == (1, 0)
+    assert len(reviewed.requests) == 1
 
-    assert output.usage.llm_calls <= audit_input.llm_call_limit
-    assert output.usage.tool_calls <= audit_input.tool_call_limit
-    assert len(model.requests) <= audit_input.llm_call_limit
+    named_tool = ScriptedLlm(
+        model="scripted",
+        responses=[tool_response("load_skill", {"skill_name": "semantic-review"})],
+    )
+    stopped = await run_auditor(
+        _audit_input(llm_call_limit=1, tool_call_limit=0), ModelSettings(), named_tool
+    )
+
+    assert stopped.review is None and stopped.feedback is not None
+    assert (stopped.usage.llm_calls, stopped.usage.tool_calls) == (1, 0)
+    assert len(named_tool.requests) == 1
 
 
 async def test_supported_paired_observation_records_bound_result(
@@ -394,6 +406,93 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
     assert activities.call_counts["corsair.record"] == 1
 
 
+class _ImageOnlySandbox:
+    image_id = "sha256:" + "a" * 64
+
+    def image_id_for(self, recipe_kind: str) -> str:
+        del recipe_kind  # One trusted image regardless of recipe kind.
+        return self.image_id
+
+
+async def _run_with_real_prepare(
+    temporal_server, tmp_path, module: str
+) -> tuple[InvestigationResult, FakeActivities]:
+    """Real source admission and pre-model gates; offline fakes for every later step."""
+    from corsair.adapters.scm.local import LocalSourceSnapshots
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.settings import Settings
+    from corsair.steps.activities import Activities
+
+    (tmp_path / "admitted").mkdir()
+    (tmp_path / "admitted" / "reader.py").write_text(module, encoding="utf-8")
+    settings = Settings(source_root=str(tmp_path), artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+    request = investigation_request("line-less")
+    case = request.case.model_copy(
+        update={"finding": request.case.finding.model_copy(update={"line": None})}
+    )
+    request = request.model_copy(update={"case": case})
+    fakes = FakeActivities(store)
+    prepare = Activities(
+        settings,
+        store=store,
+        inference=None,  # ty: ignore[invalid-argument-type]
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=_ImageOnlySandbox(),  # ty: ignore[invalid-argument-type]
+    ).prepare
+    queue = temporal_id("line-less-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=[prepare, fakes.produce, fakes.evidence, fakes.audit, fakes.record],
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("line-less"),
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+    return result, fakes
+
+
+async def test_a_line_less_finding_with_a_resolvable_function_now_runs(temporal_server, tmp_path):
+    """A scanner that named only the function: prepare binds the line from the recipe
+    function in trusted code, and the same exact-line gates then decide the case."""
+    from corsair.contracts import LineProvenance
+
+    module = (
+        "from pathlib import Path\n\n\n"
+        "def read_payload(root, path):\n"
+        "    return (Path(root) / path).read_text()\n"
+    )
+    result, fakes = await _run_with_real_prepare(temporal_server, tmp_path, module)
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    [producer_input] = fakes.producer_inputs
+    assert producer_input.prepared.finding.line == 5
+    assert producer_input.prepared.line_provenance is LineProvenance.RECIPE_FUNCTION
+    assert fakes.evidence_inputs[0].prepared.finding.line == 5
+    [audit_input] = fakes.audit_inputs
+    assert audit_input.finding.line == 5
+    assert audit_input.line_provenance is LineProvenance.RECIPE_FUNCTION
+
+
+async def test_a_line_less_finding_that_cannot_bind_is_still_unable_to_run(
+    temporal_server, tmp_path
+):
+    module = "def read_payload(root, path): return path\n"
+    result, fakes = await _run_with_real_prepare(temporal_server, tmp_path, module)
+
+    assert result.execution_status is ExecutionStatus.BLOCKED
+    assert result.verdict is Verdict.UNABLE_TO_RUN
+    assert "target_binding line_missing" in result.reason
+    assert fakes.call_counts["corsair.produce"] == 0
+    assert fakes.call_counts["corsair.evidence"] == 0
+
+
 async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
     temporal_server, temporal_artifact_store
 ):
@@ -407,9 +506,8 @@ async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
             self.produce_started.set()
             return ProducerOutput(
                 decision=ProducerDecision(
-                    root=NoGroundedCandidate(
-                        reason="The admitted source does not ground an allowed payload candidate."
-                    )
+                    kind="no_grounded_candidate",
+                    reason="The admitted source does not ground an allowed payload candidate.",
                 ),
                 usage=Usage(llm_calls=1, tool_calls=1),
             )
@@ -439,7 +537,7 @@ async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
     producer = result.rounds[0].producer
     assert producer.usage == Usage(llm_calls=1, tool_calls=1)
     assert producer.decision is not None
-    assert isinstance(producer.decision.root, NoGroundedCandidate)
+    assert producer.decision.kind == "no_grounded_candidate"
     assert activities.call_counts["corsair.evidence"] == 0
     assert activities.call_counts["corsair.audit"] == 0
     assert activities.evidence_inputs == []
@@ -647,7 +745,7 @@ async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
             plan = submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
             return ProducerOutput(
                 decision=ProducerDecision(
-                    root=ProducerProposal(submission=submission.model_copy(update={"plan": plan}))
+                    kind="proposal", submission=submission.model_copy(update={"plan": plan})
                 ),
                 usage=producer.usage,
                 feedback=producer.feedback,
@@ -984,6 +1082,29 @@ async def test_status_query_reports_bounds_deadline_and_phase_timeline(
     assert [(entry["session"], entry["round"]) for entry in status["timeline"]][1:4] == [(1, 1)] * 3
     moments = [datetime.fromisoformat(entry["at"]) for entry in status["timeline"]]
     assert moments == sorted(moments) and moments[0] >= started
+    # The recorded result carries the same transitions up to finalization, so offline
+    # inspection can show phase durations after the workflow has closed.
+    recorded = [entry.model_dump(mode="json") for entry in result.timeline]
+    assert [entry["phase"] for entry in recorded] == [
+        "prepare",
+        "producer",
+        "evidence",
+        "audit",
+        "record",
+    ]
+    assert [entry.at for entry in result.timeline] == moments[:-1]
+    assert [(entry.session, entry.round) for entry in result.timeline] == [
+        (0, 0),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+    ]
+    assert result.result_artifact is not None
+    committed = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert committed.timeline == result.timeline
 
 
 async def test_status_query_reports_the_last_feedback_gate_per_round(
@@ -1029,4 +1150,133 @@ async def test_batch_status_query_reports_running_and_error_counts(
         await handle.result()
         status = await handle.query(EvaluationWorkflow.status)
 
-    assert status == {"completed": 2, "total": 2, "running": 0, "errors": 1}
+    children = status.pop("children")
+    started = datetime.fromisoformat(status.pop("started"))
+    assert status == {
+        "completed": 2,
+        "total": 2,
+        "running": 0,
+        "errors": 1,
+        "children_omitted": 0,
+    }
+    assert [(row["case_id"], row["repeat"], row["state"]) for row in children] == [
+        ("statusbad", 0, "failed"),
+        ("statusok", 0, "completed"),
+    ]
+    assert [row["run_id"] for row in children] == [
+        f"{request.batch_id}.c1.r0",
+        f"{request.batch_id}.c0.r0",
+    ]
+    for row in children:
+        assert set(row) == {"case_id", "repeat", "run_id", "state", "started", "finished"}
+        assert started <= datetime.fromisoformat(row["started"])
+        assert datetime.fromisoformat(row["started"]) <= datetime.fromisoformat(row["finished"])
+
+
+async def test_batch_status_query_reports_running_then_pending_children_mid_batch(
+    temporal_server, temporal_artifact_store
+):
+    request = BatchRequest(
+        batch_id=temporal_id("batchlive"),
+        requests=[investigation_request("liveb"), investigation_request("livea")],
+        repeats=1,
+        concurrency=1,
+    )
+    scenario = ActivityScenario(pause_prepare=True)
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        handle = await temporal_server.client.start_workflow(
+            EvaluationWorkflow.run,
+            request,
+            id=temporal_id("batchlive"),
+            task_queue=task_queue,
+            result_type=list[BatchItem],
+        )
+        await asyncio.wait_for(acts.prepare_started.wait(), timeout=15)
+        during = await handle.query(EvaluationWorkflow.status)
+        acts.release_prepare.set()
+        await handle.result()
+        after = await handle.query(EvaluationWorkflow.status)
+
+    assert (during["completed"], during["running"], during["total"]) == (0, 1, 2)
+    # Running first, then pending: the order the operator needs, not submission order.
+    assert [(row["case_id"], row["state"]) for row in during["children"]] == [
+        ("liveb", "running"),
+        ("livea", "pending"),
+    ]
+    running, pending = during["children"]
+    assert running["started"] is not None and running["finished"] is None
+    assert pending["started"] is None and pending["finished"] is None
+    assert [(row["case_id"], row["state"]) for row in after["children"]] == [
+        ("livea", "completed"),
+        ("liveb", "completed"),
+    ]
+
+
+async def test_slow_producer_episode_ends_inside_its_activity_as_episode_timeout(
+    temporal_server, temporal_artifact_store
+):
+    """A provider slower than the producer activity window is a typed episode stop.
+
+    The real produce activity and ADK adapter run a native episode against a model
+    that never answers. The episode bound sits inside the activity window, so the
+    round records ``episode_timeout`` with accounted usage instead of an opaque
+    activity StartToClose ``ActivityError`` with unknown usage.
+    """
+    from typing import cast
+
+    from corsair.adapters.inference.adk import AdkInference
+    from corsair.ports.sandboxing import SandboxPort
+    from corsair.ports.scm import SourceSnapshotPort
+    from corsair.settings import Settings
+    from corsair.steps.activities import Activities
+    from tests.unit.adk import StalledLlm
+
+    settings = Settings()
+    model = StalledLlm(model="stalled-provider")
+    fakes = FakeActivities(temporal_artifact_store)
+    real = Activities(
+        settings,
+        store=temporal_artifact_store,
+        inference=AdkInference(settings, temporal_artifact_store, model),
+        sources=cast(SourceSnapshotPort, object()),
+        sandbox=cast(SandboxPort, object()),
+    )
+    request = investigation_request("slowproducer")
+    queue, identity = temporal_id("slow-queue"), temporal_id("slow-producer")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=[fakes.prepare, real.produce, fakes.evidence, fakes.audit, fakes.record],
+    ):
+        handle = await temporal_server.client.start_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+        result = await asyncio.wait_for(handle.result(), timeout=60)
+        history = await handle.fetch_history()
+
+    produce = next(
+        event.activity_task_scheduled_event_attributes
+        for event in history.events
+        if event.HasField("activity_task_scheduled_event_attributes")
+        and event.activity_task_scheduled_event_attributes.activity_type.name == "corsair.produce"
+    )
+    window = produce.start_to_close_timeout.seconds
+    assert 0 < window <= request.budget.max_elapsed_seconds
+    assert not any(
+        event.HasField("activity_task_timed_out_event_attributes") for event in history.events
+    )
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.usage_complete is True
+    assert len(result.rounds) == 1
+    producer = result.rounds[0].producer
+    assert producer.feedback is not None
+    assert (producer.feedback.gate, producer.feedback.operational) == ("episode_timeout", True)
+    assert producer.usage.llm_calls == 1 == len(model.requests)
+    assert producer.usage.seconds < window
+    assert fakes.call_counts["corsair.evidence"] == 0
+    assert temporal_artifact_store.reconcile(f"result.{identity}")

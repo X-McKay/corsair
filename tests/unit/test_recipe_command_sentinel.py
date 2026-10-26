@@ -107,3 +107,21 @@ def test_recipe_round_trips_through_json_preserving_the_tag() -> None:
     restored = _RECIPE.validate_json(recipe.model_dump_json())
     assert isinstance(restored, PythonCommandSentinel)
     assert restored == recipe
+
+
+def test_image_resolution_per_recipe_kind_honors_a_configured_image() -> None:
+    from corsair.settings import Settings
+
+    default = Settings()
+    assert default.image_for("python.secret_disclosure/1") == "corsair-python:0.1"
+    assert default.image_for("python.command_sentinel/1") == "corsair-python:0.1"
+    # A settings file naming only `image` keeps selecting it for every Python recipe.
+    scratch = Settings.model_validate({"image": "corsair-python:scratch"})
+    assert scratch.image_for("python.secret_disclosure/1") == "corsair-python:scratch"
+    assert scratch.image_for("python.command_sentinel/1") == "corsair-python:scratch"
+    # An explicit map row wins for its kind; absent kinds fall back to `image`.
+    mapped = Settings.model_validate(
+        {"image": "a:1", "images": {"python.command_sentinel/1": "b:1"}}
+    )
+    assert mapped.image_for("python.command_sentinel/1") == "b:1"
+    assert mapped.image_for("python.secret_disclosure/1") == "a:1"

@@ -16,24 +16,27 @@ from rich.console import Console, Group, RenderableType
 from rich.json import JSON
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress_bar import ProgressBar
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     ExecutionStatus,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
+    PhaseTransition,
     RoleObservation,
     RoleOutcome,
     RoundResult,
     Usage,
     Verdict,
 )
-from corsair.evaluation.comparison import row_label
+from corsair.evaluation.comparison import row_label, row_stop
+from corsair.evaluation.ledger import RoundKey, gate_ledger, verified_rounds
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_error_detail, safe_text
 from corsair.ports.sandboxing import SandboxUnavailable
@@ -86,12 +89,27 @@ T = TypeVar("T")
 _POLL_SECONDS = 1.0
 # Most recent phase transitions shown in the live panel.
 _TIMELINE_ROWS = 8
+# Gate-ledger stops coloured like the verdicts they lead to; the rest are non-decisive.
+_STOP_STYLES: dict[str, str] = {
+    "demonstrated": "red",
+    "component_demonstrated": "red",
+    "clean_negative": "green",
+    "evidence_unverified": "dim",
+    "kernel_error": "magenta",
+}
+# Case-level ledger stops whose reason is a fixed, code-authored sentence. Every other
+# ledger reason may repeat model text (an abstention, an audit reason) or the result's
+# own reason, so the human view names only the stage and gate.
+_CODE_REASON_STOPS = frozenset({"fix_not_blocked", "negative_threshold_unmet", "budget_exhausted"})
+# Evaluation child rows shown in the live panel; the query already orders them by state.
+_CHILD_TABLE_ROWS = 16
+_CHILD_STYLES = {"running": "cyan", "failed": "red", "completed": "green", "pending": "dim"}
 
 
 class TerminalOptions(Protocol):
     """Presentation switches shared by every parsed command."""
 
-    format: Literal["auto", "human", "json"]
+    format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
     log_format: Literal["text", "json"]
@@ -232,6 +250,13 @@ def _signed(value: object) -> str:
     return f"{round(value, 4):+}"
 
 
+def _ratio(count: object, total: object) -> str:
+    """``count/total``; an unknown count (such as decisive on agent rows) stays unknown."""
+    if not isinstance(count, int) or not isinstance(total, int):
+        return "unknown"
+    return f"{count}/{total}"
+
+
 def _usage(values: Mapping[str, Any], show: Callable[[object], str]) -> str:
     """One compact usage cell: model calls, tokens in/out and agent seconds."""
     return (
@@ -312,7 +337,7 @@ def _producer_cell(item: RoundResult) -> Text:
     decision = item.producer.decision
     if decision is None:
         cell = Text("no decision", style="yellow")
-    elif isinstance(decision.root, NoGroundedCandidate):
+    elif decision.kind == "no_grounded_candidate":
         cell = Text("abstained", style="yellow")
     else:
         cell = Text("proposal")
@@ -343,10 +368,38 @@ def _audit_cell(audit: AuditOutput | None) -> Text:
     return cell
 
 
-def _rounds_table(rounds: list[RoundResult]) -> Table:
+def _stop_cell(entry: Mapping[str, Any] | None) -> Text:
+    """Gate and stage only: a round's ledger reason can be model text."""
+    if entry is None:
+        return Text("unknown", style="dim")
+    gate = str(entry["gate"])
+    cell = Text(safe_text(gate), style=_STOP_STYLES.get(gate, "yellow"))
+    cell.append(f"\n{safe_text(entry['stage'])}", style="dim")
+    return cell
+
+
+def _case_stop(ledger: list[dict]) -> Text:
+    """Why the case stopped: its policy stops, else the last round's stopping gate."""
+    stops = [entry for entry in ledger if entry["round"] is None]
+    if not stops:
+        last = ledger[-1]
+        cell = Text(safe_text(last["gate"]), style=_STOP_STYLES.get(last["gate"], "yellow"))
+        cell.append(f" · {safe_text(last['stage'])} at {last['session']}.{last['round']}")
+        return cell
+    cell = Text()
+    for position, entry in enumerate(stops):
+        if position:
+            cell.append("; ")
+        cell.append(safe_text(entry["gate"]), style=_STOP_STYLES.get(entry["gate"], "yellow"))
+        if entry["gate"] in _CODE_REASON_STOPS:
+            cell.append(f": {safe_text(entry['reason'])}")
+    return cell
+
+
+def _rounds_table(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> Table:
     table = Table(title="Rounds", title_justify="left", expand=True)
     table.add_column("S.R", no_wrap=True)
-    for column in ("Producer", "Control", "Adversarial", "Audit"):
+    for column in ("Producer", "Control", "Adversarial", "Audit", "Stopped at"):
         table.add_column(column, overflow="fold")
     for item in rounds:
         observation = item.observation
@@ -356,7 +409,62 @@ def _rounds_table(rounds: list[RoundResult]) -> Table:
             _role_cell(observation.control if observation else None),
             _role_cell(observation.adversarial if observation else None),
             _audit_cell(item.audit),
+            _stop_cell(stops.get((item.session, item.index))),
         )
+    if any(entry["gate"] == "evidence_unverified" for entry in stops.values()):
+        table.caption = Text(
+            "evidence_unverified: the round's receipts were not validated against the "
+            "artifact store here, so no kernel gate is named; the verdict is the recorded one.",
+            style="dim",
+        )
+        table.caption_justify = "left"
+    return table
+
+
+def _duration(seconds: float) -> str:
+    return f"{seconds:.1f} s" if seconds < 60 else _clock(seconds)
+
+
+def _timeline_table(timeline: list[PhaseTransition]) -> Table:
+    """Recorded phase durations: each transition lasts until the next one, and the last
+    one (normally ``record``) has no recorded end. Unknown times stay unknown."""
+    table = Table(title="Phases", title_justify="left", expand=True)
+    for column in ("S.R", "Phase", "At", "Duration"):
+        table.add_column(column, overflow="fold")
+    first = timeline[0].at
+    totals: dict[str, float | None] = {}
+    for entry, following in zip(timeline, [*timeline[1:], None], strict=True):
+        offset = None
+        if entry.at is not None and first is not None:
+            offset = f"+{_clock((entry.at - first).total_seconds())}"
+        duration: str | None = "-"
+        if following is not None:
+            seconds = None
+            if entry.at is not None and following.at is not None:
+                seconds = (following.at - entry.at).total_seconds()
+            total = totals.get(entry.phase, 0.0)
+            totals[entry.phase] = None if total is None or seconds is None else total + seconds
+            duration = None if seconds is None else _duration(seconds)
+        table.add_row(
+            _text(f"{entry.session}.{entry.round}"),
+            _text(entry.phase),
+            _text(offset),
+            _text(duration),
+        )
+    notes = []
+    if timeline[0].phase != "prepare":
+        notes.append("earlier transitions not retained")
+    if totals:
+        notes.append(
+            "totals: "
+            + " · ".join(
+                f"{phase} {'unknown' if total is None else _duration(total)}"
+                for phase, total in totals.items()
+            )
+        )
+    if notes:
+        table.caption = _text("; ".join(notes))
+        table.caption_justify = "left"
     return table
 
 
@@ -386,6 +494,36 @@ def _roles_table(observation: Observation, title: str, *, caption: bool = False)
             _text(role.reason or "-"),
         )
     return table
+
+
+def _target_caption(item: Mapping[str, Any]) -> str:
+    """The kernel's target line, and that it was derived when prepare bound it."""
+    line = item.get("target_line")
+    if line is None:
+        return ""
+    derived = item.get("line_provenance") == "recipe_function"
+    return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
+
+
+# Validation check keys and their compact column headings.
+_DATASET_CHECKS = (
+    ("entry", "Entry"),
+    ("digests", "Digest"),
+    ("request", "Input"),
+    ("source", "Source"),
+    ("target_binding", "Bind"),
+    ("oracle", "Oracle"),
+)
+_CHECK_WORDS = {"pass": ("ok", "green"), "fail": ("FAIL", "bold red"), "skip": ("-", "dim")}
+
+
+def _check_word(status: str) -> Text:
+    word, style = _CHECK_WORDS.get(status, (status, "cyan"))
+    return Text(safe_text(word), style=style)
+
+
+def _status_word(status: str) -> Text:
+    return Text(safe_text(status).upper(), style=_STYLES.get(status, "dim"))
 
 
 def _cleanup_text(confirmed: bool) -> Text:
@@ -422,7 +560,7 @@ def _count(value: object, limit: object) -> str:
 
 _PROGRESS_KEYS = frozenset(
     {"phase", "session", "round", "max_sessions", "max_rounds", "gate", "started", "deadline"}
-    | {"timeline", "completed", "total", "running", "errors"}
+    | {"timeline", "completed", "total", "running", "errors", "children", "children_omitted"}
 )
 
 
@@ -465,22 +603,106 @@ def progress_fields(
     return fields
 
 
+def _child_rows(status: Mapping[str, object] | None) -> list[Mapping[str, object]]:
+    """Evaluation child rows from a status query, in the order the workflow returned."""
+    children = status.get("children") if status else None
+    if not isinstance(children, list):
+        return []
+    return [row for row in children if isinstance(row, Mapping)]
+
+
+def _child_elapsed(row: Mapping[str, object], now: datetime) -> str:
+    """A running child's time so far, a finished child's duration, else nothing."""
+    started = _instant(row.get("started"))
+    if started is None:
+        return ""
+    finished = _instant(row.get("finished")) or now
+    return _clock((finished - started).total_seconds())
+
+
+def _child_table(status: Mapping[str, object], now: datetime) -> Table | None:
+    rows = _child_rows(status)
+    if not rows:
+        return None
+    table = Table("State", "Case", "Repeat", "Elapsed", "Run", box=None, pad_edge=False)
+    for row in rows[:_CHILD_TABLE_ROWS]:
+        state = safe_text(row.get("state"))
+        table.add_row(
+            Text(state, style=_CHILD_STYLES.get(state, "")),
+            _text(row.get("case_id")),
+            _text(row.get("repeat")),
+            _text(_child_elapsed(row, now)),
+            _text(row.get("run_id")),
+        )
+    omitted = status.get("children_omitted")
+    hidden = max(0, len(rows) - _CHILD_TABLE_ROWS)
+    hidden += omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
+    if hidden > 0:
+        table.add_row(_text(f"… {hidden} more"), "", "", "", "")
+    return table
+
+
+def child_changes(
+    seen: dict[str, str], status: Mapping[str, object] | None
+) -> list[Mapping[str, object]]:
+    """Rows whose state differs from the last one seen for that run; updates ``seen``.
+
+    A child first seen while still pending is not a change, so the first poll of a
+    large batch prints nothing per child.
+    """
+    changed: list[Mapping[str, object]] = []
+    for row in _child_rows(status):
+        run_id, state = safe_text(row.get("run_id")), safe_text(row.get("state"))
+        previous = seen.get(run_id)
+        if previous != state and not (previous is None and state == "pending"):
+            changed.append(row)
+        seen[run_id] = state
+    return changed
+
+
+def child_line(
+    label: str, row: Mapping[str, object], fields: list[tuple[str, str]], now: datetime
+) -> Text:
+    """One plain line for one evaluation child's state change, after the batch counts."""
+    child = [
+        ("case", f"{safe_text(row.get('case_id'))} r{safe_text(row.get('repeat'))}"),
+        ("state", safe_text(row.get("state"))),
+    ]
+    elapsed = _child_elapsed(row, now)
+    if elapsed:
+        child.append(("case elapsed", elapsed))
+    return progress_line(label, [*fields, *child])
+
+
 def progress_line(label: str, fields: list[tuple[str, str]]) -> Text:
     """One plain line for a non-animated terminal: no cursor movement."""
     return _text(" · ".join([label, *(f"{key} {value}" for key, value in fields)]))
 
 
 def progress_panel(
-    label: str, status: Mapping[str, object] | None, fields: list[tuple[str, str]]
+    label: str,
+    status: Mapping[str, object] | None,
+    fields: list[tuple[str, str]],
+    *,
+    now: datetime | None = None,
 ) -> Panel:
-    """Compact live view: current status fields and the most recent phase transitions."""
+    """Compact live view: status fields, then evaluation child rows with a progress bar or
+    the most recent phase transitions, whichever the status query carries."""
     summary = Table.grid(padding=(0, 2))
     phase = next((value for key, value in fields if key == "phase"), "in progress")
     summary.add_row(Spinner("dots", style="cyan"), Text(phase, style="bold"))
     for key, value in fields:
         if key != "phase":
             summary.add_row(Text(key.capitalize(), style="cyan"), _text(value))
+    total = status.get("total") if status else None
+    completed = status.get("completed") if status else None
+    if isinstance(total, int) and isinstance(completed, int) and total > 0:
+        bar = ProgressBar(total=total, completed=min(completed, total), width=30)
+        summary.add_row(Text("Progress", style="cyan"), bar)
     parts: list[RenderableType] = [summary]
+    children = _child_table(status, now or _utcnow()) if status else None
+    if children is not None:
+        parts.extend([Text(""), children])
     timeline = status.get("timeline") if status else None
     if isinstance(timeline, list) and timeline:
         started = _instant(status.get("started")) if status else None
@@ -506,8 +728,9 @@ class Terminal:
         options = cast(TerminalOptions, args)
         requested = options.format
         self.human = requested == "human" or (requested == "auto" and sys.stdout.isatty())
+        self.markdown = requested == "markdown"
         # JSON mode must remain free of cursor movement even when running on a TTY.
-        colors = not options.no_color and requested != "json"
+        colors = not options.no_color and requested not in {"json", "markdown"}
         animation = self.human and not options.no_animation
         animation = animation and options.log_format != "json"
         self.out = Console(
@@ -527,18 +750,30 @@ class Terminal:
         )
         self.animate = animation and self.err.is_interactive
 
-    def emit(self, value: object) -> None:
-        """Write a complete JSON receipt or a compact human rendering to stdout."""
+    def emit(self, value: object, *, store: ArtifactStore | None = None) -> None:
+        """Write a complete JSON receipt, a Markdown record or a compact human rendering.
+
+        ``store`` lets the human result view verify each round's receipts for its gate
+        ledger; without it, rounds that reached the kernel show ``evidence_unverified``.
+        JSON output never depends on it.
+        """
         rendered = TypeAdapter(Any).dump_python(value, mode="json")
+        if self.markdown:
+            from corsair.entrypoints.markdown import to_markdown
+
+            sys.stdout.write(to_markdown(rendered))
+            return
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
         if isinstance(rendered, dict) and "disposition" in rendered:
-            self._result(InvestigationResult.model_validate(rendered))
+            self._result(InvestigationResult.model_validate(rendered), store)
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
             self._runs(rendered)
+        elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
+            self._datasets(rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:
             self._evidence(rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
@@ -573,6 +808,10 @@ class Terminal:
                 self.out.print(Text("Dataset: ") + _text(rendered["dataset_digest"]))
             if isinstance(rendered.get("rows"), list):
                 self._report_rows(rendered["rows"])
+            if isinstance(rendered.get("families"), list):
+                self._groups("Families", "family", rendered["families"])
+            if isinstance(rendered.get("splits"), list):
+                self._groups("Splits", "split", rendered["splits"])
             for key, detail in counts.items():
                 self._counts(key, detail)
             if "report" in rendered:
@@ -597,7 +836,7 @@ class Terminal:
     def _report_rows(self, rows: list[dict[str, Any]]) -> None:
         """Render one table row per scored attempt; unknown usage stays unknown."""
         table = Table(expand=True)
-        for column in ("Case", "Run", "Status", "Label", "Usage", "Reason"):
+        for column in ("Case", "Run", "Status", "Label", "Stop", "Usage", "Reason"):
             table.add_column(column, overflow="fold")
         for row in rows:
             status = row.get("status")
@@ -610,10 +849,63 @@ class Terminal:
                 _text(row.get("run_id")),
                 Text(detail, style=_STYLES.get(str(status), "cyan")),
                 _text(row_label(row)),
+                _text(row_stop(row) or "-"),
                 _text(_usage(row, _plain)),
                 _text(row.get("reason") or ""),
             )
         self.out.print(Panel(table, title="Corsair · Cases", border_style="cyan"))
+
+    def _groups(self, title: str, key: str, groups: list[dict[str, Any]]) -> None:
+        """Render per-family or per-split summaries; an undeclared group is shown as such."""
+        table = Table(expand=True)
+        other = "Splits" if key == "family" else "Families"
+        for column in (key.capitalize(), other, "Cases", "Pass", "Decisive", "Forbidden", "Ops"):
+            table.add_column(column, overflow="fold")
+        for group in groups:
+            spread = group.get("splits") if key == "family" else group.get("families")
+            table.add_row(
+                _text(group[key] if group[key] is not None else "(undeclared)"),
+                _text(", ".join(spread) if isinstance(spread, list) else spread),
+                _text(group["cases"]),
+                _text(_ratio(group["passed"], group["attempts"])),
+                _text(_ratio(group["decisive"], group["attempts"])),
+                Text(
+                    _plain(group["forbidden_labels"]),
+                    style="red" if group["forbidden_labels"] else "cyan",
+                ),
+                _text(group["operational_failures"]),
+            )
+        self.out.print(Panel(table, title=f"Corsair · {title}", border_style="cyan"))
+
+    def _family_deltas(self, families: list[dict[str, Any]]) -> None:
+        """Render each family's pass rate, decisive count and forbidden-label change."""
+        table = Table(expand=True)
+        for column in ("Family", "Pass rate", "Decisive", "Forbidden", "Regressions"):
+            table.add_column(column, overflow="fold")
+
+        def side(item: dict[str, Any], name: str, field: str) -> str:
+            group = item[name]
+            return "absent" if group is None else _plain(group.get(field))
+
+        for item in families:
+            family = item["family"]
+            table.add_row(
+                _text(family if family is not None else "(undeclared)"),
+                _text(
+                    f"{side(item, 'baseline', 'pass_rate')} -> "
+                    f"{side(item, 'candidate', 'pass_rate')} ({_signed(item['pass_rate_delta'])})"
+                ),
+                _text(
+                    f"{side(item, 'baseline', 'decisive')} -> "
+                    f"{side(item, 'candidate', 'decisive')} ({_signed(item['decisive_delta'])})"
+                ),
+                _text(
+                    f"{side(item, 'baseline', 'forbidden_labels')} -> "
+                    f"{side(item, 'candidate', 'forbidden_labels')}"
+                ),
+                Text(str(item["regressions"]), style="red" if item["regressions"] else "green"),
+            )
+        self.out.print(Panel(table, title="Corsair · Families", border_style="cyan"))
 
     def _comparison(self, value: dict[str, Any]) -> None:
         """Render a report comparison: dataset identity first, then deltas and changed cases."""
@@ -640,6 +932,14 @@ class Terminal:
         )
         if value["dataset_match"]:
             grid.add_row(Text("Dataset", style="cyan"), _text(digests["baseline"]))
+        gates = value.get("gate_delta", {})
+        moved = [entry for entry in gates.get("gate_ledger", []) if entry["delta"]]
+        grid.add_row(
+            Text("gates moved", style="cyan"),
+            _text(
+                ", ".join(f"{entry['gate']} {_signed(entry['delta'])}" for entry in moved) or "none"
+            ),
+        )
         for key, count in value["counts"].items():
             grid.add_row(Text(key.replace("_", " "), style="cyan"), _text(count))
         for key, delta in value["summary_delta"].items():
@@ -651,11 +951,17 @@ class Terminal:
                 ),
             )
         for item in value["regressions"]:
+            family = f" [{_plain(item['family'])}]" if item.get("family") else ""
             grid.add_row(
                 Text("Regression", style="red"),
-                _text(f"{_plain(item['case_id'])} #{_plain(item['repeat'])}: {item['reason']}"),
+                _text(
+                    f"{_plain(item['case_id'])} #{_plain(item['repeat'])}{family}: {item['reason']}"
+                ),
             )
         self.out.print(Panel(grid, title="Corsair · Comparison", border_style="cyan"))
+        self._gate_delta(gates)
+        if isinstance(value.get("families"), list):
+            self._family_deltas(value["families"])
         changed = [
             case
             for case in value["cases"]
@@ -668,7 +974,7 @@ class Terminal:
             self.out.print(Text(f"No per-case status or label changes in {len(value['cases'])}."))
             return
         table = Table(expand=True)
-        for column in ("Case", "#", "Status", "Label", "Change", "Usage Δ"):
+        for column in ("Case", "#", "Status", "Label", "Stop", "Change", "Usage Δ"):
             table.add_column(column, overflow="fold")
         for case in changed:
             regressed = (
@@ -684,13 +990,46 @@ class Terminal:
                 _text(case["repeat"]),
                 _text(f"{_plain(case['baseline_status'])} -> {_plain(case['candidate_status'])}"),
                 _text(f"{_plain(case['baseline_label'])} -> {_plain(case['candidate_label'])}"),
+                _text(
+                    f"{_plain(case.get('baseline_stop'))} -> {_plain(case.get('candidate_stop'))}"
+                ),
                 Text(safe_text(change.replace("_", " ")), style="red" if regressed else "cyan"),
                 _text(_usage(case["usage_delta"], _signed) if case["presence"] == "both" else "-"),
             )
         self.out.print(Panel(table, title="Corsair · Changed cases", border_style="cyan"))
 
-    def _result(self, result: InvestigationResult) -> None:
-        """Verdict first, then rounds, identity and totals; never model or payload content."""
+    def _gate_delta(self, gates: Mapping[str, list[dict[str, Any]]]) -> None:
+        """Per-gate counts on both sides, with the failing-row final stops beside them."""
+        stops = {entry["gate"]: entry for entry in gates.get("failure_stops", [])}
+        entries = gates.get("gate_ledger", [])
+        if not entries:
+            return
+        table = Table("Gate", "Baseline", "Candidate", "Δ", "Failing stops", expand=True)
+        for entry in entries:
+            failing = stops.get(entry["gate"])
+            table.add_row(
+                _text(entry["gate"]),
+                _text(entry["baseline"]),
+                _text(entry["candidate"]),
+                Text(_signed(entry["delta"]), style="cyan" if entry["delta"] else "dim"),
+                _text(
+                    f"{failing['baseline']} -> {failing['candidate']} ({_signed(failing['delta'])})"
+                    if failing
+                    else "-"
+                ),
+            )
+        self.out.print(Panel(table, title="Corsair · Gate ledger Δ", border_style="cyan"))
+
+    def _result(self, result: InvestigationResult, store: ArtifactStore | None = None) -> None:
+        """Verdict and case stop first, then rounds with their gate-ledger stop, phases,
+        identity and totals; never model or payload content. The ledger only describes
+        the recorded verdict: it is computed by the evaluator's pure ``gate_ledger``."""
+        ledger = gate_ledger(result, verified_rounds(result, store))
+        stops = {
+            (entry["session"], entry["round"]): entry
+            for entry in ledger
+            if entry["round"] is not None
+        }
         style = _VERDICT_STYLES.get(result.verdict, "cyan") if result.verdict else "cyan"
         header = _grid()
         header.add_row(
@@ -699,6 +1038,7 @@ class Terminal:
             if result.verdict
             else Text("not recorded", style="yellow"),
         )
+        header.add_row(_label("Case stop"), _case_stop(ledger))
         header.add_row(
             _label("Execution"),
             Text(
@@ -714,11 +1054,13 @@ class Terminal:
         header.add_row(_label("Case"), _text(result.case_id))
         self.out.print(Panel(header, title="Corsair · Investigation", border_style=style))
         if result.rounds:
-            self.out.print(_rounds_table(result.rounds))
+            self.out.print(_rounds_table(result.rounds, stops))
         else:
             self.out.print(Text("No rounds recorded.", style="dim"))
         if result.fix_observation is not None:
             self.out.print(_roles_table(result.fix_observation, "Fixed revision", caption=True))
+        if result.timeline:
+            self.out.print(_timeline_table(result.timeline))
         self.out.print(self._identity(result))
 
     @staticmethod
@@ -801,6 +1143,65 @@ class Terminal:
                 Text(f"{value['invalid_records']} committed record(s) could not be read")
             )
 
+    def _datasets(self, value: dict[str, Any]) -> None:
+        """Render a dataset validation: identity and cohort, then one row per entry."""
+        for dataset in value["datasets"]:
+            header = _grid()
+            header.add_row(_label("Status"), _status_word(dataset["status"]))
+            header.add_row(_label("Schema"), _text(dataset["schema_version"]))
+            header.add_row(_label("Kind"), _text(dataset["kind"]))
+            header.add_row(_label("Digest"), _text(dataset["dataset_digest"]))
+            cohort = dataset["cohort"]
+            header.add_row(_label("Cohort"), _text(f"{len(cohort)}: {', '.join(cohort)}"))
+            header.add_row(_label("Loader"), _status_word(dataset["loader"]))
+            for problem in dataset["problems"]:
+                header.add_row(Text("Problem", style="red"), _text(problem))
+            parts: list[RenderableType] = [header]
+            if dataset["entries"]:
+                table = Table(expand=True)
+                table.add_column("Case", overflow="fold", ratio=1)
+                for _check, heading in _DATASET_CHECKS:
+                    table.add_column(heading, no_wrap=True)
+                findings: list[Text] = []
+                for entry in dataset["entries"]:
+                    case = _text(entry["case_id"])
+                    group = (
+                        f"{entry['family']} · {entry['split']}"
+                        if entry["family"] is not None
+                        else entry["kind"]
+                    )
+                    case.append("\n").append(Text(safe_text(group), style="dim"))
+                    table.add_row(
+                        case,
+                        *(_check_word(entry["checks"][check]) for check, _ in _DATASET_CHECKS),
+                    )
+                    for line, style in (
+                        *((problem, "red") for problem in entry["problems"]),
+                        *((note, "yellow") for note in entry["notes"]),
+                    ):
+                        findings.append(
+                            Text(f"{safe_text(entry['case_id'])} ", style=style) + _text(line)
+                        )
+                parts.extend([table, *findings])
+            for change in dataset["digest_changes"]:
+                verb = "rewrote" if change["applied"] else "left (entry has other failures)"
+                parts.append(
+                    _text(
+                        f"{verb} {change['case_id']} {change['field']}: "
+                        f"{_short(change['old'])} -> {_short(change['new'])}"
+                    )
+                )
+            title = f"Corsair · Dataset {safe_text(dataset['dataset'])}"
+            style = "green" if dataset["status"] == "pass" else "red"
+            self.out.print(Panel(Group(*parts), title=title, border_style=style))
+        for problem in value["problems"]:
+            self.out.print(Text("Problem: ", style="red") + _text(problem))
+        self.out.print(
+            Text("All datasets valid", style="green")
+            if value["valid"]
+            else Text("Dataset validation failed", style="red")
+        )
+
     def _evidence(self, value: dict[str, Any]) -> None:
         """Render per-role native receipts for one committed result, never payloads."""
         tables: list[Table] = []
@@ -812,6 +1213,7 @@ class Terminal:
                 caption=_text(
                     f"committed={item['committed']} · evidence={item['evidence']} · "
                     f"admissible={item['receipts_admissible']} · gate={item['gate']}"
+                    + _target_caption(item)
                 ),
                 expand=True,
             )
@@ -844,6 +1246,16 @@ class Terminal:
             **({} if remedy is None else {"remedy": remedy}),
         )
 
+    def _print_progress(
+        self, label: str, status: Mapping[str, object], seen: dict[str, str], begun: float
+    ) -> None:
+        """Plain mode: one line per evaluation child state change, else one status line."""
+        now = _utcnow()
+        fields = progress_fields(status, now, time.monotonic() - begun)
+        lines = [child_line(label, row, fields, now) for row in child_changes(seen, status)]
+        for line in lines or [progress_line(label, fields)]:
+            self.err.print(line, soft_wrap=True)
+
     async def wait(
         self,
         awaitable: Awaitable[T],
@@ -854,14 +1266,17 @@ class Terminal:
         """Observe actual SDK completion; query failures never invent success or progress.
 
         With a status query, an animated terminal shows a live panel, a plain human terminal
-        prints one line per status change, and JSON mode writes nothing beyond the logs.
+        prints one line per status change (per child state change for an evaluation), and
+        JSON mode writes nothing beyond the logs.
         """
         begun = time.monotonic()
         last: Mapping[str, object] | None = None
+        seen: dict[str, str] = {}
 
         def frame() -> Panel:
-            fields = progress_fields(last, _utcnow(), time.monotonic() - begun)
-            return progress_panel(label, last, fields)
+            now = _utcnow()
+            fields = progress_fields(last, now, time.monotonic() - begun)
+            return progress_panel(label, last, fields, now=now)
 
         display: AbstractContextManager[object] = nullcontext()
         if self.animate and query is not None:
@@ -893,10 +1308,7 @@ class Terminal:
                                 )
                                 last = actual
                                 if self.human and not self.animate:
-                                    fields = progress_fields(
-                                        last, _utcnow(), time.monotonic() - begun
-                                    )
-                                    self.err.print(progress_line(label, fields), soft_wrap=True)
+                                    self._print_progress(label, last, seen, begun)
                             query_failed = False
                         except Exception as error:
                             if not query_failed:

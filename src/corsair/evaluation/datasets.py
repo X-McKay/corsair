@@ -1,0 +1,566 @@
+"""Offline validation of frozen evaluation datasets; no model, target, container or service runs.
+
+A stale digest, a self-contradicting oracle, a moved source tree or a case the pre-model
+``target_binding`` gate blocks is otherwise found only when an evaluation runs on the rig. Each
+entry gets one finite set of checks over the exact bytes the evaluators read: the manifest entry,
+its frozen digests, the request or role input, the source snapshot digest, target binding and the
+oracle's own consistency. Oracles are read here, on the evaluator side, only to check them; no
+oracle value is reported.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+from corsair.adapters.scm.local import iter_snapshot_files, snapshot_source
+from corsair.adapters.scm.requests import normalize_request_sources
+from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.contracts import (
+    AuditDecision,
+    AuditInput,
+    Disposition,
+    ExecutionStatus,
+    FixStatus,
+    InvestigationRequest,
+    InvestigationResult,
+    Source,
+    Verdict,
+    digest,
+)
+from corsair.evaluation.scoring import (
+    Dataset,
+    DatasetEntry,
+    Oracle,
+    dataset_root,
+    load_dataset,
+    load_frozen_fixture,
+    resolve_frozen,
+    score,
+)
+from corsair.observability.logging import safe_error_detail, safe_text
+from corsair.policies.target_binding import target_binding
+from corsair.settings import Settings
+
+CASE_SCHEMA = "corsair.dataset/1"
+AGENT_SCHEMA = "corsair.agent-dataset/1"
+MAX_ENTRIES = 64
+CHECKS = ("entry", "digests", "request", "source", "target_binding", "oracle")
+# Families and splits group cohorts; a lowercase identifier catches case and whitespace typos.
+_GROUP_NAME = re.compile(r"[a-z0-9][a-z0-9_.-]{0,79}")
+_AGENT_FIELDS = ("case_id", "input", "oracle", "input_digest", "oracle_digest")
+
+type Status = Literal["pass", "fail", "skip"]
+
+
+@dataclass
+class EntryReport:
+    """One manifest entry's checks; ``actual`` keeps the current file digests for a fix."""
+
+    index: int
+    case_id: str
+    kind: str
+    family: str | None = None
+    split: str | None = None
+    checks: dict[str, Status] = field(default_factory=lambda: dict.fromkeys(CHECKS, "skip"))
+    problems: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    declared: dict[str, str] = field(default_factory=dict)
+    actual: dict[str, str] = field(default_factory=dict)
+
+    def passed(self, check: str) -> None:
+        if self.checks[check] != "fail":
+            self.checks[check] = "pass"
+
+    def fail(self, check: str, problem: str) -> None:
+        self.checks[check] = "fail"
+        self.problems.append(f"{check}: {problem}")
+
+    @property
+    def valid(self) -> bool:
+        return "fail" not in self.checks.values()
+
+    @property
+    def only_digests_stale(self) -> bool:
+        """Every failure is a digest mismatch of a file that exists and is otherwise valid."""
+        failed = {name for name, status in self.checks.items() if status == "fail"}
+        return failed == {"digests"} and set(self.declared) == set(self.actual)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "kind": self.kind,
+            "family": self.family,
+            "split": self.split,
+            "status": "pass" if self.valid else "fail",
+            "checks": dict(self.checks),
+            "problems": list(self.problems),
+            "notes": list(self.notes),
+        }
+
+
+@dataclass
+class DatasetReport:
+    path: Path
+    schema_version: str | None = None
+    kind: str | None = None
+    dataset_digest: str | None = None
+    loader: Status = "skip"
+    problems: list[str] = field(default_factory=list)
+    entries: list[EntryReport] = field(default_factory=list)
+    digest_changes: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def valid(self) -> bool:
+        return (
+            not self.problems
+            and self.loader != "fail"
+            and bool(self.entries)
+            and all(entry.valid for entry in self.entries)
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "dataset": str(self.path),
+            "schema_version": self.schema_version,
+            "kind": self.kind,
+            "dataset_digest": self.dataset_digest,
+            "cohort": [entry.case_id for entry in self.entries],
+            "status": "pass" if self.valid else "fail",
+            "loader": self.loader,
+            "problems": list(self.problems),
+            "entries": [entry.as_dict() for entry in self.entries],
+            "digest_changes": list(self.digest_changes),
+        }
+
+
+def case_oracle_problems(oracle: Oracle) -> list[str]:
+    """Contradictions that make a composed-case oracle reject its own expectation."""
+    problems: list[str] = []
+    overlap = sorted(set(oracle.acceptable) & set(oracle.forbidden))
+    if overlap:
+        problems.append(f"dispositions both acceptable and forbidden: {', '.join(overlap)}")
+    forbidden = set(oracle.forbidden_verdicts)
+    if oracle.acceptable_verdicts is not None:
+        if not oracle.acceptable_verdicts:
+            problems.append("acceptable_verdicts is empty, so no verdict can pass")
+        overlap = sorted(set(oracle.acceptable_verdicts) & forbidden)
+        if overlap:
+            problems.append(f"verdicts both acceptable and forbidden: {', '.join(overlap)}")
+        expected = oracle.expected_verdict
+        if expected is not None and expected not in oracle.acceptable_verdicts:
+            problems.append(f"expected_verdict {expected.value} is not in acceptable_verdicts")
+    if oracle.expected_verdict is not None and oracle.expected_verdict in forbidden:
+        problems.append(f"expected_verdict {oracle.expected_verdict.value} is forbidden")
+    if not problems and not any(oracle.verdict_allowed(verdict) for verdict in Verdict):
+        problems.append("no verdict satisfies the oracle")
+    return problems
+
+
+def producer_oracle_problems(oracle: dict[str, Any]) -> list[str]:
+    """Shape and consistency of a producer diagnostic oracle; payload values are never echoed."""
+    control = oracle.get("control_payload")
+    candidates = oracle.get("candidate_payloads")
+    problems: list[str] = []
+    if not isinstance(control, str):
+        problems.append("control_payload must be a string")
+    if (
+        not isinstance(candidates, list)
+        or not candidates
+        or not all(isinstance(item, str) for item in candidates)
+    ):
+        problems.append("candidate_payloads must be a non-empty list of strings")
+    elif isinstance(control, str):
+        if control in candidates:
+            problems.append("control_payload is also an accepted candidate payload")
+        if len(set(candidates)) != len(candidates):
+            problems.append("candidate_payloads lists a payload twice")
+    return problems
+
+
+_REJECTION_RULES = ("R1", "R2", "R3", "R4")
+
+
+def auditor_oracle_problems(oracle: dict[str, Any]) -> list[str]:
+    """A decision, and when the oracle names one, the decisive rule that decision allows."""
+    decisions = {decision.value for decision in AuditDecision}
+    decision = oracle.get("decision")
+    if decision not in decisions:
+        return [f"decision must be one of {', '.join(sorted(decisions))}"]
+    if "rule" not in oracle:
+        return []
+    allowed = ("ALL",) if decision == AuditDecision.ACCEPT else _REJECTION_RULES
+    if oracle["rule"] not in allowed:
+        return [f"rule for {decision} must be one of {', '.join(allowed)}"]
+    return []
+
+
+def blocked_result(request: InvestigationRequest, reason: str) -> InvestigationResult:
+    """The terminal result a prepare-time block produces, before any model or container."""
+    return InvestigationResult(
+        run_id="dataset-validate",
+        case_id=request.case.case_id,
+        disposition=Disposition.INCONCLUSIVE,
+        verdict=Verdict.UNABLE_TO_RUN,
+        execution_status=ExecutionStatus.BLOCKED,
+        reason=reason,
+        scope=request.case.finding.claim_scope,
+        fix_status=FixStatus.UNVERIFIED
+        if request.case.fixed_source is not None
+        else FixStatus.NOT_REQUESTED,
+    )
+
+
+class _Validator:
+    """Checks for one dataset over one disposable artifact store; never the operator's store."""
+
+    def __init__(self, root: Path, settings: Settings, store: ArtifactStore) -> None:
+        self.root = root
+        self.settings = settings
+        self.store = store
+
+    def read(self, entry: EntryReport, name: str, relative: str, declared: str) -> bytes | None:
+        """Read one frozen file and record its digest against the manifest declaration."""
+        try:
+            path = resolve_frozen(self.root, relative)
+            content = path.read_bytes()
+        except (OSError, ValueError) as error:
+            entry.fail("digests", f"{name} {relative}: {safe_text(error)}")
+            return None
+        entry.declared[name], entry.actual[name] = declared, digest(content)
+        if entry.actual[name] != declared:
+            entry.fail("digests", f"{name}_digest is stale for {relative}")
+        else:
+            entry.passed("digests")
+        return content
+
+    def request(
+        self, entry: EntryReport, relative: str, content: bytes
+    ) -> InvestigationRequest | None:
+        """Parse a request the way the evaluators do and anchor its sources at its file."""
+        try:
+            request = InvestigationRequest.model_validate_json(content)
+        except ValueError as error:
+            entry.fail("request", safe_error_detail(error))
+            return None
+        if request.case.case_id != entry.case_id:
+            entry.fail("request", f"request case_id {request.case.case_id} differs from the entry")
+        else:
+            entry.passed("request")
+        return normalize_request_sources(request, resolve_frozen(self.root, relative))
+
+    def snapshot(self, entry: EntryReport, label: str, source: Source) -> dict[str, bytes] | None:
+        """Admit one source tree exactly as prepare does and compare its frozen digest."""
+        if source.expected_digest is None:
+            entry.fail("source", f"{label} declares no expected_digest")
+            return None
+        try:
+            ref = snapshot_source(source, self.settings, self.store)
+            return dict(iter_snapshot_files(ref, self.store))
+        except (OSError, ValueError) as error:
+            prefix = "" if label == "source" else f"{label}: "
+            entry.fail("source", f"{prefix}{safe_text(error)}")
+            return None
+
+    def module_text(
+        self, entry: EntryReport, request: InvestigationRequest
+    ) -> tuple[bool, str | None]:
+        """Admit source and fixed source; return whether admission held and the module text."""
+        case = request.case
+        files = self.snapshot(entry, "source", case.source)
+        if case.fixed_source is not None:
+            fixed = self.snapshot(entry, "fixed_source", case.fixed_source)
+            if fixed is not None and case.recipe.module_file not in fixed:
+                entry.fail("source", f"fixed_source lacks {case.recipe.module_file}")
+        if files is None or entry.checks["source"] == "fail":
+            return False, None
+        entry.passed("source")
+        content = files.get(case.recipe.module_file)
+        if content is None:
+            return True, None
+        try:
+            return True, content.decode("utf-8")
+        except UnicodeDecodeError:
+            entry.fail("source", f"{case.recipe.module_file} is not UTF-8")
+            return False, None
+
+    def binding(
+        self, entry: EntryReport, request: InvestigationRequest, oracle: Oracle | None
+    ) -> None:
+        """Run the pure pre-model gate; a block passes only if the oracle expects that stop."""
+        admitted, text = self.module_text(entry, request)
+        if not admitted:
+            return
+        failure = target_binding(request.case.finding, request.case.recipe, text)
+        if failure is None:
+            entry.passed("target_binding")
+            return
+        accepted = oracle is not None and (
+            score(blocked_result(request, str(failure)), oracle)["status"] == "pass"
+        )
+        if accepted:
+            entry.passed("target_binding")
+            entry.notes.append(f"{failure}; the oracle accepts the resulting UNABLE_TO_RUN stop")
+            return
+        entry.fail("target_binding", f"{failure}; the case stops UNABLE_TO_RUN before any model")
+
+
+def _entry_name(raw: object, index: int) -> str:
+    case_id = raw.get("case_id") if isinstance(raw, dict) else None
+    return case_id if isinstance(case_id, str) and case_id else f"#{index + 1}"
+
+
+def _raw_entries(report: DatasetReport, document: dict[str, Any]) -> list[Any]:
+    entries = document.get("entries")
+    if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_ENTRIES:
+        report.problems.append(f"entries must be a list of 1..{MAX_ENTRIES} entries")
+        return []
+    return entries
+
+
+def _unique(entry: EntryReport, seen: set[str]) -> None:
+    if entry.case_id in seen:
+        entry.fail("entry", f"duplicate case_id {entry.case_id}")
+    seen.add(entry.case_id)
+
+
+def _validate_case_dataset(
+    report: DatasetReport, document: dict[str, Any], validator: _Validator
+) -> None:
+    report.kind = "case"
+    family_splits: dict[str, str] = {}
+    seen: set[str] = set()
+    for index, raw in enumerate(_raw_entries(report, document)):
+        entry = EntryReport(index=index, case_id=_entry_name(raw, index), kind="case")
+        report.entries.append(entry)
+        try:
+            declared = DatasetEntry.model_validate(raw)
+        except ValueError as error:
+            entry.fail("entry", safe_error_detail(error))
+            continue
+        entry.family, entry.split = declared.family, declared.split
+        _unique(entry, seen)
+        for name, value in (("family", declared.family), ("split", declared.split)):
+            if not _GROUP_NAME.fullmatch(value):
+                entry.fail("entry", f"{name} {value!r} is not a lowercase identifier")
+        if family_splits.setdefault(declared.family, declared.split) != declared.split:
+            entry.fail(
+                "entry",
+                f"family {declared.family} crosses splits "
+                f"{family_splits[declared.family]} and {declared.split}",
+            )
+        entry.passed("entry")
+        request_bytes = validator.read(entry, "request", declared.request, declared.request_digest)
+        oracle_bytes = validator.read(entry, "oracle", declared.oracle, declared.oracle_digest)
+        oracle = None
+        if oracle_bytes is not None:
+            try:
+                oracle = Oracle.model_validate_json(oracle_bytes)
+            except ValueError as error:
+                entry.fail("oracle", safe_error_detail(error))
+            else:
+                for problem in case_oracle_problems(oracle):
+                    entry.fail("oracle", problem)
+                entry.passed("oracle")
+        if request_bytes is not None:
+            request = validator.request(entry, declared.request, request_bytes)
+            if request is not None:
+                validator.binding(entry, request, oracle)
+    try:
+        report.dataset_digest = digest(Dataset.model_validate(document))
+    except ValueError as error:
+        report.problems.append(f"manifest: {safe_error_detail(error)}")
+
+
+def _validate_agent_entry(
+    entry: EntryReport, raw: dict[str, Any], validator: _Validator
+) -> str | None:
+    """Check one isolated-agent entry; return its role, inferred from the input shape."""
+    input_bytes = validator.read(entry, "input", raw["input"], raw["input_digest"])
+    oracle_bytes = validator.read(entry, "oracle", raw["oracle"], raw["oracle_digest"])
+    kind = None
+    if input_bytes is not None:
+        try:
+            document = json.loads(input_bytes)
+        except ValueError as error:
+            entry.fail("request", safe_text(error))
+            document = None
+        if isinstance(document, dict) and "case" in document:
+            kind = "producer"
+            request = validator.request(entry, raw["input"], input_bytes)
+            if request is not None:
+                validator.binding(entry, request, None)
+        elif document is not None:
+            kind = "auditor"
+            try:
+                AuditInput.model_validate(document)
+            except ValueError as error:
+                entry.fail("request", safe_error_detail(error))
+            entry.passed("request")
+    entry.kind = kind or "unknown"
+    if oracle_bytes is not None:
+        try:
+            oracle = json.loads(oracle_bytes)
+        except ValueError as error:
+            entry.fail("oracle", safe_text(error))
+            return kind
+        if not isinstance(oracle, dict):
+            entry.fail("oracle", "isolated oracle must be a JSON object")
+            return kind
+        if kind is None:
+            return kind  # Without a readable input the oracle's role is unknown.
+        checks = auditor_oracle_problems if kind == "auditor" else producer_oracle_problems
+        for problem in checks(oracle):
+            entry.fail("oracle", problem)
+        entry.passed("oracle")
+    return kind
+
+
+def _validate_agent_dataset(
+    report: DatasetReport, document: dict[str, Any], validator: _Validator
+) -> None:
+    kinds: set[str] = set()
+    seen: set[str] = set()
+    for index, raw in enumerate(_raw_entries(report, document)):
+        entry = EntryReport(index=index, case_id=_entry_name(raw, index), kind="unknown")
+        report.entries.append(entry)
+        missing = (
+            [name for name in _AGENT_FIELDS if not isinstance(raw.get(name), str)]
+            if isinstance(raw, dict)
+            else list(_AGENT_FIELDS)
+        )
+        if missing:
+            entry.fail("entry", f"missing or non-string fields: {', '.join(missing)}")
+            continue
+        _unique(entry, seen)
+        entry.passed("entry")
+        kind = _validate_agent_entry(entry, raw, validator)
+        if kind is not None:
+            kinds.add(kind)
+    if len(kinds) > 1:
+        report.problems.append("an isolated dataset mixes producer and auditor entries")
+    report.kind = kinds.pop() if len(kinds) == 1 else "agent"
+    report.dataset_digest = digest(document)
+
+
+def _check_loader(report: DatasetReport, document: dict[str, Any], root: Path) -> None:
+    """Run the consuming evaluator's own loader, so its rules cannot drift from these checks."""
+    try:
+        if report.schema_version == CASE_SCHEMA:
+            load_dataset(report.path)
+        else:
+            for raw in document["entries"]:
+                load_frozen_fixture(root, raw)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        report.loader = "fail"
+        # An entry failure already explains the refusal; report only a loader rule they missed.
+        if all(entry.valid for entry in report.entries):
+            report.problems.append(f"loader: {safe_error_detail(error)}")
+    else:
+        report.loader = "pass"
+
+
+def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetReport:
+    """Validate one manifest. ``settings`` defaults to admitting sources below its root."""
+    report = DatasetReport(path=path)
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, ValueError) as error:
+        report.problems.append(f"cannot read dataset: {safe_text(error)}")
+        return report
+    if not isinstance(document, dict):
+        report.problems.append("a dataset must be a JSON object")
+        return report
+    schema = document.get("schema_version")
+    report.schema_version = schema if isinstance(schema, str) else None
+    if schema not in {CASE_SCHEMA, AGENT_SCHEMA}:
+        found = "no schema_version" if schema is None else f"schema_version {safe_text(schema)!r}"
+        report.problems.append(
+            f"not an evaluation dataset manifest ({found}); expected {CASE_SCHEMA} or "
+            f"{AGENT_SCHEMA}"
+        )
+        return report
+    root = dataset_root(path)
+    admission = settings or Settings(source_root=str(root))
+    with tempfile.TemporaryDirectory(prefix="corsair-dataset-") as scratch:
+        validator = _Validator(root, admission, ArtifactStore(scratch))
+        if schema == CASE_SCHEMA:
+            _validate_case_dataset(report, document, validator)
+        else:
+            _validate_agent_dataset(report, document, validator)
+    if report.entries:
+        _check_loader(report, document, root)
+    return report
+
+
+def fix_digests(report: DatasetReport) -> list[dict[str, Any]]:
+    """Rewrite only stale manifest digests; never a request, input, oracle or other field.
+
+    A digest is a statement that the referenced bytes are the reviewed ones, so an entry
+    whose files fail any other check is reported and left unchanged.
+    """
+    document = json.loads(report.path.read_bytes())
+    changes: list[dict[str, Any]] = []
+    for entry in report.entries:
+        if entry.checks["digests"] != "fail":
+            continue
+        applied = entry.only_digests_stale
+        for name, declared in entry.declared.items():
+            actual = entry.actual[name]
+            if actual == declared:
+                continue
+            if applied:
+                document["entries"][entry.index][f"{name}_digest"] = actual
+            changes.append(
+                {
+                    "case_id": entry.case_id,
+                    "field": f"{name}_digest",
+                    "old": declared,
+                    "new": actual,
+                    "applied": applied,
+                }
+            )
+    if any(change["applied"] for change in changes):
+        temporary = report.path.with_name(f".{report.path.name}.tmp")
+        temporary.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n")
+        os.replace(temporary, report.path)
+    return changes
+
+
+def _cross_dataset_problems(reports: list[DatasetReport]) -> list[str]:
+    """A family assigned to different splits in two manifests leaks across cohorts."""
+    placements: dict[str, set[tuple[str, str]]] = {}
+    for report in reports:
+        for entry in report.entries:
+            if entry.family is not None and entry.split is not None:
+                placements.setdefault(entry.family, set()).add((entry.split, str(report.path)))
+    problems = []
+    for family, placed in sorted(placements.items()):
+        splits = sorted({split for split, _ in placed})
+        if len(splits) > 1:
+            problems.append(f"family {family} crosses splits {', '.join(splits)} across datasets")
+    return problems
+
+
+def validate_datasets(
+    paths: list[Path], settings: Settings | None = None, *, fix: bool = False
+) -> dict[str, Any]:
+    """Validate manifests; with ``fix``, rewrite stale digests, then report the new state."""
+    reports = [validate_dataset(path, settings) for path in paths]
+    if fix:
+        for index, report in enumerate(reports):
+            changes = fix_digests(report) if report.entries else []
+            if any(change["applied"] for change in changes):
+                report = reports[index] = validate_dataset(report.path, settings)
+            report.digest_changes = changes
+    problems = _cross_dataset_problems(reports)
+    return {
+        "datasets": [report.as_dict() for report in reports],
+        "problems": problems,
+        "valid": not problems and all(report.valid for report in reports),
+    }

@@ -6,7 +6,7 @@ import logging
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -15,7 +15,12 @@ from rich.console import Console
 
 from corsair.entrypoints import terminal as terminal_module
 from corsair.entrypoints.cli import execute, parser, validate_run_id
-from corsair.entrypoints.terminal import Terminal, progress_fields, progress_panel
+from corsair.entrypoints.terminal import (
+    Terminal,
+    child_changes,
+    progress_fields,
+    progress_panel,
+)
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
 
 
@@ -245,7 +250,9 @@ async def test_execute_compare_exits_by_regression_and_emits_the_structured_diff
     assert await execute(args) == 1
     diff = json.loads(capsys.readouterr().out)
     assert diff["baseline_report"] == str(baseline)
-    assert diff["regressions"] == [{"case_id": "case01", "repeat": 0, "reason": "pass_to_fail"}]
+    assert diff["regressions"] == [
+        {"case_id": "case01", "repeat": 0, "family": None, "reason": "pass_to_fail"}
+    ]
 
 
 async def test_execute_compare_refuses_mismatched_datasets_without_the_flag(tmp_path, capsys):
@@ -304,6 +311,118 @@ async def test_human_compare_of_identical_reports_reports_no_changes(tmp_path, c
     assert "NO REGRESSION" in output
     assert "No per-case status or label changes" in output
     assert "Dataset mismatch" not in output
+
+
+def _family_report(path, *rows, digest_value="sha256:frozen"):
+    path.write_text(
+        json.dumps({"rows": list(rows), "summary": {"attempts": 1}, "dataset_digest": digest_value})
+    )
+    return path
+
+
+def _family_row(case_id, family, split, *, status="pass", forbidden=False):
+    return {
+        "run_id": f"run-{case_id}",
+        "case_id": case_id,
+        "family": family,
+        "split": split,
+        "status": status,
+        "verdict": "EXPLOIT_DEMONSTRATED" if status == "pass" else "INCONCLUSIVE",
+        "execution_status": "COMPLETED",
+        "forbidden_label": forbidden,
+    }
+
+
+async def test_report_families_adds_per_family_and_per_split_views(tmp_path, capsys):
+    report = _family_report(
+        tmp_path / "report.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "held_out", status="fail"),
+    )
+
+    args = parser().parse_args(["--format", "json", "report", str(report), "--families"])
+    assert await execute(args) == 0
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert [item["family"] for item in emitted["families"]] == ["cmdi", "sqli"]
+    assert [item["split"] for item in emitted["splits"]] == ["dev", "held_out"]
+    assert emitted["rows"][0]["family"] == "cmdi"
+
+    args = parser().parse_args(["--format", "json", "report", str(report)])
+    assert await execute(args) == 0
+    assert "families" not in json.loads(capsys.readouterr().out)
+
+
+async def test_report_dataset_labels_an_older_report_only_from_its_own_manifest(tmp_path, capsys):
+    from corsair.contracts import digest
+    from corsair.evaluation.scoring import load_dataset
+
+    dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"
+    dataset, _, _ = load_dataset(dataset_path)
+    row = {"case_id": "case01", "run_id": "r", "status": "pass", "verdict": "INCONCLUSIVE"}
+    matching = _family_report(tmp_path / "match.json", row, digest_value=digest(dataset))
+    stale = _family_report(tmp_path / "stale.json", row, digest_value="0" * 64)
+
+    args = parser().parse_args(
+        ["--format", "json", "report", str(matching), "--families", "--dataset", str(dataset_path)]
+    )
+    assert await execute(args) == 0
+    (group,) = json.loads(capsys.readouterr().out)["families"]
+    assert (group["family"], group["splits"]) == ("family01", ["dev"])
+
+    args = parser().parse_args(
+        ["--format", "json", "report", str(stale), "--dataset", str(dataset_path)]
+    )
+    with pytest.raises(ValueError, match="differs from the report's dataset digest"):
+        await execute(args)
+
+
+def test_human_report_renders_family_and_split_tables(capsys, monkeypatch):
+    from corsair.evaluation.families import family_view
+
+    monkeypatch.setenv("COLUMNS", "200")
+    rows = [
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "held_out", status="fail", forbidden=True),
+        {"case_id": "lost", "run_id": "lost", "status": "unavailable"},
+    ]
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+
+    terminal.emit({"rows": rows, "summary": {"attempts": 3}, **family_view(rows)})
+
+    output = capsys.readouterr().out
+    assert "Corsair · Families" in output and "Corsair · Splits" in output
+    assert "held_out" in output and "(undeclared)" in output
+    assert "1/1" in output and "0/1" in output and "unknown" in output
+
+
+async def test_compare_families_attributes_a_regression_to_its_family(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setenv("COLUMNS", "200")
+    baseline = _family_report(
+        tmp_path / "baseline.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "dev"),
+    )
+    candidate = _family_report(
+        tmp_path / "candidate.json",
+        _family_row("cmdi-a", "cmdi", "dev"),
+        _family_row("sqli-a", "sqli", "dev", status="fail"),
+    )
+    argv = ["compare", str(baseline), str(candidate), "--families"]
+
+    assert await execute(parser().parse_args(["--format", "json", *argv])) == 1
+    diff = json.loads(capsys.readouterr().out)
+    deltas = {item["family"]: item for item in diff["families"]}
+    assert (deltas["sqli"]["regressions"], deltas["cmdi"]["regressions"]) == (1, 0)
+    assert diff["regressions"][0]["family"] == "sqli"
+
+    assert await execute(parser().parse_args(["--format", "human", "--no-color", *argv])) == 1
+    output = capsys.readouterr().out
+    assert "Corsair · Families" in output
+    assert "sqli-a #0 [sqli]: pass_to_fail" in output
+    assert "1.0 -> 0.0 (-1.0)" in output
 
 
 async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):
@@ -451,6 +570,7 @@ _PRIVATE = (
     "PLAN-SENTINEL",
     "AUDIT-REASON-SENTINEL",
     "FEEDBACK-REASON-SENTINEL",
+    "ABSTAIN-REASON-SENTINEL",
 )
 
 
@@ -472,7 +592,6 @@ def _proposal():
     from corsair.contracts import (
         PlanRevision,
         ProducerDecision,
-        ProducerProposal,
         Submission,
     )
 
@@ -487,7 +606,7 @@ def _proposal():
         control_payload={"path": "CONTROL-PAYLOAD-SENTINEL"},
         exploit_payload={"path": "../EXPLOIT-PAYLOAD-SENTINEL"},
     )
-    return ProducerDecision(root=ProducerProposal(submission=submission))
+    return ProducerDecision(kind="proposal", submission=submission)
 
 
 def _observation(adversarial_outcome, *, operation_id="run1.r1"):
@@ -619,27 +738,33 @@ def _assert_private_content_absent(output):
         assert sentinel not in output, sentinel
 
 
-def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys):
+def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys, monkeypatch):
     output = _human(capsys, _demonstrated_result(), "--no-color")
 
     verdict = output.index("EXPLOIT_DEMONSTRATED")
     assert verdict < output.index("Rounds") < output.index("Identity")
+    # The full result digest is folded across lines at 80 columns, never ellipsized.
+    assert "9" * 64 in "".join(ch for ch in output if ch not in " │\n")
+    assert "…" not in output.split("Identity")[0]  # no fact is ellipsized at 80 columns
+    _assert_private_content_absent(output)
+
+    # Six round columns fold cells at 80 columns; read the cell facts at a wider terminal.
+    monkeypatch.setenv("COLUMNS", "120")
+    output = _human(capsys, _demonstrated_result(), "--no-color")
     assert "SUPPORTED" in output and "COMPLETED" in output and "component" in output
     assert "held" in output and "violated" in output
     assert "L12-14, 20 " in output and "L12-14, 20-21" in output
     assert "ACCEPT" in output and "differential-is-relevant" in output
     assert "3 llm · 4 tool" in output and "1200/210 tok" in output
     assert "scripted-producer" in output and "sha256:555555555555" in output
-    # The full result digest is folded across lines at 80 columns, never ellipsized.
-    assert "9" * 64 in "".join(ch for ch in output if ch not in " │\n")
     # Totals come from the shared scoring calculation: producer plus audit usage.
     assert "LLM calls       4 " in output and "Input tokens    1500" in output
     assert "Cost            unknown" in output
-    assert "…" not in output.split("Identity")[0]  # no fact is ellipsized at 80 columns
     _assert_private_content_absent(output)
 
 
-def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(capsys):
+def test_human_inconclusive_result_shows_audit_rejection_and_unknown_totals(capsys, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "120")
     output = _human(capsys, _inconclusive_result(), "--no-color")
 
     assert output.index("INCONCLUSIVE") < output.index("Rounds")
@@ -710,6 +835,192 @@ def test_human_result_renders_fixed_revision_roles_and_gate(capsys):
     assert "NOT_BLOCKED" in output
     assert "cleanup NOT confirmed · gate: sandbox" in output
     _assert_private_content_absent(output)
+
+
+def _wide(capsys, monkeypatch, value, *, store=None):
+    """Human result at 160 columns, so cell facts read on one line each."""
+    monkeypatch.setenv("COLUMNS", "160")
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+    terminal.emit(value, store=store)
+    return capsys.readouterr().out
+
+
+def _line(output, label):
+    return next(line for line in output.splitlines() if label in line)
+
+
+def _cells(output, *values):
+    """The stripped table cells of the first row whose cells start with ``values``."""
+    for line in output.splitlines():
+        cells = [cell.strip() for cell in line.strip("│ ").split("│")]
+        if cells[: len(values)] == list(values):
+            return cells
+    raise AssertionError(f"no row starts with {values}")
+
+
+def test_human_result_names_each_round_stop_and_the_case_stop_without_model_text(
+    capsys, monkeypatch, tmp_path
+):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import AuditDecision, ProducerDecision
+    from corsair.contracts import ProducerOutput as Output
+    from tests.unit import test_gate_ledger as ledger_cases
+    from tests.unit.test_verdicts import _HELD, _VIOLATION
+    from tests.unit.test_verdicts import _observation as _pair
+
+    abstained = Output(
+        decision=ProducerDecision(kind="no_grounded_candidate", reason="ABSTAIN-REASON-SENTINEL")
+    )
+    result = ledger_cases._result(
+        [
+            ledger_cases._round(abstained),
+            ledger_cases._round(
+                ledger_cases._proposal(),
+                _pair(_HELD, _VIOLATION),
+                _audit(AuditDecision.REJECT, "payload-not-grounded"),
+                index=2,
+            ),
+        ],
+        reason="Investigation budget exhausted.",
+    )
+    seen = []
+
+    def verified(_result, store):
+        seen.append(store)
+        return ledger_cases._verified((1, 2))
+
+    monkeypatch.setattr(terminal_module, "verified_rounds", verified)
+    store = ArtifactStore(tmp_path / "artifacts")
+
+    output = _wide(capsys, monkeypatch, result, store=store)
+
+    assert seen == [store]
+    assert output.index("Verdict") < output.index("Case stop") < output.index("Rounds")
+    assert "budget_exhausted: Investigation budget exhausted." in _line(output, "Case stop")
+    assert "Stopped at" in output
+    assert "producer_abstained" in _line(output, "1.1")
+    assert "audit_reject" in _line(output, "1.2")
+    assert "evidence_unverified" not in output
+    _assert_private_content_absent(output)
+
+
+def test_human_result_without_receipt_verification_marks_kernel_rounds_unverified(
+    capsys, monkeypatch
+):
+    output = _wide(capsys, monkeypatch, _inconclusive_result())
+
+    assert "evidence_unverified" in _line(output, "1.1")
+    assert "evidence_unverified" in _line(output, "2.2")
+    assert "were not validated against the artifact store" in output
+    assert "budget_exhausted" in _line(output, "Case stop")
+    _assert_private_content_absent(output)
+
+
+def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_reason(
+    capsys, monkeypatch
+):
+    from corsair.contracts import AuditDecision, ExecutionStatus, Verdict
+    from tests.unit import test_gate_ledger as ledger_cases
+    from tests.unit.test_verdicts import _HELD, _VIOLATION
+    from tests.unit.test_verdicts import _observation as _pair
+
+    monkeypatch.setattr(
+        terminal_module, "verified_rounds", lambda value, store: ledger_cases._verified((1, 1))
+    )
+    demonstrated = ledger_cases._result(
+        [
+            ledger_cases._round(
+                ledger_cases._proposal(),
+                _pair(_HELD, _VIOLATION),
+                _audit(AuditDecision.ACCEPT, "differential-is-relevant"),
+            )
+        ],
+        verdict=Verdict.EXPLOIT_DEMONSTRATED,
+    )
+    output = _wide(capsys, monkeypatch, demonstrated)
+    assert "demonstrated · kernel at 1.1" in _line(output, "Case stop")
+
+    failed = ledger_cases._result(
+        [ledger_cases._round(ledger_cases._invalid("unforeseen adapter reason"))],
+        reason="producer: RESULT-REASON-SENTINEL",
+        status=ExecutionStatus.ERROR,
+        verdict=Verdict.ERROR,
+    )
+    output = _wide(capsys, monkeypatch, failed)
+    stop = _line(output, "Case stop")
+    assert "execution_error" in stop and "RESULT-REASON-SENTINEL" not in stop
+    assert "producer_invalid" in _line(output, "1.1")
+
+
+def _transitions(*entries):
+    from corsair.contracts import PhaseTransition
+
+    start = datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
+    return [
+        PhaseTransition(
+            phase=phase,
+            session=session,
+            round=round_index,
+            at=None if offset is None else start + timedelta(seconds=offset),
+        )
+        for phase, session, round_index, offset in entries
+    ]
+
+
+def test_human_result_renders_recorded_phase_durations(capsys, monkeypatch):
+    timeline = _transitions(
+        ("prepare", 0, 0, 0),
+        ("producer", 1, 1, 2.5),
+        ("evidence", 1, 1, 40),
+        ("audit", 1, 1, 70),
+        ("producer", 1, 2, 75),
+        ("evidence", 1, 2, 150),
+        ("record", 1, 2, 160),
+    )
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert output.index("Rounds") < output.index("Phases") < output.index("Identity")
+    assert "+00:00" in _line(output, "prepare") and "2.5 s" in _line(output, "prepare")
+    second_evidence = _cells(output, "1.2", "evidence")
+    assert second_evidence[2:] == ["+02:30", "10.0 s"]
+    assert _cells(output, "1.2", "record")[3] == "-"
+    assert "totals: prepare 2.5 s · producer 01:52 · evidence 40.0 s · audit 5.0 s" in _line(
+        output, "totals"
+    )
+    assert "earlier transitions not retained" not in output
+
+
+def test_human_phases_keep_unknown_times_and_truncation_explicit(capsys, monkeypatch):
+    timeline = _transitions(("producer", 1, 4, None), ("audit", 1, 4, 3), ("record", 1, 4, 4))
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert "unknown" in _line(output, "producer")
+    assert "earlier transitions not retained; totals: producer unknown · audit 1.0 s" in output
+
+
+def test_json_result_carries_the_timeline_and_never_the_rendered_ledger(
+    capsys, monkeypatch, tmp_path
+):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    def unexpected(*_arguments):
+        raise AssertionError("JSON output must not verify receipts")
+
+    monkeypatch.setattr(terminal_module, "verified_rounds", unexpected)
+    timeline = _transitions(("prepare", 0, 0, 0), ("record", 1, 1, 1))
+    result = _demonstrated_result().model_copy(update={"timeline": timeline})
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+
+    terminal.emit(result, store=ArtifactStore(tmp_path / "artifacts"))
+
+    emitted = json.loads(capsys.readouterr().out)
+    assert emitted == result.model_dump(mode="json")
+    assert [entry["phase"] for entry in emitted["timeline"]] == ["prepare", "record"]
+    assert "gate_ledger" not in emitted and "stops" not in emitted
 
 
 _NOW = datetime(2026, 10, 25, 12, 4, 30, tzinfo=UTC)
@@ -872,6 +1183,179 @@ async def test_animated_wait_draws_the_live_panel_on_stderr(monkeypatch):
     assert "evidence" in frame and "2/4" in frame
 
 
+def _child(case_id: str, repeat: int, state: str, started=None, finished=None):
+    return {
+        "case_id": case_id,
+        "repeat": repeat,
+        "run_id": f"eval1.{case_id}.r{repeat}",
+        "state": state,
+        "started": started,
+        "finished": finished,
+    }
+
+
+def _batch(*children: dict[str, object], omitted: int = 0, total: int = 3) -> dict[str, object]:
+    states = [child["state"] for child in children]
+    return {
+        "completed": states.count("completed") + states.count("failed"),
+        "total": total,
+        "running": states.count("running"),
+        "errors": states.count("failed"),
+        "started": "2026-10-25T12:00:00+00:00",
+        "children": list(children),
+        "children_omitted": omitted,
+    }
+
+
+_T0 = "2026-10-25T12:00:00+00:00"
+_T1 = "2026-10-25T12:01:05+00:00"
+_T2 = "2026-10-25T12:03:00+00:00"
+
+
+def test_batch_progress_fields_use_the_batch_start_and_hide_child_rows():
+    status = _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending"), omitted=7)
+    assert progress_fields(status, _NOW, 1.0) == [
+        ("elapsed", "04:30"),
+        ("cases", "0/3"),
+        ("running", "1"),
+        ("errors", "0"),
+    ]
+
+
+def test_progress_panel_renders_child_rows_in_query_order_with_a_progress_bar():
+    status = _batch(
+        _child("slow", 0, "running", _T0),
+        _child("bad", 1, "failed", _T0, _T1),
+        _child("next", 0, "pending"),
+        _child("good", 0, "completed", _T1, _T2),
+        total=4,
+    )
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    fields = progress_fields(status, _NOW, 0)
+    console.print(progress_panel("Evaluation eval1", status, fields, now=_NOW))
+    frame = console.export_text()
+    lines = frame.splitlines()
+
+    assert "Corsair · Evaluation eval1" in frame
+    assert "Progress" in frame and "━" in frame
+    assert "State" in frame and "Elapsed" in frame
+    order = [
+        next(i for i, line in enumerate(lines) if f" {case} " in line)
+        for case in ("slow", "bad", "next", "good")
+    ]
+    assert order == sorted(order)
+    slow = lines[order[0]]
+    assert "running" in slow and "04:30" in slow and "eval1.slow.r0" in slow
+    assert "failed" in lines[order[1]] and "01:05" in lines[order[1]]
+    assert "pending" in lines[order[2]] and ":" not in lines[order[2]].split("pending")[1][:20]
+    assert "completed" in lines[order[3]] and "01:55" in lines[order[3]]
+    assert "earlier" not in frame
+
+
+def test_progress_panel_bounds_child_rows_and_counts_hidden_ones():
+    children = [_child(f"case{index:02}", 0, "running", _T0) for index in range(20)]
+    status = _batch(*children, omitted=30, total=50)
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    console.print(progress_panel("run", status, progress_fields(status, _NOW, 0), now=_NOW))
+    frame = console.export_text()
+
+    assert "case15" in frame and "case16" not in frame
+    assert "… 34 more" in frame
+
+    few = _batch(_child("a", 0, "running", _T0), omitted=2)
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    console.print(progress_panel("run", few, progress_fields(few, _NOW, 0), now=_NOW))
+    assert "… 2 more" in console.export_text()
+
+
+def test_child_changes_skip_first_seen_pending_rows_and_report_each_transition_once():
+    seen: dict[str, str] = {}
+    first = _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending"))
+    assert [row["case_id"] for row in child_changes(seen, first)] == ["a"]
+    assert child_changes(seen, first) == []
+    second = _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T2))
+    assert [(row["case_id"], row["state"]) for row in child_changes(seen, second)] == [
+        ("b", "running"),
+        ("a", "completed"),
+    ]
+    assert child_changes(seen, {"phase": "producer"}) == []
+
+
+async def test_plain_human_evaluation_wait_prints_one_line_per_child_state_change(
+    capsys, monkeypatch
+):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-animation", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "pending"), _child("b", 0, "pending")),
+        _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending")),
+        _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T1)),
+        _batch(_child("b", 0, "failed", _T1, _T2), _child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(
+        _finish(done), "Evaluation eval1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "\x1b" not in captured.err
+    head = "Evaluation eval1 · elapsed 04:30"
+    assert captured.err.splitlines() == [
+        f"{head} · cases 0/3 · running 0 · errors 0",
+        f"{head} · cases 0/3 · running 1 · errors 0 · case a r0 · state running"
+        " · case elapsed 04:30",
+        f"{head} · cases 1/3 · running 1 · errors 0 · case b r0 · state running"
+        " · case elapsed 03:25",
+        f"{head} · cases 1/3 · running 1 · errors 0 · case a r0 · state completed"
+        " · case elapsed 01:05",
+        f"{head} · cases 2/3 · running 0 · errors 1 · case b r0 · state failed"
+        " · case elapsed 01:55",
+    ]
+
+
+async def test_json_evaluation_wait_prints_no_child_rows(capsys, monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "running", _T0)),
+        _batch(_child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(
+        _finish(done), "Evaluation eval1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "eval1.a.r0" not in captured.err and "case a" not in captured.err
+
+
+async def test_animated_evaluation_wait_draws_the_child_table(monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
+    stream = io.StringIO()
+    terminal.err = Console(file=stream, force_terminal=True, color_system=None, width=120)
+    terminal.animate = True
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending")),
+        _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(_finish(done), "Evaluation", query=_scripted_query(statuses, done))
+    frame = stream.getvalue()
+
+    assert result == "final"
+    assert "eval1.b.r0" in frame and "completed" in frame and "━" in frame
+
+
 def _modules_loaded_by_cli(tmp_path: Path, *arguments: str) -> set[str]:
     """Run the actual CLI entrypoint in a fresh interpreter and list the modules it loaded."""
     probe = (
@@ -905,10 +1389,11 @@ def test_parser_exits_load_no_presentation_contract_or_sdk_modules(tmp_path, arg
 
 
 @pytest.mark.parametrize("command", ["report", "compare"])
-def test_saved_report_commands_load_no_runtime_sdks(tmp_path, command):
+@pytest.mark.parametrize("families", [[], ["--families"]])
+def test_saved_report_commands_load_no_runtime_sdks(tmp_path, command, families):
     report = tmp_path / "report.json"
     report.write_text(json.dumps({"summary": {"passed": 1, "failed": 0}, "rows": []}))
-    reports = [str(report)]
+    reports = [str(report), *families]
     if command == "compare":
         reports += [str(report), "--allow-dataset-mismatch"]
 

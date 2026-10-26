@@ -22,9 +22,12 @@ MEASURE_SCRIPT = ROOT / "scripts/measure_producer_request.py"
 PRODUCER_DEV = ROOT / "evals/datasets/producer-dev.json"
 
 # Before the tightening the Corsair-owned instruction (system.md plus the preloaded
-# procedure) rendered 3,711 bytes and the full system instruction 6,595 bytes.
+# procedure) rendered 3,711 bytes and the full system instruction 6,595 bytes. With the
+# native SkillToolset the full system instruction was 6,287 bytes and the declarations
+# 4,068 bytes (flat ProducerDecision); preloaded only they render 3,710 and 3,362 bytes.
 MAX_CORSAIR_INSTRUCTION_BYTES = 3_600
-MAX_SYSTEM_INSTRUCTION_BYTES = 6_500
+MAX_SYSTEM_INSTRUCTION_BYTES = 4_000
+MAX_TOOL_DECLARATION_BYTES = 4_000
 
 # Every producer rule, verbatim; tightening the prompt must not drop one.
 REQUIRED_CONSTRAINTS = (
@@ -50,17 +53,15 @@ REQUIRED_CONSTRAINTS = (
     "pair must implement the technique your hypothesis describes.",
     "The private\nfixture value is intentionally unavailable: never guess or supply it.",
     "Return one structured ProducerDecision, through `set_model_response` when\noffered.",
-    "`proposal` variant: one Submission whose\n"
-    "plan is an object with the packet's round revision and parent revision",
+    "sets `kind` to `proposal` and one `submission`\n"
+    "whose plan is an object with the packet's round revision and parent revision",
     "concise hypothesis of why the exploit payload may disclose information through\n"
     "the configured callable.",
-    "Otherwise use `no_grounded_candidate` with a concise\nreason.",
+    "Otherwise set `kind` to `no_grounded_candidate` with a\nconcise `reason`.",
     "Do not claim execution results or add prose outside that response.",
     "procedure is preloaded in full below; follow\nit.",
     "It is guidance only and grants no tools or exceptions to these rules.",
-    "Do\nnot call `load_skill` for it",
-    "Use `load_skill_resource` only for a\nreference it names, and request no other skill.",
-    "Neither loader runs scripts.",
+    "No\nskill loader is offered; request no skill, resource, or tool beyond those named\nhere.",
 )
 
 
@@ -94,9 +95,7 @@ async def test_rendered_case01_request_instruction_stays_below_its_byte_bound(
     assert [case_id for case_id, _, _ in fixtures] == ["case01"]
     _case_id, input_path, content = fixtures[0]
 
-    requests = await measure.render_requests(
-        input_path, content, structured_tools=structured_tools, load_skill_first=False
-    )
+    requests = await measure.render_requests(input_path, content, structured_tools=structured_tools)
     sections = measure.request_sections(requests[0])
     system = sections["corsair_instruction"] + sections["adk_instruction"]
 
@@ -106,17 +105,36 @@ async def test_rendered_case01_request_instruction_stays_below_its_byte_bound(
     assert all(rule in system for rule in REQUIRED_CONSTRAINTS)
     assert '"payload_parameter":"path"' in sections["user_packet"]
     assert ("set_model_response" in sections["tool_declarations"]) is not structured_tools
+    assert len(sections["tool_declarations"].encode()) <= MAX_TOOL_DECLARATION_BYTES
 
 
 @pytest.mark.asyncio
-async def test_measurement_reports_the_cost_of_a_redundant_skill_reload():
+@pytest.mark.parametrize("structured_tools", [False, True])
+async def test_rendered_request_declares_only_source_reads_and_no_generic_skill_text(
+    structured_tools: bool,
+):
+    measure = _measure_module()
+    _case_id, input_path, content = measure.dataset_fixtures([PRODUCER_DEV])[0]
+
+    requests = await measure.render_requests(input_path, content, structured_tools=structured_tools)
+    declared = set(requests[0].tools_dict)
+    sections = measure.request_sections(requests[0])
+
+    expected = {"read_file", "list_files"} | (set() if structured_tools else {"set_model_response"})
+    assert declared == expected
+    assert "load_skill" not in sections["tool_declarations"]
+    # ADK's generic SkillToolset text ("you MUST use the `load_skill` tool") is absent.
+    assert "load_skill" not in sections["adk_instruction"]
+    assert "available_skills" not in sections["adk_instruction"]
+
+
+@pytest.mark.asyncio
+async def test_measurement_rows_report_bytes_and_their_token_approximation():
     measure = _measure_module()
 
-    first = await measure.measure([PRODUCER_DEV], structured_tools=False)
-    reloaded = await measure.measure([PRODUCER_DEV], structured_tools=False, load_skill_first=True)
+    rows = await measure.measure([PRODUCER_DEV], structured_tools=False)
 
-    assert first[0]["request_index"] == 1 and reloaded[0]["request_index"] == 2
-    assert first[0]["sections"]["conversation"]["bytes"] == 0
-    growth = reloaded[0]["total"]["bytes"] - first[0]["total"]["bytes"]
-    assert growth == reloaded[0]["sections"]["conversation"]["bytes"] > 1_000
-    assert first[0]["total"]["approx_tokens"] * 4 >= first[0]["total"]["bytes"]
+    assert [row["case_id"] for row in rows] == ["case01"]
+    assert rows[0]["request_index"] == 1
+    assert rows[0]["sections"]["conversation"]["bytes"] == 0
+    assert rows[0]["total"]["approx_tokens"] * 4 >= rows[0]["total"]["bytes"]

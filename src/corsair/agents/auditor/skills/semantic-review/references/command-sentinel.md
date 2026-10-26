@@ -11,7 +11,7 @@ you never assert that execution happened or that the sentinel appeared.
 - R2: the `control_payload` is a benign value that should not reach execution; the
   `exploit_payload` differs in the caller-controlled `payload_parameter` and plausibly
   reaches the sink.
-- R4: a coherent claim targets the sentinel's creation via execution. Reject a claim
+- R4 real violation, not echo: a coherent claim targets the sentinel's creation via execution. Reject a claim
   whose "violation" is merely that the callable returned, echoed the payload, or that a
   marker string matched; those are not the sentinel condition. Do not reward a payload
   that would create the file by a path the source does not actually execute.

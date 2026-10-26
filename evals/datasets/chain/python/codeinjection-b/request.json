@@ -5,7 +5,7 @@
       "title": "Code injection in compute_setting",
       "description": "`expr` reaches eval() in compute_setting. The operator sentinel file is /work/corsair-sentinel; a payload that reaches command or code execution creates it, while benign input never does. Only the payload argument is caller controlled.",
       "file": "app.py",
-      "line": 1,
+      "line": 3,
       "claim_scope": "component"
     },
     "source": {

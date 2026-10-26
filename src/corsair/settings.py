@@ -65,7 +65,9 @@ class Settings(Contract):
     # Recipe kind to image tag. Both current Python recipes share one reviewed image
     # and driver, so they map to the same tag; `image` remains the Python default and
     # the fallback for any kind absent from this map. A future language/framework image
-    # is added here as a new row, not a new code path.
+    # is added here as a new row, not a new code path. When omitted, the disclosure row
+    # follows `image` (see default_images), so a settings file naming only `image` keeps
+    # selecting that image for every Python recipe.
     images: dict[str, str] = Field(
         default_factory=lambda: {"python.secret_disclosure/1": "corsair-python:0.1"}
     )
@@ -81,7 +83,24 @@ class Settings(Contract):
     # The prepare activity admits both into RunManifest, which the workflow reads.
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
+    # Temporal worker task slots. An investigation has at most one activity in flight,
+    # so max_concurrent_activities caps how many investigations (including a batch's
+    # child workflows) progress at once; work above it waits in the task queue, and
+    # that wait counts against each activity's schedule-to-close deadline. Keep it at
+    # least the largest `eval --concurrency` plus any investigations run alongside.
+    # Workflow tasks are short deterministic replays; the SDK requires at least two
+    # while workflows are cached.
+    max_concurrent_activities: int = Field(default=4, ge=1, le=64)
+    max_concurrent_workflow_tasks: int = Field(default=100, ge=2, le=1000)
     models: ModelSettings = Field(default_factory=ModelSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_images(cls, data: object) -> object:
+        """Derive the omitted image map from ``image`` instead of a fixed tag."""
+        if isinstance(data, dict) and "images" not in data and "image" in data:
+            return {**data, "images": {"python.secret_disclosure/1": data["image"]}}
+        return data
 
     def image_for(self, recipe_kind: str) -> str:
         """Resolve the configured image tag for a recipe kind, defaulting to ``image``."""
