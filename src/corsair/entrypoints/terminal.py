@@ -25,7 +25,6 @@ from corsair.contracts import (
     AuditOutput,
     ExecutionStatus,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
     RoleObservation,
     RoleOutcome,
@@ -312,7 +311,7 @@ def _producer_cell(item: RoundResult) -> Text:
     decision = item.producer.decision
     if decision is None:
         cell = Text("no decision", style="yellow")
-    elif isinstance(decision.root, NoGroundedCandidate):
+    elif decision.kind == "no_grounded_candidate":
         cell = Text("abstained", style="yellow")
     else:
         cell = Text("proposal")

@@ -22,7 +22,6 @@ with workflow.unsafe.imports_passed_through():
         FixStatus,
         InvestigationRequest,
         InvestigationResult,
-        NoGroundedCandidate,
         Observation,
         PreparedCase,
         ProducerInput,
@@ -310,14 +309,14 @@ class InvestigationWorkflow:
                     round_result = RoundResult(index=index, session=session, producer=producer)
                     session_rounds.append(round_result)
                     rounds.append(round_result)
-                    decision = producer.decision
-                    if decision is not None and isinstance(decision.root, NoGroundedCandidate):
+                    abstention = producer.abstention_reason()
+                    if abstention is not None:
                         if workflow.patched("producer-abstention-v1"):
                             result = result.model_copy(
-                                update={"reason": f"Producer abstained: {decision.root.reason}"}
+                                update={"reason": f"Producer abstained: {abstention}"}
                             )
                             break
-                        feedback = Feedback(gate="producer", reason=decision.root.reason)
+                        feedback = Feedback(gate="producer", reason=abstention)
                         self.gate = feedback.gate
                         result = result.model_copy(update={"reason": feedback.reason})
                         continue

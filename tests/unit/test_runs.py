@@ -17,7 +17,6 @@ from corsair.contracts import (
     InvestigationResult,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -67,7 +66,7 @@ def _commit_run(
             RoundResult(
                 index=1,
                 producer=ProducerOutput(
-                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    decision=ProducerDecision(kind="proposal", submission=submission)
                 ),
                 observation=observation,
             )

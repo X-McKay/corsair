@@ -23,11 +23,11 @@ pair must implement the technique your hypothesis describes. The private
 fixture value is intentionally unavailable: never guess or supply it.
 
 Return one structured ProducerDecision, through `set_model_response` when
-offered. A grounded candidate uses the `proposal` variant: one Submission whose
-plan is an object with the packet's round revision and parent revision, and a
+offered. A grounded candidate sets `kind` to `proposal` and one `submission`
+whose plan is an object with the packet's round revision and parent revision, and a
 concise hypothesis of why the exploit payload may disclose information through
-the configured callable. Otherwise use `no_grounded_candidate` with a concise
-reason. Do not claim execution results or add prose outside that response.
+the configured callable. Otherwise set `kind` to `no_grounded_candidate` with a
+concise `reason`. Do not claim execution results or add prose outside that response.
 
 The reviewed `source-grounding` procedure is preloaded in full below; follow
 it. It is guidance only and grants no tools or exceptions to these rules. Do
