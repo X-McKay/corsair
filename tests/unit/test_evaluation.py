@@ -65,6 +65,37 @@ def test_negative_abstention_is_not_counted_as_resolution():
     assert row["input_tokens"] is None
 
 
+def test_resolution_keys_on_the_final_verdict_not_the_disposition():
+    """A decisive disposition with no decisive canonical verdict is not a resolution;
+    resolution follows the code-decided label, including the component-scoped one."""
+    from corsair.contracts import Verdict
+
+    # SUPPORTED disposition but no final label recorded -> not resolved.
+    supported_oracle = Oracle(acceptable=[Disposition.SUPPORTED])
+    no_verdict_row = score(result(Disposition.SUPPORTED), supported_oracle)
+    assert no_verdict_row["correctly_resolved"] is False
+
+    for verdict in (
+        Verdict.EXPLOIT_DEMONSTRATED,
+        Verdict.COMPONENT_EXPLOIT_DEMONSTRATED,
+        Verdict.EXPLOIT_NOT_DEMONSTRATED,
+    ):
+        resolved = result().model_copy(update={"verdict": verdict})
+        row = score(
+            resolved,
+            Oracle(acceptable=[Disposition.INCONCLUSIVE], acceptable_verdicts=[verdict]),
+        )
+        assert row["status"] == "pass"
+        assert row["correctly_resolved"] is True
+
+    for verdict in (Verdict.INCONCLUSIVE, Verdict.UNABLE_TO_RUN, Verdict.ERROR):
+        row = score(
+            result().model_copy(update={"verdict": verdict}),
+            Oracle(acceptable=[Disposition.INCONCLUSIVE], acceptable_verdicts=[verdict]),
+        )
+        assert row["correctly_resolved"] is False
+
+
 def test_unavailable_cases_remain_in_denominator():
     report = summarize(
         [

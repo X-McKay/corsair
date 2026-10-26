@@ -81,7 +81,7 @@ The kernel assigns one of six labels; [`src/corsair/contracts/results.py`](../..
 | `COMPONENT_EXPLOIT_DEMONSTRATED` | The same genuine differential (both runs covered the target line, control held, exploit demonstrated, auditor did not reject), but the finding claimed application scope and only the component seam was exercised, so reachability to the claimed application entry point was not established. Developer next step: harden the component or prove an upstream guard blocks the input. |
 | `EXPLOIT_NOT_DEMONSTRATED` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
 | `INCONCLUSIVE` | Gates ran but did not settle a demonstration at any scope: coverage missed in either run, evidence disagreed, the auditor rejected, the exploit still demonstrated on a supplied fix revision, fewer than two independent negative sessions, or the budget ended first. |
-| `UNABLE_TO_RUN` | `target_binding`, `ast_guard`, or `build_replay` failed; the case could not be exercised. |
+| `UNABLE_TO_RUN` | The case could not be exercised against a bound target: the finding declared no target line to bind the demonstration to, or a source-admission or sandbox-availability gate blocked before any evidence ran. (The no-target-line check is a verdict-time gate today, not a pre-model one.) |
 | `ERROR` | An operational failure: provider, sandbox infrastructure, missing artifact, unknown cleanup, or uncertain operation. |
 
 `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR` are never negative clearance.
