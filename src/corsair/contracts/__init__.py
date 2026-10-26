@@ -38,6 +38,7 @@ from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .recipes_c import CRecipe as CRecipe
+from .recipes_java import JavaRecipe as JavaRecipe
 from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
 from .recipes_perl import PerlRecipe as PerlRecipe
 from .recipes_python import PythonCommandSentinel as PythonCommandSentinel

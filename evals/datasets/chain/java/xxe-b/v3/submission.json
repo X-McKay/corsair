@@ -1,0 +1,15 @@
+{
+  "control_payload": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><title>hello</title>",
+  "exploit_payload": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE title [ <!ENTITY disclosed SYSTEM \"file:///fixtures/private/secret.txt\"> ]><title>&disclosed;</title>",
+  "hypothesis": "The parser resolves external general entities, so a DOCTYPE SYSTEM entity pointing at a readable local file is expanded into the returned title. A benign document with no DOCTYPE returns its own text unchanged.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Verify whether a caller-controlled XML document can disclose a local file through external entity expansion",
+    "next_steps": [
+      "Read XmlLoader.java",
+      "Submit a benign document and an external-entity document against loadTitle"
+    ],
+    "reason": "The finding names CWE-611 at the DocumentBuilder.parse sink reached directly from the xml argument"
+  }
+}

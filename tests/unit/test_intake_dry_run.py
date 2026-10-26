@@ -92,9 +92,9 @@ def test_conversion_binds_the_template_to_the_finding_file_and_keeps_the_line():
     request = request_from_scanner(
         finding, case_id="c-000", source=Source(path="/src"), recipe_template=_template()
     )
+    assert isinstance(request.case.recipe, PythonRecipe)
     assert request.case.recipe.module_file == "reader.py"
     assert request.case.recipe.function == "read_file"
-    assert isinstance(request.case.recipe, PythonRecipe)
     assert request.case.recipe.payload_parameter == "path"
     assert request.case.finding.line is None  # intake never invents a line
     assert request.case.finding.scanner is not None

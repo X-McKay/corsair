@@ -45,6 +45,7 @@ from corsair.agents.resources import RoleName, load_agent_spec, select_reference
 from corsair.contracts import (
     Feedback,
     Finding,
+    JavaRecipe,
     LineProvenance,
     Recipe,
     Usage,
@@ -210,9 +211,10 @@ def _derived_line_note(
 ) -> dict[str, str]:
     """Say where a derived target line came from; a declared line adds nothing.
 
-    Packets for findings that declared their line stay byte-identical.
+    Packets for findings that declared their line stay byte-identical. Only a Python
+    callable recipe derives a line, so a Java recipe (no ``function``) never carries it.
     """
-    if provenance is not LineProvenance.RECIPE_FUNCTION:
+    if provenance is not LineProvenance.RECIPE_FUNCTION or isinstance(recipe, JavaRecipe):
         return {}
     return {
         "target_line_provenance": (

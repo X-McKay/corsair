@@ -530,6 +530,7 @@ def test_role_prompts_say_when_trusted_code_derived_the_target_line(tmp_path: Pa
     declared_producer, declared_audit = packets(LineProvenance.DECLARED)
     assert declared_producer == _producer_prompt(producer_input)
     assert "target_line_provenance" not in declared_producer + declared_audit
+    assert isinstance(prepared.recipe, PythonRecipe)
     note = (
         f"Trusted code bound line {prepared.finding.line} as the first body statement of "
         f"recipe function {prepared.recipe.function}."

@@ -28,7 +28,8 @@ Hosted macOS ARM runners do not support nested virtualization. CI therefore does
 Each recipe kind selects its own reviewed image through `Settings.images` (see
 [configuration](configuration.md)); `just images` builds every `deploy/*/Dockerfile`.
 The Python secret-disclosure recipe uses `corsair-python:0.1`; the JavaScript
-prototype-pollution recipe uses `corsair-javascript:0.1`. Both apply the identical
+prototype-pollution recipe uses `corsair-javascript:0.1`; the Java secret-disclosure
+recipe uses `corsair-java:0.1`. All apply the identical
 `DockerSandbox` isolation (read-only, offline, dropped capabilities, no-new-privileges,
 CPU/memory/PID limits, immutable-identity cleanup). Image selection is a one-line mapping,
 not a code path.
@@ -53,6 +54,28 @@ real corpus row (`prototypepollution-a`). Its evidence:
 macOS arm64 and the full live chain for this recipe are **unrun**. A `node --test` run
 produces machine-readable line coverage from V8 directly; no second test or coverage
 engine is added.
+
+### Java secret disclosure (Linux amd64)
+
+The `java.secret_disclosure/1` recipe is qualified on **Linux amd64 only** (host `x86_64`),
+on one real corpus row (`xxe-b`, fixed revision `xxe-a`). Its evidence:
+
+- Image `corsair-java:0.1` from `deploy/java/Dockerfile`, pinned
+  `eclipse-temurin:21-jdk-jammy` by digest, with the JUnit 5 console launcher (1.11.4) and
+  JaCoCo agent/CLI (0.8.12) vendored at build time and verified by SHA-256; the trusted
+  driver `drivers/java/driver.sh` compiles the admitted source with `javac` alone, runs one
+  fixed test under the JaCoCo agent, and has no network at run time.
+- `corsair verify` on the frozen v3 row `evals/datasets/chain/java/xxe-b/v3/` — control
+  held (exit 0), adversarial violated (exit 1), the parse sink (line 13) covered in both
+  runs, cleanup confirmed, no security verdict rendered.
+- `tests/integration/test_docker_java.py` (marker `docker`): control+violation,
+  neutralized hold, fixed differential, unexpected-exception error, absent-coverage
+  invalid, compile failure as operational, and cleanup.
+- Measured per-role container time ~1.1 s (JVM start-up dominates).
+
+macOS arm64 and the full live chain for this recipe are **unrun**. When the exploit is
+blocked by a thrown exception, JaCoCo reports the throwing line as missed, so a
+neutralized revision binds its target one statement earlier.
 
 ## Docker on a physical Mac
 
