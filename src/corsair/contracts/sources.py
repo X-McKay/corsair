@@ -11,6 +11,7 @@ from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, mode
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_c import CRecipe
 from .recipes_javascript import JavaScriptRecipe
 from .recipes_python import PythonCommandSentinel
 from .recipes_ruby import RubyRecipe
@@ -136,7 +137,8 @@ Recipe = Annotated[
     Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
     | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")]
     | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")]
-    | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")],
+    | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")]
+    | Annotated[CRecipe, Tag("c.integer_overflow/1")],
     Discriminator(_recipe_kind),
 ]
 

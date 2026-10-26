@@ -66,6 +66,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
 - [JavaScript corpus survey](reference/corpus-javascript.md): the JavaScript rows and why the prototype-pollution recipe is qualified first.
+- [C corpus survey](reference/corpus-c.md): the C rows and the qualified `c.integer_overflow/1` recipe.
 
 ## Agents
 

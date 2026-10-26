@@ -1,0 +1,15 @@
+{
+  "control_payload": 5,
+  "exploit_payload": 65535,
+  "hypothesis": "dup_n sizes its allocation with `unsigned short total = n + 1`, which wraps to 0 at n=65535 while the subsequent memcpy still writes n bytes. A benign short length returns a correctly sized buffer; the maximum unsigned-short length overflows the allocation and writes out of bounds, which AddressSanitizer reports as a heap-buffer-overflow in dup.c.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Show that an in-range length is handled correctly while the maximum unsigned-short length overflows the size calculation",
+    "next_steps": [
+      "Read dup.c and the length calculation at line 7",
+      "Submit a small benign length and the maximum unsigned-short length against dup_n"
+    ],
+    "reason": "The reported integer-overflow property is driven entirely by the caller-controlled length n"
+  }
+}

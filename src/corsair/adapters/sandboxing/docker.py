@@ -39,6 +39,12 @@ from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
 
+# Deliberate, kind-scoped relaxation: recipe kinds whose trusted driver compiles and
+# executes a native binary in /work. Only their /work tmpfs drops noexec (nosuid, nodev,
+# size, mode and ownership stay); every interpreter recipe keeps /work noexec, /tmp is
+# always noexec, and every other container control is unchanged.
+NATIVE_EXEC_KINDS = frozenset({"c.integer_overflow/1"})
+
 
 class SandboxExecutionError(RuntimeError):
     """A role container did not leave parseable, cleanup-confirmed evidence."""
@@ -346,7 +352,13 @@ class DockerSandbox:
                         "PYTHONNOUSERSITE": "1",
                     },
                     tmpfs={
-                        "/work": "rw,nosuid,nodev,noexec,size=64m,mode=0700,uid=1000,gid=1000",
+                        # A compiled-to-native recipe (C) must run the binary its trusted
+                        # driver builds in /work; see NATIVE_EXEC_KINDS.
+                        "/work": (
+                            "rw,nosuid,nodev,exec,size=64m,mode=0700,uid=1000,gid=1000"
+                            if prepared.recipe.kind in NATIVE_EXEC_KINDS
+                            else "rw,nosuid,nodev,noexec,size=64m,mode=0700,uid=1000,gid=1000"
+                        ),
                         "/tmp": "rw,nosuid,nodev,noexec,size=32m,mode=1777",
                     },
                     log_config=LogConfig(

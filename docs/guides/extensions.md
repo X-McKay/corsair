@@ -26,6 +26,23 @@ Do not describe the following as interchangeable. A change may need one, several
 
 For example, a second Python callable recipe could be a recipe extension without adding a language. Supporting a web framework could require framework setup and an image update while remaining Python. Supporting a non-Python language requires a concrete recipe and trusted observer in addition to language and image work. Do not add an empty provider module, `LanguageRegistry`, generic backend, or speculative adapter merely to name future possibilities.
 
+## Worked example: the C integer-overflow recipe
+
+The first non-Python runtime is qualified as a worked instance of this bar, not a generic
+adapter. [`CRecipe`](../../src/corsair/contracts/recipes_c.py) (`c.integer_overflow/1`) is one
+tagged member of the `Recipe` union in [`contracts/sources.py`](../../src/corsair/contracts/sources.py);
+the image is [`deploy/c/Dockerfile`](../../deploy/c/Dockerfile) (`corsair-c:0.1`, pinned gcc);
+the trusted driver is [`drivers/c/driver.py`](../../src/corsair/adapters/sandboxing/drivers/c/driver.py).
+The driver compiles the admitted C source plus a fixed harness under AddressSanitizer with
+gcov coverage, never running the target's own Makefile, and emits the same `corsair.driver/1`
+record as the Python driver. The only trusted assertion for a violation is a machine-readable
+sanitizer report of the operator-fixed class in a frame naming the target file; a plain crash,
+a signal, or a compile failure is `ERROR`, never a violation. Because a compiled-to-native
+runtime must execute the binary it builds, that image's `/work` tmpfs drops `noexec` (keeping
+every other container control); this is recorded in the image identity and is scoped to
+`DockerSandbox.NATIVE_EXEC_KINDS`. Qualified on Linux amd64 only with `corsair verify`; see
+[the C corpus survey](../reference/corpus-c.md) and [platforms](../reference/platforms.md#c-runtime-image-linux-amd64).
+
 ## Smallest incremental implementation map
 
 Start with one bounded, observable property, not a broad claim such as "support framework X". A minimal conceptual example is a **second Python recipe** that invokes one fixed public callable with an operator-owned control path and one model-controlled scalar path; it is not an implemented JavaScript adapter or a promise of cross-language support.

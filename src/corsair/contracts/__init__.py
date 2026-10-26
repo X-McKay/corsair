@@ -37,6 +37,7 @@ from .intake import ScannerClaim as ScannerClaim
 from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
+from .recipes_c import CRecipe as CRecipe
 from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
 from .recipes_python import PythonCommandSentinel as PythonCommandSentinel
 from .recipes_ruby import RubyRecipe as RubyRecipe

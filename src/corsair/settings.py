@@ -61,6 +61,7 @@ def _default_images(python_image: str) -> dict[str, str]:
         "python.secret_disclosure/1": python_image,
         "javascript.prototype_pollution/1": "corsair-javascript:0.1",
         "ruby.secret_disclosure/1": "corsair-ruby:0.1",
+        "c.integer_overflow/1": "corsair-c:0.1",
     }
 
 

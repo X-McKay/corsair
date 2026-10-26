@@ -76,4 +76,18 @@ Python's default macOS temp tree can fall outside Colima's shared mounts. `TMPDI
 
 Do not use privileged targets, mount the Docker socket into target containers or relax the read-only, dropped-capability, no-new-privileges, offline-network, resource or cleanup policies to obtain a pass. Source admission remains on the host; container execution remains in the Linux VM.
 
+## C runtime image (Linux amd64)
+
+The C recipe ([`c.integer_overflow/1`](schemas.md#recipes)) runs in the reviewed `corsair-c:0.1`
+image (`deploy/c/Dockerfile`, pinned gcc 13.3.0). Its trusted driver compiles the admitted C
+source plus a fixed harness under AddressSanitizer and must **execute a freshly built native
+binary**, so that image's `/work` tmpfs keeps `nosuid` and `nodev` but drops `noexec` (see
+`DockerSandbox.NATIVE_EXEC_KINDS`). Every other control is unchanged — read-only root, dropped
+capabilities, no-new-privileges, offline network, non-root user, resource/PID limits,
+read-only source/job binds, `/tmp` `noexec`, and cleanup confirmed before the adversarial
+container starts — and the Python and interpreter images keep `/work` `noexec`. This relaxation
+is intrinsic to a compiled-to-native runtime and is recorded in the image identity; it is not a
+weakening of the Python sandbox. Qualified on Linux amd64 only; macOS arm64 and the live chain
+are unrun. See [the C corpus survey](corpus-c.md).
+
 The implementation sandbox is Linux ARM, outside the requested matrix. Its local full-suite results are regression evidence; target-platform qualification comes from the actual Linux amd64/macOS arm64 CI jobs. See [environment setup](../development/setup.md) and [current plans](../plans/README.md) for exact receipts and remaining limits.

@@ -41,8 +41,7 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: Recipe  # PythonRecipe | JavaScriptRecipe | RubyRecipe, discriminated on `kind`
-│   └── recipe: Recipe  # PythonRecipe | PythonCommandSentinel | JavaScriptRecipe, on `kind`
+│   └── recipe: Recipe  # Python, PythonCommandSentinel, JavaScript, Ruby or C recipe, on `kind`
 └── budget: Budget
 ```
 
@@ -60,6 +59,7 @@ InvestigationRequest
 - **`PythonCommandSentinel`** (`kind: "python.command_sentinel/1"`, [`recipes_python.py`](../../src/corsair/contracts/recipes_python.py)) binds to one public Python callable like `PythonRecipe` and shares its fixed-argument, fixture and exception fields. The observed property is whether invoking the callable creates the operator-fixed `sentinel_path` (a non-traversing path under `/work`): the benign input must not, an input reaching command or code execution does (CWE-78, CWE-94). It has no `expected_control`; the control holds when the call returns without creating the sentinel. See the [Python corpus map](corpus-python.md).
 - **`JavaScriptRecipe`** (`kind: "javascript.prototype_pollution/1"`, [`recipes_javascript.py`](../../src/corsair/contracts/recipes_javascript.py)) binds to one exported CommonJS `.js` callable. The investigator controls only the model payload, which the trusted driver passes as the final positional argument to `function(*fixed_arguments, payload)`; `module_file`, `function` and the fixed leading arguments are not agent-editable. The observed property is whether invoking the callable adds any enumerable property to `Object.prototype` (CWE-1321); it reads no fixture. See the [JavaScript corpus survey](corpus-javascript.md) for the row it qualifies.
 - **`RubyRecipe`** (`kind: "ruby.secret_disclosure/1"`, [`recipes_ruby.py`](../../src/corsair/contracts/recipes_ruby.py)) binds to one public Ruby module/class method (`receiver`, `function`) in a `.rb` file and observes the same secret-disclosure property as `PythonRecipe`: the investigator controls only the `payload_parameter` keyword value; the receiver, method, fixed keyword arguments, public fixtures, expected control value and allowed exception classes are not agent-editable. See the [Ruby corpus survey](corpus-ruby.md).
+- **`CRecipe`** (`kind: "c.integer_overflow/1"`, [`recipes_c.py`](../../src/corsair/contracts/recipes_c.py)) binds to one C callable of the fixed shape `char *function(const char *buf, unsigned short len)` in a `.c` file. The investigator controls only the integer length (the submission's control and exploit payloads); the fill byte, expected benign length and admitted sanitizer class are not agent-editable. The trusted driver compiles the admitted source plus a fixed harness under AddressSanitizer with gcov coverage; a VIOLATION is admitted only for a sanitizer report of the fixed class in a frame naming the target file, and a plain crash or compile failure is ERROR. It reads no fixture. See the [C corpus survey](corpus-c.md).
 
 `load_investigation_request()` validates request JSON and converts source paths to absolute paths relative to the request file. That is not admission. The local admission adapter later accepts only a non-symlink directory beneath configured `source_root`, snapshots its admitted bytes, and exposes only that immutable snapshot. Current source admission is local; remote SCM checkout is not a present schema or adapter.
 
