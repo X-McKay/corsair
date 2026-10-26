@@ -10,6 +10,7 @@ import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    AuditOutput,
     Budget,
     Disposition,
     EvidenceInput,
@@ -18,7 +19,6 @@ from corsair.contracts import (
     LineProvenance,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -27,7 +27,7 @@ from corsair.entrypoints.cli import execute, parser
 from corsair.entrypoints.runs import inspect_evidence, list_runs
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
-from tests.unit.test_evidence import _FakeSandbox, _prepared, _submission
+from tests.unit.test_evidence import _audit, _FakeSandbox, _prepared, _submission
 
 PRIVATE = ("hello.txt", "../private/secret.txt", "return read(path)", "component finding")
 
@@ -39,6 +39,7 @@ def _commit_run(
     *,
     recorded: float = 1_700_000_000,
     cleanup_confirmed: bool = True,
+    audit: AuditOutput | None = None,
 ) -> InvestigationResult:
     """Commit one result whose round observation was produced by the trusted verifier."""
     prepared = _prepared().model_copy(
@@ -68,9 +69,10 @@ def _commit_run(
             RoundResult(
                 index=1,
                 producer=ProducerOutput(
-                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    decision=ProducerDecision(kind="proposal", submission=submission)
                 ),
                 observation=observation,
+                audit=audit,
             )
         ],
     )
@@ -261,6 +263,44 @@ async def test_inspect_evidence_command_emits_json_and_human_views(tmp_path, mon
 
     assert await execute(parser().parse_args(["--format", "human", "--no-color", "runs"])) == 0
     assert "run-a" in capsys.readouterr().out
+
+
+async def test_inspect_names_round_stops_from_the_committed_receipts(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("COLUMNS", "160")
+    store = ArtifactStore(tmp_path / "artifacts")
+    _commit_run(store, "run-verified", audit=_audit())
+    _commit_run(store, "run-unaudited")
+    _settings_for(store, monkeypatch)
+    before = _snapshot(store.root)
+
+    human = ["--format", "human", "--no-color", "inspect"]
+    assert await execute(parser().parse_args([*human, "run-verified"])) == 0
+    output = capsys.readouterr().out
+    stop = next(line for line in output.splitlines() if line.startswith("│ 1.1"))
+    assert "demonstrated" in stop and "evidence_unverified" not in output
+    assert "demonstrated · kernel at 1.1" in output
+
+    assert await execute(parser().parse_args([*human, "run-unaudited"])) == 0
+    assert "audit_not_run" in capsys.readouterr().out
+    for private in PRIVATE:
+        assert private not in output
+    assert _snapshot(store.root) == before, "inspect must never write to the store"
+
+    # JSON stays the committed result itself.
+    assert await execute(parser().parse_args(["--format", "json", "inspect", "run-verified"])) == 0
+    emitted = json.loads(capsys.readouterr().out)
+    assert set(emitted) == set(InvestigationResult.model_fields)
+
+
+def test_existing_store_never_creates_an_absent_artifact_root(tmp_path):
+    from corsair.entrypoints.cli import _existing_store
+
+    absent = tmp_path / "absent"
+    assert _existing_store(Settings(artifact_root=str(absent))) is None
+    assert not absent.exists()
+    store = ArtifactStore(tmp_path / "artifacts")
+    opened = _existing_store(Settings(artifact_root=str(store.root)))
+    assert opened is not None and opened.root == store.root
 
 
 async def test_inspect_evidence_rejects_online_before_runtime_state():

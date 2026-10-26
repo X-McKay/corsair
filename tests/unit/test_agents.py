@@ -9,9 +9,11 @@ from typing import cast
 
 import pytest
 from google.adk.models.llm_response import LlmResponse
+from google.adk.tools.set_model_response_tool import SetModelResponseTool
 from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
+from pydantic import ValidationError
 
 from corsair.adapters.inference.adk import (
     _MAX_PROMPT_BYTES,
@@ -32,13 +34,11 @@ from corsair.contracts import (
     AuditResult,
     Budget,
     Finding,
-    NoGroundedCandidate,
     PlanRevision,
     PreparedCase,
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    ProducerProposal,
     PythonRecipe,
     RunManifest,
     Submission,
@@ -163,12 +163,13 @@ async def test_producer_uses_native_structured_output_and_completes_after_one_re
     output = await run_producer(producer_input, ModelSettings(), store, model)
 
     assert output.decision is not None
-    assert isinstance(output.decision.root, ProducerProposal)
+    assert output.decision.kind == "proposal"
     assert output.submission_for_verification() is not None
     assert output.feedback is None
     assert output.usage.llm_calls == 1
     assert output.usage.tool_calls == 0
-    assert isinstance(output.decision.root.submission.plan, PlanRevision)
+    assert output.decision.submission is not None
+    assert isinstance(output.decision.submission.plan, PlanRevision)
     assert model.requests[0].config.response_schema is ProducerDecision
     assert len(model.requests) == 1
     assert model.requests[0].config.max_output_tokens == 512
@@ -185,10 +186,144 @@ async def test_adk_native_schema_tool_completion_is_counted_and_validated(tmp_pa
     output = await run_producer(_producer_input(store), ModelSettings(), store, model)
     assert output.feedback is None
     assert output.decision is not None
-    assert isinstance(output.decision.root, NoGroundedCandidate)
+    assert output.decision.kind == "no_grounded_candidate"
     assert output.submission_for_verification() is None
     assert output.usage.llm_calls == output.usage.tool_calls == 1
     assert "set_model_response" in model.requests[0].tools_dict
+
+
+def test_schema_completion_tool_declares_typed_top_level_parameters():
+    """Every parameter ``set_model_response`` declares has a top-level JSON type.
+
+    The former RootModel declared one untyped ``root`` (``anyOf`` of the variants) that
+    no conforming call could satisfy, and that vLLM's tool-call parser delivered as a
+    JSON string.  Object-typed ``submission`` is decoded as an object by such parsers.
+    """
+
+    declaration = SetModelResponseTool(ProducerDecision)._get_declaration()
+    assert declaration is not None
+    parameters = declaration.model_dump(exclude_none=True)["parameters_json_schema"]
+    properties = parameters["properties"]
+
+    assert set(properties) == {"schema_version", "kind", "submission", "reason"}
+    assert parameters["required"] == ["kind"]
+    assert {name: spec["type"] for name, spec in properties.items()} == {
+        "schema_version": "string",
+        "kind": "string",
+        "submission": "object",
+        "reason": "string",
+    }
+    assert properties["submission"]["anyOf"] == [{"$ref": "#/$defs/Submission"}]
+    assert "proposal" in properties["submission"]["description"]
+    assert "no_grounded_candidate" in properties["reason"]["description"]
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        ({"kind": "proposal"}, "a proposal requires submission"),
+        (
+            {"kind": "proposal", "submission": _submit_args(), "reason": "extra"},
+            "a proposal must omit reason",
+        ),
+        ({"kind": "no_grounded_candidate"}, "no_grounded_candidate requires reason"),
+        (
+            {"kind": "no_grounded_candidate", "reason": "none", "submission": _submit_args()},
+            "no_grounded_candidate must omit submission",
+        ),
+        ({"kind": "no_grounded_candidate", "reason": ""}, "at least 1 character"),
+        ({"kind": "abstain", "reason": "none"}, "'proposal' or 'no_grounded_candidate'"),
+        ({"submission": _submit_args()}, "Field required"),
+    ],
+)
+def test_producer_decision_requires_exactly_the_field_its_kind_needs(args: dict, message: str):
+    with pytest.raises(ValidationError, match=message):
+        ProducerDecision.model_validate(args)
+
+
+def test_producer_decision_kinds_round_trip_and_accept_explicit_nulls():
+    proposal = ProducerDecision.model_validate(_proposal_args())
+    abstention = ProducerDecision.model_validate(_abstention_args() | {"submission": None})
+
+    assert proposal.submission == Submission(**_submit_args())
+    assert proposal.abstention_reason() is None
+    assert abstention.abstention_reason() == _abstention_args()["reason"]
+    assert ProducerOutput(decision=abstention).submission_for_verification() is None
+    assert ProducerOutput(decision=abstention).abstention_reason() == abstention.reason
+    assert ProducerOutput(decision=proposal).abstention_reason() is None
+    for decision in (proposal, abstention):
+        assert ProducerDecision.model_validate_json(decision.model_dump_json()) == decision
+
+
+def test_stored_variant_shaped_producer_output_still_decodes():
+    """Histories and artifacts recorded with the RootModel hold the variant object
+    itself (no ``root`` key and no null counterpart field); it decodes unchanged."""
+
+    stored = json.dumps(
+        {
+            "decision": {
+                "schema_version": "corsair.producer-decision/1",
+                "kind": "proposal",
+                "submission": _submit_args(),
+            },
+            "usage": {"llm_calls": 1, "tool_calls": 1},
+            "feedback": None,
+        }
+    )
+    abstained = json.dumps({"decision": _abstention_args()})
+
+    output = ProducerOutput.model_validate_json(stored)
+    assert output.submission_for_verification() == Submission(**_submit_args())
+    assert (
+        ProducerOutput.model_validate_json(abstained).abstention_reason()
+        == (_abstention_args()["reason"])
+    )
+
+
+@pytest.mark.asyncio
+async def test_schema_tool_completion_returns_a_flat_proposal_in_one_call(tmp_path: Path):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted-schema-tool-proposal",
+        structured_tools=False,
+        responses=[tool_response("set_model_response", _proposal_args())],
+    )
+
+    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
+
+    assert output.feedback is None
+    assert output.submission_for_verification() == Submission(**_submit_args())
+    assert output.usage.llm_calls == output.usage.tool_calls == 1
+    assert len(model.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_schema_tool_rejection_names_the_missing_field_and_the_model_can_recover(
+    tmp_path: Path,
+):
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted-schema-tool-retry",
+        structured_tools=False,
+        responses=[
+            tool_response("set_model_response", {"kind": "proposal"}),
+            tool_response("set_model_response", _proposal_args()),
+        ],
+    )
+
+    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
+
+    assert output.feedback is None
+    assert output.submission_for_verification() is not None
+    assert output.usage.llm_calls == output.usage.tool_calls == 2
+    rejection = [
+        part.function_response.response
+        for content in model.requests[1].contents
+        for part in content.parts or []
+        if part.function_response is not None
+    ]
+    assert len(rejection) == 1 and rejection[0] is not None
+    assert "a proposal requires submission" in rejection[0]["error"]
 
 
 @pytest.mark.asyncio
@@ -234,11 +369,11 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
     assert auditor.output_schema is AuditResult
     assert producer.output_schema is ProducerDecision
     schema = ProducerDecision.model_json_schema()
-    assert schema["discriminator"]["propertyName"] == "kind"
-    assert len(schema["oneOf"]) == 2
-    proposal = schema["$defs"]["ProducerProposal"]
-    assert proposal["properties"]["kind"]["const"] == "proposal"
-    assert "submission" in proposal["required"]
+    assert schema["type"] == "object"
+    assert schema["required"] == ["kind"]
+    assert schema["properties"]["kind"]["enum"] == ["proposal", "no_grounded_candidate"]
+    assert schema["properties"]["submission"]["type"] == "object"
+    assert schema["properties"]["reason"]["type"] == "string"
     assert {"control_payload", "exploit_payload", "hypothesis", "plan"} <= set(
         schema["$defs"]["Submission"]["required"]
     )
@@ -249,7 +384,7 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
 
 def test_producer_output_exposes_only_the_decision_submission():
     submission = Submission(**_submit_args())
-    decision = ProducerDecision(root=ProducerProposal(submission=submission))
+    decision = ProducerDecision(kind="proposal", submission=submission)
 
     output = ProducerOutput(decision=decision)
 

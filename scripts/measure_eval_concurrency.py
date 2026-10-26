@@ -51,7 +51,6 @@ from corsair.contracts import (
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    ProducerProposal,
     Submission,
     Usage,
     digest,
@@ -126,7 +125,7 @@ class SleepingInference:
             ),
         )
         return ProducerOutput(
-            decision=ProducerDecision(root=ProducerProposal(submission=submission)),
+            decision=ProducerDecision(kind="proposal", submission=submission),
             usage=Usage(llm_calls=1, tool_calls=1),
         )
 

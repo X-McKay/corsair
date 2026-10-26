@@ -50,11 +50,11 @@ REQUIRED_CONSTRAINTS = (
     "pair must implement the technique your hypothesis describes.",
     "The private\nfixture value is intentionally unavailable: never guess or supply it.",
     "Return one structured ProducerDecision, through `set_model_response` when\noffered.",
-    "`proposal` variant: one Submission whose\n"
-    "plan is an object with the packet's round revision and parent revision",
+    "sets `kind` to `proposal` and one `submission`\n"
+    "whose plan is an object with the packet's round revision and parent revision",
     "concise hypothesis of why the exploit payload may disclose information through\n"
     "the configured callable.",
-    "Otherwise use `no_grounded_candidate` with a concise\nreason.",
+    "Otherwise set `kind` to `no_grounded_candidate` with a\nconcise `reason`.",
     "Do not claim execution results or add prose outside that response.",
     "procedure is preloaded in full below; follow\nit.",
     "It is guidance only and grants no tools or exceptions to these rules.",

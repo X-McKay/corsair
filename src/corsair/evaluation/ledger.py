@@ -23,7 +23,6 @@ from corsair.contracts import (
     FixStatus,
     InvestigationResult,
     MatchKind,
-    NoGroundedCandidate,
     PreparedCase,
     RoleOutcome,
     RoundResult,
@@ -142,10 +141,9 @@ def _round_entry(item: RoundResult, prepared: PreparedCase | None) -> tuple[dict
     """One round's stopping entry and whether it was an operational stop."""
     session, index = item.session, item.index
     producer = item.producer
-    if producer.decision is not None and isinstance(producer.decision.root, NoGroundedCandidate):
-        return _entry(
-            session, index, "producer", "producer_abstained", producer.decision.root.reason
-        ), False
+    abstention = producer.abstention_reason()
+    if abstention is not None:
+        return _entry(session, index, "producer", "producer_abstained", abstention), False
     if producer.submission_for_verification() is None:
         feedback = producer.feedback
         if feedback is None:

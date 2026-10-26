@@ -20,13 +20,14 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     ExecutionStatus,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
+    PhaseTransition,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -34,6 +35,7 @@ from corsair.contracts import (
     Verdict,
 )
 from corsair.evaluation.comparison import row_label, row_stop
+from corsair.evaluation.ledger import RoundKey, gate_ledger, verified_rounds
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_error_detail, safe_text
 from corsair.ports.sandboxing import SandboxUnavailable
@@ -86,6 +88,18 @@ T = TypeVar("T")
 _POLL_SECONDS = 1.0
 # Most recent phase transitions shown in the live panel.
 _TIMELINE_ROWS = 8
+# Gate-ledger stops coloured like the verdicts they lead to; the rest are non-decisive.
+_STOP_STYLES: dict[str, str] = {
+    "demonstrated": "red",
+    "component_demonstrated": "red",
+    "clean_negative": "green",
+    "evidence_unverified": "dim",
+    "kernel_error": "magenta",
+}
+# Case-level ledger stops whose reason is a fixed, code-authored sentence. Every other
+# ledger reason may repeat model text (an abstention, an audit reason) or the result's
+# own reason, so the human view names only the stage and gate.
+_CODE_REASON_STOPS = frozenset({"fix_not_blocked", "negative_threshold_unmet", "budget_exhausted"})
 
 
 class TerminalOptions(Protocol):
@@ -312,7 +326,7 @@ def _producer_cell(item: RoundResult) -> Text:
     decision = item.producer.decision
     if decision is None:
         cell = Text("no decision", style="yellow")
-    elif isinstance(decision.root, NoGroundedCandidate):
+    elif decision.kind == "no_grounded_candidate":
         cell = Text("abstained", style="yellow")
     else:
         cell = Text("proposal")
@@ -343,10 +357,38 @@ def _audit_cell(audit: AuditOutput | None) -> Text:
     return cell
 
 
-def _rounds_table(rounds: list[RoundResult]) -> Table:
+def _stop_cell(entry: Mapping[str, Any] | None) -> Text:
+    """Gate and stage only: a round's ledger reason can be model text."""
+    if entry is None:
+        return Text("unknown", style="dim")
+    gate = str(entry["gate"])
+    cell = Text(safe_text(gate), style=_STOP_STYLES.get(gate, "yellow"))
+    cell.append(f"\n{safe_text(entry['stage'])}", style="dim")
+    return cell
+
+
+def _case_stop(ledger: list[dict]) -> Text:
+    """Why the case stopped: its policy stops, else the last round's stopping gate."""
+    stops = [entry for entry in ledger if entry["round"] is None]
+    if not stops:
+        last = ledger[-1]
+        cell = Text(safe_text(last["gate"]), style=_STOP_STYLES.get(last["gate"], "yellow"))
+        cell.append(f" · {safe_text(last['stage'])} at {last['session']}.{last['round']}")
+        return cell
+    cell = Text()
+    for position, entry in enumerate(stops):
+        if position:
+            cell.append("; ")
+        cell.append(safe_text(entry["gate"]), style=_STOP_STYLES.get(entry["gate"], "yellow"))
+        if entry["gate"] in _CODE_REASON_STOPS:
+            cell.append(f": {safe_text(entry['reason'])}")
+    return cell
+
+
+def _rounds_table(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> Table:
     table = Table(title="Rounds", title_justify="left", expand=True)
     table.add_column("S.R", no_wrap=True)
-    for column in ("Producer", "Control", "Adversarial", "Audit"):
+    for column in ("Producer", "Control", "Adversarial", "Audit", "Stopped at"):
         table.add_column(column, overflow="fold")
     for item in rounds:
         observation = item.observation
@@ -356,7 +398,62 @@ def _rounds_table(rounds: list[RoundResult]) -> Table:
             _role_cell(observation.control if observation else None),
             _role_cell(observation.adversarial if observation else None),
             _audit_cell(item.audit),
+            _stop_cell(stops.get((item.session, item.index))),
         )
+    if any(entry["gate"] == "evidence_unverified" for entry in stops.values()):
+        table.caption = Text(
+            "evidence_unverified: the round's receipts were not validated against the "
+            "artifact store here, so no kernel gate is named; the verdict is the recorded one.",
+            style="dim",
+        )
+        table.caption_justify = "left"
+    return table
+
+
+def _duration(seconds: float) -> str:
+    return f"{seconds:.1f} s" if seconds < 60 else _clock(seconds)
+
+
+def _timeline_table(timeline: list[PhaseTransition]) -> Table:
+    """Recorded phase durations: each transition lasts until the next one, and the last
+    one (normally ``record``) has no recorded end. Unknown times stay unknown."""
+    table = Table(title="Phases", title_justify="left", expand=True)
+    for column in ("S.R", "Phase", "At", "Duration"):
+        table.add_column(column, overflow="fold")
+    first = timeline[0].at
+    totals: dict[str, float | None] = {}
+    for entry, following in zip(timeline, [*timeline[1:], None], strict=True):
+        offset = None
+        if entry.at is not None and first is not None:
+            offset = f"+{_clock((entry.at - first).total_seconds())}"
+        duration: str | None = "-"
+        if following is not None:
+            seconds = None
+            if entry.at is not None and following.at is not None:
+                seconds = (following.at - entry.at).total_seconds()
+            total = totals.get(entry.phase, 0.0)
+            totals[entry.phase] = None if total is None or seconds is None else total + seconds
+            duration = None if seconds is None else _duration(seconds)
+        table.add_row(
+            _text(f"{entry.session}.{entry.round}"),
+            _text(entry.phase),
+            _text(offset),
+            _text(duration),
+        )
+    notes = []
+    if timeline[0].phase != "prepare":
+        notes.append("earlier transitions not retained")
+    if totals:
+        notes.append(
+            "totals: "
+            + " · ".join(
+                f"{phase} {'unknown' if total is None else _duration(total)}"
+                for phase, total in totals.items()
+            )
+        )
+    if notes:
+        table.caption = _text("; ".join(notes))
+        table.caption_justify = "left"
     return table
 
 
@@ -395,6 +492,27 @@ def _target_caption(item: Mapping[str, Any]) -> str:
         return ""
     derived = item.get("line_provenance") == "recipe_function"
     return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
+
+
+# Validation check keys and their compact column headings.
+_DATASET_CHECKS = (
+    ("entry", "Entry"),
+    ("digests", "Digest"),
+    ("request", "Input"),
+    ("source", "Source"),
+    ("target_binding", "Bind"),
+    ("oracle", "Oracle"),
+)
+_CHECK_WORDS = {"pass": ("ok", "green"), "fail": ("FAIL", "bold red"), "skip": ("-", "dim")}
+
+
+def _check_word(status: str) -> Text:
+    word, style = _CHECK_WORDS.get(status, (status, "cyan"))
+    return Text(safe_text(word), style=style)
+
+
+def _status_word(status: str) -> Text:
+    return Text(safe_text(status).upper(), style=_STYLES.get(status, "dim"))
 
 
 def _cleanup_text(confirmed: bool) -> Text:
@@ -537,8 +655,13 @@ class Terminal:
         )
         self.animate = animation and self.err.is_interactive
 
-    def emit(self, value: object) -> None:
-        """Write a complete JSON receipt, a Markdown record or a compact human rendering."""
+    def emit(self, value: object, *, store: ArtifactStore | None = None) -> None:
+        """Write a complete JSON receipt, a Markdown record or a compact human rendering.
+
+        ``store`` lets the human result view verify each round's receipts for its gate
+        ledger; without it, rounds that reached the kernel show ``evidence_unverified``.
+        JSON output never depends on it.
+        """
         rendered = TypeAdapter(Any).dump_python(value, mode="json")
         if self.markdown:
             from corsair.entrypoints.markdown import to_markdown
@@ -549,11 +672,13 @@ class Terminal:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
         if isinstance(rendered, dict) and "disposition" in rendered:
-            self._result(InvestigationResult.model_validate(rendered))
+            self._result(InvestigationResult.model_validate(rendered), store)
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
             self._runs(rendered)
+        elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
+            self._datasets(rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:
             self._evidence(rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
@@ -739,8 +864,16 @@ class Terminal:
             )
         self.out.print(Panel(table, title="Corsair · Gate ledger Δ", border_style="cyan"))
 
-    def _result(self, result: InvestigationResult) -> None:
-        """Verdict first, then rounds, identity and totals; never model or payload content."""
+    def _result(self, result: InvestigationResult, store: ArtifactStore | None = None) -> None:
+        """Verdict and case stop first, then rounds with their gate-ledger stop, phases,
+        identity and totals; never model or payload content. The ledger only describes
+        the recorded verdict: it is computed by the evaluator's pure ``gate_ledger``."""
+        ledger = gate_ledger(result, verified_rounds(result, store))
+        stops = {
+            (entry["session"], entry["round"]): entry
+            for entry in ledger
+            if entry["round"] is not None
+        }
         style = _VERDICT_STYLES.get(result.verdict, "cyan") if result.verdict else "cyan"
         header = _grid()
         header.add_row(
@@ -749,6 +882,7 @@ class Terminal:
             if result.verdict
             else Text("not recorded", style="yellow"),
         )
+        header.add_row(_label("Case stop"), _case_stop(ledger))
         header.add_row(
             _label("Execution"),
             Text(
@@ -764,11 +898,13 @@ class Terminal:
         header.add_row(_label("Case"), _text(result.case_id))
         self.out.print(Panel(header, title="Corsair · Investigation", border_style=style))
         if result.rounds:
-            self.out.print(_rounds_table(result.rounds))
+            self.out.print(_rounds_table(result.rounds, stops))
         else:
             self.out.print(Text("No rounds recorded.", style="dim"))
         if result.fix_observation is not None:
             self.out.print(_roles_table(result.fix_observation, "Fixed revision", caption=True))
+        if result.timeline:
+            self.out.print(_timeline_table(result.timeline))
         self.out.print(self._identity(result))
 
     @staticmethod
@@ -850,6 +986,65 @@ class Terminal:
             self.out.print(
                 Text(f"{value['invalid_records']} committed record(s) could not be read")
             )
+
+    def _datasets(self, value: dict[str, Any]) -> None:
+        """Render a dataset validation: identity and cohort, then one row per entry."""
+        for dataset in value["datasets"]:
+            header = _grid()
+            header.add_row(_label("Status"), _status_word(dataset["status"]))
+            header.add_row(_label("Schema"), _text(dataset["schema_version"]))
+            header.add_row(_label("Kind"), _text(dataset["kind"]))
+            header.add_row(_label("Digest"), _text(dataset["dataset_digest"]))
+            cohort = dataset["cohort"]
+            header.add_row(_label("Cohort"), _text(f"{len(cohort)}: {', '.join(cohort)}"))
+            header.add_row(_label("Loader"), _status_word(dataset["loader"]))
+            for problem in dataset["problems"]:
+                header.add_row(Text("Problem", style="red"), _text(problem))
+            parts: list[RenderableType] = [header]
+            if dataset["entries"]:
+                table = Table(expand=True)
+                table.add_column("Case", overflow="fold", ratio=1)
+                for _check, heading in _DATASET_CHECKS:
+                    table.add_column(heading, no_wrap=True)
+                findings: list[Text] = []
+                for entry in dataset["entries"]:
+                    case = _text(entry["case_id"])
+                    group = (
+                        f"{entry['family']} · {entry['split']}"
+                        if entry["family"] is not None
+                        else entry["kind"]
+                    )
+                    case.append("\n").append(Text(safe_text(group), style="dim"))
+                    table.add_row(
+                        case,
+                        *(_check_word(entry["checks"][check]) for check, _ in _DATASET_CHECKS),
+                    )
+                    for line, style in (
+                        *((problem, "red") for problem in entry["problems"]),
+                        *((note, "yellow") for note in entry["notes"]),
+                    ):
+                        findings.append(
+                            Text(f"{safe_text(entry['case_id'])} ", style=style) + _text(line)
+                        )
+                parts.extend([table, *findings])
+            for change in dataset["digest_changes"]:
+                verb = "rewrote" if change["applied"] else "left (entry has other failures)"
+                parts.append(
+                    _text(
+                        f"{verb} {change['case_id']} {change['field']}: "
+                        f"{_short(change['old'])} -> {_short(change['new'])}"
+                    )
+                )
+            title = f"Corsair · Dataset {safe_text(dataset['dataset'])}"
+            style = "green" if dataset["status"] == "pass" else "red"
+            self.out.print(Panel(Group(*parts), title=title, border_style=style))
+        for problem in value["problems"]:
+            self.out.print(Text("Problem: ", style="red") + _text(problem))
+        self.out.print(
+            Text("All datasets valid", style="green")
+            if value["valid"]
+            else Text("Dataset validation failed", style="red")
+        )
 
     def _evidence(self, value: dict[str, Any]) -> None:
         """Render per-role native receipts for one committed result, never payloads."""

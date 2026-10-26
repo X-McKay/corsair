@@ -23,13 +23,11 @@ from corsair.contracts import (
     ExecutionStatus,
     FixStatus,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
     PlanRevision,
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     Scope,
     Submission,
@@ -504,9 +502,8 @@ async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
             self.produce_started.set()
             return ProducerOutput(
                 decision=ProducerDecision(
-                    root=NoGroundedCandidate(
-                        reason="The admitted source does not ground an allowed payload candidate."
-                    )
+                    kind="no_grounded_candidate",
+                    reason="The admitted source does not ground an allowed payload candidate.",
                 ),
                 usage=Usage(llm_calls=1, tool_calls=1),
             )
@@ -536,7 +533,7 @@ async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
     producer = result.rounds[0].producer
     assert producer.usage == Usage(llm_calls=1, tool_calls=1)
     assert producer.decision is not None
-    assert isinstance(producer.decision.root, NoGroundedCandidate)
+    assert producer.decision.kind == "no_grounded_candidate"
     assert activities.call_counts["corsair.evidence"] == 0
     assert activities.call_counts["corsair.audit"] == 0
     assert activities.evidence_inputs == []
@@ -744,7 +741,7 @@ async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
             plan = submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
             return ProducerOutput(
                 decision=ProducerDecision(
-                    root=ProducerProposal(submission=submission.model_copy(update={"plan": plan}))
+                    kind="proposal", submission=submission.model_copy(update={"plan": plan})
                 ),
                 usage=producer.usage,
                 feedback=producer.feedback,
@@ -1081,6 +1078,29 @@ async def test_status_query_reports_bounds_deadline_and_phase_timeline(
     assert [(entry["session"], entry["round"]) for entry in status["timeline"]][1:4] == [(1, 1)] * 3
     moments = [datetime.fromisoformat(entry["at"]) for entry in status["timeline"]]
     assert moments == sorted(moments) and moments[0] >= started
+    # The recorded result carries the same transitions up to finalization, so offline
+    # inspection can show phase durations after the workflow has closed.
+    recorded = [entry.model_dump(mode="json") for entry in result.timeline]
+    assert [entry["phase"] for entry in recorded] == [
+        "prepare",
+        "producer",
+        "evidence",
+        "audit",
+        "record",
+    ]
+    assert [entry.at for entry in result.timeline] == moments[:-1]
+    assert [(entry.session, entry.round) for entry in result.timeline] == [
+        (0, 0),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+    ]
+    assert result.result_artifact is not None
+    committed = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert committed.timeline == result.timeline
 
 
 async def test_status_query_reports_the_last_feedback_gate_per_round(

@@ -19,6 +19,15 @@ just -- eval-agent auditor evals/datasets/auditor-dev.json \
   --settings /path/to/settings.json --repeats 3
 ```
 
+Validate the frozen manifests first; it takes well under a second and needs no provider, Docker or Temporal:
+
+```bash
+uv run --locked corsair dataset validate evals/datasets/producer-dev.json \
+  evals/datasets/auditor-dev.json evals/datasets/dev.json
+```
+
+It verifies each entry's digests, input contract, source snapshot digest, the pre-model target-binding gate and the oracle's internal consistency, and prints the dataset digest and cohort membership to record with the run (see the [CLI reference](../reference/cli.md#dataset-validate-dataset)). A failure there would otherwise surface only on the rig.
+
 `just eval-agent` invokes the installed module. The producer invocation admits an immutable local snapshot for source reads but does not run the target or any probe code on the host. The auditor invocation has no tools. Raw reports belong under ignored `.runs/`; retain sanitized baselines and experiment notes under [`evals/baselines/`](../../evals/baselines/) and [`evals/experiments/`](../../evals/experiments/).
 
 Each frozen fixture input and oracle is read and digest-verified before use. The evaluator keeps its oracle local: it passes only the role input to the factory and compares the returned typed output outside the agent boundary. The producer diagnostic checks the exact canonical control payload and an allowed candidate payload; it is not semantic-equivalence or vulnerability-accuracy scoring. The auditor diagnostic checks its decision on the supplied source/submission packet without an observation or expected label. The auditor's rubric names its rules `R1` mechanism, `R2` differential, `R3` production logic and `R4` disclosure, not echo; each auditor row records the returned `audit_decision` and the decisive `audit_rule` (`ALL` for an acceptance) so a rejection is attributable. The rule is model output. When an oracle holds only a `decision` (the dev and expanded cohorts), the rule is reported but not scored. When the oracle also names a `rule`, a row passes only when both match, and the right decision under the wrong rule is the separate match kind `rule_mismatch`.
