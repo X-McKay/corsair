@@ -221,7 +221,13 @@ if [ -f "$WORK/jacoco.xml" ]; then
             "$root"/*) rel="${module_file#"$root"/}" ;;
         esac
     done < <(jq -r '.recipe.source_roots[]' "$JOB")
+    # JaCoCo names packages by their "/"-separated path under the source root (e.g.
+    # "com/example") and the default package "", whereas dirname yields "." for a
+    # top-level source file. Querying "." would find nothing and void all coverage.
     pkg=$(dirname "$rel")
+    if [ "$pkg" = "." ]; then
+        pkg=""
+    fi
     src=$(basename "$rel")
     lines=$(xmllint --xpath \
         "//package[@name=\"$pkg\"]/sourcefile[@name=\"$src\"]/line[number(@ci)>0]/@nr" \
