@@ -1,8 +1,8 @@
 """Read-only navigation of committed results and their evidence receipts.
 
 Nothing here writes to the artifact store or decides a label. Listing and evidence views
-report what was committed; payloads, source excerpts, findings and driver jobs never leave
-the store through them.
+report what was committed; payloads, source excerpts, findings (beyond their declared and
+bound line numbers) and driver jobs never leave the store through them.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from corsair.contracts import (
     ArtifactRef,
     InvestigationResult,
     Observation,
+    PreparedCase,
     RoleObservation,
     Submission,
     digest,
@@ -126,6 +127,15 @@ def _role_receipt(
     return entry
 
 
+def _target_lines(store: ArtifactStore, raw_ref: object) -> dict[str, int | None] | None:
+    """The finding's declared line and the line the coverage gate bound it to."""
+    try:
+        prepared = PreparedCase.model_validate(store.get_json(ArtifactRef.model_validate(raw_ref)))
+    except (OSError, ValueError):
+        return None
+    return {"declared": prepared.finding.line, "bound": prepared.bound_line}
+
+
 def _observation_view(
     store: ArtifactStore,
     verifier: EvidenceVerifier,
@@ -151,6 +161,7 @@ def _observation_view(
         "gate": observation.feedback.gate if observation.feedback else None,
         "evidence_sha256": observation.artifact.sha256 if observation.artifact else None,
         "evidence": "absent",
+        "target_line": None,
         "receipts_admissible": None,
     }
     roles: Any = {}
@@ -166,6 +177,7 @@ def _observation_view(
             and isinstance(bundle.get("roles"), dict)
         ):
             view["evidence"], roles = "present", bundle["roles"]
+            view["target_line"] = _target_lines(store, bundle.get("prepared"))
         else:
             view["evidence"] = "unreadable"
     if submission is not None and result.manifest is not None:

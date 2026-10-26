@@ -807,11 +807,13 @@ class Terminal:
         for item in value["observations"]:
             name = "Fixed revision" if item["fixed"] else f"Session {item['session']}"
             name = name if item["fixed"] else f"{name} round {item['round']}"
+            target = item.get("target_line") or {}
             table = Table(
                 title=_text(f"{name} · {item['operation_id']}"),
                 caption=_text(
                     f"committed={item['committed']} · evidence={item['evidence']} · "
-                    f"admissible={item['receipts_admissible']} · gate={item['gate']}"
+                    f"admissible={item['receipts_admissible']} · gate={item['gate']} · "
+                    f"line declared={target.get('declared')} bound={target.get('bound')}"
                 ),
                 expand=True,
             )

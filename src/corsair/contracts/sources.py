@@ -181,3 +181,19 @@ class PreparedCase(Contract):
     fixed_source: ArtifactRef | None = None
     source_excerpt: str
     manifest: RunManifest
+    # The statement line the coverage gate binds to, chosen in code at prepare from
+    # finding.line over the admitted module (corsair.policies.line_binding). The
+    # declared line stays in finding.line. None in records made before line binding:
+    # the kernel then binds to finding.line itself.
+    target_line: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def target_line_needs_a_declared_line(self):
+        if self.target_line is not None and self.finding.line is None:
+            raise ValueError("a bound target line needs a declared finding line")
+        return self
+
+    @property
+    def bound_line(self) -> int | None:
+        """The exact line the kernel requires in both runs: bound, else declared."""
+        return self.finding.line if self.target_line is None else self.target_line

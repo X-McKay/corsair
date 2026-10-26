@@ -55,7 +55,7 @@ InvestigationRequest
 
 ## Prepared case, manifest, and artifacts
 
-A **prepared case** is worker-derived after source admission. `PreparedCase` holds the case identity, finding, recipe, source artifact reference, optional fixed-source artifact reference, a bounded source excerpt, and a manifest. It is not an alternate request format.
+A **prepared case** is worker-derived after source admission. `PreparedCase` holds the case identity, finding, recipe, source artifact reference, optional fixed-source artifact reference, a bounded source excerpt, a manifest, and `target_line`: the line the coverage gate requires, bound in code at prepare from the declared `finding.line` (`null` in records made before line binding, where the kernel uses the declared line). It is not an alternate request format.
 
 A **run manifest** (`corsair.manifest/1`) binds a run to its request and configuration digests, producer/auditor prompt digests, immutable image ID, chosen model names, and recorded capabilities. It records run provenance; it is not a mutable settings document and does not carry credentials.
 
