@@ -10,7 +10,7 @@ These conventions apply to current implementation work. They describe how to pre
 | `contracts/` | Canonical SDK-free Pydantic models, including the evaluator-only `Oracle` and dataset schemas | Vendor SDK types or duplicate wire models |
 | `ports/` | Narrow domain interfaces over contracts | Adapter imports or provider registries |
 | `adapters/` | Implemented ADK, local source, Docker, filesystem, and Temporal integrations | Unimplemented remote-SCM, Bedrock, or HTTP placeholders |
-| `entrypoints/` | CLI, typed Python API, worker, diagnostics, and terminal presentation | A second scheduler or workflow engine |
+| `entrypoints/` | CLI, typed Python API, worker, diagnostics, and terminal presentation (`terminal.py` dispatch, `render/` views) | A second scheduler or workflow engine |
 | `workflows/` | Deterministic Temporal coordination | Filesystem, model, network, or Docker I/O |
 | `steps/` | Ordinary activities, evidence verification, manifests | Alternative durable orchestration |
 | `policies/` | The pure kernel: gate order, verdict table, fix decisions and risk material | Trusted observation generation |

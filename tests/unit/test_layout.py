@@ -166,3 +166,17 @@ def test_explicit_json_payload_types_preserve_all_supported_wire_values(value):
     schema = Submission.model_json_schema()
     assert "anyOf" in schema["properties"]["control_payload"]
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False
+
+
+def test_render_package_has_exactly_the_view_modules_the_components_page_names():
+    page = (ROOT / "docs/architecture/components.md").read_text()
+    section = page.split("## Terminal presentation", 1)[1]
+    documented = {
+        line.split("|")[1].strip().strip("`")
+        for line in section.splitlines()
+        if line.startswith("| `")
+    }
+    package = ROOT / "src/corsair/entrypoints/render"
+    modules = {path.stem for path in package.glob("*.py") if path.stem != "__init__"}
+
+    assert documented == modules

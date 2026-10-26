@@ -341,7 +341,7 @@ def test_runs_parser_defaults_to_an_unfiltered_listing():
 
 
 def test_evidence_caption_marks_a_derived_target_line() -> None:
-    from corsair.entrypoints.terminal import _target_caption
+    from corsair.entrypoints.render.runs import _target_caption
 
     assert _target_caption({"target_line": None, "line_provenance": None}) == ""
     assert _target_caption({"target_line": 4, "line_provenance": "declared"}) == " · target=L4"
@@ -351,7 +351,7 @@ def test_evidence_caption_marks_a_derived_target_line() -> None:
 
 
 def test_evidence_caption_names_the_declared_line_a_binding_moved() -> None:
-    from corsair.entrypoints.terminal import _target_caption
+    from corsair.entrypoints.render.runs import _target_caption
 
     moved = {"target_line": 4, "declared_line": 3, "line_provenance": "declared"}
     assert _target_caption(moved) == " · target=L4 (declared L3, bound to its reported statement)"
