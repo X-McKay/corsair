@@ -19,6 +19,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
+from corsair.evaluation.ledger import gate_ledger, ledger_counts, verified_rounds
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
@@ -230,6 +231,7 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         **usage_metrics(result),
         "config_digest": result.manifest.config_digest if result.manifest else None,
         "reason": result.reason,
+        "gate_ledger": gate_ledger(result, verified_rounds(result, store)),
     }
 
 
@@ -284,6 +286,14 @@ def summarize(rows: list[dict]) -> dict:
         "input_tokens": _sum_known_counts(row.get("input_tokens") for row in rows),
         "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
+        # Every recorded stop, then the final stop of each failed row: where accuracy
+        # was lost. Rows without a ledger (unavailable, agent-only) contribute nothing.
+        "gate_ledger": ledger_counts(row.get("gate_ledger") or [] for row in rows),
+        "failure_stops": ledger_counts(
+            row["gate_ledger"][-1:]
+            for row in rows
+            if row.get("status") == "fail" and row.get("gate_ledger")
+        ),
     }
 
 
