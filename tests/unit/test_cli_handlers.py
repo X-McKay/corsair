@@ -107,13 +107,13 @@ def _stderr_events(stderr: str) -> list[dict[str, object]]:
 
 
 @pytest.mark.usefixtures("restored_logging")
-def test_main_reports_a_saved_summary_with_exit_zero(tmp_path, monkeypatch, capsys):
+def test_main_reports_a_saved_report_with_exit_zero(tmp_path, monkeypatch, capsys):
     report = tmp_path / "report.json"
     report.write_text(json.dumps({"rows": [], "summary": {"attempts": 2, "failed": 0}}))
 
     assert _main(monkeypatch, "report", str(report)) == 0
     captured = capsys.readouterr()
-    assert json.loads(captured.out) == {"attempts": 2, "failed": 0}
+    assert json.loads(captured.out) == {"rows": [], "summary": {"attempts": 2, "failed": 0}}
     assert captured.err == ""
 
 
