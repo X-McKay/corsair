@@ -175,3 +175,40 @@ def test_match_kind_does_not_change_exact_pass_rule_or_totals(tmp_path):
     assert summarize(rows)["attempts"] == 6
     assert summarize(rows)["passed"] == 2
     assert summarize(rows)["failed"] == 4
+
+
+def test_auditor_row_attributes_the_decisive_rubric_rule_without_changing_the_pass_rule(
+    tmp_path,
+):
+    store = ArtifactStore(tmp_path)
+
+    def row(output: AuditOutput | ProducerOutput, agent: str, oracle: dict) -> dict:
+        return fixture_score_row(
+            output,
+            oracle,
+            identity="run1",
+            case_id="audit02",
+            repeat=0,
+            agent=agent,
+            settings=Settings(),
+            store=store,
+        )
+
+    rejected = AuditOutput(
+        review=AuditResult(decision=AuditDecision.REJECT, rule="R1", reason="false mechanism")
+    )
+    # A model-chosen rule never decides the pass: a REJECT matches a REJECT oracle
+    # whatever id it cites, and mismatches an ACCEPT oracle.
+    assert row(rejected, "auditor", {"decision": "REJECT"})["status"] == "pass"
+    mismatch = row(rejected, "auditor", {"decision": "ACCEPT"})
+    assert mismatch["status"] == "fail"
+    assert (mismatch["audit_decision"], mismatch["audit_rule"]) == ("REJECT", "R1")
+    invalid = row(AuditOutput(usage=Usage(llm_calls=2)), "auditor", {"decision": "ACCEPT"})
+    assert invalid["audit_decision"] is None and invalid["audit_rule"] is None
+    produced = row(
+        _producer_output(),
+        "producer",
+        {"control_payload": "control", "candidate_payloads": ["candidate"]},
+    )
+    assert produced["audit_decision"] is None and produced["audit_rule"] is None
+    assert json.loads(json.dumps({"rows": [mismatch]}))["rows"][0]["audit_rule"] == "R1"
