@@ -56,6 +56,18 @@ def test_retry_feedback_forwards_only_the_structural_audit_rejection():
     assert feedback.reason == "reviewed"
 
 
+def test_retry_feedback_depends_on_the_audit_alone():
+    """ADR 0005: no run fact may reach the producer on retry, not even a control-role
+    one, because a healthy-control signal reveals the exploit outcome by elimination.
+    The function therefore accepts only the audit output."""
+    import inspect
+
+    from corsair.contracts import AuditOutput
+
+    parameters = list(inspect.signature(_retry_feedback).parameters.values())
+    assert [(p.name, p.annotation) for p in parameters] == [("audit", AuditOutput)]
+
+
 # --- finding 2: a later terminal failure is not masked by an earlier round -----
 
 

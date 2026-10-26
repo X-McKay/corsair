@@ -23,6 +23,7 @@ Recorded architecture decisions describe implemented choices:
 2. [Canonical Pydantic contracts and narrow ports](architecture/decisions/0002-pydantic-contracts-and-ports.md).
 3. [Immutable native evidence](architecture/decisions/0003-immutable-native-evidence.md).
 4. [Payload pair, coverage-gated kernel, and six labels](architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md).
+5. [Outcome-blind retry feedback carries no role-attributed run fact](architecture/decisions/0005-outcome-blind-retry-feedback.md) (proposed).
 
 ## Development
 
