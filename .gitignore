@@ -57,3 +57,7 @@ result-*
 !.claude/skills/corsair-development
 !.claude/skills/corsair-evaluations
 .codex/
+
+# Experiment-loop worktrees
+.worktrees/
+.claude/worktrees/
