@@ -62,7 +62,7 @@ def test_case_rejects_a_recipe_bound_to_a_different_file() -> None:
         )
 
 
-def test_smart_union_routes_c_and_python_without_a_declared_discriminator() -> None:
+def test_discriminated_union_routes_c_and_python() -> None:
     c_json = _case(CRecipe(module_file="dup.c", function="dup_n")).model_dump_json()
     py = PythonRecipe(module_file="t.py", function="read_file", payload_parameter="path")
     py_case = Case(
@@ -77,8 +77,8 @@ def test_smart_union_routes_c_and_python_without_a_declared_discriminator() -> N
 
 
 def test_frozen_python_fixture_without_kind_still_routes_to_python() -> None:
-    # The pre-tag Python fixtures omit "kind"; the smart union must keep accepting them
-    # so their pinned dataset digests never need to change.
+    # The pre-tag Python fixtures omit "kind"; the callable discriminator defaults a
+    # tag-less payload to the Python recipe so their pinned dataset digests never change.
     raw = json.loads(Path("evals/fixtures/case01/request.json").read_bytes())
     assert "kind" not in raw["case"]["recipe"]
     request = InvestigationRequest.model_validate(raw)

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
@@ -108,16 +108,26 @@ class PythonRecipe(Contract):
         return self
 
 
-# A concrete, tested second recipe exists, so the recipe binding is a Pydantic union with
-# a stable ``kind`` tag on each member; the kernel reads ``recipe.kind`` to resolve image
-# and driver. This is Pydantic's smart union rather than ``Field(discriminator="kind")``
-# on purpose: the frozen Python fixtures predate the tag and omit ``kind``, and a declared
-# discriminator cannot fall back to a member default for a missing tag, so it would reject
-# them and force a rewrite of their pinned dataset digests. The members disambiguate
-# unambiguously without the tag — each forbids extra fields, PythonRecipe requires
-# ``payload_parameter`` while CRecipe requires a ``.c`` ``module_file`` and forbids the
-# Python-only fields — so smart matching routes every input to exactly one member.
-Recipe = PythonRecipe | CRecipe
+def _recipe_kind(value: Any) -> str:
+    """Discriminator tag for a recipe payload or model, defaulting to the Python recipe.
+
+    The frozen Python fixtures predate the ``kind`` tag and omit it, and their dataset
+    digests are pinned. A callable discriminator lets a tag-less payload read as
+    ``python.secret_disclosure/1`` while a tagged payload routes by its ``kind``, so new
+    runtimes add a member here without rewriting any frozen request.
+    """
+    kind = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    return kind if isinstance(kind, str) else "python.secret_disclosure/1"
+
+
+# A concrete, tested second recipe exists, so the recipe binding is a discriminated Pydantic
+# union on the stable ``kind`` tag (the ProducerDecision pattern); the kernel reads
+# ``recipe.kind`` to resolve image and driver. New runtimes add one member below.
+Recipe = Annotated[
+    Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[CRecipe, Tag("c.integer_overflow/1")],
+    Discriminator(_recipe_kind),
+]
 
 
 class Case(Contract):
