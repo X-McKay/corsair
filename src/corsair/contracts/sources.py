@@ -122,17 +122,30 @@ class Case(Contract):
         return self
 
 
+DEFAULT_MAX_OUTPUT_TOKENS = 12288
+
+
 class Budget(Contract):
-    # Defaults are sized for a thinking model on a live provider: a producer episode
-    # must cover reading several files AND submitting a pair (episode_llm_calls), the
-    # case budget must leave room for a second independent session (max_llm_calls),
-    # and the answer budget must sit well above a model's reasoning spend
-    # (max_output_tokens) or the submission is truncated to MAX_TOKENS.
+    """Bounded per-request limits for one investigation.
+
+    Defaults are sized for a thinking model on a live provider: a producer episode
+    must cover reading several files AND submitting a pair (``episode_llm_calls``),
+    and the case budget must leave room for a second independent session
+    (``max_llm_calls``).
+
+    ``max_output_tokens`` caps every individual model request, for the producer and
+    for the auditor alike (the workflow passes the same value into ``AuditInput``).
+    On a thinking model the provider counts reasoning tokens against that same cap,
+    so it must sit well above the model's reasoning spend plus the structured answer.
+    A final response that stops at the cap is reported as the operational
+    ``provider_max_tokens`` gate, never parsed into a decision or review.
+    """
+
     max_rounds: int = Field(default=3, ge=1, le=16)
     max_llm_calls: int = Field(default=48, ge=2, le=128)
     episode_llm_calls: int = Field(default=12, ge=1, le=32)
     max_tool_calls: int = Field(default=48, ge=1, le=256)
-    max_output_tokens: int = Field(default=12288, ge=256, le=16384)
+    max_output_tokens: int = Field(default=DEFAULT_MAX_OUTPUT_TOKENS, ge=256, le=16384)
     max_elapsed_seconds: int = Field(default=900, ge=30, le=3600)
     probe_timeout_seconds: int = Field(default=30, ge=1, le=300)
     tool_output_bytes: int = Field(default=32768, ge=1024, le=131072)

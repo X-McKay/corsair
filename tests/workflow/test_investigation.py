@@ -205,6 +205,28 @@ async def test_auditor_receives_only_remaining_root_budgets(
     ] == [(2, 2), (2, 1), (1, 0)]
 
 
+async def test_producer_and_auditor_share_the_request_output_cap(
+    temporal_server, temporal_artifact_store
+):
+    """Both roles get the request's own per-request output cap, reasoning included:
+    the auditor's cap is not a separate, smaller value than the producer's."""
+
+    budget = _three_round_budget().model_copy(update={"max_output_tokens": 3072})
+    request = investigation_request("shared-output-cap", budget=budget)
+    async with temporal_server.worker(temporal_artifact_store) as (task_queue, activities):
+        await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("shared-output-cap"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert activities.producer_inputs and activities.audit_inputs
+    assert {item.budget.max_output_tokens for item in activities.producer_inputs} == {3072}
+    assert {item.max_output_tokens for item in activities.audit_inputs} == {3072}
+
+
 async def test_auditor_usage_cannot_exceed_its_admitted_remaining_budget(
     temporal_server, temporal_artifact_store
 ):
