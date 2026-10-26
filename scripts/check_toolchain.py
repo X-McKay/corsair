@@ -178,8 +178,11 @@ def check_providers_extra(root: Path, config: dict[str, str] | None) -> Finding 
 
 
 def toolchain_findings(
-    root: Path, uv_python: str | None, *, platform: str = sys.platform, ld_library_path: str = ""
+    root: Path, uv_python: str | None, *, platform: str | None = None, ld_library_path: str = ""
 ) -> list[Finding]:
+    # Resolved at call time: a definition-time ``sys.platform`` default froze the importing
+    # host's value, so a Darwin runner skipped the Linux library-gap check the tests substitute.
+    platform = sys.platform if platform is None else platform
     config = venv_config(root)
     findings = [
         check_just(),
