@@ -77,6 +77,11 @@ def test_default_just_lists_recipes_without_running_side_effects():
             ],
         ),
         (
+            "eval-intake",
+            ["data set's.json", "--output", "report $(touch SHOULD_NOT_EXIST).json"],
+            ["run", "--locked", "python", "-m", "corsair.evaluation.intake"],
+        ),
+        (
             "live-agent",
             [
                 "auditor",

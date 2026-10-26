@@ -554,6 +554,8 @@ class Terminal:
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
             self._runs(rendered)
+        elif isinstance(rendered, dict) and {"intake", "findings"} <= set(rendered):
+            self._intake(rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:
             self._evidence(rendered)
         elif isinstance(rendered, dict) and "checks" in rendered:
@@ -849,6 +851,47 @@ class Terminal:
         if value["invalid_records"]:
             self.out.print(
                 Text(f"{value['invalid_records']} committed record(s) could not be read")
+            )
+
+    def _intake(self, value: dict[str, Any]) -> None:
+        """Render a scanner-intake dry run: one row per finding, admissible or why blocked."""
+        table = Table(expand=True)
+        for column in ("#", "File", "Line", "Outcome", "Detail"):
+            # Outcome labels stay whole; paths and details fold, never truncate.
+            table.add_column(column, overflow="fold", no_wrap=column in {"#", "Outcome"})
+        for row in value["findings"]:
+            line = "-" if row["line"] is None else str(row["line"])
+            if row["line_provenance"] == "recipe_function":
+                line += " (derived)"
+            outcome = str(row["outcome"])
+            table.add_row(
+                _text(row["index"]),
+                _text(row["file"] or "-"),
+                _text(line),
+                Text(
+                    safe_text(outcome), style="green" if outcome.startswith("admissible") else "red"
+                ),
+                _text(row["detail"]),
+            )
+        intake, counts = value["intake"], value["counts"]
+        title = f"Corsair · Intake {safe_text(intake['report'])}"
+        self.out.print(Panel(table, title=title, border_style="cyan"))
+        summary = (
+            f"{counts['admissible']} of {counts['findings']} finding(s) admissible "
+            f"({counts['admissible_derived_line']} with a line derived from the recipe function)"
+            f" · source {_short(str(intake['source_digest']))}"
+        )
+        self.out.print(_text(summary))
+        if not intake["report_admitted"]:
+            self.out.print(
+                _text(
+                    "load_scan_report rejects this report as a whole: a finding fails the "
+                    "ScanReport contract. Fix or drop it before admitting the report."
+                )
+            )
+        if intake["recipe_template"] is None and counts["blocked_reasons"].get("recipe_missing"):
+            self.out.print(
+                _text("Pass --recipe-template with the function and payload parameter to bind.")
             )
 
     def _evidence(self, value: dict[str, Any]) -> None:

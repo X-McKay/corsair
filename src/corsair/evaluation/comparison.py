@@ -43,8 +43,8 @@ def read_report(path: Path) -> dict[str, Any]:
 
 
 def row_label(row: dict[str, Any]) -> str | None:
-    """The canonical verdict, else the disposition, else an isolated match kind."""
-    for field in ("verdict", "disposition", "match_kind"):
+    """The canonical verdict, else the disposition, an isolated match kind or intake outcome."""
+    for field in ("verdict", "disposition", "match_kind", "intake"):
         value = row.get(field)
         if isinstance(value, str):
             return value

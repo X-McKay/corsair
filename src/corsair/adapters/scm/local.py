@@ -18,13 +18,12 @@ from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     ArtifactRef,
     Case,
-    LineProvenance,
     PreparedCase,
     RunManifest,
     Source,
     safe_path,
 )
-from corsair.policies.target_binding import derive_target_line
+from corsair.policies.target_binding import bind_target_line
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
@@ -438,14 +437,9 @@ def prepare_case(
     )
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
-    finding, provenance = case.finding, LineProvenance.DECLARED
-    if finding.line is None:
-        # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
-        # admitted text. The line comes from the trusted recipe, never the narrative.
-        derived = derive_target_line(case.recipe, finding_text)
-        if derived is not None:
-            finding = finding.model_copy(update={"line": derived})
-            provenance = LineProvenance.RECIPE_FUNCTION
+    # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
+    # admitted text. A missing line comes from the trusted recipe, never the narrative.
+    finding, provenance = bind_target_line(case.finding, case.recipe, finding_text)
     return PreparedCase(
         case_id=case.case_id,
         finding=finding,

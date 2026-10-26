@@ -101,6 +101,10 @@ eval dataset *args:
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
 
+# Score a frozen scanner-intake dataset (evals/datasets/intake.json); no model, container or service.
+eval-intake dataset *args:
+    uv run --locked python -m corsair.evaluation.intake "$@"
+
 # Live isolated eval with .state/settings.json; record in .runs/live. Optional BASELINE report, --dry-run.
 live-agent role dataset *args:
     uv run --locked --extra providers python scripts/live_eval.py agent "$@"

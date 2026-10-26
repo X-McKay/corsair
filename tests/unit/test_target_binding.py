@@ -21,6 +21,7 @@ from corsair.contracts import (
 )
 from corsair.policies.target_binding import (
     TargetBindingReason,
+    bind_target_line,
     derive_target_line,
     target_binding,
 )
@@ -385,3 +386,14 @@ async def test_prepare_still_blocks_a_line_less_finding_it_cannot_bind(tmp_path)
         await ActivityEnvironment().run(activities.prepare, request)
     assert rejected.value.type == "PREPARE_BLOCKED"
     assert "target_binding line_missing" in str(rejected.value)
+
+
+def test_bind_target_line_keeps_a_declared_line_and_derives_only_a_missing_one():
+    """The one binding prepare and the intake dry run share."""
+    declared = _finding(3)
+    assert bind_target_line(declared, _recipe(), READER) == (declared, LineProvenance.DECLARED)
+    derived, provenance = bind_target_line(_finding(None), _recipe(), READER)
+    assert (derived.line, provenance) == (4, LineProvenance.RECIPE_FUNCTION)
+    one_line = "def read_file(root, path): pass\n"
+    unbound, provenance = bind_target_line(_finding(None), _recipe(), one_line)
+    assert (unbound.line, provenance) == (None, LineProvenance.DECLARED)

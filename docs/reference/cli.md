@@ -264,6 +264,22 @@ The comparison is refused (exit `2`) when the dataset digests differ or either r
 
 The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output opens with a `gates moved` line, renders the per-gate table and lists only attempts whose status, label, forbidden flag or presence changed, with their final stop; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts`, `summary_delta` and `gate_delta`. `--format markdown` writes the result line, the caveats (a dataset mismatch first), an identity table per side (report path, dataset digest, config digests, cohorts), the counts, the summary deltas, the regressions and the changed attempts with their usage deltas; a side an attempt is missing from is `absent`. The exit codes are the same in every format.
 
+### `intake REPORT --source-root DIR [--recipe-template FILE]`
+
+```bash
+corsair intake evals/fixtures/scan_reports/python-reader-mixed.json \
+  --source-root evals/datasets/intake/reader-source \
+  --recipe-template evals/datasets/intake/recipe-read-file.json
+corsair --format json intake scan.json --source-root src --recipe-template recipe.json \
+  | jq '.findings[] | select(.request) | .request'
+```
+
+A dry run of [scanner intake](../guides/integration.md#dry-run-a-scan-report-corsair-intake): for each finding of a `corsair.scan_report/1` report it builds the candidate request a scanner finding would become and decides, without a model, Temporal or a container, whether the prepare activity would admit it. `--source-root DIR` is the findings' source tree (the request's `source.path`); it is admitted exactly as prepare admits it, so it must lie below the settings `source_root` (the current directory by default) and pass the same symlink, special-file and size checks. `--recipe-template FILE` is the operator's recipe: a `PythonRecipe` object without `module_file`, which intake binds to each finding's `file`. Nothing is read from a finding's description.
+
+Each finding is `admissible` (its declared line binds), `admissible:recipe_function` (a line-less finding whose line prepare derives from the recipe function) or `blocked:REASON`. Reasons before binding are `path_unsafe` (the file is absolute or leaves the tree), `finding_invalid` (any other contract failure), `unsupported_language` (not a `.py` module; Python is the only running runtime), `file_absent`, `source_not_utf8`, `recipe_missing` (no `--recipe-template`) and `recipe_invalid`; the rest are the pre-model [`target_binding`](../../src/corsair/policies/target_binding.py) reasons (`line_missing`, `line_out_of_range`, `module_unparseable`, `function_not_defined`, `function_async`, `payload_parameter_unknown`, `fixed_kwarg_unknown`, `required_parameter_unbound`). Human output is one table row per finding (index, file, line with `(derived)` for a recipe-derived line, outcome, detail) and a count line. `--format json` emits `intake` (report, source path, `source_digest`, template, and `report_admitted`: false when a finding fails the `ScanReport` contract, so `load_scan_report` would reject the whole report), `counts` (findings, admissible, admissible with a derived line, blocked, and blocked reasons) and `findings`, where each admissible finding carries its complete candidate `request` with the snapshot digest pinned as `source.expected_digest`. The command exits `0` when every finding is admissible and `1` when any is blocked; a malformed report, template or source fails with exit `2` and a remedy.
+
+To measure intake against a frozen dataset, run `just eval-intake evals/datasets/intake.json` (`--output PATH`, default `.runs/evaluations/intake-*.json`). It verifies every report, template, oracle and source-snapshot digest, scores each finding's outcome against its oracle, and saves an ordinary report that `corsair report` and `corsair compare` read: one row per finding, labelled by its outcome, whose gate ledger entry is that outcome; `llm_calls` and token counts are measured zeros. It exits `1` when any finding disagrees with its oracle.
+
 ## Watching and recovery
 
 A native activity records an immutable intent before its Docker side effect and reconciles a committed observation by identity. A committed observation can be recovered from the artifact root. An intent with no committed observation is uncertain—even if no container remains—and is not safe to replay automatically.
@@ -287,7 +303,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. `runs` and `inspect` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression, or an `intake` dry run blocked a finding. `runs` and `inspect` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 

@@ -1,0 +1,14 @@
+{
+  "function": "read_file",
+  "payload_parameter": "path",
+  "fixed_kwargs": {
+    "root": "/fixtures/allowed"
+  },
+  "public_files": {
+    "hello.txt": "hello"
+  },
+  "expected_control": "hello",
+  "allowed_exceptions": [
+    "builtins.ValueError"
+  ]
+}

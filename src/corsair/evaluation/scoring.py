@@ -84,7 +84,7 @@ def dataset_root(path: Path) -> Path:
     return parent.parent if parent.name == "datasets" else parent
 
 
-def _read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
+def read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
     """Read once and verify the exact bytes that the evaluator will parse."""
     path = (root / relative).resolve()
     if not path.is_relative_to(root) or not path.is_file():
@@ -107,10 +107,10 @@ def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[
         if entry.family in family_splits and family_splits[entry.family] != entry.split:
             raise ValueError("related family variants may not cross dataset splits")
         family_splits[entry.family] = entry.split
-        request_path, request_bytes = _read_frozen_file(
+        request_path, request_bytes = read_frozen_file(
             root, entry.request, entry.request_digest, "request"
         )
-        _, oracle_bytes = _read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
+        _, oracle_bytes = read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
         request = InvestigationRequest.model_validate_json(request_bytes)
         if request.case.case_id != entry.case_id:
             raise ValueError("dataset and request case identities disagree")

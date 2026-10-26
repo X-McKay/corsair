@@ -4,6 +4,7 @@ Corsair's executable evaluators are installed package code, shared with the CLI 
 
 - [Isolated agent evaluator](../../src/corsair/evaluation/agents.py) invokes the actual producer/auditor factory against digest-verified frozen inputs. The producer diagnostic uses exact canonical payload matching; the auditor diagnostic compares its typed review decision. Oracles stay local to the evaluator, outside agent inputs.
 - [Domain scorer](../../src/corsair/evaluation/scoring.py) validates persisted native evidence, binds case/configuration/scope, checks oracle dispositions and fixed-result evidence, and retains invalid positives, operational errors and unavailable results in the report denominator. It is the same scorer used by eval/rescore, not another grading engine.
+- [Intake evaluator](../../src/corsair/evaluation/intake.py) scores the frozen scanner-intake dataset (`intake.json`): it admits each digest-pinned source tree, converts every scan-report finding to a candidate request and compares its admissibility outcome (`admissible`, `admissible:recipe_function` or `blocked:REASON`) with an external per-finding oracle. It runs no model, container or service; `corsair intake` is the same assessment on one report without an oracle.
 
 ## Candidate expanded diagnostics
 

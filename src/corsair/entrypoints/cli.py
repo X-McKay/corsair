@@ -57,6 +57,8 @@ class CliArguments(argparse.Namespace):
     limit: int | None
     evidence: bool
     model: bool
+    source_root: str
+    recipe_template: str | None
 
 
 def validate_run_id(value: str) -> str:
@@ -384,6 +386,18 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
+async def _handle_intake(args: CliArguments, ui: Terminal) -> int:
+    """Dry-run scanner intake: which findings would become admissible requests, and why not."""
+    from corsair.evaluation.intake import intake_receipt
+
+    template = Path(args.recipe_template) if args.recipe_template else None
+    receipt, intakes = intake_receipt(
+        Path(args.report), Path(args.source_root), _settings(args), template
+    )
+    ui.emit(receipt)
+    return 0 if intakes and all(item.admissible for item in intakes) else 1
+
+
 async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     """List committed results from the artifact store without contacting services."""
     from corsair.adapters.storage.filesystem import ArtifactStore
@@ -407,6 +421,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "investigate": _handle_investigate,
     "eval": _handle_eval,
     "rescore": _handle_rescore,
+    "intake": _handle_intake,
 }
 
 
@@ -481,6 +496,8 @@ def parser() -> argparse.ArgumentParser:
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
+        "intake": "Dry-run a scanner report: which findings become admissible requests; "
+        "no model or container",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -533,6 +550,17 @@ def parser() -> argparse.ArgumentParser:
         "--allow-dataset-mismatch",
         action="store_true",
         help="Compare reports over different or undeclared frozen dataset digests",
+    )
+    intake = commands["intake"]
+    intake.add_argument("report", help="Scanner report JSON (corsair.scan_report/1)")
+    intake.add_argument(
+        "--source-root",
+        required=True,
+        help="The findings' source tree (a request's source.path), admitted under source_root",
+    )
+    intake.add_argument(
+        "--recipe-template",
+        help="Operator recipe JSON without module_file; intake binds it to each finding's file",
     )
     return root
 

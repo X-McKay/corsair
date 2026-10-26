@@ -1,0 +1,7 @@
+{
+  "expected": [
+    "blocked:path_unsafe",
+    "blocked:path_unsafe",
+    "admissible"
+  ]
+}
