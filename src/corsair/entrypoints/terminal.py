@@ -19,7 +19,6 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
-from temporalio.service import RPCError, RPCStatusCode
 
 from corsair.contracts import (
     AuditDecision,
@@ -184,18 +183,22 @@ def failure_remedy(error: BaseException) -> str | None:
         return _IMAGE_REMEDY
     if _module_error(error, "docker.errors", "DockerException"):
         return _DOCKER_REMEDY
-    if isinstance(error, RPCError):
-        if error.status == RPCStatusCode.NOT_FOUND and text.startswith("Namespace"):
+    if _module_error(error, "temporalio.service", "RPCError"):
+        # Already loaded whenever an RPCError exists; importing it eagerly costs ~0.3 s.
+        from temporalio.service import RPCError, RPCStatusCode
+
+        status = cast(RPCError, error).status
+        if status == RPCStatusCode.NOT_FOUND and text.startswith("Namespace"):
             return (
                 "Create the namespace (`temporal operator namespace create`) or set "
                 "temporal_namespace in --settings."
             )
-        if error.status == RPCStatusCode.NOT_FOUND:
+        if status == RPCStatusCode.NOT_FOUND:
             return (
                 "Check the run id and temporal_namespace; `temporal workflow list` shows "
                 "existing runs."
             )
-        if error.status in {RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED}:
+        if status in {RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED}:
             return _TEMPORAL_REMEDY
         return None
     if isinstance(error, RuntimeError) and text.startswith("Failed client connect"):

@@ -11,7 +11,8 @@ from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.adapters.temporal.client import connect
-from corsair.observability.logging import LifecycleLoggingInterceptor, event
+from corsair.observability.lifecycle import LifecycleLoggingInterceptor
+from corsair.observability.logging import event
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.evaluation import EvaluationWorkflow

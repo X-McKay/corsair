@@ -870,3 +870,50 @@ async def test_animated_wait_draws_the_live_panel_on_stderr(monkeypatch):
     assert result == "final"
     assert "Corsair · Evaluation" in frame
     assert "evidence" in frame and "2/4" in frame
+
+
+def _modules_loaded_by_cli(tmp_path: Path, *arguments: str) -> set[str]:
+    """Run the actual CLI entrypoint in a fresh interpreter and list the modules it loaded."""
+    probe = (
+        "import json, sys\n"
+        "from corsair.entrypoints.cli import main\n"
+        "try:\n"
+        "    main()\n"
+        "except SystemExit:\n"
+        "    print(json.dumps(sorted(sys.modules)), file=sys.stderr)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe, *arguments],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        cwd=tmp_path,
+    )
+    return set(json.loads(result.stderr.splitlines()[-1]))
+
+
+def _loads(modules: set[str], prefix: str) -> bool:
+    return any(name == prefix or name.startswith(f"{prefix}.") for name in modules)
+
+
+@pytest.mark.parametrize("arguments", [["--version"], ["--help"], ["unknown-command"]])
+def test_parser_exits_load_no_presentation_contract_or_sdk_modules(tmp_path, arguments):
+    modules = _modules_loaded_by_cli(tmp_path, *arguments)
+
+    for prefix in ("rich", "pydantic", "temporalio", "docker", "corsair.contracts"):
+        assert not _loads(modules, prefix), prefix
+
+
+@pytest.mark.parametrize("command", ["report", "compare"])
+def test_saved_report_commands_load_no_runtime_sdks(tmp_path, command):
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps({"summary": {"passed": 1, "failed": 0}, "rows": []}))
+    reports = [str(report)]
+    if command == "compare":
+        reports += [str(report), "--allow-dataset-mismatch"]
+
+    modules = _modules_loaded_by_cli(tmp_path, "--format", "json", command, *reports)
+
+    assert _loads(modules, "corsair.evaluation.comparison")
+    for prefix in ("temporalio", "docker", "corsair.steps", "corsair.adapters.sandboxing"):
+        assert not _loads(modules, prefix), prefix
