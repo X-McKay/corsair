@@ -1,0 +1,14 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "java-xxe-b",
+      "family": "xxe",
+      "split": "chain",
+      "request": "datasets/chain/java/xxe-b/v3/request.json",
+      "oracle": "datasets/chain/java/xxe-b/v3/oracle.json",
+      "request_digest": "bf4a31833f7821ffa9a094b0afb78478be57add4f27c5c4ddf380669493293b8",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    }
+  ]
+}

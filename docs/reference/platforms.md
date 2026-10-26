@@ -44,3 +44,7 @@ Python's default macOS temp tree can fall outside Colima's shared mounts. `TMPDI
 Do not use privileged targets, mount the Docker socket into target containers or relax the read-only, dropped-capability, no-new-privileges, offline-network, resource or cleanup policies to obtain a pass. Source admission remains on the host; container execution remains in the Linux VM.
 
 The implementation sandbox is Linux ARM, outside the requested matrix. Its local full-suite results are regression evidence; target-platform qualification comes from the actual Linux amd64/macOS arm64 CI jobs. See [environment setup](../development/setup.md) and [current plans](../plans/README.md) for exact receipts and remaining limits.
+
+## Trusted images per recipe kind
+
+Each recipe `kind` selects a reviewed image: `python.secret_disclosure/1` uses `corsair-python:0.1` and `java.secret_disclosure/1` uses `corsair-java:0.1`. `just images` builds every `deploy/*/Dockerfile`. The Java image pins an `eclipse-temurin:21-jdk` base by digest and vendors the JUnit 5 console launcher and JaCoCo agent/CLI at build time with pinned versions and verified SHA-256 checksums; it has no network at run time. The Java recipe is qualified on **Linux amd64 only**; each host architecture is a separate qualification, and the resolved local Docker image ID (not the tag) is what the manifest records and verification binds. JVM start-up dominates per-role container time (a few seconds per role), well within the probe deadline.

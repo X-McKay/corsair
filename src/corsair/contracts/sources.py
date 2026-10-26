@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_java import JavaRecipe
 
 
 class Source(Contract):
@@ -107,12 +108,34 @@ class PythonRecipe(Contract):
         return self
 
 
+def _recipe_kind(value: object) -> str:
+    """Discriminate a recipe by its ``kind`` tag, defaulting a tag-less one to Python.
+
+    Requests written before the recipe union omit ``kind`` entirely; they are Python
+    secret-disclosure recipes, so they must keep validating unchanged.
+    """
+    if isinstance(value, dict):
+        return str(value.get("kind", "python.secret_disclosure/1"))
+    return str(getattr(value, "kind", "python.secret_disclosure/1"))
+
+
+# The recipe is a discriminated union on the ``kind`` tag: one concrete member per
+# qualified runtime. PythonRecipe stays the default (tag-less requests resolve to it);
+# JavaRecipe is the second concrete, tested recipe. A new language adds exactly one
+# member here and one image mapping.
+Recipe = Annotated[
+    Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[JavaRecipe, Tag("java.secret_disclosure/1")],
+    Discriminator(_recipe_kind),
+]
+
+
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
 
     @model_validator(mode="after")
@@ -176,7 +199,7 @@ class RunManifest(Contract):
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str

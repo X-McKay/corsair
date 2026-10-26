@@ -61,7 +61,7 @@ class DockerSandbox:
         self.settings = settings
         self._client: docker.DockerClient | None = client
         self._client_error: str | None = None
-        self._image_id: str | None = None
+        self._image_ids: dict[str, str] = {}
         if client is None:
             try:
                 self._client = docker.from_env()
@@ -70,27 +70,34 @@ class DockerSandbox:
 
     @property
     def image_id(self) -> str:
-        """Return the immutable Docker image ID or raise if it cannot be obtained."""
-        return self._ensure_image()
+        """Return the default (Python) immutable Docker image ID, or raise."""
+        return self._ensure_image(self.settings.image)
 
-    def _ensure_image(self) -> str:
-        if self._image_id is not None:
-            return self._image_id
+    def image_id_for(self, recipe_kind: str) -> str:
+        """Resolve the immutable Docker image ID for a recipe kind's trusted image."""
+        return self._ensure_image(self.settings.image_for(recipe_kind))
+
+    def _ensure_image(self, tag: str) -> str:
+        cached = self._image_ids.get(tag)
+        if cached is not None:
+            return cached
         client = self._client
         if client is None:
             raise SandboxUnavailable(
                 f"Docker client unavailable: {self._client_error or 'unknown error'}"
             )
         try:
-            image = client.images.get(self.settings.image)
+            image = client.images.get(tag)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with just images"
+                f"trusted image {tag} unavailable; build the matching deploy/ Dockerfile "
+                "with just images"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
-        self._image_id = str(image.id)
-        return self._image_id
+        resolved = str(image.id)
+        self._image_ids[tag] = resolved
+        return resolved
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         """An old labeled container means the operation may have run; never rerun it."""
@@ -267,7 +274,7 @@ class DockerSandbox:
 
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
-        image_id = self._ensure_image()
+        image_id = self._ensure_image(self.settings.image_for(prepared.recipe.kind))
         client = self._client
         if client is None:
             raise SandboxUnavailable(

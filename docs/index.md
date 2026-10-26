@@ -63,6 +63,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Schemas](reference/schemas.md): canonical Pydantic models and schema inspection.
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
+- [Java corpus survey](reference/corpus-java.md): per-row fit for the Java secret-disclosure recipe and the one qualified row.
 
 ## Agents
 

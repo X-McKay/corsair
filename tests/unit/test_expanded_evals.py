@@ -5,7 +5,7 @@ import pytest
 
 from corsair.adapters.scm.local import snapshot_source
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import AuditInput, InvestigationRequest
+from corsair.contracts import AuditInput, InvestigationRequest, PythonRecipe
 from corsair.evaluation.agents import load_frozen_fixture
 from corsair.settings import Settings
 
@@ -85,9 +85,11 @@ def test_expanded_producer_cases_are_typed_and_snapshot_frozen(
     input_path, raw_input, oracle = load_frozen_fixture(EVALS_ROOT, entry)
     request = InvestigationRequest.model_validate_json(raw_input)
 
-    assert request.case.recipe.function == function
-    assert request.case.recipe.fixed_kwargs == fixed_kwargs
-    assert request.case.recipe.payload_parameter not in fixed_kwargs
+    recipe = request.case.recipe
+    assert isinstance(recipe, PythonRecipe)
+    assert recipe.function == function
+    assert recipe.fixed_kwargs == fixed_kwargs
+    assert recipe.payload_parameter not in fixed_kwargs
     assert isinstance(oracle["control_payload"], str)
     assert all(isinstance(payload, str) for payload in oracle["candidate_payloads"])
     assert oracle["control_payload"] != oracle["candidate_payloads"][0]

@@ -1,0 +1,39 @@
+{
+  "case": {
+    "case_id": "java-xxe-b",
+    "finding": {
+      "title": "XML external entity expansion in loadTitle",
+      "description": "XmlLoader.loadTitle parses a caller-controlled XML string with a DocumentBuilderFactory left at its permissive defaults (CWE-611). A document whose DOCTYPE declares an external SYSTEM entity has that entity expanded into the returned text, so a local file the process can read is disclosed. The private test fixture is at /fixtures/private/secret.txt; its value is not available. Only the xml argument is caller controlled.",
+      "file": "src/main/java/com/example/XmlLoader.java",
+      "line": 13,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source"
+    },
+    "recipe": {
+      "kind": "java.secret_disclosure/1",
+      "module_file": "src/main/java/com/example/XmlLoader.java",
+      "entry_class": "com.example.XmlLoader",
+      "method": "loadTitle",
+      "source_roots": [
+        "src/main/java"
+      ],
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "expected_control": "hello",
+      "allowed_exceptions": [
+        "org.xml.sax.SAXParseException"
+      ]
+    },
+    "fixed_source": {
+      "path": "fixed"
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "probe_timeout_seconds": 90,
+    "max_elapsed_seconds": 900
+  }
+}

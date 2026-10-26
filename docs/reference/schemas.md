@@ -41,13 +41,13 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: PythonRecipe
+│   └── recipe: Recipe (PythonRecipe | JavaRecipe, discriminated on kind)
 └── budget: Budget
 ```
 
 - A **finding** is the reported title, description, source file, optional line, and requested claim scope. It is not trusted evidence.
 - A **source** names a local source-tree path and may pin its expected snapshot digest. It is a proposed local input, not an admitted archive or a remote checkout.
-- A **recipe** is the operator-owned test shape. The initial recipe binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable. The recipe must bind to the finding's file.
+- A **recipe** is the operator-owned test shape, a discriminated union on a `kind` tag with one concrete member per qualified runtime. `PythonRecipe` (`python.secret_disclosure/1`) binds to one public Python callable; `JavaRecipe` (`java.secret_disclosure/1`, in [`recipes_java.py`](../../src/corsair/contracts/recipes_java.py)) binds to one public Java `entry_class.method(String)` compiled from the admitted tree with `javac` alone. A request that omits `kind` resolves to the Python recipe, so older requests keep validating. The investigator controls only the single payload value; fixed arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable. The recipe must bind to the finding's file.
 - A **case** combines that finding, source, recipe, optional fixed source, and stable `case_id`. A case describes what to investigate; it has no run budget and no workflow identity.
 - An **investigation request** is a case plus a bounded `Budget`. The default budget is bounded in rounds, model/tool calls, output tokens, elapsed time, probe time, tool output, and source handling. `max_output_tokens` caps each model request of both the producer and the auditor; on a thinking model it includes reasoning tokens (see the `Budget` docstring in [`contracts/sources.py`](../../src/corsair/contracts/sources.py)). It is the typed Temporal input for one investigation.
 

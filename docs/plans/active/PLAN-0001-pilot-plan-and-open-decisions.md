@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the running runtime; Java has one qualified secret-disclosure row (`xxe-b`, Linux amd64) behind the `JavaRecipe` union member and the `corsair-java:0.1` image; JavaScript, Ruby and Perl rows are carried in the corpus matrix only | Two qualified runtimes via the discriminated recipe union; the [Java corpus survey](../../reference/corpus-java.md) records why only one Java row fits the secret-disclosure recipe so far. |
 
 ## Gates and environment
 

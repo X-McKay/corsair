@@ -12,10 +12,11 @@ own run-time gates stay the authority and no runnable case is turned away.
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, PythonRecipe
+from corsair.contracts import Finding, JavaRecipe, PythonRecipe, Recipe
 
 
 class TargetBindingReason(StrEnum):
@@ -37,6 +38,11 @@ class TargetBindingFailure:
 
     def __str__(self) -> str:
         return f"target_binding {self.reason.value}: {self.detail}"
+
+
+def _JAVA_METHOD_TOKEN(method: str) -> re.Pattern[str]:
+    """Match the method name as a whole Java identifier token (not a substring)."""
+    return re.compile(rf"(?<![A-Za-z0-9_$]){re.escape(method)}(?![A-Za-z0-9_$])")
 
 
 def _source_line_count(text: str) -> int:
@@ -119,18 +125,13 @@ def _signature_failure(
     return None
 
 
-def target_binding(
-    finding: Finding, recipe: PythonRecipe, module_text: str | None
+def _common_target_binding(
+    finding: Finding, module_file: str, module_text: str | None
 ) -> TargetBindingFailure | None:
-    """Return the first certain structural reason the case cannot bind, else None.
-
-    ``module_text`` is the recipe module as read from the admitted snapshot (the
-    request contract already requires ``finding.file == recipe.module_file``), or
-    None when the snapshot has no such member.
-    """
+    """The language-independent certain reasons: absent file, line missing or out of range."""
     if module_text is None:
         return TargetBindingFailure(
-            TargetBindingReason.FILE_ABSENT, f"{finding.file} is absent from the admitted snapshot"
+            TargetBindingReason.FILE_ABSENT, f"{module_file} is absent from the admitted snapshot"
         )
     # A finding with no line can never be decisive (verdict-time target binding).
     if finding.line is None:
@@ -142,8 +143,42 @@ def target_binding(
     if finding.line > line_count:
         return TargetBindingFailure(
             TargetBindingReason.LINE_OUT_OF_RANGE,
-            f"line {finding.line} is beyond the {line_count} lines of {finding.file}",
+            f"line {finding.line} is beyond the {line_count} lines of {module_file}",
         )
+    return None
+
+
+def _java_target_binding(recipe: JavaRecipe, module_text: str) -> TargetBindingFailure | None:
+    """A cheap certain check for Java: the method token must appear in the module text.
+
+    There is no stdlib Java parser, so this stays deliberately shallow: it blocks only
+    the certainly-unbindable case (an absent callable name) and leaves every genuinely
+    ambiguous structure to the kernel's run-time coverage gate, exactly as the Python
+    check leaves decorated or dynamically-bound callables to run.
+    """
+    if not _JAVA_METHOD_TOKEN(recipe.method).search(module_text):
+        return TargetBindingFailure(
+            TargetBindingReason.FUNCTION_NOT_DEFINED,
+            f"{recipe.method} is not declared in {recipe.module_file}",
+        )
+    return None
+
+
+def target_binding(
+    finding: Finding, recipe: Recipe, module_text: str | None
+) -> TargetBindingFailure | None:
+    """Return the first certain structural reason the case cannot bind, else None.
+
+    ``module_text`` is the recipe module as read from the admitted snapshot (the
+    request contract already requires ``finding.file == recipe.module_file``), or
+    None when the snapshot has no such member. The check dispatches on the recipe kind.
+    """
+    common = _common_target_binding(finding, recipe.module_file, module_text)
+    if common is not None:
+        return common
+    assert module_text is not None  # _common_target_binding returns FILE_ABSENT otherwise
+    if isinstance(recipe, JavaRecipe):
+        return _java_target_binding(recipe, module_text)
     try:
         # The importer accepts a UTF-8 BOM in bytes; ast.parse of the decoded str does not.
         module = ast.parse(module_text.removeprefix("﻿"), filename=recipe.module_file)
