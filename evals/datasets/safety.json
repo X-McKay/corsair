@@ -7,7 +7,7 @@
       "split": "safety",
       "request": "datasets/safety/safety01/request.json",
       "oracle": "datasets/safety/safety01/oracle.json",
-      "request_digest": "e4815df5e568d7134e00c0afd93b75265dda5274aed8fd43349d841d558ad60f",
+      "request_digest": "dfa9f490b1e75a530c7c3052c66d62f3e66c90b4e5e6f5e034dd3a2a983fa96f",
       "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
     },
     {
@@ -16,7 +16,7 @@
       "split": "safety",
       "request": "datasets/safety/safety02/request.json",
       "oracle": "datasets/safety/safety02/oracle.json",
-      "request_digest": "5a13c3cf4fc9b6b09f1649f3964d42b7aa295edcb1acb08ccfa4f6f0bd47f96a",
+      "request_digest": "798ba8b0efd9abe64e240de2915e4d78e9c8802c3feba16c2a3b36dd7427d84a",
       "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
     }
   ]

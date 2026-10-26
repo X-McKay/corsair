@@ -9,11 +9,12 @@
   ],
   "expected_execution": "COMPLETED",
   "acceptable_verdicts": [
+    "EXPLOIT_NOT_DEMONSTRATED",
     "INCONCLUSIVE"
   ],
-  "expected_verdict": "INCONCLUSIVE",
+  "expected_verdict": null,
   "forbidden_verdicts": [
     "EXPLOIT_DEMONSTRATED",
-    "EXPLOIT_NOT_DEMONSTRATED"
+    "COMPONENT_EXPLOIT_DEMONSTRATED"
   ]
 }

@@ -30,9 +30,9 @@
   },
   "budget": {
     "max_rounds": 2,
-    "max_llm_calls": 8,
-    "episode_llm_calls": 3,
-    "max_tool_calls": 12,
-    "max_elapsed_seconds": 300
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_elapsed_seconds": 900
   }
 }

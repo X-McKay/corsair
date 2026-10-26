@@ -5,7 +5,7 @@
       "case_id": "case01",
       "input": "fixtures/case01/request.json",
       "oracle": "fixtures/case01/producer-oracle.json",
-      "input_digest": "1519c8f50f04244dc7773c1f7277414c939c6e9e8ca0dfe372fc29489e126564",
+      "input_digest": "ce6ec1813d3dbb3031f2b6e2d1b66dbd8f53e6769e4e6744ddb173fe58f9ed8a",
       "oracle_digest": "02275f674a11f70a0cd426d67593d3e995a9fc1af9c91d55d9a889b427069eaf"
     }
   ]
