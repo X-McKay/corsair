@@ -28,6 +28,11 @@ from corsair.ports.scm import SourceSnapshotPort
 from corsair.settings import Settings
 from corsair.steps.manifest import build_manifest
 
+# Seconds between heartbeats while an activity awaits blocking work. Well inside every
+# heartbeat timeout the workflow schedules (heartbeat_seconds), so a slow Docker daemon,
+# source admission or model episode is never mistaken for a lost worker.
+HEARTBEAT_INTERVAL_SECONDS = 2.0
+
 
 class Activities:
     def __init__(
@@ -58,10 +63,11 @@ class Activities:
 
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
-        activity.heartbeat("preparing")
         kind = request.case.recipe.kind
         try:
-            image_id = await asyncio.to_thread(self.sandbox.image_id_for, kind)
+            image_id = await self._with_heartbeats(
+                asyncio.to_thread(self.sandbox.image_id_for, kind), "preparing"
+            )
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -80,7 +86,9 @@ class Activities:
             # Preparation also binds the target, over the admitted bytes: a case that
             # certainly cannot bind stops here as UNABLE_TO_RUN, before any model or
             # container cost (Python callable recipes; see prepare_case).
-            return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
+            return await self._with_heartbeats(
+                asyncio.to_thread(self.sources.prepare, request.case, manifest), "preparing"
+            )
         except TargetBindingBlocked as exc:
             raise ApplicationError(
                 format_diagnostic(str(exc)), type="PREPARE_BLOCKED", non_retryable=True
@@ -103,11 +111,14 @@ class Activities:
             queued,
         )
 
-    async def _model_episode(self, awaitable):
+    @staticmethod
+    async def _with_heartbeats(awaitable, detail: str):
+        """Await ``awaitable`` while heartbeating ``detail`` every interval until it ends."""
+
         async def heartbeats():
             while True:
-                activity.heartbeat("agent episode")
-                await asyncio.sleep(2)
+                activity.heartbeat(detail)
+                await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
 
         heartbeat_task = asyncio.create_task(heartbeats())
         try:
@@ -120,7 +131,9 @@ class Activities:
     async def produce(self, request: ProducerInput) -> ProducerOutput:
         try:
             window = self._activity_window()
-            return await self._model_episode(self.inference.produce(request, window_seconds=window))
+            return await self._with_heartbeats(
+                self.inference.produce(request, window_seconds=window), "agent episode"
+            )
         except Exception as exc:
             raise self._activity_error(exc, "PRODUCER_FAILED", non_retryable=True) from None
 
@@ -128,7 +141,9 @@ class Activities:
     async def audit(self, request: AuditInput) -> AuditOutput:
         try:
             window = self._activity_window()
-            return await self._model_episode(self.inference.audit(request, window_seconds=window))
+            return await self._with_heartbeats(
+                self.inference.audit(request, window_seconds=window), "agent episode"
+            )
         except Exception as exc:
             raise self._activity_error(exc, "AUDITOR_FAILED", non_retryable=True) from None
 
