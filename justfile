@@ -38,9 +38,14 @@ test *args:
 
 alias test-offline := test
 
-# Build the reviewed native observer image.
+# Build every reviewed native observer image under deploy/ as corsair-<language>:0.1.
 images:
-    docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for dockerfile in deploy/*/Dockerfile; do
+        language="$(basename "$(dirname "$dockerfile")")"
+        docker build -f "$dockerfile" -t "corsair-${language}:0.1" .
+    done
 
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
 settings-init:

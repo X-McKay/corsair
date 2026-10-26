@@ -159,8 +159,10 @@ async def _handle_verify(args: CliArguments, ui: Terminal) -> int:
     submission = Submission.model_validate_json(Path(args.submission).read_bytes())
     identity = validate_run_id(args.run_id or f"reference-{uuid4().hex}")
     sandbox = DockerSandbox(settings, store=store)
+    recipe_kind = request.case.recipe.kind
     image_id = await ui.wait(
-        asyncio.to_thread(lambda: sandbox.image_id), "Resolving native Docker image"
+        asyncio.to_thread(lambda: sandbox.image_id_for(recipe_kind)),
+        "Resolving native Docker image",
     )
     prepared = await ui.wait(
         asyncio.to_thread(

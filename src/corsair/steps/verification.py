@@ -221,7 +221,10 @@ class EvidenceVerifier:
             and junit["errors"] == 0
             and junit["skipped"] == 0,
             RoleOutcome.VIOLATION: status == "FAILURE"
-            and record.get("observation_kind") == "disclosure"
+            # The trusted driver's own violation signal: the Python recipe discloses the
+            # private fixture; the C recipe reports an operator-fixed sanitizer class in a
+            # target frame. A plain crash never reaches here (the driver maps it to ERROR).
+            and record.get("observation_kind") in {"disclosure", "sanitizer_report"}
             and expected_role == "adversarial"
             and exit_code != 0
             and junit["failures"] == 1
@@ -254,7 +257,7 @@ class EvidenceVerifier:
                 outcome=outcome,
                 target_executed=target_executed,
                 covered_lines=lines,
-                reason="validated native pytest/coverage evidence",
+                reason="validated native observer and coverage evidence",
                 native_exit_code=exit_code,
             ),
             True,
@@ -375,9 +378,9 @@ class EvidenceVerifier:
                     "operation-reconciliation",
                     "an uncommitted labeled sandbox exists; operation will not be replayed",
                 )
-            # Ensure image availability before starting the first role. There is no
-            # fake/non-Docker success path.
-            _ = self.sandbox.image_id
+            # Ensure the recipe's image is available before starting the first role.
+            # There is no fake/non-Docker success path.
+            _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:

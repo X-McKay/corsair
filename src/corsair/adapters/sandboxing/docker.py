@@ -28,6 +28,7 @@ from corsair.contracts import (
     ArtifactRef,
     Budget,
     PreparedCase,
+    PythonRecipe,
     Submission,
     digest,
 )
@@ -36,6 +37,11 @@ from corsair.ports.sandboxing import SandboxUnavailable as SandboxUnavailable
 from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
+
+# Recipe kinds whose trusted driver compiles and executes a native binary in /work.
+# Their /work tmpfs drops noexec (keeping nosuid, nodev, and every other control); no
+# interpreter-language recipe is admitted here.
+NATIVE_EXEC_KINDS = frozenset({"c.integer_overflow/1"})
 
 
 class SandboxExecutionError(RuntimeError):
@@ -61,7 +67,7 @@ class DockerSandbox:
         self.settings = settings
         self._client: docker.DockerClient | None = client
         self._client_error: str | None = None
-        self._image_id: str | None = None
+        self._image_ids: dict[str, str] = {}
         if client is None:
             try:
                 self._client = docker.from_env()
@@ -70,27 +76,38 @@ class DockerSandbox:
 
     @property
     def image_id(self) -> str:
-        """Return the immutable Docker image ID or raise if it cannot be obtained."""
-        return self._ensure_image()
+        """The immutable Docker image ID for the default Python recipe runtime."""
+        return self.image_id_for("python.secret_disclosure/1")
 
-    def _ensure_image(self) -> str:
-        if self._image_id is not None:
-            return self._image_id
+    def image_id_for(self, recipe_kind: str) -> str:
+        """Resolve the configured image tag for a recipe kind to its immutable local ID.
+
+        A tag selects an image; only the resolved local ID is evidence of which built
+        image ran (docs/guides/extensions.md). A kind with no configured image has no
+        qualified runtime and is reported unavailable, never silently substituted.
+        """
+        cached = self._image_ids.get(recipe_kind)
+        if cached is not None:
+            return cached
+        tag = self.settings.images.get(recipe_kind)
+        if tag is None:
+            raise SandboxUnavailable(f"no trusted image configured for recipe kind {recipe_kind!r}")
         client = self._client
         if client is None:
             raise SandboxUnavailable(
                 f"Docker client unavailable: {self._client_error or 'unknown error'}"
             )
         try:
-            image = client.images.get(self.settings.image)
+            image = client.images.get(tag)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with just images"
+                f"trusted image {tag!r} unavailable; build deploy/ images with just images"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
-        self._image_id = str(image.id)
-        return self._image_id
+        resolved = str(image.id)
+        self._image_ids[recipe_kind] = resolved
+        return resolved
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         """An old labeled container means the operation may have run; never rerun it."""
@@ -131,6 +148,13 @@ class DockerSandbox:
         private = root / "private"
         cls._mkdir(allowed)
         cls._mkdir(private)
+        # Only the Python secret-disclosure recipe needs public fixtures and a private
+        # secret. The C recipe's property is a sanitizer report on the admitted source,
+        # not a disclosure, so /fixtures is mounted empty and the driver never reads it.
+        if not isinstance(prepared.recipe, PythonRecipe):
+            for directory in (allowed, private, root):
+                os.chmod(directory, 0o555)
+            return
         for relative, content in prepared.recipe.public_files.items():
             destination = allowed.joinpath(*relative.split("/"))
             cls._mkdir(destination.parent)
@@ -267,7 +291,7 @@ class DockerSandbox:
 
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
-        image_id = self._ensure_image()
+        image_id = self.image_id_for(prepared.recipe.kind)
         client = self._client
         if client is None:
             raise SandboxUnavailable(
@@ -333,7 +357,15 @@ class DockerSandbox:
                         "PYTHONNOUSERSITE": "1",
                     },
                     tmpfs={
-                        "/work": "rw,nosuid,nodev,noexec,size=64m,mode=0700,uid=1000,gid=1000",
+                        # A compiled-to-native recipe (C) must execute the binary the
+                        # trusted driver builds in /work, so that one mount keeps nosuid
+                        # and nodev but drops noexec. Every other recipe (Python and the
+                        # interpreter languages) keeps /work noexec. /tmp is always noexec.
+                        "/work": (
+                            "rw,nosuid,nodev,exec,size=64m,mode=0700,uid=1000,gid=1000"
+                            if prepared.recipe.kind in NATIVE_EXEC_KINDS
+                            else "rw,nosuid,nodev,noexec,size=64m,mode=0700,uid=1000,gid=1000"
+                        ),
                         "/tmp": "rw,nosuid,nodev,noexec,size=32m,mode=1777",
                     },
                     log_config=LogConfig(

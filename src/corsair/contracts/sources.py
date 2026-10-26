@@ -11,6 +11,7 @@ from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_c import CRecipe
 
 
 class Source(Contract):
@@ -107,12 +108,24 @@ class PythonRecipe(Contract):
         return self
 
 
+# A concrete, tested second recipe exists, so the recipe binding is a Pydantic union with
+# a stable ``kind`` tag on each member; the kernel reads ``recipe.kind`` to resolve image
+# and driver. This is Pydantic's smart union rather than ``Field(discriminator="kind")``
+# on purpose: the frozen Python fixtures predate the tag and omit ``kind``, and a declared
+# discriminator cannot fall back to a member default for a missing tag, so it would reject
+# them and force a rewrite of their pinned dataset digests. The members disambiguate
+# unambiguously without the tag — each forbids extra fields, PythonRecipe requires
+# ``payload_parameter`` while CRecipe requires a ``.c`` ``module_file`` and forbids the
+# Python-only fields — so smart matching routes every input to exactly one member.
+Recipe = PythonRecipe | CRecipe
+
+
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
 
     @model_validator(mode="after")
@@ -176,7 +189,7 @@ class RunManifest(Contract):
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str

@@ -51,7 +51,9 @@ def test_the_frozen_case_fixtures_bind():
         Path("evals/fixtures/case01/request.json").read_bytes()
     )
     text = Path("evals/fixtures/case01/source/target.py").read_text(encoding="utf-8")
-    assert target_binding(request.case.finding, request.case.recipe, text) is None
+    recipe = request.case.recipe
+    assert isinstance(recipe, PythonRecipe)
+    assert target_binding(request.case.finding, recipe, text) is None
 
 
 def test_an_absent_module_is_file_absent():
@@ -183,6 +185,10 @@ def test_defaulted_parameters_need_not_be_supplied(text):
 
 class _Sandbox:
     image_id = "sha256:" + "a" * 64
+
+    def image_id_for(self, recipe_kind: str) -> str:
+        del recipe_kind
+        return self.image_id
 
 
 def _activities(tmp_path: Path, content: str) -> tuple[Activities, InvestigationRequest]:

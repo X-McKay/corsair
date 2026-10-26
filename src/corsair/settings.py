@@ -61,7 +61,17 @@ class Settings(Contract):
     temporal_address: str = "localhost:7233"
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
+    # The Python default stays for compatibility. Each recipe kind selects its reviewed
+    # image through ``images``; DockerSandbox and build_manifest resolve by the case's
+    # recipe kind (docs/guides/extensions.md). A recipe kind absent from this map has no
+    # qualified runtime image and the sandbox reports it unavailable rather than guessing.
     image: str = "corsair-python:0.1"
+    images: dict[str, str] = Field(
+        default_factory=lambda: {
+            "python.secret_disclosure/1": "corsair-python:0.1",
+            "c.integer_overflow/1": "corsair-c:0.1",
+        }
+    )
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)

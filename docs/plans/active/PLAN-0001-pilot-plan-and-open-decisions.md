@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the primary running runtime; a C recipe (`c.integer_overflow/1`) is qualified on one corpus row with real Docker on Linux amd64; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | Recipes are a tagged `Recipe` union; each qualified runtime adds one member, image and trusted driver. The C row (`c-intoverflow-a`) is qualified by `corsair verify` (control held + exploit violation on the vulnerable revision, demonstration blocked on the fixed revision); the live chain is unrun. See [the C corpus survey](../../reference/corpus-c.md). |
 
 ## Gates and environment
 
