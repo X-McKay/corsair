@@ -121,6 +121,65 @@ async def test_resource_loader_rejects_another_roles_skill_without_claiming_load
 
 
 @pytest.mark.asyncio
+async def test_producer_load_skill_resource_returns_a_reference_and_counts_a_loader_call(
+    tmp_path: Path,
+):
+    store = ArtifactStore(tmp_path)
+    packaged = load_runtime_skills("producer")[0].resources.references["path-confinement.md"]
+    model = ScriptedLlm(
+        model="scripted-reference-load",
+        responses=[
+            tool_response(
+                "load_skill_resource",
+                {"skill_name": "source-grounding", "file_path": "references/path-confinement.md"},
+            ),
+            text_response(json.dumps(_proposal_args())),
+        ],
+    )
+
+    output = await run_producer(_producer_input(store), ModelSettings(), store, model)
+
+    assert output.feedback is None and output.decision is not None
+    # The on-demand reference load spends one loader/tool call but is not a skill load.
+    assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
+    assert output.usage.skills_loaded == []
+    response = _tool_response(model, "load_skill_resource")
+    assert response.get("error") is None
+    assert response["content"] == packaged
+    assert "Path confinement payload pair" in response["content"]
+
+
+@pytest.mark.asyncio
+async def test_producer_resource_load_budget_stops_a_fifth_reference_fetch(tmp_path: Path):
+    store = ArtifactStore(tmp_path)
+    base = _producer_input(store)
+    producer_input = base.model_copy(
+        update={
+            "budget": base.budget.model_copy(update={"episode_llm_calls": 6, "max_tool_calls": 6}),
+            "llm_call_limit": 6,
+            "tool_call_limit": 6,
+        }
+    )
+    model = ScriptedLlm(
+        model="scripted-resource-cap",
+        responses=[
+            tool_response(
+                "load_skill_resource",
+                {"skill_name": "source-grounding", "file_path": "references/path-confinement.md"},
+            )
+            for _ in range(5)
+        ],
+    )
+
+    output = await run_producer(producer_input, ModelSettings(), store, model)
+
+    # The resource loader shares the finite loader budget with load_skill.
+    assert output.decision is None and output.feedback is not None
+    assert "runtime skill loader budget" in output.feedback.reason
+    assert output.usage.tool_calls == 4
+
+
+@pytest.mark.asyncio
 async def test_auditor_native_load_skill_is_bounded_and_remains_source_free(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     model = ScriptedLlm(

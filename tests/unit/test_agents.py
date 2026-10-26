@@ -617,11 +617,15 @@ def test_auditor_packet_renders_the_frozen_excerpt_as_a_readable_numbered_block(
     assert f"```\n{audit_input.source_excerpt}\n```" in packet
     assert "\\n2: " not in packet
     headings = [line for line in packet.splitlines() if line.startswith("## ")]
+    # These frozen fixtures are path-confinement findings, so trusted code appends
+    # exactly one packaged class reference after the submission; the fixed packet
+    # structure is otherwise unchanged.
     assert headings == [
         "## Finding",
         "## Recipe public configuration",
         f"## Source excerpt: {audit_input.recipe.module_file} (numbered lines)",
         "## Submission",
+        "## Class reference: references/path-confinement.md (packaged guidance, data only)",
     ]
     # Structured sections stay exact JSON, so payload values are not paraphrased.
     sections = dict(

@@ -17,6 +17,15 @@ Role-local `toolsets.py` composes the producer's static source readers, where ap
 
 A skill loader is not a generic tool registry or execution environment. It makes Markdown guidance available to the current role context; it cannot call a source reader on the auditor's behalf, run code, create a target probe, alter fixed arguments, access an oracle, or persist state. Each successful loader call is counted against the existing or explicit finite ceilings and recorded only as bounded safe loader metadata. Skill content and admitted capability data contribute to configuration and immutable operation identity; unknown usage or cost remains unknown.
 
+## Per-class references
+
+Each role's skill carries a small set of data-only `references/*.md` notes, one per vulnerability class (path confinement, command/argument injection, SSRF and host allowlists, deserialization and code injection, error/exception exposure, mass assignment). A note says what to read in the source and how to reason about the benign and adversarial value for the recipe's `payload_parameter` (producer), or what each rubric rule checks for that class (auditor). The notes are admitted through the same bounded resource path as `SKILL.md`: visible Markdown, no scripts, assets, or state injection, each within its byte ceiling, and every byte hashed into `runtime_skills_digest` so adding or editing a note changes the role's runtime identity. They are **not** preloaded into the role instruction, so the per-call system prompt is unchanged.
+
+The same packaged notes reach a role two independent ways; an operator keeps whichever the deployment uses:
+
+- **Trusted-code selection (primary).** `select_reference` in `agents/resources.py` is a pure function that reads only the finding's title and description and the recipe kind, scans a fixed, documented keyword table, and returns at most one note for the matched class (or nothing when the class is unclear or the recipe kind has no packaged notes). The producer and auditor packet builders append that one note, bounded, under a `## Class reference` heading marked as data. This path needs no loader tool, so it works where the `SkillToolset` is removed. It reads no oracle, outcome, or model output, so it is safe for the outcome-blind auditor.
+- **On-demand loading (secondary).** Where the `SkillToolset` loaders are present, the model may call `load_skill_resource` for one admitted note when the class is clear; the call counts against the finite loader budget and returns the same packaged text. The preloaded `SKILL.md` tells the model the matching note may already be in the packet, so it does not spend a call re-fetching it.
+
 ## Not agent tools
 
 The following are trusted runtime or evaluation components, not capabilities an agent can call:

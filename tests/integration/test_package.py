@@ -55,7 +55,9 @@ from corsair.agents.resources import (
     load_runtime_skills,
     prompt_text,
     runtime_skill_digest,
+    select_reference,
 )
+from corsair.contracts import Finding
 from corsair.entrypoints.terminal import Terminal
 from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.entrypoints.cli import parser
@@ -72,6 +74,17 @@ assert [skill.name for skill in load_runtime_skills('producer')] == ['source-gro
 assert [skill.name for skill in load_runtime_skills('auditor')] == ['semantic-review']
 assert files('corsair.agents.producer').joinpath('skills/source-grounding/SKILL.md').is_file()
 assert files('corsair.agents.auditor').joinpath('skills/semantic-review/SKILL.md').is_file()
+_classes = {'code-execution.md', 'command-injection.md', 'error-exposure.md',
+            'mass-assignment.md', 'path-confinement.md', 'ssrf-allowlist.md'}
+for _role, _slug in (('producer', 'source-grounding'), ('auditor', 'semantic-review')):
+    _refs = files(f'corsair.agents.{_role}').joinpath(f'skills/{_slug}/references')
+    assert set(load_runtime_skills(_role)[0].resources.references) == _classes
+    for _name in _classes:
+        assert _refs.joinpath(_name).is_file(), _name
+_finding = Finding(title='Path traversal in read_doc', description='reaches open()', file='a.py')
+_selected = select_reference('producer', _finding, 'python.secret_disclosure/1')
+assert _selected is not None and _selected[0] == 'references/path-confinement.md'
+assert 'Path confinement' in _selected[1]
 assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()
 assert files('corsair.adapters.sandboxing').joinpath('driver.py').is_file()
 assert parser().parse_args(['report', 'report.json']).command == 'report'

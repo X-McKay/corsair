@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from corsair.contracts import Contract
+from corsair.contracts import Contract, Finding
 
 if TYPE_CHECKING:
     from google.adk.skills import Skill
@@ -30,8 +30,51 @@ _LOADER_TOOLS = ("load_skill", "load_skill_resource")
 _MAX_LOADER_CALLS = 4
 _MAX_SKILL_BYTES = 12_000
 _MAX_REFERENCE_BYTES = 8_000
-_MAX_REFERENCE_COUNT = 4
+_MAX_REFERENCE_COUNT = 8
 _MAX_TOTAL_SKILL_BYTES = 24_000
+
+
+# Data-driven class selection. Each row names a packaged reference basename and the
+# lowercase keywords whose presence in a finding's title or description marks that
+# vulnerability class. Trusted code scans in this fixed priority order and selects the
+# first matching row's reference; this is a static table, not model-authored logic and
+# not a discovery registry. Both roles package the same six basenames.
+_REFERENCE_CLASS_SELECTORS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "code-execution.md",
+        ("deserializ", "unpickl", "pickle", "code injection", "eval", "arbitrary code"),
+    ),
+    (
+        "command-injection.md",
+        ("command injection", "os command", "subprocess", "shell", "argument injection"),
+    ),
+    (
+        "ssrf-allowlist.md",
+        ("request forgery", "ssrf", "urlopen", "server-side request"),
+    ),
+    (
+        "error-exposure.md",
+        ("error message", "traceback", "stack trace", "information exposure", "exception"),
+    ),
+    (
+        "mass-assignment.md",
+        ("mass assignment", "setattr", "request body", "mass-assignment"),
+    ),
+    (
+        "path-confinement.md",
+        (
+            "path traversal",
+            "traversal",
+            "outside its",
+            "document root",
+            "records root",
+            "path validation",
+            "name validation",
+            "disclose a file",
+        ),
+    ),
+)
+_SELECTABLE_RECIPE_KINDS = frozenset({"python.secret_disclosure/1"})
 
 
 def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
@@ -233,6 +276,45 @@ def load_runtime_skills(role: str) -> list[Skill]:
     validated_role = _validated_role(role)
     spec = load_agent_spec(validated_role)
     return [_load_runtime_skill(validated_role, slug) for slug in spec.runtime_skills]
+
+
+def _reference_class(finding: Finding) -> str | None:
+    """Return the packaged reference basename for a finding's class, or None.
+
+    Pure, deterministic keyword selection over the finding's own title and
+    description in trusted code: at most one class, by the fixed priority table.
+    """
+
+    haystack = f"{finding.title}\n{finding.description}".lower()
+    for basename, keywords in _REFERENCE_CLASS_SELECTORS:
+        if any(keyword in haystack for keyword in keywords):
+            return basename
+    return None
+
+
+def select_reference(role: str, finding: Finding, recipe_kind: str) -> tuple[str, str] | None:
+    """Select at most one admitted reference for a finding's vulnerability class.
+
+    Trusted-code path: the caller may append the returned text to the role's
+    packet so per-class depth is available even where no loader tool is offered.
+    Selection reads only the finding and the recipe kind; it never reads an
+    oracle, an outcome, or model output. Returns ``(relative_path, text)`` with
+    the ``references/`` prefix, or ``None`` when no class matches or the recipe
+    kind has no packaged references.
+    """
+
+    validated_role = _validated_role(role)
+    if recipe_kind not in _SELECTABLE_RECIPE_KINDS:
+        return None
+    basename = _reference_class(finding)
+    if basename is None:
+        return None
+    relative = f"references/{basename}"
+    for slug in load_agent_spec(validated_role).runtime_skills:
+        for admitted_path, content in _admitted_skill_files(validated_role, slug):
+            if admitted_path == relative:
+                return relative, content.decode("utf-8")
+    return None
 
 
 def runtime_skill_digest(role: str) -> str:

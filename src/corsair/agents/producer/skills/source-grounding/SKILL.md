@@ -12,3 +12,4 @@ description: Derive one declarative Corsair producer payload pair from an admitt
 5. Select one payload pair whose candidate implements the stated hypothesis. Keep the hypothesis tied to the observed source mechanism.
 6. Copy the revision and parent values from the packet into the plan exactly. Do not manufacture workflow history.
 7. Return `no_grounded_candidate` with a concise reason when the packet and admissible source cannot ground a valid pair. Do not guess a candidate.
+8. `references/` holds one note per vulnerability class. When the class is clear the matching note is appended to the packet; use it, do not re-fetch. Otherwise load at most one with `load_skill_resource`.

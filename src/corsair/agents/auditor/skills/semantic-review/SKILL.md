@@ -10,3 +10,4 @@ description: Review a supplied Corsair producer packet for semantic coherence wi
 3. `INSUFFICIENT_CONTEXT` when nothing is contradicted but the packet cannot establish a required link; `rule` is the first unestablished id.
 4. `ACCEPT` only when R1 to R4 are all supported; `rule` is `ALL`.
 5. Do not create facts, execution evidence, coverage, private values, or negative clearance. Semantic acceptance is not a finding disposition.
+6. `references/` holds one note per vulnerability class saying what R1 to R4 check for it. When this finding's class is clear a note is appended to the packet; use it and do not re-fetch it. Otherwise load at most one with `load_skill_resource`, only when the class is clear. The notes refine the rubric only; they create no facts.
