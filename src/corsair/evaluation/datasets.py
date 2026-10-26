@@ -39,6 +39,8 @@ from corsair.evaluation.scoring import (
     Oracle,
     dataset_root,
     load_dataset,
+    load_frozen_fixture,
+    resolve_frozen,
     score,
 )
 from corsair.observability.logging import safe_error_detail, safe_text
@@ -54,32 +56,6 @@ _GROUP_NAME = re.compile(r"[a-z0-9][a-z0-9_.-]{0,79}")
 _AGENT_FIELDS = ("case_id", "input", "oracle", "input_digest", "oracle_digest")
 
 type Status = Literal["pass", "fail", "skip"]
-
-
-def _resolve_frozen(root: Path, relative: str) -> Path:
-    """Resolve a manifest path below its dataset root, as both evaluators require."""
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root):
-        raise ValueError("dataset path escapes its root")
-    return path
-
-
-def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
-    """Read/verify an isolated-agent fixture once; the oracle remains local to the evaluator."""
-    contents: dict[str, bytes] = {}
-    paths: dict[str, Path] = {}
-    for name in ("input", "oracle"):
-        path = (root / entry[name]).resolve()
-        if not path.is_relative_to(root):
-            raise ValueError("agent dataset path escapes its root")
-        content = path.read_bytes()
-        if digest(content) != entry[f"{name}_digest"]:
-            raise ValueError("frozen isolated fixture changed")
-        paths[name], contents[name] = path, content
-    oracle = json.loads(contents["oracle"])
-    if not isinstance(oracle, dict):
-        raise ValueError("isolated oracle must be a JSON object")
-    return paths["input"], contents["input"], oracle
 
 
 @dataclass
@@ -241,7 +217,7 @@ class _Validator:
     def read(self, entry: EntryReport, name: str, relative: str, declared: str) -> bytes | None:
         """Read one frozen file and record its digest against the manifest declaration."""
         try:
-            path = _resolve_frozen(self.root, relative)
+            path = resolve_frozen(self.root, relative)
             content = path.read_bytes()
         except (OSError, ValueError) as error:
             entry.fail("digests", f"{name} {relative}: {safe_text(error)}")
@@ -266,7 +242,7 @@ class _Validator:
             entry.fail("request", f"request case_id {request.case.case_id} differs from the entry")
         else:
             entry.passed("request")
-        return normalize_request_sources(request, _resolve_frozen(self.root, relative))
+        return normalize_request_sources(request, resolve_frozen(self.root, relative))
 
     def snapshot(self, entry: EntryReport, label: str, source: Source) -> dict[str, bytes] | None:
         """Admit one source tree exactly as prepare does and compare its frozen digest."""
