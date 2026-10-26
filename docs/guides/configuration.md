@@ -35,8 +35,8 @@ Retain the reviewed `image` and Docker `runtime` unless a change has its own nat
 trusted container role. `DockerSandbox` starts that deadline with the container,
 stops the immutable labeled container on expiry, and owns its cleanup confirmation.
 The in-container driver deliberately has no independent pytest target-execution
-cap. It retains a 30-second allowance only for post-pytest coverage JSON reporting;
-that subprocess cannot extend the outer container deadline.
+cap. After pytest exits it reads the target module's executed lines from the coverage
+data in its own process, still under the outer container deadline.
 
 The trusted driver is copied into the reviewed Docker image. After this driver or
 Dockerfile changes, the parent must rebuild from this worktree with `just images`

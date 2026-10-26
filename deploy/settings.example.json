@@ -13,6 +13,8 @@
   "source_limit_files": 1000,
   "negative_threshold": 2,
   "max_sessions": 2,
+  "max_concurrent_activities": 4,
+  "max_concurrent_workflow_tasks": 100,
   "models": {
     "connector": "gemini",
     "producer": "gemini-2.5-flash",

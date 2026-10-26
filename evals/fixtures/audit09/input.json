@@ -1,0 +1,41 @@
+{
+  "finding": {
+    "title": "Object key validation",
+    "description": "The fetch_object API must not disclose a file outside its configured root. Investigate only the caller-controlled key value. The private fixture is at /fixtures/private/secret.txt; its value is unavailable.",
+    "file": "objects.py",
+    "line": 4,
+    "claim_scope": "component"
+  },
+  "recipe": {
+    "module_file": "objects.py",
+    "function": "fetch_object",
+    "payload_parameter": "key",
+    "fixed_kwargs": {
+      "bucket_root": "/fixtures/allowed"
+    },
+    "public_files": {
+      "index.txt": "public record\n"
+    },
+    "expected_control": "public record\n",
+    "allowed_exceptions": [
+      "builtins.ValueError"
+    ]
+  },
+  "source_excerpt": "1: from storage.backends import resolve_key, storage\n2: \n3: \n4: def fetch_object(bucket_root: str, key: str) -> str:\n5:     return storage.load(resolve_key(bucket_root, key))",
+  "submission": {
+    "schema_version": "corsair.submission/1",
+    "control_payload": "index.txt",
+    "exploit_payload": "../private/secret.txt",
+    "hypothesis": "resolve_key joins the caller-controlled key to the fixed bucket_root without normalising or checking containment, and storage.load reads the resulting file path, so a parent traversal key reaches the private fixture while index.txt stays the public control.",
+    "plan": {
+      "revision": 1,
+      "parent_revision": null,
+      "objective": "Propose a value pair for the configured object reader",
+      "next_steps": [
+        "Inspect objects.py",
+        "Submit the public index and a traversal key"
+      ],
+      "reason": "The recipe fixes bucket_root and permits only key to vary"
+    }
+  }
+}

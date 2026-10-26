@@ -5,9 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from google.adk.tools.skill_toolset import SkillDiscoveryMode, SkillToolset
-
-from corsair.agents.resources import load_agent_spec, load_runtime_skills
+from corsair.agents.resources import load_agent_spec
 from corsair.contracts import ProducerInput
 from corsair.ports.scm import SourceReader
 
@@ -23,8 +21,8 @@ def _callable_name(tool: Callable[..., Any]) -> str:
 
 def build_producer_toolset(
     producer_input: ProducerInput, sources: SourceReader
-) -> list[Callable[..., Any] | SkillToolset]:
-    """Return source reads that are always present plus the finite native loader."""
+) -> list[Callable[..., Any]]:
+    """Return exactly the two episode-bound source reads; the procedure is preloaded."""
 
     spec = load_agent_spec("producer")
     source_tools = [
@@ -32,13 +30,6 @@ def build_producer_toolset(
         create_list_files(producer_input, sources),
     ]
     names = [_callable_name(tool) for tool in source_tools]
-    if names != spec.source_tools:
+    if names != spec.tools:
         raise ValueError("producer source tool creators do not match approved metadata")
-    return [
-        *source_tools,
-        SkillToolset(
-            skills=load_runtime_skills("producer"),
-            discovery_mode=SkillDiscoveryMode.EAGER,
-            tool_filter=list(spec.loader_tools),
-        ),
-    ]
+    return source_tools
