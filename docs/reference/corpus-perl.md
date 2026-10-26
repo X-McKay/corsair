@@ -38,6 +38,9 @@ of the Python secret-disclosure driver's "the real secret must not appear in the
 named for what it actually checks. `responsesplitting` a is an equally core-only fallback with a CRLF-count assertion.
 
 The vulnerable tree reproduces with control `PROPERTY_HELD` and exploit `VIOLATION` (EXPLOIT_DEMONSTRATED by R4); the
-fixed tree shows control `PROPERTY_HELD` and exploit `PROPERTY_HELD`, so the fix is verified. The finding line is bound
+fixed tree shows control `PROPERTY_HELD` and exploit `PROPERTY_HELD`, so the fix is verified. The row's request sets
+`baseline_markup_chars: 4` explicitly, which equals the markup count of its `expected_control` (the recipe derives that
+count when the field is omitted and rejects an explicit value that differs). A sub that returns `undef` for adversarial
+input rendered no HTML, so the driver records it as held, never as a `VIOLATION`. The finding line is bound
 to the sink `return` (line 10 of `xss/b`, which executes), not the `sub render {` declaration line, so relevant
 coverage is observed.

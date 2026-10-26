@@ -8,6 +8,7 @@ and absent-coverage gates and to confirm cleanup against the immutable container
 
 from __future__ import annotations
 
+import hashlib
 import os
 import time
 from pathlib import Path
@@ -37,7 +38,8 @@ from corsair.steps.verification import EvidenceVerifier
 
 pytestmark = pytest.mark.docker
 
-PERL_IMAGE = "corsair-perl:0.1"
+# Set CORSAIR_TEST_PERL_IMAGE to qualify a differently tagged scratch build of the driver.
+PERL_IMAGE = os.environ.get("CORSAIR_TEST_PERL_IMAGE", "corsair-perl:0.1")
 PERL_KIND = "perl.html_injection/1"
 CORPUS = Path("evals/datasets/corpus/infosec-harness/perl/xss")
 
@@ -57,6 +59,11 @@ def _docker_client() -> docker.DockerClient:
             pytest.fail(f"explicit real Docker test requires image: {type(exc).__name__}")
         pytest.skip(f"real Docker image unavailable; build with just images: {type(exc).__name__}")
     return client
+
+
+def _image_id(client: docker.DockerClient) -> str:
+    settings = Settings(images={PERL_KIND: PERL_IMAGE})
+    return DockerSandbox(settings, client=client).image_id_for(PERL_KIND)
 
 
 def _manifest(image_id: str) -> RunManifest:
@@ -130,7 +137,7 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
 
 def test_real_docker_perl_corpus_row_demonstrates_and_fix_verifies(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
+    image_id = _image_id(client)
     source_root = CORPUS.resolve()
 
     # Vulnerable revision (xss/b): control holds and the exploit injects markup.
@@ -164,8 +171,10 @@ def test_real_docker_perl_corpus_row_demonstrates_and_fix_verifies(tmp_path: Pat
     assert 10 in observation.control.covered_lines
     assert 10 in observation.adversarial.covered_lines
     _assert_cleanup(client, "perl-docker-vulnerable")
-    # Two containers (control + adversarial); keep a generous ceiling for CI jitter.
-    assert elapsed < 20
+    # Two containers (control + adversarial). A test-side sanity ceiling, not the kernel's
+    # per-role probe deadline (Budget.probe_timeout_seconds above); slower hosts were seen
+    # at ~22 s for the pair, so keep generous headroom against CI jitter.
+    assert elapsed < 60
 
     # Fixed revision (xss/a): the exploit no longer reproduces, so the fix is verified.
     fixed_settings, fixed_store = _settings(tmp_path / "fixed", source_root)
@@ -205,6 +214,13 @@ _VULNERABLE = (
     "package Renderer;\nuse strict;\nuse warnings;\n\n\n\n# comment\nsub render {\n"
     '    my ($text) = @_;\n    return "<div class=\'comment\'>" . $text . "</div>";\n}\n\n1;\n'
 )
+# Safe render that returns undef (no output at all) for markup input. No HTML is
+# produced, so this must never establish an injection.
+_UNDEF_ON_MARKUP = (
+    "package Renderer;\nuse strict;\nuse warnings;\n\n\n\n# comment\nsub render {\n"
+    "    my ($text) = @_;\n    return undef if $text =~ /[<>]/;\n"
+    '    return "<div class=\'comment\'>" . $text . "</div>";\n}\n\n1;\n'
+)
 _DIES = (
     "package Renderer;\nuse strict;\nuse warnings;\n\n\n\n# comment\nsub render {\n"
     '    my ($text) = @_;\n    die "boom\\n";\n}\n\n1;\n'
@@ -218,6 +234,10 @@ _DIES = (
         (_VULNERABLE, 10, {}, "adversarial", "VIOLATION"),
         # Escaping render: control holds and the exploit is neutralized -> HELD.
         (_ESCAPING, 11, {}, "adversarial", "PROPERTY_HELD"),
+        # Undefined adversarial output is not injected markup -> HELD, never VIOLATION.
+        (_UNDEF_ON_MARKUP, 10, {}, "adversarial", "PROPERTY_HELD"),
+        # The same renderer still preserves the exact benign control.
+        (_UNDEF_ON_MARKUP, 10, {}, "control", "PROPERTY_HELD"),
         # Unexpected die with no allowed exception -> ERROR, never a positive.
         (_DIES, 10, {}, "adversarial", "ERROR"),
         # A control that does not preserve the expected benign output -> INVALID.
@@ -226,12 +246,14 @@ _DIES = (
 )
 def test_role_outcomes(tmp_path, body, line, recipe_update, role, expected) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
+    image_id = _image_id(client)
     settings, store, prepared = _inline_prepared(
         tmp_path, image_id, body, line=line, **recipe_update
     )
     sandbox = DockerSandbox(settings, client=client, store=store)
-    operation = f"perl-role-{role}-{expected}"
+    # Distinct per parametrized body so cases with the same role/outcome never share an id.
+    body_tag = hashlib.sha256(body.encode()).hexdigest()[:8]
+    operation = f"perl-role-{role}-{expected}-{body_tag}"
     raw_ref = sandbox.execute_role(
         prepared,
         _submission(),
@@ -253,10 +275,33 @@ def test_role_outcomes(tmp_path, body, line, recipe_update, role, expected) -> N
     _assert_cleanup(client, operation)
 
 
+def test_undefined_adversarial_output_never_demonstrates_injection(tmp_path: Path) -> None:
+    """A renderer that returns undef for markup input produced no HTML: no VIOLATION."""
+    client = _docker_client()
+    settings, store, prepared = _inline_prepared(
+        tmp_path, _image_id(client), _UNDEF_ON_MARKUP, line=10
+    )
+    sandbox = DockerSandbox(settings, client=client, store=store)
+    observation = EvidenceVerifier(settings, store, sandbox).evaluate(
+        EvidenceInput(
+            run_id="perl-undef",
+            operation_id="perl-docker-undef",
+            prepared=prepared,
+            submission=_submission(),
+            budget=Budget(probe_timeout_seconds=20),
+        )
+    )
+    assert observation.cleanup_confirmed is True
+    assert observation.control and observation.control.outcome.value == "PROPERTY_HELD"
+    assert observation.adversarial and observation.adversarial.outcome.value == "PROPERTY_HELD"
+    assert 10 in observation.adversarial.covered_lines
+    _assert_cleanup(client, "perl-docker-undef")
+
+
 def test_absent_target_coverage_is_invalid(tmp_path: Path) -> None:
     """A finding line that is never executed cannot be a relevant coverage demonstration."""
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
+    image_id = _image_id(client)
     # Line 1 (the `package` statement) is compiled, not executed as a traced statement.
     settings, store, prepared = _inline_prepared(tmp_path, image_id, _VULNERABLE, line=1)
     sandbox = DockerSandbox(settings, client=client, store=store)
