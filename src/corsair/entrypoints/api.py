@@ -12,6 +12,7 @@ from corsair.contracts import (
     InvestigationResult,
     validate_root_identity,
 )
+from corsair.policies.time_bounds import investigation_execution_seconds
 from corsair.settings import Settings
 from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
@@ -32,7 +33,7 @@ async def start_investigation(
         request,
         id=identity,
         task_queue=settings.task_queue,
-        execution_timeout=timedelta(seconds=request.budget.max_elapsed_seconds + 120),
+        execution_timeout=timedelta(seconds=investigation_execution_seconds(request.budget)),
         id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
         id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
     )

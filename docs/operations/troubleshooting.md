@@ -82,6 +82,14 @@ Inspect the final result’s rounds, feedback gate, usage metadata, and manifest
 
 For a native `ERROR` or `INVALID` observation, preserve the raw evidence artifact and Docker receipt. A native error does not establish a safe application, an unsupported finding, or a failed fix; the result stays `ERROR` and is never relabelled.
 
+## A model episode stops with `episode_timeout`
+
+The producer or auditor episode ran out of its elapsed-time bound before a structured response. The round records the operational `episode_timeout` feedback with its accounted model calls; the investigation ends as `ERROR` (producer) or `BLOCKED` (auditor), and the reason names the episode bound in seconds. It is not evidence about the finding. The bounds nest as described in [time bounds](../reference/configuration.md#time-bounds): a provider request never outlives its episode, and the episode ends inside its Temporal activity.
+
+- A single slow request is the usual cause on a thinking model. Inspect the round's usage: one model call that used the whole episode points at provider latency, many calls at an episode spending its call budget on reads.
+- Raising `request_timeout_seconds` above the episode bound has no effect: the adapter lowers it to the episode. The producer episode is at most `285` s and the auditor episode `165` s, and less when the investigation deadline is near.
+- An `ActivityError` naming a StartToClose or ScheduleToClose timeout in the `producer` or `audit` phase, with `usage_complete: false`, means the activity bound fired before the episode, which the nested bounds should prevent; report it with the run's history.
+
 ## Exit status is not the security verdict
 
 | Exit | Meaning | Operator action |

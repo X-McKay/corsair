@@ -9,6 +9,7 @@ from temporalio.exceptions import ChildWorkflowError
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import BatchItem, BatchRequest, format_diagnostic
+    from corsair.policies.time_bounds import investigation_execution_seconds
     from corsair.workflows.investigation import InvestigationWorkflow
 
 
@@ -43,7 +44,7 @@ class EvaluationWorkflow:
                         case_request,
                         id=run_id,
                         execution_timeout=timedelta(
-                            seconds=case_request.budget.max_elapsed_seconds + 120
+                            seconds=investigation_execution_seconds(case_request.budget)
                         ),
                         retry_policy=RetryPolicy(maximum_attempts=1),
                         parent_close_policy=workflow.ParentClosePolicy.REQUEST_CANCEL,

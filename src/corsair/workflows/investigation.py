@@ -31,6 +31,15 @@ with workflow.unsafe.imports_passed_through():
         Verdict,
         format_terminal_result,
     )
+    from corsair.policies.time_bounds import (
+        AUDITOR_ACTIVITY_SECONDS,
+        PREPARE_ACTIVITY_SECONDS,
+        RECORD_ATTEMPT_SECONDS,
+        RECORD_FINALIZATION_SECONDS,
+        evidence_activity_seconds,
+        heartbeat_seconds,
+        producer_activity_seconds,
+    )
     from corsair.policies.verdicts import (
         SessionOutcome,
         case_verdict,
@@ -196,7 +205,7 @@ class InvestigationWorkflow:
             result_type=result_type,
             start_to_close_timeout=timedelta(seconds=seconds),
             schedule_to_close_timeout=timedelta(seconds=seconds),
-            heartbeat_timeout=timedelta(seconds=min(15, seconds)),
+            heartbeat_timeout=timedelta(seconds=heartbeat_seconds(seconds)),
             retry_policy=RetryPolicy(maximum_attempts=1),
             cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
         )
@@ -219,9 +228,11 @@ class InvestigationWorkflow:
                 "corsair.record",
                 result,
                 result_type=InvestigationResult,
-                start_to_close_timeout=timedelta(seconds=30),
+                start_to_close_timeout=timedelta(seconds=RECORD_ATTEMPT_SECONDS),
                 schedule_to_close_timeout=(
-                    timedelta(seconds=90) if workflow.patched("bounded-finalization-v1") else None
+                    timedelta(seconds=RECORD_FINALIZATION_SECONDS)
+                    if workflow.patched("bounded-finalization-v1")
+                    else None
                 ),
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
@@ -255,7 +266,7 @@ class InvestigationWorkflow:
         try:
             self.phase = "prepare"
             prepared = await self._execute_bounded_activity(
-                "corsair.prepare", request, PreparedCase, 120
+                "corsair.prepare", request, PreparedCase, PREPARE_ACTIVITY_SECONDS
             )
             result = result.model_copy(update={"manifest": prepared.manifest})
             # Sessions share the root LLM/tool budget and the elapsed deadline; only
@@ -301,7 +312,7 @@ class InvestigationWorkflow:
                             tool_call_limit=tools_left,
                         ),
                         ProducerOutput,
-                        min(300, budget.max_elapsed_seconds - int(elapsed)),
+                        producer_activity_seconds(budget, elapsed),
                     )
                     calls_left -= producer.usage.llm_calls
                     tools_left -= producer.usage.tool_calls
@@ -346,7 +357,7 @@ class InvestigationWorkflow:
                             budget=budget,
                         ),
                         Observation,
-                        2 * budget.probe_timeout_seconds + 45,
+                        evidence_activity_seconds(budget),
                     )
                     round_result = round_result.model_copy(update={"observation": observation})
                     session_rounds[-1] = round_result
@@ -394,7 +405,7 @@ class InvestigationWorkflow:
                         "corsair.audit",
                         audit_request,
                         AuditOutput,
-                        180,
+                        AUDITOR_ACTIVITY_SECONDS,
                     )
                     calls_left -= audit.usage.llm_calls
                     tools_left -= audit.usage.tool_calls
@@ -426,7 +437,7 @@ class InvestigationWorkflow:
                                     fixed=True,
                                 ),
                                 Observation,
-                                2 * budget.probe_timeout_seconds + 45,
+                                evidence_activity_seconds(budget),
                             )
                             result = result.model_copy(
                                 update={"fix_status": fix_status(fixed), "fix_observation": fixed}
