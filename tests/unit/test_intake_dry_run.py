@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from corsair.adapters.scm.local import prepare_case
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import LineProvenance, ScannerFinding, Source, digest
+from corsair.contracts import LineProvenance, PythonRecipe, ScannerFinding, Source, digest
 from corsair.entrypoints import cli
 from corsair.entrypoints.requests import load_recipe_template, request_from_scanner
 from corsair.entrypoints.terminal import Terminal
@@ -94,6 +94,7 @@ def test_conversion_binds_the_template_to_the_finding_file_and_keeps_the_line():
     )
     assert request.case.recipe.module_file == "reader.py"
     assert request.case.recipe.function == "read_file"
+    assert isinstance(request.case.recipe, PythonRecipe)
     assert request.case.recipe.payload_parameter == "path"
     assert request.case.finding.line is None  # intake never invents a line
     assert request.case.finding.scanner is not None

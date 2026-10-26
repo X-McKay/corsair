@@ -309,6 +309,10 @@ READER = (
 class _Sandbox:
     image_id = "sha256:" + "a" * 64
 
+    def image_id_for(self, kind: str) -> str:
+        del kind
+        return self.image_id
+
 
 async def test_prepare_records_the_declared_and_the_bound_line(tmp_path):
     project = tmp_path / "project"
