@@ -232,6 +232,13 @@ def _signed(value: object) -> str:
     return f"{round(value, 4):+}"
 
 
+def _ratio(count: object, total: object) -> str:
+    """``count/total``; an unknown count (such as decisive on agent rows) stays unknown."""
+    if not isinstance(count, int) or not isinstance(total, int):
+        return "unknown"
+    return f"{count}/{total}"
+
+
 def _usage(values: Mapping[str, Any], show: Callable[[object], str]) -> str:
     """One compact usage cell: model calls, tokens in/out and agent seconds."""
     return (
@@ -573,6 +580,10 @@ class Terminal:
                 self.out.print(Text("Dataset: ") + _text(rendered["dataset_digest"]))
             if isinstance(rendered.get("rows"), list):
                 self._report_rows(rendered["rows"])
+            if isinstance(rendered.get("families"), list):
+                self._groups("Families", "family", rendered["families"])
+            if isinstance(rendered.get("splits"), list):
+                self._groups("Splits", "split", rendered["splits"])
             for key, detail in counts.items():
                 self._counts(key, detail)
             if "report" in rendered:
@@ -615,6 +626,58 @@ class Terminal:
             )
         self.out.print(Panel(table, title="Corsair · Cases", border_style="cyan"))
 
+    def _groups(self, title: str, key: str, groups: list[dict[str, Any]]) -> None:
+        """Render per-family or per-split summaries; an undeclared group is shown as such."""
+        table = Table(expand=True)
+        other = "Splits" if key == "family" else "Families"
+        for column in (key.capitalize(), other, "Cases", "Pass", "Decisive", "Forbidden", "Ops"):
+            table.add_column(column, overflow="fold")
+        for group in groups:
+            spread = group.get("splits") if key == "family" else group.get("families")
+            table.add_row(
+                _text(group[key] if group[key] is not None else "(undeclared)"),
+                _text(", ".join(spread) if isinstance(spread, list) else spread),
+                _text(group["cases"]),
+                _text(_ratio(group["passed"], group["attempts"])),
+                _text(_ratio(group["decisive"], group["attempts"])),
+                Text(
+                    _plain(group["forbidden_labels"]),
+                    style="red" if group["forbidden_labels"] else "cyan",
+                ),
+                _text(group["operational_failures"]),
+            )
+        self.out.print(Panel(table, title=f"Corsair · {title}", border_style="cyan"))
+
+    def _family_deltas(self, families: list[dict[str, Any]]) -> None:
+        """Render each family's pass rate, decisive count and forbidden-label change."""
+        table = Table(expand=True)
+        for column in ("Family", "Pass rate", "Decisive", "Forbidden", "Regressions"):
+            table.add_column(column, overflow="fold")
+
+        def side(item: dict[str, Any], name: str, field: str) -> str:
+            group = item[name]
+            return "absent" if group is None else _plain(group.get(field))
+
+        for item in families:
+            family = item["family"]
+            table.add_row(
+                _text(family if family is not None else "(undeclared)"),
+                _text(
+                    f"{side(item, 'baseline', 'pass_rate')} -> "
+                    f"{side(item, 'candidate', 'pass_rate')} ({_signed(item['pass_rate_delta'])})"
+                ),
+                _text(
+                    f"{side(item, 'baseline', 'decisive')} -> "
+                    f"{side(item, 'candidate', 'decisive')} ({_signed(item['decisive_delta'])})"
+                ),
+                _text(
+                    f"{side(item, 'baseline', 'forbidden_labels')} -> "
+                    f"{side(item, 'candidate', 'forbidden_labels')}"
+                ),
+                Text(str(item["regressions"]), style="red" if item["regressions"] else "green"),
+            )
+        self.out.print(Panel(table, title="Corsair · Families", border_style="cyan"))
+
     def _comparison(self, value: dict[str, Any]) -> None:
         """Render a report comparison: dataset identity first, then deltas and changed cases."""
         digests = value["dataset_digest"]
@@ -651,11 +714,16 @@ class Terminal:
                 ),
             )
         for item in value["regressions"]:
+            family = f" [{_plain(item['family'])}]" if item.get("family") else ""
             grid.add_row(
                 Text("Regression", style="red"),
-                _text(f"{_plain(item['case_id'])} #{_plain(item['repeat'])}: {item['reason']}"),
+                _text(
+                    f"{_plain(item['case_id'])} #{_plain(item['repeat'])}{family}: {item['reason']}"
+                ),
             )
         self.out.print(Panel(grid, title="Corsair · Comparison", border_style="cyan"))
+        if isinstance(value.get("families"), list):
+            self._family_deltas(value["families"])
         changed = [
             case
             for case in value["cases"]

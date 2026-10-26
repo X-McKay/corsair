@@ -104,6 +104,12 @@ def _identities(rows: Iterable[dict[str, Any]], field: str) -> list[str]:
     return sorted({value for row in rows if isinstance(value := row.get(field), str)})
 
 
+def _family(row: dict[str, Any] | None) -> str | None:
+    """The row's declared dataset family, when its report carries one."""
+    value = None if row is None else row.get("family")
+    return value if isinstance(value, str) else None
+
+
 def _case(
     key: tuple[str, int], before: dict[str, Any] | None, after: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -127,6 +133,7 @@ def _case(
     return {
         "case_id": case_id,
         "repeat": repeat,
+        "family": _family(after) or _family(before),
         "presence": presence,
         "baseline_status": before.get("status") if before else None,
         "candidate_status": after.get("status") if after else None,
@@ -146,7 +153,7 @@ def _regressions(cases: list[dict[str, Any]], unidentified: dict[str, int]) -> l
     """A pass that stops passing, a new forbidden label, or a lost case regresses."""
     found: list[dict[str, Any]] = []
     for case in cases:
-        identity = {"case_id": case["case_id"], "repeat": case["repeat"]}
+        identity = {"case_id": case["case_id"], "repeat": case["repeat"], "family": case["family"]}
         if case["flip"] == "pass_to_fail":
             found.append({**identity, "reason": "pass_to_fail"})
         if case["new_forbidden_label"]:
@@ -154,7 +161,9 @@ def _regressions(cases: list[dict[str, Any]], unidentified: dict[str, int]) -> l
         if case["presence"] == "baseline_only":
             found.append({**identity, "reason": "missing_in_candidate"})
     if unidentified["candidate"] > unidentified["baseline"]:
-        found.append({"case_id": None, "repeat": None, "reason": "unidentified_rows"})
+        found.append(
+            {"case_id": None, "repeat": None, "family": None, "reason": "unidentified_rows"}
+        )
     return found
 
 

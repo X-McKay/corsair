@@ -228,6 +228,8 @@ corsair report .runs/evaluations/dev.json
 
 Reads an existing evaluation report. Human output shows the summary, the report's dataset digest and one table row per scored attempt (case, run, status, verdict or disposition or match kind, usage and reason); unknown usage is shown as `unknown`. `--format json` emits the complete saved report (`rows`, `summary` and `dataset_digest`). It does not re-run, re-score, or repair the report.
 
+`--families` adds `families` and `splits` lists: for each declared family (and each split) the distinct cases, attempts, passed, failed, pass rate, decisive count and rate (`unknown` for isolated agent rows, which carry no verdict), correctly resolved, forbidden labels, inconclusive, operational failures and unavailable results; rows without a family form one undeclared group. Rows written by `eval` and `rescore` carry `family` and `split`. `--dataset MANIFEST` labels an older report's rows from that manifest and is refused (exit `2`) unless the manifest's dataset digest equals the report's.
+
 ### `compare BASELINE.json CANDIDATE.json`
 
 ```bash
@@ -239,7 +241,7 @@ Compares two saved evaluation reports without contacting services or re-scoring.
 
 The comparison is refused (exit `2`) when the dataset digests differ or either report does not declare one. `--allow-dataset-mismatch` compares them anyway; the result then carries `dataset_match: false`, the human output opens with a mismatch warning and a `compare.dataset_mismatch` warning is logged. A mismatched comparison is not a statement about one frozen dataset.
 
-The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output lists only attempts whose status, label, forbidden flag or presence changed; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts` and `summary_delta`.
+The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output lists only attempts whose status, label, forbidden flag or presence changed; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts` and `summary_delta`. Each case and regression names its `family` (`null` when the rows carry none). `--families` adds a `families` list with each family's baseline and candidate summary, pass-rate, decisive and forbidden-label deltas and the number of regressions attributed to it; `--dataset MANIFEST` labels both reports as for `report`.
 
 ## Watching and recovery
 

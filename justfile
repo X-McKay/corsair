@@ -99,3 +99,7 @@ eval dataset *args:
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
+
+# Check that dataset families, cases and chain pairs keep one split; default evals/datasets/*.json.
+dataset-families *datasets:
+    uv run --locked python -m corsair.evaluation.families "$@"
