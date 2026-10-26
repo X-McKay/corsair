@@ -848,9 +848,7 @@ def _final_reason_result(path: str):
 
 
 @pytest.mark.parametrize("path", ["accepted_audit", "rejected_audit", "producer_abstention"])
-def test_human_views_and_markdown_omit_the_final_reason_that_json_keeps(
-    path, capsys, monkeypatch
-):
+def test_human_views_and_markdown_omit_the_final_reason_that_json_keeps(path, capsys, monkeypatch):
     from corsair.entrypoints.markdown import to_markdown
     from corsair.evaluation.ledger import gate_ledger
     from corsair.policies.explanation import explain_result

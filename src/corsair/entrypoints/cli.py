@@ -494,9 +494,8 @@ async def _handle_dataset_refreeze(args: CliArguments, ui: Terminal) -> int:
         event(
             "dataset.refrozen",
             level=logging.WARNING,
-            message=(
-                f"digests rewritten; review the diff and commit; dataset digest {'; '.join(changed)}"
-            ),
+            message="digests rewritten; review the diff and commit; dataset digest "
+            + "; ".join(changed),
         )
         return 1
     return 0 if report["valid"] else 1
