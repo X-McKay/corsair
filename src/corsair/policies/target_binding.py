@@ -15,7 +15,7 @@ import ast
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, LineProvenance, PythonRecipe, Recipe
+from corsair.contracts import Finding, LineProvenance, PythonCallableRecipe
 
 
 class TargetBindingReason(StrEnum):
@@ -114,7 +114,7 @@ def _compiles_to_nothing(statement: ast.stmt) -> bool:
     )
 
 
-def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
+def derive_target_line(recipe: PythonCallableRecipe, module_text: str) -> int | None:
     """Bind a line-less finding to the recipe function's first body statement.
 
     Trusted, deterministic and model-free: the line comes from the operator-owned
@@ -154,17 +154,16 @@ def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
 
 
 def bind_target_line(
-    finding: Finding, recipe: Recipe, module_text: str
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str
 ) -> tuple[Finding, LineProvenance]:
     """The finding prepare hands on: its declared line, else one derived from the recipe.
 
     ``module_text`` is the admitted text of ``finding.file`` (the recipe module). A
     finding that already declares a line is returned unchanged; a line-less one gets
     ``derive_target_line`` when that is certain, else stays line-less for
-    ``target_binding`` to report ``line_missing``. Line derivation reads Python AST, so it
-    applies to the Python recipe only; a non-Python recipe keeps its declared line.
+    ``target_binding`` to report ``line_missing``.
     """
-    if finding.line is not None or not isinstance(recipe, PythonRecipe):
+    if finding.line is not None:
         return finding, LineProvenance.DECLARED
     derived = derive_target_line(recipe, module_text)
     if derived is None:
@@ -173,7 +172,7 @@ def bind_target_line(
 
 
 def _signature_failure(
-    function: ast.FunctionDef, recipe: PythonRecipe
+    function: ast.FunctionDef, recipe: PythonCallableRecipe
 ) -> TargetBindingFailure | None:
     """The driver calls ``function(**fixed_kwargs, payload_parameter=payload)``."""
     arguments = function.args
@@ -213,20 +212,14 @@ def _signature_failure(
 
 
 def target_binding(
-    finding: Finding, recipe: Recipe, module_text: str | None
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str | None
 ) -> TargetBindingFailure | None:
     """Return the first certain structural reason the case cannot bind, else None.
 
     ``module_text`` is the recipe module as read from the admitted snapshot (the
     request contract already requires ``finding.file == recipe.module_file``), or
     None when the snapshot has no such member.
-
-    The structural check reads Python AST, so it gates the Python recipe only; a
-    non-Python recipe is not turned away here and relies on the kernel's run-time
-    coverage and agreement gates.
     """
-    if not isinstance(recipe, PythonRecipe):
-        return None
     if module_text is None:
         return TargetBindingFailure(
             TargetBindingReason.FILE_ABSENT, f"{finding.file} is absent from the admitted snapshot"

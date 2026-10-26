@@ -8,6 +8,7 @@ from temporalio.exceptions import ApplicationError
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     MAX_TERMINAL_ROUNDS,
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -17,7 +18,6 @@ from corsair.contracts import (
     PreparedCase,
     ProducerInput,
     ProducerOutput,
-    PythonRecipe,
     format_diagnostic,
     format_terminal_result,
 )
@@ -61,9 +61,9 @@ class Activities:
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
-        recipe_kind = request.case.recipe.kind
+        kind = request.case.recipe.kind
         try:
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id_for(recipe_kind))
+            image_id = await asyncio.to_thread(self.sandbox.image_id_for, kind)
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -90,22 +90,20 @@ class Activities:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
         # Pre-model target binding over the admitted bytes: a case that certainly cannot
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        # The structural check reads Python AST, so it applies to the Python recipe only;
-        # other recipe kinds rely on the kernel's run-time coverage and agreement gates.
-        if isinstance(prepared.recipe, PythonRecipe):
+        # The structural gate and statement-line binding are Python-AST specific; other
+        # languages rely on their own run-time coverage and binding gates.
+        if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
             failure = target_binding(prepared.finding, prepared.recipe, module_text)
             if failure is not None:
                 raise ApplicationError(
                     format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
                 )
-        # Bind the finding to the statement line coverage reports for it. bind_target_line
-        # returns the declared line unchanged on non-Python source (ast.parse fails), so a
-        # C recipe binds to its declared gcov line. Absent a declared line, the coverage
-        # gate falls back to actual recipe-module execution.
-        if prepared.finding.line is None:
-            return prepared
-        target_line = bind_target_line(module_text, prepared.finding.line)
-        return prepared.model_copy(update={"target_line": target_line})
+            # target_binding passed, so the finding declares a line and the module exists.
+            # The coverage gate binds to the statement line coverage reports for it.
+            assert prepared.finding.line is not None
+            target_line = bind_target_line(module_text, prepared.finding.line)
+            return prepared.model_copy(update={"target_line": target_line})
+        return prepared
 
     @staticmethod
     def _activity_window() -> float | None:

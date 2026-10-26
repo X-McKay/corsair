@@ -13,7 +13,7 @@ checks for this class.
   through the callable's own path handling.
 - R3 production logic: both payloads go through the production reader with the
   recipe's fixed root/kwargs, not a stand-in opener.
-- R4 disclosure, not echo: the claimed violation is returning the out-of-root
+- R4 real violation, not echo: the claimed violation is returning the out-of-root
   private file's content, not echoing the supplied path or matching a marker.
 
 Reject on the first contradicted rule; do not repair the hypothesis into a

@@ -1,6 +1,6 @@
 ---
 name: semantic-review
-description: Review a supplied Corsair producer packet for semantic coherence with a reported disclosure mechanism. Use when deciding whether a complete payload claim is supported, insufficiently grounded, or must be rejected without creating evidence.
+description: Review a supplied Corsair producer packet for semantic coherence with a reported security mechanism. Use when deciding whether a complete payload claim is supported, insufficiently grounded, or must be rejected without creating evidence.
 ---
 
 # Semantic review

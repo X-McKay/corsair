@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the primary running runtime; a C recipe (`c.integer_overflow/1`) is qualified on one corpus row with real Docker on Linux amd64; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | Recipes are a tagged `Recipe` union; each qualified runtime adds one member, image and trusted driver. The C row (`c-intoverflow-a`) is qualified by `corsair verify` (control held + exploit violation on the vulnerable revision, demonstration blocked on the fixed revision); the live chain is unrun. See [the C corpus survey](../../reference/corpus-c.md). |
+| Languages | Python is the running runtime; a first JavaScript recipe (`javascript.prototype_pollution/1`) is qualified on Linux amd64 on one corpus row (`prototypepollution-a`); a Ruby recipe (`ruby.secret_disclosure/1`) is qualified on Linux amd64 on one corpus row (`pathtraversal-b`, see the [Ruby corpus survey](../../reference/corpus-ruby.md)); a C recipe (`c.integer_overflow/1`) is qualified on Linux amd64 on one corpus row (`c-intoverflow-a`, see the [C corpus survey](../../reference/corpus-c.md)); Java and Perl rows, and the remaining Ruby rows, are carried in the corpus matrix only | Capability depth comes from concrete, tested operator-owned recipes; a new language is a discriminated `Case.recipe` union member with its own trusted driver and image, not a generic adapter. macOS arm64 and the live chain for JavaScript, Ruby and C are unrun. |
 
 ## Gates and environment
 
@@ -33,6 +33,7 @@ The cloud development environment has no Docker daemon, Temporal service or mode
 | `just test-docker`, `just test-temporal` | rig | not yet recorded |
 | `just test-live`, composed live batch | rig | not yet recorded |
 | Isolated producer/auditor baselines on the six labels | rig | not yet promoted |
+| JavaScript recipe `corsair verify` + `test_docker_javascript.py` (Linux amd64) | rig | run: control held / adversarial violated on `prototypepollution-a`, 4 Docker tests pass, cleanup confirmed, ~0.16 s/role; live chain unrun ([platforms](../../reference/platforms.md#javascript-prototype-pollution-linux-amd64)) |
 
 ## Open decisions awaiting the owner
 

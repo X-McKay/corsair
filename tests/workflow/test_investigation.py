@@ -478,8 +478,8 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
 class _ImageOnlySandbox:
     image_id = "sha256:" + "a" * 64
 
-    def image_id_for(self, recipe_kind: str) -> str:
-        del recipe_kind
+    def image_id_for(self, kind: str) -> str:
+        del kind  # One trusted image regardless of recipe kind.
         return self.image_id
 
 

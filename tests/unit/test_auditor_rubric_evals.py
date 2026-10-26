@@ -135,11 +135,10 @@ def test_rubric_cohort_round_trips_with_one_case_per_rubric_outcome():
         AuditDecision(oracle["decision"])
         assert (oracle["decision"] == "ACCEPT") == (oracle["rule"] == "ALL")
         # Each packet cites the configured function and the fixed root the payload varies under.
-        recipe = packet.recipe
-        assert isinstance(recipe, PythonRecipe)
-        assert f"def {recipe.function}(" in packet.source_excerpt
-        assert recipe.payload_parameter not in recipe.fixed_kwargs
-        assert packet.finding.file == recipe.module_file
+        assert f"def {packet.recipe.function}(" in packet.source_excerpt
+        assert isinstance(packet.recipe, PythonRecipe)
+        assert packet.recipe.payload_parameter not in packet.recipe.fixed_kwargs
+        assert packet.finding.file == packet.recipe.module_file
         outcomes.add((oracle["decision"], oracle["rule"]))
 
     assert outcomes == {

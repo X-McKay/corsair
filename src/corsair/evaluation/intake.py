@@ -30,6 +30,7 @@ from corsair.adapters.scm.local import iter_snapshot_files, snapshot_source
 from corsair.adapters.scm.requests import load_recipe_template, request_from_scanner
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     Contract,
     Digest,
     Identifier,
@@ -183,6 +184,9 @@ def assess_finding(
         detail = f"invalid recipe: {_invalid_fields(error)}"
         return _blocked(index, file, IntakeBlock.RECIPE_INVALID, detail, line)
     recipe = request.case.recipe
+    if not isinstance(recipe, PYTHON_CALLABLE_RECIPES):
+        detail = f"{recipe.kind} has no pre-model structural gate; intake supports Python recipes"
+        return _blocked(index, file, IntakeBlock.UNSUPPORTED_LANGUAGE, detail, line)
     finding, provenance = bind_target_line(request.case.finding, recipe, module_text)
     failure = target_binding(finding, recipe, module_text)
     if failure is not None:

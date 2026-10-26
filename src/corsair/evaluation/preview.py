@@ -36,6 +36,7 @@ from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.resources import RoleName, load_runtime_skills, prompt_text
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     Feedback,
@@ -293,11 +294,13 @@ def _prepare(
     module_text = read_source(
         prepared.source, prepared.recipe.module_file, store, settings.source_limit_bytes
     )
-    failure = target_binding(prepared.finding, prepared.recipe, module_text)
-    if failure is not None:
-        raise ValueError(
-            f"agent preview: the workflow stops this case before any model request ({failure})"
-        )
+    # The structural gate is Python-AST specific; other recipes declare their line.
+    if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
+        failure = target_binding(prepared.finding, prepared.recipe, module_text)
+        if failure is not None:
+            raise ValueError(
+                f"agent preview: the workflow stops this case before any model request ({failure})"
+            )
     return prepared
 
 
