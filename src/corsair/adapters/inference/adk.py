@@ -382,6 +382,32 @@ def _effective_limit(requested: int, configured: int) -> int:
     return limit
 
 
+def _completed_text(
+    accounting: _EpisodeAccounting,
+    text: str | None,
+    operational_feedback: Feedback | None,
+    *,
+    invalid_gate: str,
+    no_output_reason: str,
+) -> str | Feedback:
+    """Return an episode's final role text, or the feedback for why it stopped early."""
+
+    role = accounting.role
+    if operational_feedback is not None:
+        return operational_feedback
+    if accounting.loader_limit_exhausted:
+        reason = f"{role} exhausted its runtime skill loader budget before structured completion"
+    elif accounting.tool_limit_exhausted:
+        reason = f"{role} exhausted its tool-call budget before structured completion"
+    elif accounting.llm_limit_exhausted:
+        reason = f"{role} exhausted its LLM-call budget before structured completion"
+    elif text is None:
+        reason = no_output_reason
+    else:
+        return text
+    return Feedback(gate=invalid_gate, reason=reason, operational=False)
+
+
 async def run_producer(
     producer_input: ProducerInput,
     settings: Settings | ModelSettings,
@@ -424,35 +450,32 @@ async def run_producer(
     )
     seconds = time.perf_counter() - started
     usage = accounting.usage(seconds)
-    if operational_feedback is not None:
-        return ProducerOutput(usage=usage, feedback=operational_feedback)
-    if accounting.loader_limit_exhausted:
-        reason = "producer exhausted its runtime skill loader budget before structured completion"
-    elif accounting.tool_limit_exhausted:
-        reason = "producer exhausted its tool-call budget before structured completion"
-    elif accounting.llm_limit_exhausted:
-        reason = "producer exhausted its LLM-call budget before structured completion"
-    elif last_agent_text is None:
-        reason = "producer returned no structured ProducerDecision output"
+    completed = _completed_text(
+        accounting,
+        last_agent_text,
+        operational_feedback,
+        invalid_gate="producer_invalid",
+        no_output_reason="producer returned no structured ProducerDecision output",
+    )
+    if isinstance(completed, Feedback):
+        return ProducerOutput(usage=usage, feedback=completed)
+    try:
+        decision = ProducerDecision.model_validate_json(completed)
+    except ValidationError:
+        reason = "producer returned malformed ProducerDecision output"
     else:
-        try:
-            decision = ProducerDecision.model_validate_json(last_agent_text)
-        except ValidationError:
-            reason = "producer returned malformed ProducerDecision output"
+        variant = decision.root
+        if not isinstance(variant, ProducerProposal):
+            return ProducerOutput(decision=decision, usage=usage)
+        expected_parent = (
+            None if producer_input.round_index == 1 else producer_input.round_index - 1
+        )
+        if variant.submission.plan.revision != producer_input.round_index:
+            reason = "plan revision must equal the current round index"
+        elif variant.submission.plan.parent_revision != expected_parent:
+            reason = "plan parent_revision does not match the preceding round"
         else:
-            variant = decision.root
-            if isinstance(variant, ProducerProposal):
-                expected_parent = (
-                    None if producer_input.round_index == 1 else producer_input.round_index - 1
-                )
-                if variant.submission.plan.revision != producer_input.round_index:
-                    reason = "plan revision must equal the current round index"
-                elif variant.submission.plan.parent_revision != expected_parent:
-                    reason = "plan parent_revision does not match the preceding round"
-                else:
-                    return ProducerOutput(decision=decision, usage=usage)
-            else:
-                return ProducerOutput(decision=decision, usage=usage)
+            return ProducerOutput(decision=decision, usage=usage)
     return ProducerOutput(
         usage=usage,
         feedback=Feedback(gate="producer_invalid", reason=reason, operational=False),
@@ -507,49 +530,17 @@ async def run_auditor(
         accounting=accounting,
     )
     usage = accounting.usage(seconds=time.perf_counter() - started)
-    if operational_feedback is not None:
-        return AuditOutput(usage=usage, feedback=operational_feedback)
-    if accounting.loader_limit_exhausted:
-        return AuditOutput(
-            usage=usage,
-            feedback=Feedback(
-                gate="audit_invalid",
-                reason=(
-                    "auditor exhausted its runtime skill loader budget before structured completion"
-                ),
-                operational=False,
-            ),
-        )
-    if accounting.tool_limit_exhausted:
-        return AuditOutput(
-            usage=usage,
-            feedback=Feedback(
-                gate="audit_invalid",
-                reason="auditor exhausted its tool-call budget before structured completion",
-                operational=False,
-            ),
-        )
-    if accounting.llm_limit_exhausted:
-        return AuditOutput(
-            usage=usage,
-            feedback=Feedback(
-                gate="audit_invalid",
-                reason="auditor exhausted its LLM-call budget before structured completion",
-                operational=False,
-            ),
-        )
-    text = last_agent_text
-    if text is None:
-        return AuditOutput(
-            usage=usage,
-            feedback=Feedback(
-                gate="audit_invalid",
-                reason="auditor returned no structured output",
-                operational=False,
-            ),
-        )
+    completed = _completed_text(
+        accounting,
+        last_agent_text,
+        operational_feedback,
+        invalid_gate="audit_invalid",
+        no_output_reason="auditor returned no structured output",
+    )
+    if isinstance(completed, Feedback):
+        return AuditOutput(usage=usage, feedback=completed)
     try:
-        review = AuditResult.model_validate_json(text)
+        review = AuditResult.model_validate_json(completed)
     except (ValidationError, ValueError):
         return AuditOutput(
             usage=usage,
