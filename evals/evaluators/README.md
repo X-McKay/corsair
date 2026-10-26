@@ -11,6 +11,8 @@ Corsair's executable evaluators are installed package code, shared with the CLI 
 
 `auditor-expanded.json` retains `audit01` and `audit02` with their original byte identities and adds `audit03`, a coherent source-grounded parent-traversal claim expected to be accepted, and `audit04`, a semantically fabricated SQL claim expected to be rejected. Decision labels remain in external oracle files. These four AI-authored cases are candidate diagnostics pending human review, not human-labelled, held-out, promoted, or population baselines.
 
+`auditor-rubric.json` adds `audit05` to `audit11`: one packet for each of `R1` to `R4` failing on its own, one `INSUFFICIENT_CONTEXT` packet and two acceptances of different path-handling flaws. Each oracle names a `decision` and the decisive `rule`, and the evaluator scores both only when the oracle has a `rule` (otherwise the decision alone decides, so `auditor-dev.json` and `auditor-expanded.json` score as before). These seven are also AI-authored candidate diagnostics pending human review.
+
 The accompanying frozen consistency test parses packets with canonical Pydantic contracts, validates raw packet digests through the actual isolated evaluator loader, and admits producer source bytes through the canonical snapshot loader. It does not import or execute any fixture target, invoke a model, or claim native evidence.
 
 From the repository root, run an isolated diagnostic only with explicitly configured provider access:

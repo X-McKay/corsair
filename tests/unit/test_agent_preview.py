@@ -220,21 +220,28 @@ async def test_preview_refuses_a_case_the_workflow_stops_before_any_model(tmp_pa
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("role", "options", "message"),
+    ("role", "round_index", "reviewed", "feedback", "message"),
     [
-        ("auditor", {}, "pass --submission"),
-        ("auditor", {"round_index": 2, "submission": "submission"}, "producer inputs"),
-        ("producer", {"submission": "submission"}, "auditor's input"),
-        ("producer", {"feedback": Feedback(gate="audit", reason="x")}, "pass --round 2"),
-        ("producer", {"round_index": 3}, "max_rounds"),
+        ("auditor", 1, False, None, "pass --submission"),
+        ("auditor", 2, True, None, "producer inputs"),
+        ("producer", 1, True, None, "auditor's input"),
+        ("producer", 1, False, Feedback(gate="audit", reason="x"), "pass --round 2"),
+        ("producer", 3, False, None, "max_rounds"),
     ],
 )
-async def test_preview_rejects_inputs_the_role_never_receives(role, options, message):
-    if options.get("submission") == "submission":
-        options = {**options, "submission": _submission()}
-
+async def test_preview_rejects_inputs_the_role_never_receives(
+    role, round_index: int, reviewed: bool, feedback: Feedback | None, message: str
+):
     with pytest.raises(ValueError, match=message) as refused:
-        await preview.preview_request(role, REQUEST, _settings(), structured_tools=False, **options)
+        await preview.preview_request(
+            role,
+            REQUEST,
+            _settings(),
+            round_index=round_index,
+            feedback=feedback,
+            submission=_submission() if reviewed else None,
+            structured_tools=False,
+        )
 
     assert str(refused.value).startswith("agent preview:")
     assert "corsair agent preview --help" in (failure_remedy(refused.value) or "")

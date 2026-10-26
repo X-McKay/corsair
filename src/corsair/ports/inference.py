@@ -6,6 +6,16 @@ from corsair.contracts import AuditInput, AuditOutput, ProducerInput, ProducerOu
 
 
 class InferencePort(Protocol):
-    async def produce(self, request: ProducerInput) -> ProducerOutput: ...
+    """``window_seconds`` is the time left to the calling activity, when it has a bound.
 
-    async def audit(self, request: AuditInput) -> AuditOutput: ...
+    An implementation ends its episode inside that window so the activity returns a
+    typed ``episode_timeout`` instead of timing out (see ``policies/time_bounds``).
+    """
+
+    async def produce(
+        self, request: ProducerInput, *, window_seconds: float | None = None
+    ) -> ProducerOutput: ...
+
+    async def audit(
+        self, request: AuditInput, *, window_seconds: float | None = None
+    ) -> AuditOutput: ...

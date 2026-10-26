@@ -3,10 +3,8 @@
 
 A dataset-wide wrapper over ``corsair.evaluation.preview`` (the engine behind
 ``corsair agent preview``): the production ``run_producer`` path renders each request
-and a capturing model records it, so no provider is called and no target code runs.
-With ``--after-load-skill`` the first scripted response is a ``load_skill`` call, and
-the second request shows what one redundant reload of the preloaded procedure adds to
-every later call.
+and a capturing model records it and abstains, so no provider is called and no target
+code runs. ``corsair agent preview producer REQUEST --full`` prints one request whole.
 
 Token counts are an approximation, ``ceil(bytes / 4)``, not a provider tokenizer.
 """
@@ -29,7 +27,6 @@ from corsair.evaluation.scoring import dataset_root
 from corsair.settings import Settings
 
 DEFAULT_DATASETS = ("evals/datasets/producer-dev.json", "evals/datasets/producer-expanded.json")
-_LOAD_SKILL = {"name": "load_skill", "args": {"skill_name": "source-grounding"}}
 
 
 def request_sections(request: LlmRequest) -> dict[str, str]:
@@ -39,7 +36,7 @@ def request_sections(request: LlmRequest) -> dict[str, str]:
 
 
 async def render_requests(
-    request_path: Path, content: bytes, *, structured_tools: bool, load_skill_first: bool
+    request_path: Path, content: bytes, *, structured_tools: bool
 ) -> list[LlmRequest]:
     """Render one fixture's producer requests through the production path."""
 
@@ -48,7 +45,6 @@ async def render_requests(
         load_request(request_path, content),
         Settings(),
         structured_tools=structured_tools,
-        leading_calls=[_LOAD_SKILL] if load_skill_first else [],
     )
 
 
@@ -69,19 +65,12 @@ def dataset_fixtures(datasets: list[Path]) -> list[tuple[str, Path, bytes]]:
     return fixtures
 
 
-async def measure(
-    datasets: list[Path], *, structured_tools: bool, load_skill_first: bool = False
-) -> list[dict[str, Any]]:
+async def measure(datasets: list[Path], *, structured_tools: bool) -> list[dict[str, Any]]:
     """Measure the final rendered request of each fixture's scripted episode."""
 
     rows: list[dict[str, Any]] = []
     for case_id, input_path, content in dataset_fixtures(datasets):
-        requests = await render_requests(
-            input_path,
-            content,
-            structured_tools=structured_tools,
-            load_skill_first=load_skill_first,
-        )
+        requests = await render_requests(input_path, content, structured_tools=structured_tools)
         sections = request_sections(requests[-1])
         rows.append(
             {
@@ -103,18 +92,9 @@ def main() -> None:
         help="model declares output_schema_and_tools (response_schema replaces the "
         "set_model_response tool)",
     )
-    parser.add_argument(
-        "--after-load-skill",
-        action="store_true",
-        help="measure the request that follows one load_skill call",
-    )
     args = parser.parse_args()
     paths = [Path(item).resolve() for item in args.datasets]
-    rows = asyncio.run(
-        measure(
-            paths, structured_tools=args.structured_tools, load_skill_first=args.after_load_skill
-        )
-    )
+    rows = asyncio.run(measure(paths, structured_tools=args.structured_tools))
     print(json.dumps({"token_estimate": "ceil(bytes/4)", "rows": rows}, indent=2))
 
 

@@ -1078,6 +1078,29 @@ async def test_status_query_reports_bounds_deadline_and_phase_timeline(
     assert [(entry["session"], entry["round"]) for entry in status["timeline"]][1:4] == [(1, 1)] * 3
     moments = [datetime.fromisoformat(entry["at"]) for entry in status["timeline"]]
     assert moments == sorted(moments) and moments[0] >= started
+    # The recorded result carries the same transitions up to finalization, so offline
+    # inspection can show phase durations after the workflow has closed.
+    recorded = [entry.model_dump(mode="json") for entry in result.timeline]
+    assert [entry["phase"] for entry in recorded] == [
+        "prepare",
+        "producer",
+        "evidence",
+        "audit",
+        "record",
+    ]
+    assert [entry.at for entry in result.timeline] == moments[:-1]
+    assert [(entry.session, entry.round) for entry in result.timeline] == [
+        (0, 0),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+    ]
+    assert result.result_artifact is not None
+    committed = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert committed.timeline == result.timeline
 
 
 async def test_status_query_reports_the_last_feedback_gate_per_round(
@@ -1123,4 +1146,133 @@ async def test_batch_status_query_reports_running_and_error_counts(
         await handle.result()
         status = await handle.query(EvaluationWorkflow.status)
 
-    assert status == {"completed": 2, "total": 2, "running": 0, "errors": 1}
+    children = status.pop("children")
+    started = datetime.fromisoformat(status.pop("started"))
+    assert status == {
+        "completed": 2,
+        "total": 2,
+        "running": 0,
+        "errors": 1,
+        "children_omitted": 0,
+    }
+    assert [(row["case_id"], row["repeat"], row["state"]) for row in children] == [
+        ("statusbad", 0, "failed"),
+        ("statusok", 0, "completed"),
+    ]
+    assert [row["run_id"] for row in children] == [
+        f"{request.batch_id}.c1.r0",
+        f"{request.batch_id}.c0.r0",
+    ]
+    for row in children:
+        assert set(row) == {"case_id", "repeat", "run_id", "state", "started", "finished"}
+        assert started <= datetime.fromisoformat(row["started"])
+        assert datetime.fromisoformat(row["started"]) <= datetime.fromisoformat(row["finished"])
+
+
+async def test_batch_status_query_reports_running_then_pending_children_mid_batch(
+    temporal_server, temporal_artifact_store
+):
+    request = BatchRequest(
+        batch_id=temporal_id("batchlive"),
+        requests=[investigation_request("liveb"), investigation_request("livea")],
+        repeats=1,
+        concurrency=1,
+    )
+    scenario = ActivityScenario(pause_prepare=True)
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        handle = await temporal_server.client.start_workflow(
+            EvaluationWorkflow.run,
+            request,
+            id=temporal_id("batchlive"),
+            task_queue=task_queue,
+            result_type=list[BatchItem],
+        )
+        await asyncio.wait_for(acts.prepare_started.wait(), timeout=15)
+        during = await handle.query(EvaluationWorkflow.status)
+        acts.release_prepare.set()
+        await handle.result()
+        after = await handle.query(EvaluationWorkflow.status)
+
+    assert (during["completed"], during["running"], during["total"]) == (0, 1, 2)
+    # Running first, then pending: the order the operator needs, not submission order.
+    assert [(row["case_id"], row["state"]) for row in during["children"]] == [
+        ("liveb", "running"),
+        ("livea", "pending"),
+    ]
+    running, pending = during["children"]
+    assert running["started"] is not None and running["finished"] is None
+    assert pending["started"] is None and pending["finished"] is None
+    assert [(row["case_id"], row["state"]) for row in after["children"]] == [
+        ("livea", "completed"),
+        ("liveb", "completed"),
+    ]
+
+
+async def test_slow_producer_episode_ends_inside_its_activity_as_episode_timeout(
+    temporal_server, temporal_artifact_store
+):
+    """A provider slower than the producer activity window is a typed episode stop.
+
+    The real produce activity and ADK adapter run a native episode against a model
+    that never answers. The episode bound sits inside the activity window, so the
+    round records ``episode_timeout`` with accounted usage instead of an opaque
+    activity StartToClose ``ActivityError`` with unknown usage.
+    """
+    from typing import cast
+
+    from corsair.adapters.inference.adk import AdkInference
+    from corsair.ports.sandboxing import SandboxPort
+    from corsair.ports.scm import SourceSnapshotPort
+    from corsair.settings import Settings
+    from corsair.steps.activities import Activities
+    from tests.unit.adk import StalledLlm
+
+    settings = Settings()
+    model = StalledLlm(model="stalled-provider")
+    fakes = FakeActivities(temporal_artifact_store)
+    real = Activities(
+        settings,
+        store=temporal_artifact_store,
+        inference=AdkInference(settings, temporal_artifact_store, model),
+        sources=cast(SourceSnapshotPort, object()),
+        sandbox=cast(SandboxPort, object()),
+    )
+    request = investigation_request("slowproducer")
+    queue, identity = temporal_id("slow-queue"), temporal_id("slow-producer")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=[fakes.prepare, real.produce, fakes.evidence, fakes.audit, fakes.record],
+    ):
+        handle = await temporal_server.client.start_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+        result = await asyncio.wait_for(handle.result(), timeout=60)
+        history = await handle.fetch_history()
+
+    produce = next(
+        event.activity_task_scheduled_event_attributes
+        for event in history.events
+        if event.HasField("activity_task_scheduled_event_attributes")
+        and event.activity_task_scheduled_event_attributes.activity_type.name == "corsair.produce"
+    )
+    window = produce.start_to_close_timeout.seconds
+    assert 0 < window <= request.budget.max_elapsed_seconds
+    assert not any(
+        event.HasField("activity_task_timed_out_event_attributes") for event in history.events
+    )
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.usage_complete is True
+    assert len(result.rounds) == 1
+    producer = result.rounds[0].producer
+    assert producer.feedback is not None
+    assert (producer.feedback.gate, producer.feedback.operational) == ("episode_timeout", True)
+    assert producer.usage.llm_calls == 1 == len(model.requests)
+    assert producer.usage.seconds < window
+    assert fakes.call_counts["corsair.evidence"] == 0
+    assert temporal_artifact_store.reconcile(f"result.{identity}")

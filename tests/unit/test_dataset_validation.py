@@ -575,3 +575,36 @@ def test_dataset_validate_loads_no_runtime_sdks(tmp_path):
         assert not any(
             name == prefix or name.startswith(f"{prefix}.") for name in loaded["modules"]
         ), prefix
+
+
+@pytest.mark.parametrize(
+    ("oracle", "problems"),
+    [
+        ('{"decision": "REJECT", "rule": "R2"}', []),
+        ('{"decision": "ACCEPT", "rule": "ALL"}', []),
+        ('{"decision": "INSUFFICIENT_CONTEXT", "rule": "R1"}', []),
+        ('{"decision": "ACCEPT", "rule": "R1"}', ["oracle: rule for ACCEPT must be one of ALL"]),
+        (
+            '{"decision": "REJECT", "rule": "ALL"}',
+            ["oracle: rule for REJECT must be one of R1, R2, R3, R4"],
+        ),
+        (
+            '{"decision": "REJECT", "rule": "R2 differential"}',
+            ["oracle: rule for REJECT must be one of R1, R2, R3, R4"],
+        ),
+    ],
+)
+def test_an_auditor_oracle_rule_must_fit_its_decision(tmp_path, oracle: str, problems: list):
+    _copy_fixture(tmp_path, "audit01")
+    (tmp_path / "fixtures/audit01/oracle.json").write_text(oracle)
+    path = _agent_dataset(
+        tmp_path, [("audit01", "fixtures/audit01/input.json", "fixtures/audit01/oracle.json")]
+    )
+
+    assert _entry(validate_dataset(path).as_dict(), "audit01")["problems"] == problems
+
+
+def test_the_auditor_rubric_cohort_validates():
+    report = validate_dataset(ROOT / "evals/datasets/auditor-rubric.json").as_dict()
+
+    assert [entry["problems"] for entry in report["entries"]] == [[]] * 7

@@ -61,16 +61,14 @@ _MANIFEST_IMAGE = "preview:no-native-execution"
 
 
 class CapturingLlm(BaseLlm):
-    """Record each native request and answer from a fixed script; never a provider.
+    """Record each native request and answer with one fixed reply; never a provider.
 
-    ``leading_calls`` are function calls answered, in order, before the fixed ``reply``;
-    the reply goes through ``set_model_response`` when ADK declared that tool and as JSON
-    text otherwise.
+    The reply goes through ``set_model_response`` when ADK declared that tool and as
+    JSON text otherwise.
     """
 
     reply: dict[str, Any]
     structured_tools: bool = False
-    leading_calls: list[dict[str, Any]] = Field(default_factory=list)
     requests: list[LlmRequest] = Field(default_factory=list)
 
     @property
@@ -82,12 +80,7 @@ class CapturingLlm(BaseLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         del stream
         self.requests.append(llm_request)
-        index = len(self.requests) - 1
-        if index < len(self.leading_calls):
-            scripted = self.leading_calls[index]
-            call = types.FunctionCall(name=scripted["name"], args=dict(scripted["args"]))
-            part = types.Part(function_call=call)
-        elif "set_model_response" in declared_tool_names(llm_request):
+        if "set_model_response" in declared_tool_names(llm_request):
             call = types.FunctionCall(name="set_model_response", args=dict(self.reply))
             part = types.Part(function_call=call)
         else:
@@ -242,7 +235,6 @@ async def capture_producer(
     store: ArtifactStore,
     *,
     structured_tools: bool,
-    leading_calls: Sequence[Mapping[str, Any]] = (),
 ) -> list[LlmRequest]:
     """Run the production producer episode against a capturing model; return its requests."""
 
@@ -250,7 +242,6 @@ async def capture_producer(
         model="corsair-preview",
         reply=_ABSTAIN,
         structured_tools=structured_tools,
-        leading_calls=[dict(call) for call in leading_calls],
     )
     await run_producer(producer_input, settings, store, model)
     return model.requests
@@ -363,7 +354,6 @@ async def render_requests(
     previous: Submission | None = None,
     feedback: Feedback | None = None,
     submission: Submission | None = None,
-    leading_calls: Sequence[Mapping[str, Any]] = (),
 ) -> list[LlmRequest]:
     """Run one role episode for ``request`` through the production path; return every
     request it sent to the capturing model.
@@ -399,7 +389,6 @@ async def render_requests(
                 scratch,
                 store,
                 structured_tools=structured_tools,
-                leading_calls=leading_calls,
             )
         if submission is None:  # Refused by _check_role_inputs; narrows the type.
             raise ValueError("agent preview: the auditor reviews a submission; pass --submission")

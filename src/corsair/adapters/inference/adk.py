@@ -41,7 +41,7 @@ from corsair.agents.producer.contracts import (
 )
 from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.toolsets import build_producer_toolset
-from corsair.agents.resources import load_agent_spec
+from corsair.agents.resources import RoleName, load_agent_spec
 from corsair.contracts import (
     Feedback,
     Finding,
@@ -50,6 +50,12 @@ from corsair.contracts import (
     Usage,
 )
 from corsair.observability.logging import event
+from corsair.policies.time_bounds import (
+    AUDITOR_ACTIVITY_SECONDS,
+    EpisodeBounds,
+    episode_bounds,
+    producer_activity_seconds,
+)
 from corsair.settings import ModelSettings, Settings
 
 _MAX_PROMPT_BYTES = 32_768
@@ -75,14 +81,9 @@ class _EpisodeAccounting:
     max_llm_calls: int
     max_output_tokens: int
     max_tool_calls: int = 0
-    max_loader_calls: int = 0
     role: str = ""
-    loader_tool_names: frozenset[str] = frozenset()
-    allowed_skill_names: frozenset[str] = frozenset()
     tool_calls: int = 0
-    loader_calls: int = 0
     tool_limit_exhausted: bool = False
-    loader_limit_exhausted: bool = False
     llm_calls: int = 0
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -91,7 +92,6 @@ class _EpisodeAccounting:
     provider_error_message: str | None = None
     applied_output_cap: int | None = None
     final_response_hit_output_cap: bool = False
-    skills_loaded: list[str] = field(default_factory=list)
     skills_preloaded: list[str] = field(default_factory=list)
 
     async def before_model(
@@ -122,18 +122,12 @@ class _EpisodeAccounting:
     ) -> dict[str, str] | None:
         """Charge every native tool, including ADK schema completion, before work."""
 
-        del args
+        del tool, args
         if self.tool_calls >= self.max_tool_calls:
             self.tool_limit_exhausted = True
             tool_context._invocation_context.end_invocation = True
             return {"error": "tool-call budget exhausted"}
-        if tool.name in self.loader_tool_names and self.loader_calls >= self.max_loader_calls:
-            self.loader_limit_exhausted = True
-            tool_context._invocation_context.end_invocation = True
-            return {"error": "runtime skill loader budget exhausted"}
         self.tool_calls += 1
-        if tool.name in self.loader_tool_names:
-            self.loader_calls += 1
         return None
 
     async def after_model(
@@ -159,34 +153,12 @@ class _EpisodeAccounting:
             self.provider_error_message = str(llm_response.error_message or "")
         return None
 
-    async def after_tool(
-        self,
-        tool: BaseTool,
-        args: dict[str, Any],
-        tool_context: ToolContext,
-        tool_response: dict[str, Any],
-    ) -> None:
-        """Record only an ADK-confirmed successful load of an admitted skill."""
-
-        del args, tool_context
-        if tool.name != "load_skill" or not isinstance(tool_response, dict):
-            return None
-        skill_name = tool_response.get("skill_name")
-        if (
-            tool_response.get("error") is None
-            and isinstance(skill_name, str)
-            and skill_name in self.allowed_skill_names
-            and skill_name not in self.skills_loaded
-        ):
-            self.skills_loaded.append(skill_name)
-            event("agent.skill_loaded", role=self.role, skill_name=skill_name)
-        return None
-
     def usage(self, seconds: float) -> Usage:
         return Usage(
             llm_calls=self.llm_calls,
             tool_calls=self.tool_calls,
-            skills_loaded=self.skills_loaded,
+            # No role exposes a native skill loader: procedures are preloaded only.
+            skills_loaded=[],
             skills_preloaded=self.skills_preloaded,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
@@ -418,7 +390,7 @@ async def _run_native_episode(
     message: str,
     author: str,
     llm_call_limit: int,
-    timeout_seconds: int,
+    timeout_seconds: float,
     accounting: _EpisodeAccounting,
 ) -> tuple[str | None, Feedback | None]:
     """Run exactly one ordinary ADK Runner episode with a fresh memory-only session."""
@@ -432,7 +404,6 @@ async def _run_native_episode(
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
     agent.before_tool_callback = accounting.before_tool
-    agent.after_tool_callback = accounting.after_tool
     last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
@@ -447,7 +418,10 @@ async def _run_native_episode(
     except TimeoutError:
         return last_text, Feedback(
             gate="episode_timeout",
-            reason="bounded ADK episode exceeded its elapsed-time limit",
+            reason=(
+                f"bounded ADK episode exceeded its {timeout_seconds:.0f}-second elapsed-time "
+                "limit inside its activity window"
+            ),
             operational=True,
         )
     except Exception as error:  # Provider/transport failures are activity data, not retries.
@@ -459,6 +433,31 @@ async def _run_native_episode(
             accounting.provider_error_code, accounting.provider_error_message
         )
     return last_text, None
+
+
+def _role_bounds(
+    settings: Settings | ModelSettings, window_seconds: float | None, fresh_window: float
+) -> EpisodeBounds:
+    """Episode and request bounds inside the calling activity's window.
+
+    Outside Temporal (isolated agent evaluation) there is no activity, so the window
+    is ``fresh_window``: the one a fresh investigation would grant the role.
+    """
+
+    model_settings = settings.models if isinstance(settings, Settings) else settings
+    window = fresh_window if window_seconds is None else window_seconds
+    return episode_bounds(window, model_settings.request_timeout_seconds)
+
+
+def _role_model(
+    settings: Settings | ModelSettings,
+    role: RoleName,
+    bounds: EpisodeBounds,
+    model_override: str | BaseLlm | None,
+) -> str | BaseLlm:
+    if model_override is not None:
+        return model_override
+    return model_for_role(settings, role, request_timeout_seconds=bounds.request_seconds)
 
 
 def _effective_limit(requested: int, configured: int) -> int:
@@ -483,9 +482,7 @@ def _completed_text(
     role = accounting.role
     if operational_feedback is not None:
         return operational_feedback
-    if accounting.loader_limit_exhausted:
-        reason = f"{role} exhausted its runtime skill loader budget before structured completion"
-    elif accounting.tool_limit_exhausted:
+    if accounting.tool_limit_exhausted:
         reason = f"{role} exhausted its tool-call budget before structured completion"
     elif accounting.llm_limit_exhausted:
         reason = f"{role} exhausted its LLM-call budget before structured completion"
@@ -501,6 +498,8 @@ async def run_producer(
     settings: Settings | ModelSettings,
     store: ArtifactStore,
     model_override: str | BaseLlm | None = None,
+    *,
+    window_seconds: float | None = None,
 ) -> ProducerOutput:
     """Run one bounded producer episode and return only typed decision data."""
 
@@ -511,18 +510,17 @@ async def run_producer(
     tool_limit = min(producer_input.tool_call_limit, producer_input.budget.max_tool_calls)
     spec = load_agent_spec("producer")
     private_tools = build_producer_toolset(producer_input, StoredSourceReader(store))
-    model = model_for_role(settings, "producer") if model_override is None else model_override
-    agent = build_producer(model, private_tools)
+    bounds = _role_bounds(
+        settings, window_seconds, producer_activity_seconds(producer_input.budget, 0)
+    )
+    agent = build_producer(_role_model(settings, "producer", bounds, model_override), private_tools)
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
         max_llm_calls=llm_limit,
         max_output_tokens=producer_input.budget.max_output_tokens,
         max_tool_calls=tool_limit,
-        max_loader_calls=spec.loader_call_limit,
         role=spec.name,
-        loader_tool_names=frozenset(spec.loader_tools),
-        allowed_skill_names=frozenset(spec.runtime_skills),
         skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(
@@ -533,7 +531,7 @@ async def run_producer(
         message=_producer_prompt(producer_input),
         author="producer",
         llm_call_limit=llm_limit,
-        timeout_seconds=producer_input.budget.max_elapsed_seconds,
+        timeout_seconds=bounds.episode_seconds,
         accounting=accounting,
     )
     seconds = time.perf_counter() - started
@@ -573,6 +571,8 @@ async def run_auditor(
     audit_input: AuditInput,
     settings: Settings | ModelSettings,
     model_override: str | BaseLlm | None = None,
+    *,
+    window_seconds: float | None = None,
 ) -> AuditOutput:
     """Run one fresh outcome-blind review: a single tool-free structured request.
 
@@ -595,8 +595,8 @@ async def run_auditor(
                 operational=False,
             ),
         )
-    model = model_for_role(settings, "auditor") if model_override is None else model_override
-    agent = build_auditor(model)
+    bounds = _role_bounds(settings, window_seconds, AUDITOR_ACTIVITY_SECONDS)
+    agent = build_auditor(_role_model(settings, "auditor", bounds, model_override))
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
@@ -613,7 +613,7 @@ async def run_auditor(
         message=_auditor_prompt(audit_input),
         author="auditor",
         llm_call_limit=llm_limit,
-        timeout_seconds=300,
+        timeout_seconds=bounds.episode_seconds,
         accounting=accounting,
     )
     usage = accounting.usage(seconds=time.perf_counter() - started)
@@ -648,8 +648,16 @@ class AdkInference:
     store: ArtifactStore
     model_override: str | BaseLlm | None = None
 
-    async def produce(self, request: ProducerInput) -> ProducerOutput:
-        return await run_producer(request, self.settings, self.store, self.model_override)
+    async def produce(
+        self, request: ProducerInput, *, window_seconds: float | None = None
+    ) -> ProducerOutput:
+        return await run_producer(
+            request, self.settings, self.store, self.model_override, window_seconds=window_seconds
+        )
 
-    async def audit(self, request: AuditInput) -> AuditOutput:
-        return await run_auditor(request, self.settings, self.model_override)
+    async def audit(
+        self, request: AuditInput, *, window_seconds: float | None = None
+    ) -> AuditOutput:
+        return await run_auditor(
+            request, self.settings, self.model_override, window_seconds=window_seconds
+        )

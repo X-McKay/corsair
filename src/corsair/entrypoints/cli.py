@@ -95,6 +95,16 @@ def _result_from_store(store: ArtifactStore, identity: str) -> InvestigationResu
     return InvestigationResult.model_validate(store.get_json(ref))
 
 
+def _existing_store(settings: Settings) -> ArtifactStore | None:
+    """The local artifact store only when it already exists, so opening creates nothing."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    root = Path(settings.artifact_root)
+    if not ((root / "blobs").is_dir() and (root / "operations").is_dir()):
+        return None
+    return ArtifactStore(root)
+
+
 def _score_saved_result(
     store: ArtifactStore, identity: str, oracles: Mapping[str, Oracle]
 ) -> dict[str, object]:
@@ -244,7 +254,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
             ui.emit(inspect_evidence(store, result))
         else:
-            ui.emit(result)
+            ui.emit(result, store=store)
         return 0
 
     from corsair.adapters.temporal.client import connect, wait_for_result
@@ -315,7 +325,8 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
         f"Investigation {handle.id}",
         query=lambda: handle.query(InvestigationWorkflow.status),
     )
-    ui.emit(result)
+    # A worker sharing this host's artifact root lets the human view verify the ledger.
+    ui.emit(result, store=_existing_store(settings) if ui.human else None)
     event(
         "investigation.completed",
         run_id=handle.id,

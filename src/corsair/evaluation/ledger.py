@@ -46,7 +46,6 @@ _BUDGET_REASONS = frozenset(
 # Fixed adapter reasons behind the non-operational producer_invalid/audit_invalid
 # gates. Qualifying them separates "ran out of calls" from "returned bad output".
 _INVALID_QUALIFIERS = (
-    ("exhausted its runtime skill loader budget", "loader_budget"),
     ("exhausted its tool-call budget", "tool_budget"),
     ("exhausted its LLM-call budget", "llm_budget"),
     ("no remaining model-call budget", "llm_budget"),
@@ -65,6 +64,7 @@ _ORACLE_REASONS = {
     MatchKind.EXACT_MATCH: "output matched the frozen oracle exactly",
     MatchKind.CONTROL_MISMATCH: "control payload differs from the frozen oracle",
     MatchKind.CANDIDATE_EXACT_MISMATCH: "output differs from the frozen oracle",
+    MatchKind.RULE_MISMATCH: "decision matched but the decisive rule differs from the oracle",
 }
 
 
@@ -287,7 +287,7 @@ def _agent_oracle_entry(kind: MatchKind, row: Mapping[str, Any]) -> dict:
     if isinstance(decision, str) and decision in {item.value for item in AuditDecision}:
         rule = row.get("audit_rule")
         cited = f":{rule}" if rule in _AUDIT_RUBRIC else ""
-        if kind is MatchKind.CANDIDATE_EXACT_MISMATCH:
+        if kind in {MatchKind.CANDIDATE_EXACT_MISMATCH, MatchKind.RULE_MISMATCH}:
             gate += f":{decision.lower()}{cited}"
         reason = f"auditor returned {decision}{cited.replace(':', ' under ')}; {reason}"
     return _entry(None, None, "oracle", gate, reason)

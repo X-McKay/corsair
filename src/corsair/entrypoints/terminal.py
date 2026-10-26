@@ -17,16 +17,19 @@ from rich.console import Console, Group, RenderableType
 from rich.json import JSON
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress_bar import ProgressBar
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     AuditDecision,
     AuditOutput,
     ExecutionStatus,
     InvestigationResult,
     Observation,
+    PhaseTransition,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -34,6 +37,7 @@ from corsair.contracts import (
     Verdict,
 )
 from corsair.evaluation.comparison import row_label, row_stop
+from corsair.evaluation.ledger import RoundKey, gate_ledger, verified_rounds
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_error_detail, safe_text
 from corsair.ports.sandboxing import SandboxUnavailable
@@ -86,6 +90,21 @@ T = TypeVar("T")
 _POLL_SECONDS = 1.0
 # Most recent phase transitions shown in the live panel.
 _TIMELINE_ROWS = 8
+# Gate-ledger stops coloured like the verdicts they lead to; the rest are non-decisive.
+_STOP_STYLES: dict[str, str] = {
+    "demonstrated": "red",
+    "component_demonstrated": "red",
+    "clean_negative": "green",
+    "evidence_unverified": "dim",
+    "kernel_error": "magenta",
+}
+# Case-level ledger stops whose reason is a fixed, code-authored sentence. Every other
+# ledger reason may repeat model text (an abstention, an audit reason) or the result's
+# own reason, so the human view names only the stage and gate.
+_CODE_REASON_STOPS = frozenset({"fix_not_blocked", "negative_threshold_unmet", "budget_exhausted"})
+# Evaluation child rows shown in the live panel; the query already orders them by state.
+_CHILD_TABLE_ROWS = 16
+_CHILD_STYLES = {"running": "cyan", "failed": "red", "completed": "green", "pending": "dim"}
 
 
 class TerminalOptions(Protocol):
@@ -353,10 +372,38 @@ def _audit_cell(audit: AuditOutput | None) -> Text:
     return cell
 
 
-def _rounds_table(rounds: list[RoundResult]) -> Table:
+def _stop_cell(entry: Mapping[str, Any] | None) -> Text:
+    """Gate and stage only: a round's ledger reason can be model text."""
+    if entry is None:
+        return Text("unknown", style="dim")
+    gate = str(entry["gate"])
+    cell = Text(safe_text(gate), style=_STOP_STYLES.get(gate, "yellow"))
+    cell.append(f"\n{safe_text(entry['stage'])}", style="dim")
+    return cell
+
+
+def _case_stop(ledger: list[dict]) -> Text:
+    """Why the case stopped: its policy stops, else the last round's stopping gate."""
+    stops = [entry for entry in ledger if entry["round"] is None]
+    if not stops:
+        last = ledger[-1]
+        cell = Text(safe_text(last["gate"]), style=_STOP_STYLES.get(last["gate"], "yellow"))
+        cell.append(f" · {safe_text(last['stage'])} at {last['session']}.{last['round']}")
+        return cell
+    cell = Text()
+    for position, entry in enumerate(stops):
+        if position:
+            cell.append("; ")
+        cell.append(safe_text(entry["gate"]), style=_STOP_STYLES.get(entry["gate"], "yellow"))
+        if entry["gate"] in _CODE_REASON_STOPS:
+            cell.append(f": {safe_text(entry['reason'])}")
+    return cell
+
+
+def _rounds_table(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> Table:
     table = Table(title="Rounds", title_justify="left", expand=True)
     table.add_column("S.R", no_wrap=True)
-    for column in ("Producer", "Control", "Adversarial", "Audit"):
+    for column in ("Producer", "Control", "Adversarial", "Audit", "Stopped at"):
         table.add_column(column, overflow="fold")
     for item in rounds:
         observation = item.observation
@@ -366,7 +413,62 @@ def _rounds_table(rounds: list[RoundResult]) -> Table:
             _role_cell(observation.control if observation else None),
             _role_cell(observation.adversarial if observation else None),
             _audit_cell(item.audit),
+            _stop_cell(stops.get((item.session, item.index))),
         )
+    if any(entry["gate"] == "evidence_unverified" for entry in stops.values()):
+        table.caption = Text(
+            "evidence_unverified: the round's receipts were not validated against the "
+            "artifact store here, so no kernel gate is named; the verdict is the recorded one.",
+            style="dim",
+        )
+        table.caption_justify = "left"
+    return table
+
+
+def _duration(seconds: float) -> str:
+    return f"{seconds:.1f} s" if seconds < 60 else _clock(seconds)
+
+
+def _timeline_table(timeline: list[PhaseTransition]) -> Table:
+    """Recorded phase durations: each transition lasts until the next one, and the last
+    one (normally ``record``) has no recorded end. Unknown times stay unknown."""
+    table = Table(title="Phases", title_justify="left", expand=True)
+    for column in ("S.R", "Phase", "At", "Duration"):
+        table.add_column(column, overflow="fold")
+    first = timeline[0].at
+    totals: dict[str, float | None] = {}
+    for entry, following in zip(timeline, [*timeline[1:], None], strict=True):
+        offset = None
+        if entry.at is not None and first is not None:
+            offset = f"+{_clock((entry.at - first).total_seconds())}"
+        duration: str | None = "-"
+        if following is not None:
+            seconds = None
+            if entry.at is not None and following.at is not None:
+                seconds = (following.at - entry.at).total_seconds()
+            total = totals.get(entry.phase, 0.0)
+            totals[entry.phase] = None if total is None or seconds is None else total + seconds
+            duration = None if seconds is None else _duration(seconds)
+        table.add_row(
+            _text(f"{entry.session}.{entry.round}"),
+            _text(entry.phase),
+            _text(offset),
+            _text(duration),
+        )
+    notes = []
+    if timeline[0].phase != "prepare":
+        notes.append("earlier transitions not retained")
+    if totals:
+        notes.append(
+            "totals: "
+            + " · ".join(
+                f"{phase} {'unknown' if total is None else _duration(total)}"
+                for phase, total in totals.items()
+            )
+        )
+    if notes:
+        table.caption = _text("; ".join(notes))
+        table.caption_justify = "left"
     return table
 
 
@@ -550,7 +652,7 @@ def _count(value: object, limit: object) -> str:
 
 _PROGRESS_KEYS = frozenset(
     {"phase", "session", "round", "max_sessions", "max_rounds", "gate", "started", "deadline"}
-    | {"timeline", "completed", "total", "running", "errors"}
+    | {"timeline", "completed", "total", "running", "errors", "children", "children_omitted"}
 )
 
 
@@ -593,22 +695,106 @@ def progress_fields(
     return fields
 
 
+def _child_rows(status: Mapping[str, object] | None) -> list[Mapping[str, object]]:
+    """Evaluation child rows from a status query, in the order the workflow returned."""
+    children = status.get("children") if status else None
+    if not isinstance(children, list):
+        return []
+    return [row for row in children if isinstance(row, Mapping)]
+
+
+def _child_elapsed(row: Mapping[str, object], now: datetime) -> str:
+    """A running child's time so far, a finished child's duration, else nothing."""
+    started = _instant(row.get("started"))
+    if started is None:
+        return ""
+    finished = _instant(row.get("finished")) or now
+    return _clock((finished - started).total_seconds())
+
+
+def _child_table(status: Mapping[str, object], now: datetime) -> Table | None:
+    rows = _child_rows(status)
+    if not rows:
+        return None
+    table = Table("State", "Case", "Repeat", "Elapsed", "Run", box=None, pad_edge=False)
+    for row in rows[:_CHILD_TABLE_ROWS]:
+        state = safe_text(row.get("state"))
+        table.add_row(
+            Text(state, style=_CHILD_STYLES.get(state, "")),
+            _text(row.get("case_id")),
+            _text(row.get("repeat")),
+            _text(_child_elapsed(row, now)),
+            _text(row.get("run_id")),
+        )
+    omitted = status.get("children_omitted")
+    hidden = max(0, len(rows) - _CHILD_TABLE_ROWS)
+    hidden += omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
+    if hidden > 0:
+        table.add_row(_text(f"… {hidden} more"), "", "", "", "")
+    return table
+
+
+def child_changes(
+    seen: dict[str, str], status: Mapping[str, object] | None
+) -> list[Mapping[str, object]]:
+    """Rows whose state differs from the last one seen for that run; updates ``seen``.
+
+    A child first seen while still pending is not a change, so the first poll of a
+    large batch prints nothing per child.
+    """
+    changed: list[Mapping[str, object]] = []
+    for row in _child_rows(status):
+        run_id, state = safe_text(row.get("run_id")), safe_text(row.get("state"))
+        previous = seen.get(run_id)
+        if previous != state and not (previous is None and state == "pending"):
+            changed.append(row)
+        seen[run_id] = state
+    return changed
+
+
+def child_line(
+    label: str, row: Mapping[str, object], fields: list[tuple[str, str]], now: datetime
+) -> Text:
+    """One plain line for one evaluation child's state change, after the batch counts."""
+    child = [
+        ("case", f"{safe_text(row.get('case_id'))} r{safe_text(row.get('repeat'))}"),
+        ("state", safe_text(row.get("state"))),
+    ]
+    elapsed = _child_elapsed(row, now)
+    if elapsed:
+        child.append(("case elapsed", elapsed))
+    return progress_line(label, [*fields, *child])
+
+
 def progress_line(label: str, fields: list[tuple[str, str]]) -> Text:
     """One plain line for a non-animated terminal: no cursor movement."""
     return _text(" · ".join([label, *(f"{key} {value}" for key, value in fields)]))
 
 
 def progress_panel(
-    label: str, status: Mapping[str, object] | None, fields: list[tuple[str, str]]
+    label: str,
+    status: Mapping[str, object] | None,
+    fields: list[tuple[str, str]],
+    *,
+    now: datetime | None = None,
 ) -> Panel:
-    """Compact live view: current status fields and the most recent phase transitions."""
+    """Compact live view: status fields, then evaluation child rows with a progress bar or
+    the most recent phase transitions, whichever the status query carries."""
     summary = Table.grid(padding=(0, 2))
     phase = next((value for key, value in fields if key == "phase"), "in progress")
     summary.add_row(Spinner("dots", style="cyan"), Text(phase, style="bold"))
     for key, value in fields:
         if key != "phase":
             summary.add_row(Text(key.capitalize(), style="cyan"), _text(value))
+    total = status.get("total") if status else None
+    completed = status.get("completed") if status else None
+    if isinstance(total, int) and isinstance(completed, int) and total > 0:
+        bar = ProgressBar(total=total, completed=min(completed, total), width=30)
+        summary.add_row(Text("Progress", style="cyan"), bar)
     parts: list[RenderableType] = [summary]
+    children = _child_table(status, now or _utcnow()) if status else None
+    if children is not None:
+        parts.extend([Text(""), children])
     timeline = status.get("timeline") if status else None
     if isinstance(timeline, list) and timeline:
         started = _instant(status.get("started")) if status else None
@@ -656,8 +842,13 @@ class Terminal:
         )
         self.animate = animation and self.err.is_interactive
 
-    def emit(self, value: object) -> None:
-        """Write a complete JSON receipt, a Markdown record or a compact human rendering."""
+    def emit(self, value: object, *, store: ArtifactStore | None = None) -> None:
+        """Write a complete JSON receipt, a Markdown record or a compact human rendering.
+
+        ``store`` lets the human result view verify each round's receipts for its gate
+        ledger; without it, rounds that reached the kernel show ``evidence_unverified``.
+        JSON output never depends on it.
+        """
         rendered = TypeAdapter(Any).dump_python(value, mode="json")
         if self.markdown:
             from corsair.entrypoints.markdown import to_markdown
@@ -668,7 +859,7 @@ class Terminal:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
         if isinstance(rendered, dict) and "disposition" in rendered:
-            self._result(InvestigationResult.model_validate(rendered))
+            self._result(InvestigationResult.model_validate(rendered), store)
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
@@ -860,8 +1051,16 @@ class Terminal:
             )
         self.out.print(Panel(table, title="Corsair · Gate ledger Δ", border_style="cyan"))
 
-    def _result(self, result: InvestigationResult) -> None:
-        """Verdict first, then rounds, identity and totals; never model or payload content."""
+    def _result(self, result: InvestigationResult, store: ArtifactStore | None = None) -> None:
+        """Verdict and case stop first, then rounds with their gate-ledger stop, phases,
+        identity and totals; never model or payload content. The ledger only describes
+        the recorded verdict: it is computed by the evaluator's pure ``gate_ledger``."""
+        ledger = gate_ledger(result, verified_rounds(result, store))
+        stops = {
+            (entry["session"], entry["round"]): entry
+            for entry in ledger
+            if entry["round"] is not None
+        }
         style = _VERDICT_STYLES.get(result.verdict, "cyan") if result.verdict else "cyan"
         header = _grid()
         header.add_row(
@@ -870,6 +1069,7 @@ class Terminal:
             if result.verdict
             else Text("not recorded", style="yellow"),
         )
+        header.add_row(_label("Case stop"), _case_stop(ledger))
         header.add_row(
             _label("Execution"),
             Text(
@@ -885,11 +1085,13 @@ class Terminal:
         header.add_row(_label("Case"), _text(result.case_id))
         self.out.print(Panel(header, title="Corsair · Investigation", border_style=style))
         if result.rounds:
-            self.out.print(_rounds_table(result.rounds))
+            self.out.print(_rounds_table(result.rounds, stops))
         else:
             self.out.print(Text("No rounds recorded.", style="dim"))
         if result.fix_observation is not None:
             self.out.print(_roles_table(result.fix_observation, "Fixed revision", caption=True))
+        if result.timeline:
+            self.out.print(_timeline_table(result.timeline))
         self.out.print(self._identity(result))
 
     @staticmethod
@@ -1204,6 +1406,16 @@ class Terminal:
             **({} if remedy is None else {"remedy": remedy}),
         )
 
+    def _print_progress(
+        self, label: str, status: Mapping[str, object], seen: dict[str, str], begun: float
+    ) -> None:
+        """Plain mode: one line per evaluation child state change, else one status line."""
+        now = _utcnow()
+        fields = progress_fields(status, now, time.monotonic() - begun)
+        lines = [child_line(label, row, fields, now) for row in child_changes(seen, status)]
+        for line in lines or [progress_line(label, fields)]:
+            self.err.print(line, soft_wrap=True)
+
     async def wait(
         self,
         awaitable: Awaitable[T],
@@ -1214,14 +1426,17 @@ class Terminal:
         """Observe actual SDK completion; query failures never invent success or progress.
 
         With a status query, an animated terminal shows a live panel, a plain human terminal
-        prints one line per status change, and JSON mode writes nothing beyond the logs.
+        prints one line per status change (per child state change for an evaluation), and
+        JSON mode writes nothing beyond the logs.
         """
         begun = time.monotonic()
         last: Mapping[str, object] | None = None
+        seen: dict[str, str] = {}
 
         def frame() -> Panel:
-            fields = progress_fields(last, _utcnow(), time.monotonic() - begun)
-            return progress_panel(label, last, fields)
+            now = _utcnow()
+            fields = progress_fields(last, now, time.monotonic() - begun)
+            return progress_panel(label, last, fields, now=now)
 
         display: AbstractContextManager[object] = nullcontext()
         if self.animate and query is not None:
@@ -1253,10 +1468,7 @@ class Terminal:
                                 )
                                 last = actual
                                 if self.human and not self.animate:
-                                    fields = progress_fields(
-                                        last, _utcnow(), time.monotonic() - begun
-                                    )
-                                    self.err.print(progress_line(label, fields), soft_wrap=True)
+                                    self._print_progress(label, last, seen, begun)
                             query_failed = False
                         except Exception as error:
                             if not query_failed:
