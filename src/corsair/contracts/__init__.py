@@ -21,6 +21,9 @@ from .common import DiagnosticText as DiagnosticText
 from .common import Digest as Digest
 from .common import Feedback as Feedback
 from .common import Identifier as Identifier
+from .common import MAX_USAGE_CALL_ENTRIES as MAX_USAGE_CALL_ENTRIES
+from .common import ModelCall as ModelCall
+from .common import ToolCall as ToolCall
 from .common import Usage as Usage
 from .common import digest as digest
 from .common import format_diagnostic as format_diagnostic
