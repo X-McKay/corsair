@@ -17,4 +17,7 @@ class SourceReader(Protocol):
 
 
 class SourceSnapshotPort(SourceReader, Protocol):
-    def prepare(self, case: Case, manifest: RunManifest) -> PreparedCase: ...
+    def prepare(self, case: Case, manifest: RunManifest) -> PreparedCase:
+        """Admit sources and bind the target line; a certainly unbindable Python target
+        raises ``policies.target_binding.TargetBindingBlocked`` before any model call."""
+        ...

@@ -21,6 +21,7 @@ from corsair.contracts import (
     Case,
     EvidenceInput,
     Finding,
+    Observation,
     PlanRevision,
     PythonRecipe,
     RunManifest,
@@ -140,10 +141,19 @@ def _submission() -> Submission:
     )
 
 
-def _prepared(tmp_path: Path, image_id: str, *, safe: bool = False, fixed: bool = False):
+def _prepared(
+    tmp_path: Path,
+    image_id: str,
+    *,
+    safe: bool = False,
+    fixed: bool = False,
+    source: str | None = None,
+    line: int = 4,
+):
     vulnerable = tmp_path / "vulnerable"
     vulnerable.mkdir(parents=True)
-    (vulnerable / "reader.py").write_text(SAFE if safe else VULNERABLE, encoding="utf-8")
+    text = source if source is not None else SAFE if safe else VULNERABLE
+    (vulnerable / "reader.py").write_text(text, encoding="utf-8")
     if fixed:
         fixed_dir = tmp_path / "fixed"
         fixed_dir.mkdir()
@@ -159,7 +169,7 @@ def _prepared(tmp_path: Path, image_id: str, *, safe: bool = False, fixed: bool 
     )
     case = Case(
         case_id="docker-case",
-        finding=Finding(title="traversal", description="fixture read", file="reader.py", line=4),
+        finding=Finding(title="traversal", description="fixture read", file="reader.py", line=line),
         source=Source(path="vulnerable"),
         fixed_source=Source(path="fixed") if fixed else None,
         recipe=recipe,
@@ -435,3 +445,56 @@ def test_session_sweep_removes_only_this_sessions_sandboxes(session_operation) -
         for container in created.values():
             with suppress(NotFound):
                 client.api.remove_container(container.id, force=True)
+
+
+# The traversal runs only on the ``or`` branch (line 6), which a benign control skips.
+SHORT_CIRCUIT = """from pathlib import Path
+
+
+def read_file(root, path):
+    return (path == "hello.txt" and "hello"
+        or (Path(root) / path).read_text())
+"""
+
+
+def test_real_coverage_never_reports_a_skippable_continuation_line(
+    tmp_path: Path, session_operation: Callable[[str], str]
+) -> None:
+    """coverage.py reports line 5 for the whole ``return`` in both runs, although only the
+    adversarial run executes line 6. A ``def``-line finding binds to that body statement,
+    which both runs execute, and demonstrates. A finding on line 6 keeps line 6, which
+    coverage never reports: the pair cannot demonstrate it (INCONCLUSIVE), never a
+    demonstration bound to a line the control skipped."""
+    client = _docker_client()
+    image_id = DockerSandbox(Settings(image=_image()), client=client).image_id
+
+    def observe(line: int, bound: int) -> Observation:
+        operation_id = session_operation(f"short-circuit-{line}")
+        settings, store, prepared = _prepared(
+            tmp_path / f"line-{line}", image_id, source=SHORT_CIRCUIT, line=line
+        )
+        assert (prepared.finding.line, prepared.bound_line) == (line, bound)
+        observation = EvidenceVerifier(
+            settings, store, DockerSandbox(settings, client=client, store=store)
+        ).evaluate(
+            EvidenceInput(
+                run_id="run-short-circuit",
+                operation_id=operation_id,
+                prepared=prepared,
+                submission=_submission(),
+                budget=Budget(probe_timeout_seconds=20),
+            )
+        )
+        assert observation.cleanup_confirmed is True
+        _assert_cleanup(client, operation_id)
+        return observation
+
+    on_def = observe(4, 5)
+    assert on_def.control and on_def.control.outcome.value == "PROPERTY_HELD"
+    assert on_def.adversarial and on_def.adversarial.outcome.value == "VIOLATION"
+    for role in (on_def.control, on_def.adversarial):
+        assert 5 in role.covered_lines and 6 not in role.covered_lines
+
+    on_branch = observe(6, 6)
+    assert on_branch.control and on_branch.control.outcome.value == "INVALID"
+    assert on_branch.control.reason == "relevant source coverage was not observed"

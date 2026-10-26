@@ -300,11 +300,13 @@ async def test_rescore_marks_a_result_for_an_unknown_case_unavailable(tmp_path, 
 # verify (labelled sandbox double; real source admission and evidence validation)
 
 
-def _verify_inputs(tmp_path: Path) -> tuple[Path, Path, Path, ArtifactStore]:
+def _verify_inputs(
+    tmp_path: Path, *, source_text: str = SOURCE, line: int = 4
+) -> tuple[Path, Path, Path, ArtifactStore]:
     settings, store = _settings_file(tmp_path)
     source = tmp_path / "case" / "source"
     source.mkdir(parents=True)
-    (source / "reader.py").write_text(SOURCE)
+    (source / "reader.py").write_text(source_text)
     request = tmp_path / "case" / "request.json"
     request.write_text(
         json.dumps(
@@ -315,7 +317,7 @@ def _verify_inputs(tmp_path: Path) -> tuple[Path, Path, Path, ArtifactStore]:
                         "title": "secret path",
                         "description": "component finding",
                         "file": "reader.py",
-                        "line": 4,
+                        "line": line,
                         "claim_scope": "component",
                     },
                     "source": {"path": "source"},
@@ -396,6 +398,44 @@ async def test_verify_invalid_observation_exits_one(tmp_path, monkeypatch, capsy
     assert observation["operation_id"].startswith("reference-")
     assert observation["control"]["outcome"] == "INVALID"
     assert _completion(caplog)["status"] == "fail"
+
+
+async def test_verify_binds_a_def_line_finding_to_its_body_like_the_workflow(
+    tmp_path, monkeypatch, capsys
+):
+    # The sandbox double reports line 4 only, as coverage.py does for this module: the
+    # declared ``def`` line 3 binds to the body's first statement, line 4.
+    body_on_four = "import os\n\ndef read_file(root, path):\n    return open(path).read()\n"
+    settings, request, submission, store = _verify_inputs(
+        tmp_path, source_text=body_on_four, line=3
+    )
+    _install_sandbox(monkeypatch, _FakeSandbox(store))
+
+    code = await _run(
+        _arguments("verify", str(request), str(submission), "--settings", str(settings))
+    )
+
+    observation = json.loads(capsys.readouterr().out)
+    assert observation["control"]["outcome"] == "PROPERTY_HELD"
+    assert observation["adversarial"]["outcome"] == "VIOLATION"
+    assert code == 0
+
+
+@pytest.mark.usefixtures("restored_logging")
+def test_verify_refuses_a_case_the_workflow_blocks_before_any_model(tmp_path, monkeypatch, capsys):
+    settings, request, submission, store = _verify_inputs(
+        tmp_path, source_text=SOURCE.replace("read_file", "load_file")
+    )
+    sandbox = _FakeSandbox(store)
+    _install_sandbox(monkeypatch, sandbox)
+
+    code = _main(monkeypatch, "verify", str(request), str(submission), "--settings", str(settings))
+
+    assert code == 2
+    stderr = capsys.readouterr().err
+    assert "target_binding function_not_defined" in stderr
+    assert "corsair dataset validate" in stderr
+    assert sandbox.calls == 0
 
 
 async def test_verify_fixed_without_fixed_source_is_blocked(tmp_path, monkeypatch, capsys):

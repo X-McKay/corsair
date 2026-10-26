@@ -31,12 +31,11 @@ from pydantic import BaseModel, Field
 
 from corsair.adapters.inference.adk import run_auditor, run_producer
 from corsair.adapters.inference.models import model_for_role
-from corsair.adapters.scm.local import prepare_case, read_source
+from corsair.adapters.scm.local import prepare_case
 from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.resources import RoleName, load_runtime_skills, prompt_text
 from corsair.contracts import (
-    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     Feedback,
@@ -46,7 +45,7 @@ from corsair.contracts import (
     Submission,
     digest,
 )
-from corsair.policies.target_binding import target_binding
+from corsair.policies.target_binding import TargetBindingBlocked
 from corsair.settings import ModelSettings, Settings
 from corsair.steps.manifest import build_manifest
 
@@ -288,20 +287,14 @@ def _prepare(
 ) -> PreparedCase:
     """Admit the request's sources and refuse a case the workflow stops before any model."""
 
-    prepared = prepare_case(
-        request.case, settings, store, build_manifest(request, settings, _MANIFEST_IMAGE)
-    )
-    module_text = read_source(
-        prepared.source, prepared.recipe.module_file, store, settings.source_limit_bytes
-    )
-    # The structural gate is Python-AST specific; other recipes declare their line.
-    if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
-        failure = target_binding(prepared.finding, prepared.recipe, module_text)
-        if failure is not None:
-            raise ValueError(
-                f"agent preview: the workflow stops this case before any model request ({failure})"
-            )
-    return prepared
+    try:
+        return prepare_case(
+            request.case, settings, store, build_manifest(request, settings, _MANIFEST_IMAGE)
+        )
+    except TargetBindingBlocked as blocked:
+        raise ValueError(
+            f"agent preview: the workflow stops this case before any model request ({blocked})"
+        ) from None
 
 
 def _check_role_inputs(

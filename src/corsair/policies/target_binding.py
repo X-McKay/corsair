@@ -39,6 +39,14 @@ class TargetBindingFailure:
         return f"target_binding {self.reason.value}: {self.detail}"
 
 
+class TargetBindingBlocked(ValueError):
+    """Preparation refuses a case whose target certainly cannot bind (pre-model)."""
+
+    def __init__(self, failure: TargetBindingFailure):
+        super().__init__(str(failure))
+        self.failure = failure
+
+
 def _source_line_count(text: str) -> int:
     """Count lines the way the Python tokenizer and coverage number them.
 

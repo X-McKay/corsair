@@ -19,6 +19,17 @@ model call, the one reportable line the declared line belongs to:
   header such as ``if``/``with``/``class``, an ``except`` or ``case`` clause, a
   decorator, or statements joined by ``;``) binds to that logical line's first
   line, provided that line starts a statement, decorator or clause coverage reports.
+- Except that a continuation line holding any part of a subexpression that can be
+  skipped while its statement runs is kept, whichever rule above would bind it:
+  ``and``/``or`` operands after the first, a conditional expression's two branches,
+  chained-comparison operands after the first comparison, a lambda body, everything
+  in a comprehension or generator but its first iterable, an ``assert`` message, a
+  ``for`` target, and a ``case`` pattern or guard. Coverage reports the statement's
+  first line whether or not that part ran, so binding it would call an unexecuted
+  line covered. coverage.py never reports the kept line, so the session stays
+  INCONCLUSIVE. (A line that starts its logical line is outside this exception: it
+  is already the line coverage reports, and a ``def`` or decorator line binds to the
+  body, which asks for more than the line itself.)
 - Every other line is kept: a line that already starts its logical line, a module or
   class docstring, a ``global``/``nonlocal`` or annotation-only declaration, a comment
   or blank line between statements, the ``else:``/``finally:`` keyword lines, a
@@ -143,6 +154,55 @@ def _reportable_starts(module: ast.Module) -> set[int]:
     return starts
 
 
+def _lines(node: ast.AST) -> range:
+    start = getattr(node, "lineno", None)
+    if start is None:
+        return range(0)
+    end = getattr(node, "end_lineno", None)
+    return range(start, (end if end is not None else start) + 1)
+
+
+def _skippable_parts(node: ast.AST) -> list[ast.AST]:
+    """Subexpressions that may not run when the statement that holds them runs."""
+    if isinstance(node, ast.BoolOp):
+        return list(node.values[1:])  # Short-circuit: ``a or b``, ``a and b``.
+    if isinstance(node, ast.IfExp):
+        return [node.body, node.orelse]  # Only the test always runs.
+    if isinstance(node, ast.Compare):
+        return list(node.comparators[1:])  # ``a < b < c`` stops at the first false link.
+    if isinstance(node, ast.Lambda):
+        return [node.body]  # Runs only when called; the defaults run at definition.
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+        # Only the first iterable is evaluated unconditionally (eagerly, even for a
+        # generator); everything else runs per element, and possibly never.
+        first, *rest = node.generators
+        elements = [node.key, node.value] if isinstance(node, ast.DictComp) else [node.elt]
+        return [*elements, first.target, *first.ifs, *rest]
+    if isinstance(node, ast.Assert):
+        return [] if node.msg is None else [node.msg]  # Evaluated only on failure.
+    if isinstance(node, (ast.For, ast.AsyncFor)):
+        return [node.target]  # Assigned per item: never on an empty iterable.
+    if isinstance(node, ast.match_case):
+        guard = [] if node.guard is None else [node.guard]
+        return [node.pattern, *guard]  # Sub-patterns and the guard can be skipped.
+    return []
+
+
+def _skippable_lines(module: ast.Module) -> frozenset[int]:
+    """Physical lines that hold any part of a subexpression that can be skipped.
+
+    coverage.py reports a multi-line logical line at its first line whenever the
+    statement starts, whether or not a short-circuit, conditional or lazy part on a
+    later line ran, so such a line must never be bound to that first line.
+    """
+    return frozenset(
+        line
+        for node in ast.walk(module)
+        for part in _skippable_parts(node)
+        for line in _lines(part)
+    )
+
+
 def bind_target_line(module_text: str, line: int) -> int:
     """Return the statement line coverage reports for declared ``line``, or ``line``.
 
@@ -157,6 +217,8 @@ def bind_target_line(module_text: str, line: int) -> int:
         logical = _LogicalLines.of(text)
     except (SyntaxError, ValueError, RecursionError, tokenize.TokenError):
         return line
+    if logical.first.get(line, line) != line and line in _skippable_lines(module):
+        return line  # Coverage never reports it, and its statement can run without it.
     for node in ast.walk(module):
         if isinstance(node, _FunctionNode) and _function_header(node, line, logical):
             return _first_body_statement(node, line, logical)
