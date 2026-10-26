@@ -1,5 +1,6 @@
 """Test the actual Just runner; the labelled UV recorder observes arguments only."""
 
+import functools
 import json
 import os
 import shutil
@@ -9,12 +10,29 @@ from pathlib import Path
 
 import pytest
 
+from scripts.check_toolchain import JUST_REMEDY, PINNED_JUST, tool_version
+
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@functools.cache
+def just_parse_error(binary: str) -> str | None:
+    """Return Just's first error line when this binary cannot parse the justfile."""
+
+    process = subprocess.run([binary, "--summary"], cwd=ROOT, capture_output=True, text=True)
+    if process.returncode == 0:
+        return None
+    return (process.stderr.strip().splitlines() or [f"exit status {process.returncode}"])[0]
 
 
 def just_binary() -> str:
     binary = shutil.which("just")
-    assert binary is not None, "Enter nix develop before running developer-task tests"
+    assert binary is not None, f"Just is not on PATH; {JUST_REMEDY}"
+    version = tool_version("just")
+    error = None if version == PINNED_JUST else just_parse_error(binary)
+    if error is not None:
+        # Only an unpinned Just may skip: the pinned one failing to parse is a real defect.
+        pytest.skip(f"just {version} cannot parse the justfile ({error}); {JUST_REMEDY}")
     return binary
 
 

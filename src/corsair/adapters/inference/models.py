@@ -23,7 +23,15 @@ def model_for_role(settings: Settings | ModelSettings, role: RoleName) -> str | 
 
     # LiteLlm is intentionally imported only when configured.  The optional
     # provider dependency is therefore not required for a normal Gemini worker.
-    from google.adk.models import LiteLlm
+    try:
+        from google.adk.models import LiteLlm
+    except ImportError as error:
+        # ADK's own message names google-adk[extensions]; Corsair pins LiteLLM
+        # in its providers extra, so name the remedy that matches uv.lock.
+        raise ImportError(
+            "connector 'litellm' requires Corsair's providers extra; install it with "
+            "`just sync` (uv sync --locked --all-extras) or `uv sync --locked --extra providers`"
+        ) from error
 
     return LiteLlm(
         model=model_name,

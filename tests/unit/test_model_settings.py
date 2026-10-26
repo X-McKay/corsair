@@ -30,7 +30,10 @@ def test_litellm_model_uses_only_configured_endpoint_controls(monkeypatch):
 
     import google.adk.models as adk_models
 
-    monkeypatch.setattr(adk_models, "LiteLlm", FakeLiteLlm, raising=False)
+    # Patch the module namespace directly: getattr-based patching would first
+    # trigger ADK's lazy LiteLlm import, which needs the optional providers
+    # extra although this test never constructs the real class.
+    monkeypatch.setitem(vars(adk_models), "LiteLlm", FakeLiteLlm)
     value = model_for_role(
         ModelSettings(
             connector="litellm",
@@ -51,6 +54,22 @@ def test_litellm_model_uses_only_configured_endpoint_controls(monkeypatch):
         "extra_body": {"reasoning_effort": "low"},
     }
     assert "api_key" not in captured
+
+
+def test_litellm_without_providers_extra_names_the_project_remedy(monkeypatch):
+    import sys
+
+    import google.adk.models as adk_models
+
+    monkeypatch.delitem(vars(adk_models), "LiteLlm", raising=False)
+    # A None entry makes ADK's lazy import fail exactly as a missing extra does.
+    monkeypatch.setitem(sys.modules, "google.adk.models.lite_llm", None)
+
+    with pytest.raises(ImportError, match="providers extra") as raised:
+        model_for_role(ModelSettings(connector="litellm", producer="hosted_vllm/x"), "producer")
+
+    assert "just sync" in str(raised.value)
+    assert isinstance(raised.value.__cause__, ImportError)
 
 
 def test_litellm_openai_route_is_rejected_for_the_tool_using_producer():
