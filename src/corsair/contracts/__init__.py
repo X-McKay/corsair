@@ -39,6 +39,7 @@ from .intake import ScannerClaim as ScannerClaim
 from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
+from .recipes_ruby import RubyRecipe as RubyRecipe
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES
 from .results import Disposition as Disposition
@@ -54,6 +55,7 @@ from .sources import Finding as Finding
 from .sources import InvestigationRequest as InvestigationRequest
 from .sources import PreparedCase as PreparedCase
 from .sources import PythonRecipe as PythonRecipe
+from .sources import Recipe as Recipe
 from .sources import RunManifest as RunManifest
 from .sources import Scope as Scope
 from .sources import Source as Source

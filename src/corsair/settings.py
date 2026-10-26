@@ -62,6 +62,15 @@ class Settings(Contract):
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
+    # Trusted runtime image per recipe kind. ``image`` stays the Python default for
+    # compatibility; a case's image is resolved from its recipe ``kind`` through this
+    # map, falling back to ``image`` for an unlisted kind.
+    images: dict[str, str] = Field(
+        default_factory=lambda: {
+            "python.secret_disclosure/1": "corsair-python:0.1",
+            "ruby.secret_disclosure/1": "corsair-ruby:0.1",
+        }
+    )
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)

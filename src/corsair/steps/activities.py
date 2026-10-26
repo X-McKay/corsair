@@ -17,6 +17,7 @@ from corsair.contracts import (
     PreparedCase,
     ProducerInput,
     ProducerOutput,
+    PythonRecipe,
     format_diagnostic,
     format_terminal_result,
 )
@@ -59,7 +60,8 @@ class Activities:
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
         try:
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id)
+            kind = request.case.recipe.kind
+            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id_for(kind))
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -86,11 +88,15 @@ class Activities:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
         # Pre-model target binding over the admitted bytes: a case that certainly cannot
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        failure = target_binding(prepared.finding, prepared.recipe, module_text)
-        if failure is not None:
-            raise ApplicationError(
-                format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
-            )
+        # The structural check reads a Python AST, so it applies only to the Python
+        # recipe; other runtimes rely on the run-time coverage/target-line gate, which
+        # remains the decisive authority and is never weakened by this early stop.
+        if isinstance(prepared.recipe, PythonRecipe):
+            failure = target_binding(prepared.finding, prepared.recipe, module_text)
+            if failure is not None:
+                raise ApplicationError(
+                    format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
+                )
         return prepared
 
     async def _model_episode(self, awaitable):

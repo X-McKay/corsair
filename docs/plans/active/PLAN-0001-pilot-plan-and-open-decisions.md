@@ -20,7 +20,7 @@ Corsair validates a reported security finding with two Google ADK agents over a 
 | Sandbox | Keep the `SandboxPort`; Docker adapter only; OpenShell adapter deferred, not stubbed | An empty adapter misrepresents capability; the port keeps the seam open. |
 | `negative_threshold` | 2 independent producer sessions for `EXPLOIT_NOT_DEMONSTRATED` | A single producer miss must not become a negative certificate. |
 | Coverage | Exact target-line coverage required in both runs of every pair | Primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`. |
-| Languages | Python is the running runtime; JavaScript, Java, Ruby and Perl rows are carried in the corpus matrix only | One qualified runtime; corpus rows preserve the matrix without claiming support. |
+| Languages | Python is the running runtime; a Ruby `secret_disclosure/1` recipe is qualified on one corpus row (`pathtraversal-b`) on Linux amd64 with real Docker evidence; JavaScript, Java and Perl rows, and the remaining Ruby rows, are carried in the corpus matrix only | A second concrete recipe proves the extension path without a generic adapter; `Case.recipe` is now a `kind`-discriminated union and `Settings.images` maps each kind to a reviewed image. See the [Ruby corpus survey](../../reference/corpus-ruby.md). The Ruby row's macOS arm64 and live-model gates are unrun. |
 
 ## Gates and environment
 

@@ -375,9 +375,9 @@ class EvidenceVerifier:
                     "operation-reconciliation",
                     "an uncommitted labeled sandbox exists; operation will not be replayed",
                 )
-            # Ensure image availability before starting the first role. There is no
-            # fake/non-Docker success path.
-            _ = self.sandbox.image_id
+            # Ensure the recipe's image is available before starting the first role.
+            # There is no fake/non-Docker success path.
+            _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:
