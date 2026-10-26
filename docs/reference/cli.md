@@ -148,11 +148,28 @@ corsair inspect "$RUN_ID" --online --settings .state/settings.json
 
 # Query live status and wait for the actual final workflow result.
 corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
+
+# Per-role native receipts behind the committed result.
+corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
 ```
 
 Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one.
 
 With `--online`, it uses the workflow’s native status query without opening or creating a local artifact store. `--watch` without `--online` is rejected before runtime I/O. For an investigation, the reported phase and round come from the actual Temporal workflow state, not a CLI estimate. For an evaluation, the status reports actual completed and total child work. `--watch` repeats the native status query while the workflow remains open, then waits for and returns the workflow’s actual final result. It does not fabricate a percentage, infer model progress, or turn an activity heartbeat into a security conclusion.
+
+`--evidence` reads the committed result offline (it is rejected with `--online`) and walks each round's observation, and the fixed-revision observation when present, to its committed operation record, evidence bundle and raw container receipts. Each observation reports `committed` (the operation record resolves to the same observation the result carries), `evidence` (`present`, `absent` or `unreadable`), `cleanup_confirmed`, the feedback `gate`, and `receipts_admissible`: whether the saved receipts still pass the trusted verifier's admission rules, or `null` when the round has no submission or the result has no manifest. Per role it reports the admitted `outcome`, `target_executed`, `covered_lines` and `native_exit_code`, and from the raw receipt only `receipt` status, `cleanup_confirmed`, `container_id`, `image_id`, `docker_exit_code` and the receipt digest. Payloads, the driver job and record, the prepared case (finding, recipe and source excerpt) and model output are never printed. The view is a navigation aid, not a verdict: the label remains the result's code-decided `verdict`, and `receipts_admissible: false` is an operational fact to investigate, never a negative security result.
+
+### `runs`
+
+```bash
+corsair runs --settings .state/settings.json
+corsair runs --case case01 --limit 5 --settings .state/settings.json
+corsair --format json runs --settings .state/settings.json | jq -r '.runs[].run_id'
+```
+
+Lists committed investigation results in the artifact store, newest first, without contacting Temporal, Docker or a model. Each row has `run_id`, `case_id`, `verdict`, `execution_status`, `fix_status`, `rounds`, `recorded_at` and `result_sha256`. `--case ID` keeps only that case; `--limit N` (at least 1) caps the rows after filtering.
+
+Operation names are stored hashed, so the listing reads every committed record and admits a result only if it validates and is committed under its own `result.<run_id>` name. Observation and intent records are skipped. `invalid_records` counts records that could not be read or a result-shaped record that failed validation or that binding; they are reported, never listed or repaired. `recorded_at` is the operation record's filesystem time in UTC: operational metadata for ordering, not evidence, and it changes if the store is copied without preserving times. The command never writes to the store, although opening an absent artifact root creates its empty directories as every local store command does.
 
 ### `cancel RUN_ID`
 
@@ -226,7 +243,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. |
+| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. `runs` and `inspect` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 

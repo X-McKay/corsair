@@ -20,6 +20,7 @@ from corsair.contracts import (
     validate_root_identity,
 )
 from corsair.entrypoints.requests import load_investigation_request
+from corsair.entrypoints.runs import positive_limit
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.comparison import compare_reports, read_report
 from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score
@@ -54,6 +55,9 @@ class CliArguments(argparse.Namespace):
     baseline: str
     candidate: str
     allow_dataset_mismatch: bool
+    case: str | None
+    limit: int | None
+    evidence: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -197,10 +201,19 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
     if args.watch and not args.online:
         raise ValueError("--watch requires --online")
 
+    if args.evidence and args.online:
+        raise ValueError("--evidence reads the artifact store; it cannot be used with --online")
+
     settings = _settings(args)
     if not args.online:
         store = ArtifactStore(settings.artifact_root)
-        ui.emit(_result_from_store(store, identity))
+        result = _result_from_store(store, identity)
+        if args.evidence:
+            from corsair.entrypoints.runs import inspect_evidence
+
+            ui.emit(inspect_evidence(store, result))
+        else:
+            ui.emit(result)
         return 0
 
     from corsair.adapters.temporal.client import connect, wait_for_result
@@ -343,6 +356,15 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
+async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
+    """List committed results from the artifact store without contacting services."""
+    from corsair.entrypoints.runs import list_runs
+
+    store = ArtifactStore(_settings(args).artifact_root)
+    ui.emit(list_runs(store, case_id=args.case, limit=args.limit))
+    return 0
+
+
 CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
@@ -351,6 +373,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "worker": _handle_worker,
     "verify": _handle_verify,
     "inspect": _handle_inspect,
+    "runs": _handle_runs,
     "cancel": _handle_cancel,
     "investigate": _handle_investigate,
     "eval": _handle_eval,
@@ -411,6 +434,7 @@ def parser() -> argparse.ArgumentParser:
         "worker": "Run the native Temporal worker; Ctrl+C stops gracefully",
         "investigate": "Submit a durable investigation; use --wait for live phase updates",
         "inspect": "Read a committed result or query/watch the native Temporal workflow",
+        "runs": "List committed results in the artifact store, newest first; no services",
         "cancel": "Request cancellation; this does not assert completed cleanup",
         "verify": "Execute a frozen reference submission natively; no security verdict",
         "eval": "Run frozen cases with bounded child workflows and external oracles",
@@ -434,6 +458,12 @@ def parser() -> argparse.ArgumentParser:
     inspect.add_argument(
         "--watch", action="store_true", help="Wait for actual completion; requires --online"
     )
+    inspect.add_argument(
+        "--evidence", action="store_true", help="Per-role native receipts; never payloads"
+    )
+    runs = commands["runs"]
+    runs.add_argument("--case", help="Only results for this case id")
+    runs.add_argument("--limit", type=positive_limit, help="At most N rows")
     commands["cancel"].add_argument("run_id")
     verify = commands["verify"]
     verify.add_argument("request")
