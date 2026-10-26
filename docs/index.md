@@ -64,6 +64,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Ruby corpus survey](reference/corpus-ruby.md): the Ruby rows, their properties, and the one migrated, qualified row.
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
+- [JavaScript corpus survey](reference/corpus-javascript.md): the JavaScript rows and why the prototype-pollution recipe is qualified first.
 
 ## Agents
 

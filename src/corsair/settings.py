@@ -63,11 +63,12 @@ class Settings(Contract):
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
     # Trusted runtime image per recipe kind. ``image`` stays the Python default for
-    # compatibility; a case's image is resolved from its recipe ``kind`` through this
-    # map, falling back to ``image`` for an unlisted kind.
+    # compatibility; a recipe kind absent here falls back to it. A new language adds one
+    # entry and its own reviewed Dockerfile under deploy/, never a code path.
     images: dict[str, str] = Field(
         default_factory=lambda: {
             "python.secret_disclosure/1": "corsair-python:0.1",
+            "javascript.prototype_pollution/1": "corsair-javascript:0.1",
             "ruby.secret_disclosure/1": "corsair-ruby:0.1",
         }
     )
@@ -95,7 +96,7 @@ class Settings(Contract):
     models: ModelSettings = Field(default_factory=ModelSettings)
 
     def image_for(self, kind: str) -> str:
-        """Return the trusted image tag for a recipe kind, ``image`` being the default."""
+        """Return the configured image tag for a recipe kind, or the Python default."""
         return self.images.get(kind, self.image)
 
     @property

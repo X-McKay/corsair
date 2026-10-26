@@ -25,7 +25,7 @@ from corsair.contracts import (
     Source,
     safe_path,
 )
-from corsair.policies.target_binding import derive_target_line
+from corsair.policies.target_binding import bind_target_line
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
@@ -440,15 +440,11 @@ def prepare_case(
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
     finding, provenance = case.finding, LineProvenance.DECLARED
-    if finding.line is None and isinstance(case.recipe, PythonRecipe):
+    if isinstance(case.recipe, PythonRecipe):
+        # Python-AST derivation only; other recipes must declare their line.
         # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
-        # admitted text. The line comes from the trusted recipe, never the narrative.
-        # The derivation reads a Python AST; other runtimes keep a line-less finding,
-        # which the target-binding gates report as line_missing.
-        derived = derive_target_line(case.recipe, finding_text)
-        if derived is not None:
-            finding = finding.model_copy(update={"line": derived})
-            provenance = LineProvenance.RECIPE_FUNCTION
+        # admitted text. A missing line comes from the trusted recipe, never the narrative.
+        finding, provenance = bind_target_line(case.finding, case.recipe, finding_text)
     return PreparedCase(
         case_id=case.case_id,
         finding=finding,

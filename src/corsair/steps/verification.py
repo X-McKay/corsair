@@ -237,14 +237,15 @@ class EvidenceVerifier:
             return self._invalid("native exit, junit, and driver outcome disagree"), False
         if record.get("coverage_file") != prepared.recipe.module_file:
             return self._invalid("coverage was not reported for the recipe module"), False
-        # A vulnerable source needs the configured finding line (or, where no line
+        # A vulnerable source needs the bound finding line (or, where no line
         # exists, actual recipe-module execution). Fixed source can delete the old
         # line but must still execute the relevant callable.
         relevant = bool(lines) and target_executed
-        if not fixed and prepared.finding.line is not None:
+        line = prepared.bound_line
+        if not fixed and line is not None:
             relevant = (
                 prepared.finding.file == prepared.recipe.module_file
-                and prepared.finding.line in lines
+                and line in lines
                 and target_executed
             )
         if not relevant:
@@ -375,8 +376,8 @@ class EvidenceVerifier:
                     "operation-reconciliation",
                     "an uncommitted labeled sandbox exists; operation will not be replayed",
                 )
-            # Ensure the recipe's image is available before starting the first role.
-            # There is no fake/non-Docker success path.
+            # Ensure image availability before starting the first role. There is no
+            # fake/non-Docker success path.
             _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))

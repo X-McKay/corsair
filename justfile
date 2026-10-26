@@ -39,9 +39,10 @@ test *args:
 
 alias test-offline := test
 
-# Build every reviewed native observer image under deploy/.
+# Build the reviewed native observer images (one per language under deploy/).
 images:
     docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
+    docker build -f deploy/javascript/Dockerfile -t corsair-javascript:0.1 .
     docker build -f deploy/ruby/Dockerfile -t corsair-ruby:0.1 .
 
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
@@ -101,6 +102,10 @@ eval dataset *args:
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
+
+# Score a frozen scanner-intake dataset (evals/datasets/intake.json); no model, container or service.
+eval-intake dataset *args:
+    uv run --locked python -m corsair.evaluation.intake "$@"
 
 # Live isolated eval with .state/settings.json; record in .runs/live. Optional BASELINE report, --dry-run.
 live-agent role dataset *args:

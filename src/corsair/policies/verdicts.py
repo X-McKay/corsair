@@ -166,11 +166,12 @@ def _audit_accepts(audit: AuditOutput) -> bool:
 
 
 def _line_covered_in_both(prepared: PreparedCase, observation: Observation) -> bool:
-    """The exact declared finding line must execute in BOTH the control and the
-    adversarial run before a session may be decisive. This is the primary guard
-    against a false EXPLOIT_NOT_DEMONSTRATED: a negative we did not actually reach
-    is never a clean negative."""
-    line = prepared.finding.line
+    """The exact target line must execute in BOTH the control and the adversarial
+    run before a session may be decisive. This is the primary guard against a false
+    EXPLOIT_NOT_DEMONSTRATED: a negative we did not actually reach is never a clean
+    negative. The target is the declared finding line as bound in code at prepare
+    to the statement line coverage reports (``PreparedCase.bound_line``)."""
+    line = prepared.bound_line
     if line is None or observation.control is None or observation.adversarial is None:
         return False
     return (
@@ -218,8 +219,8 @@ def session_verdict(
             Verdict.UNABLE_TO_RUN, "finding declares no target line to bind the demonstration to"
         )
 
-    # 5. Exact target-line coverage gate: the declared line must execute in BOTH the
-    #    control and adversarial runs before the session may be decisive.
+    # 5. Exact target-line coverage gate: the bound target line must execute in BOTH
+    #    the control and adversarial runs before the session may be decisive.
     if not _line_covered_in_both(prepared, observation):
         return SessionOutcome(Verdict.INCONCLUSIVE, "declared target line not covered in both runs")
 

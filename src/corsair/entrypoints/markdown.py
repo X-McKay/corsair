@@ -168,9 +168,20 @@ def _counts_lines(title: str, counts: object) -> list[str]:
     return [f"### {title}", "", *_table(("Gate", "Count"), rows, numeric=1)]
 
 
+def _replay(row: Mapping[str, Any]) -> str:
+    """A native replay's demonstrates/does-not result; never a payload."""
+    replay = row.get("replay")
+    if not isinstance(replay, Mapping):
+        return "-"
+    return {"demonstrated": "demonstrates", "not_demonstrated": "does not"}.get(
+        str(replay.get("status")), "unavailable"
+    )
+
+
 def _case_lines(rows: list[dict[str, Any]]) -> list[str]:
     if not rows:
         return []
+    replayed = any("replay" in row for row in rows)
     seen: dict[object, int] = {}
     body = []
     for row in rows:
@@ -187,11 +198,13 @@ def _case_lines(rows: list[dict[str, Any]]) -> list[str]:
                 _code(row.get("run_id")),
                 _status(row),
                 _code(row_label(row)),
+                *((_replay(row),) if replayed else ()),
                 _stop(row),
                 *(_number(row.get(field)) for field, _ in _USAGE_COLUMNS),
             )
         )
-    header = ("Case", "#", "Run", "Status", "Label", "Stop", *(name for _, name in _USAGE_COLUMNS))
+    labels = ("Label", "Replay") if replayed else ("Label",)
+    header = ("Case", "#", "Run", "Status", *labels, "Stop", *(name for _, name in _USAGE_COLUMNS))
     return ["### Cases", "", *_table(header, body, numeric=len(_USAGE_COLUMNS))]
 
 
@@ -221,6 +234,8 @@ def report_markdown(report: Mapping[str, Any]) -> str:
         _case_lines(rows),
         _counts_lines("Gate ledger", summary.get("gate_ledger")),
         _counts_lines("Failure stops", summary.get("failure_stops")),
+        _counts_lines("Native replay", summary.get("replay")),
+        [_text(report["replay_note"])] if isinstance(report.get("replay_note"), str) else [],
     )
 
 

@@ -218,10 +218,6 @@ async def test_prepare_rejects_a_session_cap_beyond_terminal_round_capacity(tmp_
     class Sandbox:
         image_id = "sha256:" + "a" * 64
 
-        def image_id_for(self, kind: str) -> str:
-            del kind
-            return self.image_id
-
     request = InvestigationRequest.model_validate_json(
         Path("evals/fixtures/case01/request.json").read_bytes()
     ).model_copy(update={"budget": Budget(max_rounds=16)})

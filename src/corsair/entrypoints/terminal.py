@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 import sys
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -225,6 +226,16 @@ def failure_remedy(error: BaseException) -> str | None:
         return (
             "A service did not answer in time; run `corsair doctor` to check Temporal and Docker."
         )
+    if isinstance(error, ValueError) and text.startswith("agent preview: the workflow stops"):
+        return (
+            "The case cannot bind its target, so no model would see it; correct finding.line "
+            "or the recipe, or run `corsair dataset validate` on its dataset."
+        )
+    if isinstance(error, ValueError) and text.startswith("agent preview:"):
+        return (
+            "See `corsair agent preview --help`: the producer takes REQUEST [--round N "
+            "--previous FILE --feedback GATE:REASON], the auditor REQUEST --submission FILE."
+        )
     if isinstance(error, ValueError) and text.startswith("No committed result"):
         return (
             "Check the run id and artifact_root in --settings; for a run that has not "
@@ -276,6 +287,20 @@ def _grid() -> Table:
     grid.add_column(no_wrap=True)
     grid.add_column(ratio=1, overflow="fold")
     return grid
+
+
+def _replay_cell(replay: object) -> Text:
+    """A native replay's demonstrates/does-not result beside the exact-match label."""
+    if not isinstance(replay, Mapping):
+        return Text("-")
+    status = replay.get("status")
+    if status == "demonstrated":
+        return Text("demonstrates", style="green")
+    if status == "not_demonstrated":
+        roles = f"{_plain(replay.get('control'))}/{_plain(replay.get('adversarial'))}"
+        covered = "covered" if replay.get("covered") else "not covered"
+        return Text(f"does not · {roles} · {covered}", style="yellow")
+    return Text(f"unavailable · {_plain(replay.get('reason'))}", style="red")
 
 
 def _outcome(role: RoleObservation) -> Text:
@@ -497,12 +522,19 @@ def _roles_table(observation: Observation, title: str, *, caption: bool = False)
 
 
 def _target_caption(item: Mapping[str, Any]) -> str:
-    """The kernel's target line, and that it was derived when prepare bound it."""
+    """The kernel's target line, and where it came from: derived by prepare from the
+    recipe function, or bound by line binding from a different declared line."""
     line = item.get("target_line")
     if line is None:
         return ""
-    derived = item.get("line_provenance") == "recipe_function"
-    return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
+    declared = item.get("declared_line")
+    if item.get("line_provenance") == "recipe_function":
+        origin = " (derived from recipe function)"
+    elif declared is not None and declared != line:
+        origin = f" (declared L{declared}, bound to its reported statement)"
+    else:
+        origin = ""
+    return f" · target=L{line}{origin}"
 
 
 # Validation check keys and their compact column headings.
@@ -524,6 +556,94 @@ def _check_word(status: str) -> Text:
 
 def _status_word(status: str) -> Text:
     return Text(safe_text(status).upper(), style=_STYLES.get(status, "dim"))
+
+
+# Characters blanked when a rendered request part is printed whole; newline and tab stay.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+_SUMMARY_CHARS = 64
+
+
+def _verbatim(text: str) -> Text:
+    """A rendered request part, whole: terminal control characters other than newline and
+    tab are blanked; nothing is truncated."""
+    return Text(_CONTROL.sub(" ", text))
+
+
+def _clip(text: str, keep: int = _SUMMARY_CHARS) -> str:
+    return text if len(text) <= keep else text[: keep - 1] + "…"
+
+
+def _json_or_none(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError:
+        return None
+
+
+def _schema_keys(schema: object) -> list[str]:
+    if not isinstance(schema, dict):
+        return []
+    properties = schema.get("properties")
+    return list(properties) if isinstance(properties, dict) else []
+
+
+def _part_summary(part: Mapping[str, Any]) -> str:
+    """One line describing a request part in the collapsed preview."""
+    text = str(part["text"])
+    kind = part["kind"]
+    if kind == "tool":
+        declaration = _json_or_none(text)
+        if isinstance(declaration, dict):
+            schema = declaration.get("parameters") or declaration.get("parameters_json_schema")
+            return "(" + ", ".join(_schema_keys(schema)) + ")"
+    if kind == "response_schema":
+        return "properties: " + ", ".join(_schema_keys(_json_or_none(text)))
+    if kind == "packet":
+        headings = [line[3:] for line in text.splitlines() if line.startswith("## ")]
+        if headings:
+            return "sections: " + "; ".join(headings)
+        for line in text.splitlines():
+            value = _json_or_none(line)
+            if isinstance(value, dict):
+                return "fields: " + ", ".join(value)
+    if kind == "conversation":
+        value = _json_or_none(text)
+        return f"{len(value)} later turn(s)" if isinstance(value, list) else ""
+    first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    return first
+
+
+def _pretty_part(part: Mapping[str, Any]) -> str:
+    """A part's text for full display: JSON-only parts are indented, the rest is verbatim."""
+    if part["kind"] in {"tool", "response_schema", "conversation"}:
+        value = _json_or_none(str(part["text"]))
+        if value is not None:
+            return json.dumps(value, indent=2, ensure_ascii=False)
+    return str(part["text"])
+
+
+def _or_dash(value: object) -> str:
+    """A size that one side of a preview diff lacks is absent, not unknown."""
+    return "-" if value is None else safe_text(value)
+
+
+_DIFF_STYLES = {"added": "green", "removed": "red", "changed": "yellow", "unchanged": "dim"}
+
+
+def _diff_text(unified: str) -> Text:
+    text = Text()
+    for line in unified.splitlines():
+        style = (
+            "green"
+            if line.startswith("+") and not line.startswith("+++")
+            else "red"
+            if line.startswith("-") and not line.startswith("---")
+            else "cyan"
+            if line.startswith("@@")
+            else ""
+        )
+        text.append(_CONTROL.sub(" ", line) + "\n", style=style)
+    return text
 
 
 def _cleanup_text(confirmed: bool) -> Text:
@@ -766,12 +886,16 @@ class Terminal:
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
-        if isinstance(rendered, dict) and "disposition" in rendered:
+        if isinstance(rendered, dict) and "statements" in rendered:
+            self._explanation(rendered, store)
+        elif isinstance(rendered, dict) and "disposition" in rendered:
             self._result(InvestigationResult.model_validate(rendered), store)
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             self._observation(Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
             self._runs(rendered)
+        elif isinstance(rendered, dict) and {"intake", "findings"} <= set(rendered):
+            self._intake(rendered)
         elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
             self._datasets(rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:
@@ -806,6 +930,8 @@ class Terminal:
             self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
             if "dataset_digest" in rendered:
                 self.out.print(Text("Dataset: ") + _text(rendered["dataset_digest"]))
+            if "replay_note" in rendered:
+                self.out.print(_text(rendered["replay_note"]))
             if isinstance(rendered.get("rows"), list):
                 self._report_rows(rendered["rows"])
             if isinstance(rendered.get("families"), list):
@@ -836,7 +962,9 @@ class Terminal:
     def _report_rows(self, rows: list[dict[str, Any]]) -> None:
         """Render one table row per scored attempt; unknown usage stays unknown."""
         table = Table(expand=True)
-        for column in ("Case", "Run", "Status", "Label", "Stop", "Usage", "Reason"):
+        replayed = any("replay" in row for row in rows)
+        columns = ("Case", "Run", "Status", "Label", *(("Replay",) if replayed else ()))
+        for column in (*columns, "Stop", "Usage", "Reason"):
             table.add_column(column, overflow="fold")
         for row in rows:
             status = row.get("status")
@@ -844,11 +972,13 @@ class Terminal:
             detail = _plain(status)
             if execution not in {None, "COMPLETED"}:
                 detail += f" · {_plain(execution)}"
+            replay = (_replay_cell(row.get("replay")),) if replayed else ()
             table.add_row(
                 _text(row.get("case_id")),
                 _text(row.get("run_id")),
                 Text(detail, style=_STYLES.get(str(status), "cyan")),
                 _text(row_label(row)),
+                *replay,
                 _text(row_stop(row) or "-"),
                 _text(_usage(row, _plain)),
                 _text(row.get("reason") or ""),
@@ -1143,6 +1273,47 @@ class Terminal:
                 Text(f"{value['invalid_records']} committed record(s) could not be read")
             )
 
+    def _intake(self, value: dict[str, Any]) -> None:
+        """Render a scanner-intake dry run: one row per finding, admissible or why blocked."""
+        table = Table(expand=True)
+        for column in ("#", "File", "Line", "Outcome", "Detail"):
+            # Outcome labels stay whole; paths and details fold, never truncate.
+            table.add_column(column, overflow="fold", no_wrap=column in {"#", "Outcome"})
+        for row in value["findings"]:
+            line = "-" if row["line"] is None else str(row["line"])
+            if row["line_provenance"] == "recipe_function":
+                line += " (derived)"
+            outcome = str(row["outcome"])
+            table.add_row(
+                _text(row["index"]),
+                _text(row["file"] or "-"),
+                _text(line),
+                Text(
+                    safe_text(outcome), style="green" if outcome.startswith("admissible") else "red"
+                ),
+                _text(row["detail"]),
+            )
+        intake, counts = value["intake"], value["counts"]
+        title = f"Corsair · Intake {safe_text(intake['report'])}"
+        self.out.print(Panel(table, title=title, border_style="cyan"))
+        summary = (
+            f"{counts['admissible']} of {counts['findings']} finding(s) admissible "
+            f"({counts['admissible_derived_line']} with a line derived from the recipe function)"
+            f" · source {_short(str(intake['source_digest']))}"
+        )
+        self.out.print(_text(summary))
+        if not intake["report_admitted"]:
+            self.out.print(
+                _text(
+                    "load_scan_report rejects this report as a whole: a finding fails the "
+                    "ScanReport contract. Fix or drop it before admitting the report."
+                )
+            )
+        if intake["recipe_template"] is None and counts["blocked_reasons"].get("recipe_missing"):
+            self.out.print(
+                _text("Pass --recipe-template with the function and payload parameter to bind.")
+            )
+
     def _datasets(self, value: dict[str, Any]) -> None:
         """Render a dataset validation: identity and cohort, then one row per entry."""
         for dataset in value["datasets"]:
@@ -1234,6 +1405,147 @@ class Terminal:
         title = f"Corsair · Evidence {safe_text(value['run_id'])} · {safe_text(value['verdict'])}"
         body = Group(*tables) if tables else Text("No observations were recorded")
         self.out.print(Panel(body, title=title, border_style="cyan"))
+
+    def _explanation(self, value: dict[str, Any], store: ArtifactStore | None = None) -> None:
+        """Render the verdict explanation in order, after the result panel when it is present."""
+        if isinstance(value.get("result"), dict):
+            self._result(InvestigationResult.model_validate(value["result"]), store)
+        verdict = value.get("verdict")
+        style = _VERDICT_STYLES.get(Verdict(verdict), "cyan") if verdict else "cyan"
+        table = _grid()
+        for statement in value["statements"]:
+            table.add_row(_label(statement["kind"]), _text(statement["text"]))
+        title = f"Corsair · Why {safe_text(verdict or 'no verdict')} · {safe_text(value['run_id'])}"
+        self.out.print(Panel(table, title=title, border_style=style))
+
+    def preview(self, value: dict[str, Any], *, full: bool) -> None:
+        """Render an agent preview or preview diff; JSON and Markdown keep every byte."""
+        if not self.human:
+            self.emit(value)
+        elif "baseline" in value:
+            self._preview_diff(value, full=full)
+        else:
+            self._preview(value, full=full)
+
+    def _preview(self, value: dict[str, Any], *, full: bool) -> None:
+        """Header, one row per request part with sizes, totals; ``full`` adds each part."""
+        inputs, route = value["inputs"], value["route"]
+        header = _grid()
+        header.add_row(_label("Request"), _text(inputs["request"]))
+        header.add_row(_label("Case"), _text(f"{inputs['case_id']} · round {inputs['round']}"))
+        if inputs.get("feedback_gate"):
+            header.add_row(_label("Feedback"), _text(inputs["feedback_gate"]))
+        schema_path = (
+            "native response schema"
+            if route["output_schema_and_tools"]
+            else "set_model_response tool when tools exist"
+        )
+        header.add_row(
+            _label("Route"),
+            _text(
+                f"{route['connector']} · {route['model']} · {schema_path} ({route['capability']})"
+            ),
+        )
+        header.add_row(_label("Output cap"), _text(value["generation"]["max_output_tokens"]))
+        header.add_row(_label("Tools"), _text(", ".join(value["declared_tools"]) or "none"))
+        header.add_row(_label("Request sha256"), _text(_short(value["request_sha256"])))
+        table = Table(expand=True)
+        table.add_column("Part", overflow="fold")
+        table.add_column("Bytes", justify="right", no_wrap=True)
+        table.add_column("~Tokens", justify="right", no_wrap=True)
+        table.add_column("Summary", overflow="ellipsis", no_wrap=True, ratio=1)
+        for part in value["parts"]:
+            table.add_row(
+                _text(part["name"]),
+                _text(part["bytes"]),
+                _text(part["approx_tokens"]),
+                _text(_clip(_part_summary(part))),
+            )
+        table.add_section()
+        for kind, total in value["totals"].items():
+            if total["bytes"] or kind == "request":
+                style = "bold" if kind == "request" else "cyan"
+                table.add_row(
+                    Text(f"total {kind}", style=style),
+                    Text(str(total["bytes"]), style=style),
+                    Text(str(total["approx_tokens"]), style=style),
+                    Text(""),
+                )
+        caption = f"tokens ≈ {value['token_estimate']}, not a provider tokenizer"
+        if not full:
+            caption += " · --full prints every part · --output FILE saves the exact preview"
+        table.caption = caption
+        title = f"Corsair · Agent preview · {safe_text(value['role'])}"
+        self.out.print(Panel(Group(header, table), title=title, border_style="cyan"))
+        if full:
+            for part in value["parts"]:
+                self.out.print(
+                    Panel(
+                        _verbatim(_pretty_part(part)),
+                        title=safe_text(part["name"]),
+                        subtitle=f"{part['bytes']} B · ~{part['approx_tokens']} tokens",
+                        border_style="dim",
+                    )
+                )
+
+    def _preview_diff(self, value: dict[str, Any], *, full: bool) -> None:
+        """Part-by-part size deltas between two previews; ``full`` adds unified diffs."""
+        header = _grid()
+        for side in ("baseline", "candidate"):
+            inputs = value[side]
+            header.add_row(
+                _label(side.capitalize()),
+                _text(
+                    f"{inputs['request']} · {inputs['case_id']} · round {inputs['round']} · "
+                    f"{_short(inputs['request_sha256'])}"
+                ),
+            )
+        header.add_row(
+            _label("Changed"),
+            Text("yes", style="yellow") if value["changed"] else Text("no", style="green"),
+        )
+        table = Table(expand=True)
+        table.add_column("Part", overflow="fold")
+        table.add_column("Status", no_wrap=True)
+        table.add_column("Bytes", justify="right", no_wrap=True)
+        table.add_column("Δ Bytes", justify="right", no_wrap=True)
+        table.add_column("Δ ~Tokens", justify="right", no_wrap=True)
+        for part in value["parts"]:
+            style = _DIFF_STYLES.get(part["status"], "")
+            sizes = part["bytes"]
+            table.add_row(
+                Text(safe_text(part["name"]), style="dim" if style == "dim" else ""),
+                Text(safe_text(part["status"]), style=style),
+                _text(f"{_or_dash(sizes['baseline'])} → {_or_dash(sizes['candidate'])}"),
+                _text(_signed(sizes["delta"])),
+                _text(_signed(part["approx_tokens"]["delta"])),
+            )
+        table.add_section()
+        for kind, total in value["totals"].items():
+            sizes = total["bytes"]
+            if sizes["baseline"] or sizes["candidate"] or kind == "request":
+                style = "bold" if kind == "request" else "cyan"
+                table.add_row(
+                    Text(f"total {kind}", style=style),
+                    Text(""),
+                    Text(f"{sizes['baseline']} → {sizes['candidate']}", style=style),
+                    Text(_signed(sizes["delta"]), style=style),
+                    Text(_signed(total["approx_tokens"]["delta"]), style=style),
+                )
+        if not full and value["changed"]:
+            table.caption = "--full prints the unified diff of each changed part"
+        title = f"Corsair · Agent preview diff · {safe_text(value['role'])}"
+        self.out.print(Panel(Group(header, table), title=title, border_style="cyan"))
+        if full:
+            for part in value["parts"]:
+                if part.get("unified_diff"):
+                    self.out.print(
+                        Panel(
+                            _diff_text(part["unified_diff"]),
+                            title=safe_text(part["name"]),
+                            border_style="dim",
+                        )
+                    )
 
     def report_failure(self, error: Exception) -> None:
         """Log a failed command with its sanitized detail and, when known, a fixed remedy."""

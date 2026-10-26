@@ -12,7 +12,14 @@ import pytest
 
 from corsair.adapters.inference import adk
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import AuditDecision, AuditInput, AuditOutput, AuditResult, MatchKind
+from corsair.contracts import (
+    AuditDecision,
+    AuditInput,
+    AuditOutput,
+    AuditResult,
+    MatchKind,
+    PythonRecipe,
+)
 from corsair.evaluation import agents
 from corsair.evaluation.agents import fixture_score_row, load_frozen_fixture
 from corsair.evaluation.ledger import agent_row_ledger
@@ -129,6 +136,7 @@ def test_rubric_cohort_round_trips_with_one_case_per_rubric_outcome():
         assert (oracle["decision"] == "ACCEPT") == (oracle["rule"] == "ALL")
         # Each packet cites the configured function and the fixed root the payload varies under.
         assert f"def {packet.recipe.function}(" in packet.source_excerpt
+        assert isinstance(packet.recipe, PythonRecipe)
         assert packet.recipe.payload_parameter not in packet.recipe.fixed_kwargs
         assert packet.finding.file == packet.recipe.module_file
         outcomes.add((oracle["decision"], oracle["rule"]))

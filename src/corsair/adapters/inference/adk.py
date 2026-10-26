@@ -46,7 +46,6 @@ from corsair.contracts import (
     Feedback,
     Finding,
     LineProvenance,
-    PythonRecipe,
     Recipe,
     Usage,
 )
@@ -213,7 +212,7 @@ def _derived_line_note(
 
     Packets for findings that declared their line stay byte-identical.
     """
-    if provenance is not LineProvenance.RECIPE_FUNCTION or not isinstance(recipe, PythonRecipe):
+    if provenance is not LineProvenance.RECIPE_FUNCTION:
         return {}
     return {
         "target_line_provenance": (

@@ -21,6 +21,7 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.line_binding import bind_target_line
 from corsair.policies.target_binding import target_binding
 from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
@@ -60,9 +61,9 @@ class Activities:
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
+        kind = request.case.recipe.kind
         try:
-            kind = request.case.recipe.kind
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id_for(kind))
+            image_id = await asyncio.to_thread(self.sandbox.image_id_for, kind)
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -89,15 +90,19 @@ class Activities:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
         # Pre-model target binding over the admitted bytes: a case that certainly cannot
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        # The structural check reads a Python AST, so it applies only to the Python
-        # recipe; other runtimes rely on the run-time coverage/target-line gate, which
-        # remains the decisive authority and is never weakened by this early stop.
+        # The structural gate and statement-line binding are Python-AST specific; other
+        # languages rely on their own run-time coverage and binding gates.
         if isinstance(prepared.recipe, PythonRecipe):
             failure = target_binding(prepared.finding, prepared.recipe, module_text)
             if failure is not None:
                 raise ApplicationError(
                     format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
                 )
+            # target_binding passed, so the finding declares a line and the module exists.
+            # The coverage gate binds to the statement line coverage reports for it.
+            assert prepared.finding.line is not None
+            target_line = bind_target_line(module_text, prepared.finding.line)
+            return prepared.model_copy(update={"target_line": target_line})
         return prepared
 
     @staticmethod

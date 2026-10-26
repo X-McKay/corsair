@@ -178,6 +178,9 @@ corsair inspect "$RUN_ID" --online --watch --settings .state/settings.json
 
 # Per-role native receipts behind the committed result.
 corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
+
+# The result panel followed by the plain-language explanation.
+corsair inspect "$RUN_ID" --explain --settings .state/settings.json
 ```
 
 Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one. In human mode it renders the result with its gate ledger verified: each round that reached the kernel is classified from that round's own committed receipts, revalidated with the trusted verifier's admission rules, so **Stopped at** names the kernel or audit gate (`demonstrated`, `clean_negative`, `coverage`, `audit_reject`, ...). A round whose receipts do not validate shows `evidence_unverified`, never a gate read from unverified fields. The same view after `investigate --wait` verifies against the local artifact root only when it already exists; otherwise, and after `inspect --online --watch`, which never opens a local store, kernel rounds show `evidence_unverified` with a caption saying so. The verdict shown is always the recorded one.
@@ -186,7 +189,30 @@ The result's `timeline` (in JSON too) is the workflow's bounded phase timeline, 
 
 With `--online`, it uses the workflow’s native status query without opening or creating a local artifact store. `--watch` without `--online` is rejected before runtime I/O. For an investigation, the reported phase and round come from the actual Temporal workflow state, not a CLI estimate. For an evaluation, the status reports actual completed and total child work and a bounded per-child state list. `--watch` repeats the native status query while the workflow remains open, then waits for and returns the workflow’s actual final result. It does not fabricate a percentage, infer model progress, or turn an activity heartbeat into a security conclusion.
 
-`--evidence` reads the committed result offline (it is rejected with `--online`) and walks each round's observation, and the fixed-revision observation when present, to its committed operation record, evidence bundle and raw container receipts. Each observation reports `committed` (the operation record resolves to the same observation the result carries), `evidence` (`present`, `absent` or `unreadable`), `cleanup_confirmed`, the feedback `gate`, and `receipts_admissible`: whether the saved receipts still pass the trusted verifier's admission rules, or `null` when the round has no submission or the result has no manifest. When the receipts are admissible it also reports, from the verified prepared case, `target_line` (the line the coverage gate checked) and `line_provenance` (`declared`, or `recipe_function` when prepare derived the line from the recipe function); both are `null` otherwise. Per role it reports the admitted `outcome`, `target_executed`, `covered_lines` and `native_exit_code`, and from the raw receipt only `receipt` status, `cleanup_confirmed`, `container_id`, `image_id`, `docker_exit_code` and the receipt digest. Payloads, the driver job and record, the rest of the prepared case (finding text, recipe and source excerpt) and model output are never printed. The view is a navigation aid, not a verdict: the label remains the result's code-decided `verdict`, and `receipts_admissible: false` is an operational fact to investigate, never a negative security result.
+`--evidence` reads the committed result offline (it is rejected with `--online`) and walks each round's observation, and the fixed-revision observation when present, to its committed operation record, evidence bundle and raw container receipts. Each observation reports `committed` (the operation record resolves to the same observation the result carries), `evidence` (`present`, `absent` or `unreadable`), `cleanup_confirmed`, the feedback `gate`, and `receipts_admissible`: whether the saved receipts still pass the trusted verifier's admission rules, or `null` when the round has no submission or the result has no manifest. When the receipts are admissible it also reports, from the verified prepared case, `target_line` (the line the coverage gate checked, after line binding), `declared_line` (the finding's line it was bound from) and `line_provenance` (`declared`, or `recipe_function` when prepare derived the line from the recipe function); all three are `null` otherwise. The human caption shows them in one phrase, for example `target=L5 (declared L4, bound to its reported statement)`. Per role it reports the admitted `outcome`, `target_executed`, `covered_lines` and `native_exit_code`, and from the raw receipt only `receipt` status, `cleanup_confirmed`, `container_id`, `image_id`, `docker_exit_code` and the receipt digest. Payloads, the driver job and record, the rest of the prepared case (finding text, recipe and source excerpt) and model output are never printed. The view is a navigation aid, not a verdict: the label remains the result's code-decided `verdict`, and `receipts_admissible: false` is an operational fact to investigate, never a negative security result.
+
+`--explain` reads the committed result offline (it is rejected with `--online` or `--evidence`) and adds the [`explain`](#explain-run_id) statements after the result. Its JSON is `{"result": ..., "run_id", "case_id", "verdict", "statements"}`.
+
+### `explain RUN_ID`
+
+```bash
+corsair explain "$RUN_ID" --settings .state/settings.json
+corsair --format json explain "$RUN_ID" --settings .state/settings.json | jq -r '.statements[] | select(.kind == "change") | .text'
+```
+
+Explains a committed result's verdict in plain language, offline: it reads the result from the artifact store, re-validates each round's saved receipts, builds the [gate ledger](../agents/evaluations.md#reading-results) and passes both to the pure [`explain_result`](../../src/corsair/policies/explanation.py). It never contacts Temporal, Docker or a model and never changes the label. The output is `run_id`, `case_id`, `verdict` and an ordered list of `statements`, each with `kind`, `session`, `gate` and `text`:
+
+| `kind` | What it states |
+| --- | --- |
+| `verdict` | The label with execution status, claimed scope and fix status. |
+| `rule` | The verdict-table rule behind that label ([ADR 0004](../architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md)). |
+| `session` | Per session: rounds and the gate that stopped each, then the last evaluated round's decisive facts (control and exploit outcome, whether the declared target line ran in both runs, audit decision), or that it demonstrated or ended in a clean negative. |
+| `shortfall` | The single gate at which a non-decisive session fell short, with its fixed meaning. A run that did not complete is attributed to its operational stop. |
+| `policy` | `negative_threshold` and `max_sessions` from the manifest, sessions run and clean negatives reached, a `budget_exhausted` stop, and the request digest that identifies the budget (the limits themselves are not recorded in the result). |
+| `fix` | What the fixed-revision status means for this label. |
+| `change` | What would change the label, derived from the verdict table: for example how many more clean negatives `EXPLOIT_NOT_DEMONSTRATED` needs, what each short session needed, or that only a `NOT_BLOCKED` fixed revision withholds a demonstration. |
+
+Every sentence is fixed text over enum values, counts and gate names. The explanation never reads payloads, the hypothesis or plan, the audit rule or reason, a producer abstention, feedback reasons or the result's `reason` (which can carry model text), and it reads no oracle. A round whose receipts no longer validate is explained as `evidence_unverified` rather than from its unverified fields. A missing result fails with the same remedy as `inspect`. The [glossary](glossary.md) defines the labels and gate terms it uses.
 
 ### `runs`
 
@@ -265,6 +291,17 @@ A check that cannot run because an earlier one failed is `skip`, as are source a
 
 The command exits `0` when every dataset is valid and `1` when any entry, manifest or cross-dataset check fails.
 
+### `dataset replay-candidates REPORT.json DATASET.json`
+
+```bash
+corsair dataset replay-candidates .runs/evaluations/producer-1.json \
+  evals/datasets/producer-expanded.json --settings .state/settings.json
+```
+
+Replays every mismatching proposal of a saved isolated producer report (`control_mismatch` or `candidate_exact_mismatch` rows) natively in the configured Docker sandbox on the row's frozen request, exactly as `verify` does, and writes a copy of the report whose rows gain a `replay` entry and whose summary gains `replay` counts (`demonstrated`, `not_demonstrated`, `unavailable`, `not_replayed`). Row `status` and the pass/fail summary are unchanged, and no oracle file is read or written; see [admitting an alternate producer payload](../agents/evaluations.md#admitting-an-alternate-producer-payload). The output artifacts named by the report must be in `artifact_root` of `--settings`. The command refuses (exit `2`) a report whose rows are not all producer rows or whose `dataset_digest` differs from `DATASET.json`.
+
+`--run-id ID` sets the replay identity (operation ids are `ID.c<row index>`), and `--output PATH` defaults to `.runs/evaluations/<replay-id>.json`. Human output adds a `Replay` column (`demonstrates`, `does not` with both role outcomes and coverage, or `unavailable`) and the replay counts; `--format markdown` adds the column, a `Native replay` table and the human-decision note; `--format json` emits the saved report plus its `report` path. It exits `1` when any replay was `unavailable`, otherwise `0` whatever the replay outcomes. `corsair report` and `corsair compare` read the replay report like any other.
+
 ### `rescore DATASET RUN_ID...`
 
 ```bash
@@ -303,6 +340,49 @@ The comparison is refused (exit `2`) when the dataset digests differ or either r
 
 The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output opens with a `gates moved` line, renders the per-gate table and lists only attempts whose status, label, forbidden flag or presence changed, with their final stop; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts`, `summary_delta` and `gate_delta`. `--format markdown` writes the result line, the caveats (a dataset mismatch first), an identity table per side (report path, dataset digest, config digests, cohorts), the counts, the summary deltas, the regressions and the changed attempts with their usage deltas; a side an attempt is missing from is `absent`. The exit codes are the same in every format. Each case and regression names its `family` (`null` when the rows carry none). `--families` adds a `families` list with each family's baseline and candidate summary, pass-rate, decisive and forbidden-label deltas and the number of regressions attributed to it; `--dataset MANIFEST` labels both reports as for `report`.
 
+### `intake REPORT --source-root DIR [--recipe-template FILE]`
+
+```bash
+corsair intake evals/fixtures/scan_reports/python-reader-mixed.json \
+  --source-root evals/datasets/intake/reader-source \
+  --recipe-template evals/datasets/intake/recipe-read-file.json
+corsair --format json intake scan.json --source-root src --recipe-template recipe.json \
+  | jq '.findings[] | select(.request) | .request'
+```
+
+A dry run of [scanner intake](../guides/integration.md#dry-run-a-scan-report-corsair-intake): for each finding of a `corsair.scan_report/1` report it builds the candidate request a scanner finding would become and decides, without a model, Temporal or a container, whether the prepare activity would admit it. `--source-root DIR` is the findings' source tree (the request's `source.path`); it is admitted exactly as prepare admits it, so it must lie below the settings `source_root` (the current directory by default) and pass the same symlink, special-file and size checks. `--recipe-template FILE` is the operator's recipe: a `PythonRecipe` object without `module_file`, which intake binds to each finding's `file`. Nothing is read from a finding's description.
+
+Each finding is `admissible` (its declared line binds), `admissible:recipe_function` (a line-less finding whose line prepare derives from the recipe function) or `blocked:REASON`. Reasons before binding are `path_unsafe` (the file is absolute or leaves the tree), `finding_invalid` (any other contract failure), `unsupported_language` (not a `.py` module; Python is the only running runtime), `file_absent`, `source_not_utf8`, `recipe_missing` (no `--recipe-template`) and `recipe_invalid`; the rest are the pre-model [`target_binding`](../../src/corsair/policies/target_binding.py) reasons (`line_missing`, `line_out_of_range`, `module_unparseable`, `function_not_defined`, `function_async`, `payload_parameter_unknown`, `fixed_kwarg_unknown`, `required_parameter_unbound`). Human output is one table row per finding (index, file, line with `(derived)` for a recipe-derived line, outcome, detail) and a count line. `--format json` emits `intake` (report, source path, `source_digest`, template, and `report_admitted`: false when a finding fails the `ScanReport` contract, so `load_scan_report` would reject the whole report), `counts` (findings, admissible, admissible with a derived line, blocked, and blocked reasons) and `findings`, where each admissible finding carries its complete candidate `request` with the snapshot digest pinned as `source.expected_digest`. The command exits `0` when every finding is admissible and `1` when any is blocked; a malformed report, template or source fails with exit `2` and a remedy.
+
+To measure intake against a frozen dataset, run `just eval-intake evals/datasets/intake.json` (`--output PATH`, default `.runs/evaluations/intake-*.json`). It verifies every report, template, oracle and source-snapshot digest, scores each finding's outcome against its oracle, and saves an ordinary report that `corsair report` and `corsair compare` read: one row per finding, labelled by its outcome, whose gate ledger entry is that outcome; `llm_calls` and token counts are measured zeros. It exits `1` when any finding disagrees with its oracle.
+
+
+### `agent preview ROLE REQUEST`
+
+```bash
+corsair agent preview producer evals/fixtures/case01/request.json --output .work/preview.json
+corsair agent preview producer evals/fixtures/case01/request.json --diff .work/preview.json
+corsair agent preview producer evals/fixtures/case01/request.json --round 2 \
+  --previous evals/fixtures/case01/submission.json --feedback "audit:the exploit never reaches open"
+corsair agent preview auditor evals/fixtures/case01/request.json \
+  --submission evals/fixtures/case01/submission.json --full
+```
+
+Renders the first model request one role would receive, without calling a model. The production `run_producer` or `run_auditor` path (role factory, toolset, packet builder and ADK's own request processors) builds the request and a capturing model in [`evaluation/preview.py`](../../src/corsair/evaluation/preview.py) records it and answers with a fixed abstention or review. No provider, container, Temporal service or oracle is touched; sources are admitted from `--settings`' `source_root` and limits into a throwaway store, so nothing is written to `artifact_root`. A case the pre-model `target_binding` gate would stop is refused, because the workflow would never send it.
+
+The request is split into parts, in request order: `instruction.prompt` (the role's `system.md`), one `instruction.skill.NAME` per preloaded procedure, `instruction.adk` (text ADK appends, such as its `set_model_response` guidance), one `tool.NAME` per declared function with its full parameter schema (whatever tools the factory returns, `set_model_response` included when ADK declares it), `response_schema` when the route sends one, and `packet`. Each part carries its UTF-8 `bytes`, `approx_tokens` (`ceil(bytes/4)`, not a provider tokenizer), `sha256` and exact `text`; `totals` sums them per kind and for the whole request, and `request_sha256` identifies the request. Human output is a collapsed table (part, bytes, tokens, a one-line summary); `--full` prints every part whole. `--format json` and `--output FILE` give the complete preview, the exact artifact to attach to a review.
+
+| Option | Role | Effect |
+| --- | --- | --- |
+| `--submission FILE` | auditor (required) | The `Submission` JSON under review. |
+| `--round N` | producer | The round index (default `1`, at most the request's `max_rounds`). |
+| `--previous FILE` | producer, round > 1 | The previous round's `Submission`, as the retry packet carries it. |
+| `--feedback GATE:REASON` | producer, round > 1 | The retry feedback; the workflow only ever sends `audit` (the auditor's rejection) or `retry` (a fixed blind text), per [ADR 0005](../architecture/decisions/0005-outcome-blind-retry-feedback.md). |
+| `--structured-tools` / `--no-structured-tools` | both | Force the native response-schema route or the `set_model_response` route; by default the configured model's own capability decides, as it does in production. |
+| `--diff PREVIEW.json` | both | Compare against a saved preview of the same role: per part `added`, `removed`, `changed` or `unchanged` with byte and token deltas, totals deltas, and (for `--full` or in JSON) a unified diff in which JSON lines are pretty-printed. |
+
+The command exits `0` when it renders; invalid role inputs exit `2` with a remedy.
+
 ## Watching and recovery
 
 A native activity records an immutable intent before its Docker side effect and reconciles a committed observation by identity. A committed observation can be recovered from the artifact root. An intent with no committed observation is uncertain—even if no container remains—and is not safe to replay automatically.
@@ -326,7 +406,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression. `runs` and `inspect` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression, or an `intake` dry run blocked a finding. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 

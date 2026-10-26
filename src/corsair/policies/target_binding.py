@@ -15,7 +15,7 @@ import ast
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, PythonRecipe
+from corsair.contracts import Finding, LineProvenance, PythonRecipe
 
 
 class TargetBindingReason(StrEnum):
@@ -151,6 +151,24 @@ def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
     if first.lineno <= function.lineno or source_line[: first.col_offset].strip():
         return None  # The statement shares a line with the signature.
     return first.lineno
+
+
+def bind_target_line(
+    finding: Finding, recipe: PythonRecipe, module_text: str
+) -> tuple[Finding, LineProvenance]:
+    """The finding prepare hands on: its declared line, else one derived from the recipe.
+
+    ``module_text`` is the admitted text of ``finding.file`` (the recipe module). A
+    finding that already declares a line is returned unchanged; a line-less one gets
+    ``derive_target_line`` when that is certain, else stays line-less for
+    ``target_binding`` to report ``line_missing``.
+    """
+    if finding.line is not None:
+        return finding, LineProvenance.DECLARED
+    derived = derive_target_line(recipe, module_text)
+    if derived is None:
+        return finding, LineProvenance.DECLARED
+    return finding.model_copy(update={"line": derived}), LineProvenance.RECIPE_FUNCTION
 
 
 def _signature_failure(

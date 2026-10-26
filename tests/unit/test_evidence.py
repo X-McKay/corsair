@@ -89,9 +89,10 @@ class _FakeSandbox:
     image_id: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
+    adversarial_violates: bool = True
 
     def image_id_for(self, kind: str) -> str:
-        del kind  # One trusted image per recipe kind; the double returns its only image.
+        del kind  # The double resolves one trusted image regardless of recipe kind.
         return self.image_id
 
     def has_unknown_operation(self, operation_id: str) -> bool:
@@ -102,7 +103,7 @@ class _FakeSandbox:
         store = self.store
         del budget, heartbeat
         self.calls += 1
-        violation = role == "adversarial"
+        violation = role == "adversarial" and self.adversarial_violates
         driver = {
             "schema_version": "corsair.driver/1",
             "operation_id": operation_id,
@@ -121,7 +122,7 @@ class _FakeSandbox:
             "observation_kind": "disclosure" if violation else "held",
             "target_executed": True,
             "covered_lines": [4],
-            "coverage_file": "reader.py",
+            "coverage_file": prepared.recipe.module_file,
         }
         raw = {
             "schema_version": "corsair.raw-evidence/1",
