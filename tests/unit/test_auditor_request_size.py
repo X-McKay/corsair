@@ -19,6 +19,7 @@ MEASURE_SCRIPT = ROOT / "scripts/measure_auditor_request.py"
 AUDITOR_DATASETS = [
     ROOT / "evals/datasets/auditor-dev.json",
     ROOT / "evals/datasets/auditor-expanded.json",
+    ROOT / "evals/datasets/auditor-rubric.json",
 ]
 
 # With its SkillToolset the auditor's system instruction plus tool declarations
@@ -43,7 +44,7 @@ async def test_every_frozen_audit_is_one_tool_free_schema_request(structured_too
 
     rows = await measure.measure(AUDITOR_DATASETS, structured_tools=structured_tools)
 
-    assert [row["case_id"] for row in rows] == ["audit01", "audit02", "audit03", "audit04"]
+    assert [row["case_id"] for row in rows] == [f"audit{index:02d}" for index in range(1, 12)]
     for row in rows:
         assert (row["requests"], row["llm_calls"], row["tool_calls"]) == (1, 1, 0)
         assert row["declared_tools"] == []

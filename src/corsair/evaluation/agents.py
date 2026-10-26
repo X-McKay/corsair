@@ -18,6 +18,7 @@ from corsair.agents.resources import load_agent_spec, prompt_text, runtime_skill
 from corsair.contracts import (
     AuditInput,
     AuditOutput,
+    AuditResult,
     InvestigationRequest,
     MatchKind,
     ProducerInput,
@@ -26,27 +27,10 @@ from corsair.contracts import (
 )
 from corsair.evaluation.ledger import agent_row_ledger
 from corsair.evaluation.scoring import dataset_root, summarize
+from corsair.evaluation.scoring import load_frozen_fixture as load_frozen_fixture
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.settings import Settings, load_settings
 from corsair.steps.manifest import build_manifest
-
-
-def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
-    """Read/verify once; the oracle remains local to this evaluator."""
-    contents: dict[str, bytes] = {}
-    paths: dict[str, Path] = {}
-    for field in ("input", "oracle"):
-        path = (root / entry[field]).resolve()
-        if not path.is_relative_to(root):
-            raise ValueError("agent dataset path escapes its root")
-        content = path.read_bytes()
-        if digest(content) != entry[f"{field}_digest"]:
-            raise ValueError("frozen isolated fixture changed")
-        paths[field], contents[field] = path, content
-    oracle = json.loads(contents["oracle"])
-    if not isinstance(oracle, dict):
-        raise ValueError("isolated oracle must be a JSON object")
-    return paths["input"], contents["input"], oracle
 
 
 async def invoke_fixture_agent(
@@ -92,7 +76,17 @@ def fixture_matches_oracle(output: ProducerOutput | AuditOutput, oracle: dict[st
             and submission.control_payload == oracle["control_payload"]
             and submission.exploit_payload in oracle["candidate_payloads"]
         )
-    return output.review is not None and output.review.decision == oracle["decision"]
+    return (
+        output.review is not None
+        and output.review.decision == oracle["decision"]
+        and (audit_rule_matches(output.review, oracle))
+    )
+
+
+def audit_rule_matches(review: AuditResult, oracle: dict[str, Any]) -> bool:
+    """An oracle may also name the decisive rubric rule; without one the decision decides."""
+    expected = oracle.get("rule")
+    return expected is None or review.rule == expected
 
 
 def fixture_match_kind(output: ProducerOutput | AuditOutput, oracle: dict[str, Any]) -> MatchKind:
@@ -112,6 +106,8 @@ def fixture_match_kind(output: ProducerOutput | AuditOutput, oracle: dict[str, A
         return MatchKind.NO_VALID_OUTPUT
     if output.review.decision != oracle["decision"]:
         return MatchKind.CANDIDATE_EXACT_MISMATCH
+    if not audit_rule_matches(output.review, oracle):
+        return MatchKind.RULE_MISMATCH
     return MatchKind.EXACT_MATCH
 
 
@@ -140,7 +136,7 @@ def fixture_score_row(
         else "COMPLETED",
         "agent": agent,
         # The auditor's own decisive rubric id makes a rejection attributable in the
-        # report; it is model output, so it never changes the oracle pass predicate.
+        # report; it changes the pass predicate only when the frozen oracle names a rule.
         "audit_decision": None if review is None else review.decision.value,
         "audit_rule": None if review is None else review.rule,
         "output_artifact": store.put_json(output).model_dump(mode="json"),

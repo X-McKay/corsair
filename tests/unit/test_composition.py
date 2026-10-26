@@ -31,12 +31,16 @@ from corsair.steps.activities import Activities
 
 
 class InferenceStub:
-    async def produce(self, request: ProducerInput) -> ProducerOutput:
-        raise AssertionError(f"unexpected producer invocation: {request.run_id}")
+    async def produce(
+        self, request: ProducerInput, *, window_seconds: float | None = None
+    ) -> ProducerOutput:
+        raise AssertionError(f"unexpected producer invocation: {request.run_id} {window_seconds}")
 
-    async def audit(self, request: AuditInput) -> AuditOutput:
+    async def audit(
+        self, request: AuditInput, *, window_seconds: float | None = None
+    ) -> AuditOutput:
         del request
-        raise AssertionError("unexpected auditor invocation")
+        raise AssertionError(f"unexpected auditor invocation: {window_seconds}")
 
 
 class SourcesStub:

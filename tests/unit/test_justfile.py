@@ -41,7 +41,7 @@ def test_default_just_lists_recipes_without_running_side_effects():
     assert process.returncode == 0, process.stderr
     assert "Available recipes" in process.stdout
     recipes = ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up")
-    for recipe in (*recipes, "live-agent", "live-chain"):
+    for recipe in (*recipes, "live-agent", "live-chain", "dataset-families"):
         assert recipe in process.stdout
 
 

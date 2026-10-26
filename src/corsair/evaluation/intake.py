@@ -42,7 +42,7 @@ from corsair.contracts import (
     format_diagnostic,
 )
 from corsair.contracts.intake import MAX_SCANNER_FINDINGS
-from corsair.evaluation.scoring import dataset_root, read_frozen_file, summarize
+from corsair.evaluation.scoring import dataset_root, read_frozen, resolve_frozen, summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.policies.target_binding import (
     TargetBindingReason,
@@ -51,6 +51,7 @@ from corsair.policies.target_binding import (
 )
 from corsair.settings import Settings
 
+INTAKE_SCHEMA = "corsair.intake-dataset/1"
 ADMISSIBLE = "admissible"
 BLOCKED = "blocked"
 # One finding's intake outcome, as an oracle states it and a report records it.
@@ -316,21 +317,21 @@ class IntakeOracle(Contract):
 
 
 def _frozen_source(root: Path, relative: str) -> Path:
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root) or not path.is_dir():
-        raise ValueError("dataset source escapes its root or is missing")
+    path = resolve_frozen(root, relative)
+    if not path.is_dir():
+        raise ValueError("dataset source is missing")
     return path
 
 
 def _entry_rows(root: Path, entry: IntakeDatasetEntry) -> list[dict[str, Any]]:
     """Assess one frozen report and score each finding against its oracle."""
-    report_path, report_bytes = read_frozen_file(root, entry.report, entry.report_digest, "report")
-    _, oracle_bytes = read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
+    report_path, report_bytes = read_frozen(root, entry.report, entry.report_digest, "report")
+    _, oracle_bytes = read_frozen(root, entry.oracle, entry.oracle_digest, "oracle")
     template = None
     if entry.recipe_template is not None:
         if entry.recipe_template_digest is None:
             raise ValueError("a dataset recipe template needs its digest")
-        template_path, _ = read_frozen_file(
+        template_path, _ = read_frozen(
             root, entry.recipe_template, entry.recipe_template_digest, "recipe template"
         )
         template = load_recipe_template(template_path)

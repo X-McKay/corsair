@@ -2,7 +2,8 @@
 """Trusted in-image driver for the initial Python secret-disclosure recipe.
 
 This program is intentionally not an agent tool.  It receives an operator-created,
-JSON-only job, writes a fixed pytest test, runs it through coverage.py, and emits one
+JSON-only job, writes a fixed pytest test, runs it through coverage.py, reads the
+target module's coverage JSON report in-process after pytest exits, and emits one
 strict JSON record on stdout.  Target stdout/stderr are captured by pytest and never
 become driver output.  The driver does not print target values, exception messages,
 or the random private fixture.
@@ -20,15 +21,15 @@ import subprocess
 import sys
 import textwrap
 import xml.etree.ElementTree as element_tree
-from contextlib import suppress
+from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 JOB_PATH = Path("/input/job.json")
 WORK = Path("/work")
 JUNIT = WORK / "junit.xml"
-COVERAGE = WORK / "coverage.json"
+COVERAGE_DATA = WORK / ".coverage"
+COVERAGE_REPORT = WORK / "coverage.json"
 TEST = WORK / "test_recipe.py"
-COVERAGE_REPORT_TIMEOUT_SECONDS = 30
 
 
 TEST_SOURCE = r"""
@@ -150,27 +151,54 @@ def _junit_status(exit_code: int) -> tuple[str, dict[str, int]]:
         return "MISSING", {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
 
 
-def _coverage_lines(module_file: str) -> list[int]:
-    try:
-        document = json.loads(COVERAGE.read_text(encoding="utf-8"))
-        expected = str(Path("/source") / PurePosixPath(module_file))
-        entry = document.get("files", {}).get(expected, {})
-        lines = entry.get("executed_lines", [])
-        if not isinstance(lines, list) or any(type(line) is not int or line < 1 for line in lines):
+def _valid_line_numbers(lines: Iterable[object]) -> list[int]:
+    """Return sorted unique positive line numbers, or none if any entry is not one."""
+    numbers: set[int] = set()
+    for line in lines:
+        if type(line) is not int or line < 1:
             return []
-        return sorted(set(lines))
-    except (OSError, TypeError, ValueError):
+        numbers.add(line)
+    return sorted(numbers)
+
+
+def _executed_lines(data_file: Path, source_file: str, report_file: Path) -> list[int]:
+    """Return one file's ``executed_lines`` from coverage.py's own JSON report.
+
+    The report is produced in this process through ``Coverage.json_report`` after pytest
+    has exited, for the single target file only, so no second interpreter is started and
+    the line semantics remain exactly those of the pinned coverage.py JSON report.
+    ``config_file=False`` ignores any configuration a target could have written to the
+    working directory.  Unmeasured, absent or unparsable source yields no lines.
+    """
+    try:
+        # Imported here: only a role that ran pytest pays for coverage.py's import.
+        from coverage import Coverage
+
+        measurement = Coverage(data_file=str(data_file), config_file=False)
+        measurement.load()
+        measurement.json_report(morfs=[source_file], outfile=str(report_file))
+        document = json.loads(report_file.read_text(encoding="utf-8"))
+        lines = document.get("files", {}).get(source_file, {}).get("executed_lines", [])
+        return _valid_line_numbers(lines) if isinstance(lines, list) else []
+    except Exception:
         return []
 
 
+def _coverage_lines(module_file: str) -> list[int]:
+    target = str(Path("/source") / PurePosixPath(module_file))
+    return _executed_lines(COVERAGE_DATA, target, COVERAGE_REPORT)
+
+
 def _child_environment() -> dict[str, str]:
-    """Return the complete, fixed environment for the pytest and coverage children."""
+    """Return the complete, fixed environment for the coverage-run pytest child."""
     return {
         "PATH": os.environ.get("PATH", ""),
         "HOME": "/tmp",
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
-        "COVERAGE_FILE": str(WORK / ".coverage"),
+        "COVERAGE_FILE": str(COVERAGE_DATA),
+        # The image installs no pytest plugins; do not scan distributions for any.
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         # Line measurement through PEP 669 sys.monitoring. The default C tracer traces
         # every pytest/stdlib frame before discarding it as outside --source, which
         # roughly doubled each role's in-container time; executed lines are identical.
@@ -205,6 +233,8 @@ def main() -> int:
         "-m",
         "pytest",
         "-q",
+        "-p",
+        "no:cacheprovider",
         f"--junitxml={JUNIT}",
         str(TEST),
     ]
@@ -224,22 +254,9 @@ def main() -> int:
     except OSError:
         exit_code = 2
 
-    # Coverage reporting happens only after pytest exits, so a normal target return
-    # cannot write the driver record. Its allowance is bounded here, while DockerSandbox's
-    # container deadline continues to govern the whole driver process. Failure to produce
-    # coverage remains invalid.
-    with suppress(OSError, subprocess.TimeoutExpired):
-        subprocess.run(
-            [sys.executable, "-m", "coverage", "json", "-o", str(COVERAGE)],
-            cwd=WORK,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=COVERAGE_REPORT_TIMEOUT_SECONDS,
-        )
-
+    # Coverage is read only after pytest exits, so a normal target return cannot write
+    # the driver record. DockerSandbox's container deadline governs the whole driver
+    # process, including this read. Failure to produce coverage remains invalid.
     status, junit = _junit_status(exit_code)
     try:
         observed = json.loads((WORK / "observation.json").read_text()).get("kind")

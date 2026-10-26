@@ -480,3 +480,23 @@ async def test_cli_intake_refuses_a_source_outside_the_settings_source_root(tmp_
     )
     with pytest.raises(SourceAdmissionError, match="outside configured source_root"):
         await cli.execute(args, Terminal(args))
+
+
+def test_dataset_validate_checks_intake_rows_and_fixes_only_a_stale_digest(tmp_path):
+    from corsair.evaluation.datasets import validate_dataset, validate_datasets
+
+    dataset = _copied_dataset(tmp_path)
+    assert validate_dataset(dataset).valid
+    _redigest_oracle(dataset, "scan-reader-no-line", ["admissible", "admissible"])
+    oracle_count = validate_dataset(dataset).as_dict()
+    [row] = [
+        entry for entry in oracle_count["entries"] if entry["case_id"] == "scan-reader-no-line"
+    ]
+    assert row["checks"]["oracle"] == "fail"
+    _redigest_oracle(dataset, "scan-reader-no-line", ["admissible:recipe_function"])
+    report = dataset.parent.parent / "fixtures/scan_reports/python-reader-mixed.json"
+    report.write_text(report.read_text() + "\n")
+    stale = validate_dataset(dataset).as_dict()
+    [row] = [entry for entry in stale["entries"] if entry["case_id"] == "scan-reader-mixed"]
+    assert row["checks"]["digests"] == "fail" and stale["status"] == "fail"
+    assert validate_datasets([dataset], fix=True)["valid"] is True

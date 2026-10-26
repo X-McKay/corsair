@@ -112,3 +112,7 @@ live-agent role dataset *args:
 # Live composed eval (needs Temporal and a worker); same record. Optional BASELINE report, --dry-run.
 live-chain dataset *args:
     uv run --locked --extra providers python scripts/live_eval.py chain "$@"
+
+# Check that dataset families, cases and chain pairs keep one split; default evals/datasets/*.json.
+dataset-families *datasets:
+    uv run --locked python -m corsair.evaluation.families "$@"

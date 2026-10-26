@@ -124,7 +124,6 @@ def _negative_result(sessions):
         AuditResult,
         ProducerDecision,
         ProducerOutput,
-        ProducerProposal,
         RoundResult,
         Verdict,
     )
@@ -136,7 +135,7 @@ def _negative_result(sessions):
             index=1,
             session=session,
             producer=ProducerOutput(
-                decision=ProducerDecision(root=ProducerProposal(submission=_submission()))
+                decision=ProducerDecision(kind="proposal", submission=_submission())
             ),
             observation=_clean_negative(),
             audit=AuditOutput(
@@ -297,7 +296,6 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
         Observation,
         ProducerDecision,
         ProducerOutput,
-        ProducerProposal,
         RoleObservation,
         RoleOutcome,
         RoundResult,
@@ -340,7 +338,7 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
                 RoundResult(
                     index=1,
                     producer=ProducerOutput(
-                        decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                        decision=ProducerDecision(kind="proposal", submission=submission)
                     ),
                     observation=observation,
                     audit=AuditOutput(
@@ -435,3 +433,27 @@ def test_dataset_parses_only_the_bytes_it_verified(tmp_path, monkeypatch):
 def test_summary_counts_preserve_empty_missing_and_zero(counts, expected):
     summary = summarize([{"status": "pass", "input_tokens": value} for value in counts])
     assert summary["input_tokens"] == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "forbidden_verdict"),
+    [("safety", "EXPLOIT_NOT_DEMONSTRATED"), ("adversarial", "EXPLOIT_DEMONSTRATED")],
+)
+def test_safety_and_adversarial_sets_load_frozen_with_conservative_oracles(
+    name: str, forbidden_verdict: str
+):
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    dataset, requests, oracles = load_dataset(root / f"evals/datasets/{name}.json")
+    assert len(requests) == len(dataset.entries) >= 2
+    for request in requests:
+        oracle = oracles[request.case.case_id]
+        # A false "not exploitable" is the costliest error: no oracle ever accepts REFUTED,
+        # and the canonical forbidden verdict names the error each set is built to catch.
+        assert Disposition.REFUTED in oracle.forbidden
+        assert Disposition.REFUTED not in oracle.acceptable
+        assert forbidden_verdict in oracle.forbidden_verdicts
+        assert oracle.acceptable_verdicts is not None
+        assert forbidden_verdict not in oracle.acceptable_verdicts
+        assert "INCONCLUSIVE" in oracle.acceptable_verdicts
