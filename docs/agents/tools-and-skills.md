@@ -1,21 +1,28 @@
 # Tools and runtime instructions
 
-Agent capabilities are deliberately smaller than the surrounding runtime. The producer receives two episode-private native ADK source tools and both roles receive only private native procedural-guidance loaders. The auditor has no source, execution, network, or external tools. Factory metadata and construction reject a surface outside these approved capabilities.
+Agent capabilities are deliberately smaller than the surrounding runtime. The producer receives exactly two episode-private native ADK source tools and no skill loader. The auditor has no tools at all: no source, execution, network, external or skill-loading tool. Each role's procedure is preloaded into its instruction. Factory metadata and construction reject a surface outside these approved capabilities.
 
 | Role | Capability | Permitted operation | Boundary |
 | --- | --- | --- | --- |
 | Producer | `read_file(path)` | Read one bounded, normalized relative text file from the already admitted immutable source snapshot. | No arbitrary host path, write, execution, or new source admission. |
 | Producer | `list_files()` | List bounded regular relative files in that same validated snapshot. | No archive mutation, shell, or target invocation. |
-| Producer and auditor | `load_skill(name)` | Load an explicitly admitted role-local `SKILL.md` procedure from the installed package. | Role-filtered private catalog only; no dynamic directory, remote, or user-supplied skill loading. |
-| Producer and auditor | `load_skill_resource(skill, resource)` | Load an explicitly admitted packaged resource for an admitted role-local procedure. | No scripts, code execution, asset execution, environment injection, or state transfer. |
 
 The producer receives a read capability created for one `ProducerInput`; it cannot choose a host directory or obtain the broader source-admission capability. Tool output is bounded by the configured tool-output budget. Source content is untrusted data, so embedded instructions do not override the packaged role instruction. The auditor reads only its supplied packet and cannot obtain additional source context.
 
 ## Private procedural skill loading
 
-Role-local `toolsets.py` composes the producer's static source readers, where applicable, with native Google ADK `SkillToolset`. The skill catalog is initialized in `EAGER` mode from an explicit allowlist of package resources. The producer can load only `source-grounding`; the auditor can load only `semantic-review`. A resource call is available only for an admitted resource of an admitted skill. The current procedures need no scripts, templates, or supplemental resources.
+The producer's role-local `toolsets.py` returns only `read_file` and `list_files`. The auditor has no `toolsets.py`. Each factory parses its admitted procedure (`source-grounding` or `semantic-review`) through the admitted native loader path and preloads it into the instruction, and `AgentSpec` rejects any loader tool on either role. No `SkillToolset` is composed: for the producer it would only re-offer the same reference-free text and add ADK's generic "load the skill first" guidance and two loader declarations (about 3.3 KB) to every request; for the auditor, having no tools lets ADK send `AuditResult` as the response schema on every route, so a review is one JSON-mode request with no `set_model_response` round trip and none of the roughly 2.4 KB of generic skill-tool guidance. A model-invented loader call is a native unknown-tool error (producer, charged to the ordinary tool budget) or stopped by the zero tool budget (auditor). The current procedures need no scripts, templates, or supplemental resources.
 
-A skill loader is not a generic tool registry or execution environment. It makes Markdown guidance available to the current role context; it cannot call a source reader on the auditor's behalf, run code, create a target probe, alter fixed arguments, access an oracle, or persist state. Each successful loader call is counted against the existing or explicit finite ceilings and recorded only as bounded safe loader metadata. Skill content and admitted capability data contribute to configuration and immutable operation identity; unknown usage or cost remains unknown.
+A preloaded procedure is not a generic tool registry or execution environment. It is Markdown guidance in the role instruction; it cannot call a source reader, run code, create a target probe, alter fixed arguments, access an oracle, or persist state. Skill content and admitted capability data contribute to configuration and immutable operation identity; unknown usage or cost remains unknown.
+
+## Per-class references
+
+Each role's skill carries a small set of data-only `references/*.md` notes, one per vulnerability class (path confinement, command/argument injection, SSRF and host allowlists, deserialization and code injection, error/exception exposure, mass assignment). A note says what to read in the source and how to reason about the benign and adversarial value for the recipe's `payload_parameter` (producer), or what each rubric rule checks for that class (auditor). The notes are admitted through the same bounded resource path as `SKILL.md`: visible Markdown, no scripts, assets, or state injection, each within its byte ceiling, and every byte hashed into `runtime_skills_digest` so adding or editing a note changes the role's runtime identity. They are **not** preloaded into the role instruction, so the per-call system prompt is unchanged.
+
+The same packaged notes reach a role two independent ways; an operator keeps whichever the deployment uses:
+
+- **Trusted-code selection (primary).** `select_reference` in `agents/resources.py` is a pure function that reads only the finding's title and description and the recipe kind, scans a fixed, documented keyword table, and returns at most one note for the matched class (or nothing when the class is unclear or the recipe kind has no packaged notes). A recipe kind whose property is fixed by the recipe itself (`python.command_sentinel/1`) selects its own `command-sentinel.md` note before the class table is consulted. The producer and auditor packet builders append that one note, bounded, under a `## Class reference` heading marked as data. This path needs no loader tool, so it works where the `SkillToolset` is removed. It reads no oracle, outcome, or model output, so it is safe for the outcome-blind auditor.
+- **On-demand loading (secondary).** Where the `SkillToolset` loaders are present, the model may call `load_skill_resource` for one admitted note when the class is clear; the call counts against the finite loader budget and returns the same packaged text. The preloaded `SKILL.md` tells the model the matching note may already be in the packet, so it does not spend a call re-fetching it.
 
 ## Not agent tools
 
@@ -31,7 +38,7 @@ There is no production MCP integration, remote forge connector, generic tool cat
 
 ## Runtime instructions versus procedural guidance
 
-The model always receives the packaged system instruction associated with its role plus the bounded activity packet. The system instruction owns the role's always-on safety and output boundary. A procedural skill is optional, role-private guidance that the native loader places into the same episode context after an explicit tool call. Neither replaces the other, and loading guidance does not execute the guidance.
+The model always receives the packaged system instruction associated with its role plus the bounded activity packet. The system instruction owns the role's always-on safety and output boundary. A procedural skill is role-private guidance preloaded after the system instruction in the same role instruction. Neither replaces the other, and preloading guidance does not execute the guidance.
 
 Corsair's `agent.json` is validated JSON role metadata. A skill's `SKILL.md` has YAML frontmatter (`name` and `description`) used by the native skill mechanism. These are not an ADK YAML Agent Config and do not create a Corsair DSL. The authoritative behavior remains the native Python factory, canonical Pydantic contract, and trusted runtime.
 
@@ -43,4 +50,4 @@ The shared [coding-agent workflows](../development/coding-agent-workflows.md) us
 
 ## Core preload versus optional progressive loading
 
-The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. Optional native load_skill refreshes and load_skill_resource reference requests remain available within finite root/episode budgets; only successful model-requested loads populate Usage.skills_loaded, and their dispatches count as tool calls. A provider that never requests an optional load is reported as such; it is not rewritten as successful tool use.
+The required role procedure is parsed from its private packaged SKILL.md by native ADK during controlled factory assembly and its instruction body is present in LlmAgent.instruction before the first model request. This avoids relying on a structured-output model to choose a loading tool. Usage.skills_preloaded and agent.skill_preloaded describe actual preparation, not model compliance or tool execution. Neither role offers optional progressive loading any more, so Usage.skills_loaded is always empty; it is not rewritten as successful tool use.

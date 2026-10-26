@@ -130,7 +130,7 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
 
 def test_real_docker_perl_corpus_row_demonstrates_and_fix_verifies(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id(PERL_KIND)
+    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
     source_root = CORPUS.resolve()
 
     # Vulnerable revision (xss/b): control holds and the exploit injects markup.
@@ -226,7 +226,7 @@ _DIES = (
 )
 def test_role_outcomes(tmp_path, body, line, recipe_update, role, expected) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id(PERL_KIND)
+    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
     settings, store, prepared = _inline_prepared(
         tmp_path, image_id, body, line=line, **recipe_update
     )
@@ -256,7 +256,7 @@ def test_role_outcomes(tmp_path, body, line, recipe_update, role, expected) -> N
 def test_absent_target_coverage_is_invalid(tmp_path: Path) -> None:
     """A finding line that is never executed cannot be a relevant coverage demonstration."""
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id(PERL_KIND)
+    image_id = DockerSandbox(Settings(), client=client).image_id_for(PERL_KIND)
     # Line 1 (the `package` statement) is compiled, not executed as a traced statement.
     settings, store, prepared = _inline_prepared(tmp_path, image_id, _VULNERABLE, line=1)
     sandbox = DockerSandbox(settings, client=client, store=store)

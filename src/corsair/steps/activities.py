@@ -8,6 +8,7 @@ from temporalio.exceptions import ApplicationError
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     MAX_TERMINAL_ROUNDS,
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -17,11 +18,12 @@ from corsair.contracts import (
     PreparedCase,
     ProducerInput,
     ProducerOutput,
-    PythonRecipe,
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.line_binding import bind_target_line
 from corsair.policies.target_binding import target_binding
+from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
 from corsair.ports.scm import SourceSnapshotPort
@@ -59,9 +61,9 @@ class Activities:
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
+        kind = request.case.recipe.kind
         try:
-            recipe_kind = request.case.recipe.kind
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id(recipe_kind))
+            image_id = await asyncio.to_thread(self.sandbox.image_id_for, kind)
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -88,18 +90,35 @@ class Activities:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
         # Pre-model target binding over the admitted bytes: a case that certainly cannot
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
-        # The gate reads a Python module with ``ast``; other language recipes rely on the
-        # kernel's own run-time coverage and outcome gates instead.
-        failure = (
-            target_binding(prepared.finding, prepared.recipe, module_text)
-            if isinstance(prepared.recipe, PythonRecipe)
-            else None
-        )
-        if failure is not None:
-            raise ApplicationError(
-                format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
-            )
+        # The structural gate and statement-line binding are Python-AST specific; other
+        # languages rely on their own run-time coverage and binding gates.
+        if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
+            failure = target_binding(prepared.finding, prepared.recipe, module_text)
+            if failure is not None:
+                raise ApplicationError(
+                    format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
+                )
+            # target_binding passed, so the finding declares a line and the module exists.
+            # The coverage gate binds to the statement line coverage reports for it.
+            assert prepared.finding.line is not None
+            target_line = bind_target_line(module_text, prepared.finding.line)
+            return prepared.model_copy(update={"target_line": target_line})
         return prepared
+
+    @staticmethod
+    def _activity_window() -> float | None:
+        """Time left to this activity attempt, from the bounds the workflow scheduled."""
+        info = activity.info()
+        queued = (info.started_time - info.current_attempt_scheduled_time).total_seconds()
+        start_to_close, schedule_to_close = (
+            info.start_to_close_timeout,
+            info.schedule_to_close_timeout,
+        )
+        return activity_window_seconds(
+            start_to_close.total_seconds() if start_to_close else None,
+            schedule_to_close.total_seconds() if schedule_to_close else None,
+            queued,
+        )
 
     async def _model_episode(self, awaitable):
         async def heartbeats():
@@ -117,14 +136,16 @@ class Activities:
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
         try:
-            return await self._model_episode(self.inference.produce(request))
+            window = self._activity_window()
+            return await self._model_episode(self.inference.produce(request, window_seconds=window))
         except Exception as exc:
             raise self._activity_error(exc, "PRODUCER_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.audit")
     async def audit(self, request: AuditInput) -> AuditOutput:
         try:
-            return await self._model_episode(self.inference.audit(request))
+            window = self._activity_window()
+            return await self._model_episode(self.inference.audit(request, window_seconds=window))
         except Exception as exc:
             raise self._activity_error(exc, "AUDITOR_FAILED", non_retryable=True) from None
 

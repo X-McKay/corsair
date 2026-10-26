@@ -31,12 +31,16 @@ from corsair.steps.activities import Activities
 
 
 class InferenceStub:
-    async def produce(self, request: ProducerInput) -> ProducerOutput:
-        raise AssertionError(f"unexpected producer invocation: {request.run_id}")
+    async def produce(
+        self, request: ProducerInput, *, window_seconds: float | None = None
+    ) -> ProducerOutput:
+        raise AssertionError(f"unexpected producer invocation: {request.run_id} {window_seconds}")
 
-    async def audit(self, request: AuditInput) -> AuditOutput:
+    async def audit(
+        self, request: AuditInput, *, window_seconds: float | None = None
+    ) -> AuditOutput:
         del request
-        raise AssertionError("unexpected auditor invocation")
+        raise AssertionError(f"unexpected auditor invocation: {window_seconds}")
 
 
 class SourcesStub:
@@ -52,8 +56,12 @@ class SourcesStub:
 
 
 class SandboxStub:
-    def image_id(self, recipe_kind: str) -> str:
-        raise AssertionError(f"unexpected image lookup: {recipe_kind}")
+    @property
+    def image_id(self) -> str:
+        raise AssertionError("unexpected image lookup")
+
+    def image_id_for(self, kind: str) -> str:
+        raise AssertionError(f"unexpected image lookup: {kind}")
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         raise AssertionError(f"unexpected operation lookup: {operation_id}")
@@ -176,3 +184,53 @@ def test_worker_composes_real_boundary_roles_around_one_store(monkeypatch, tmp_p
     assert created["inference"].settings is settings
     assert created["sources"].settings is settings
     assert created["sandbox"].settings is settings
+
+
+def test_worker_takes_task_slots_from_settings(monkeypatch, tmp_path: Path):
+    captured: dict[str, Any] = {}
+
+    class WorkerStub:
+        def __init__(self, client: object, **options: Any) -> None:
+            captured.update(options, client=client)
+
+    monkeypatch.setattr(worker, "Worker", WorkerStub)
+    settings = Settings(
+        artifact_root=str(tmp_path / "artifacts"),
+        task_queue="slots-queue",
+        max_concurrent_activities=16,
+        max_concurrent_workflow_tasks=8,
+    )
+    activities = Activities(
+        settings,
+        store=ArtifactStore(settings.artifact_root),
+        inference=InferenceStub(),
+        sources=SourcesStub(),
+        sandbox=SandboxStub(),
+    )
+    client = object()
+
+    worker.compose_worker(cast(Any, client), settings, activities)
+
+    assert captured["client"] is client
+    assert captured["task_queue"] == "slots-queue"
+    assert captured["max_concurrent_activities"] == 16
+    assert captured["max_concurrent_workflow_tasks"] == 8
+    assert [type(item).__name__ for item in captured["interceptors"]] == [
+        "LifecycleLoggingInterceptor"
+    ]
+
+
+def test_worker_task_slot_settings_keep_safe_defaults_and_bounds():
+    defaults = Settings()
+    # The default keeps the worker's historical four activity slots and the SDK's
+    # default workflow-task slots; raising them is an explicit operator choice.
+    assert defaults.max_concurrent_activities == 4
+    assert defaults.max_concurrent_workflow_tasks == 100
+    for field, value in (
+        ("max_concurrent_activities", 0),
+        ("max_concurrent_activities", 65),
+        ("max_concurrent_workflow_tasks", 1),
+        ("max_concurrent_workflow_tasks", 1001),
+    ):
+        with pytest.raises(ValueError, match=field):
+            Settings.model_validate({field: value})

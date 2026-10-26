@@ -51,6 +51,8 @@ _FIELDS = frozenset(
         "role",
         "skill_name",
         "remedy",
+        "max_concurrent_activities",
+        "max_concurrent_workflow_tasks",
     ]
 )
 
