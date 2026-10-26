@@ -34,7 +34,20 @@ from corsair.policies.target_binding import (
 from corsair.ports.scm import SourceAdmissionError as SourceAdmissionError
 from corsair.settings import Settings
 
-_EXCLUDED_DIRECTORIES = {".git", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+# Silently skipped wherever they occur: version-control metadata, caches, and the
+# repository-private evidence, configuration, scratch and virtualenv directories that the
+# shipped defaults (source_root ".", artifact_root ".runs") place inside a source tree.
+_EXCLUDED_DIRECTORIES = {
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".runs",
+    ".state",
+    ".work",
+    ".venv",
+}
 _SENSITIVE_BASENAMES = {
     "oracle.json",
     "expected.json",
@@ -210,11 +223,28 @@ def _directory_entries(directory_fd: int) -> list[os.DirEntry[str]]:
         raise SourceAdmissionError("source changed while it was being admitted") from exc
 
 
+def _artifact_root_identity(settings: Settings) -> tuple[int, int] | None:
+    """The configured artifact root's (st_dev, st_ino), or None while it does not exist."""
+    try:
+        metadata = os.stat(Path(settings.artifact_root).absolute())
+    except OSError:
+        return None
+    return metadata.st_dev, metadata.st_ino
+
+
+def _excluded_directory(
+    name: str, metadata: os.stat_result, artifact_root: tuple[int, int] | None
+) -> bool:
+    """Skip excluded names, and the artifact root under any name, without admitting them."""
+    return name in _EXCLUDED_DIRECTORIES or (metadata.st_dev, metadata.st_ino) == artifact_root
+
+
 def _iter_regular_files(
     directory_fd: int, settings: Settings
 ) -> Generator[tuple[PurePosixPath, int, str, os.stat_result], None, None]:
     """Walk pinned descriptors in lexical order, rejecting every unadmitted entry."""
     directory_flags = _require_secure_source_support()
+    artifact_root = _artifact_root_identity(settings)
     emitted = 0
 
     def walk(
@@ -232,7 +262,7 @@ def _iter_regular_files(
             except OSError as exc:
                 raise SourceAdmissionError("cannot inspect admitted source entry") from exc
             if stat.S_ISDIR(metadata.st_mode):
-                if entry.name not in _EXCLUDED_DIRECTORIES:
+                if not _excluded_directory(entry.name, metadata, artifact_root):
                     directories.append((entry.name, relative, metadata))
             else:
                 files.append((entry.name, relative, metadata))

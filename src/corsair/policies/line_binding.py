@@ -46,6 +46,7 @@ from __future__ import annotations
 import ast
 import io
 import tokenize
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 _FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
@@ -136,13 +137,39 @@ def _function_header(function: _FunctionNode, line: int, logical: _LogicalLines)
 
 def _reportable_starts(module: ast.Module) -> set[int]:
     """First lines coverage reports: statements, decorators, ``except`` and ``case`` lines."""
+    return _starts(module, ast.walk(module))
+
+
+def _import_time_nodes(module: ast.Module) -> Iterator[ast.AST]:
+    """Every node the import itself runs: the module and class bodies, never a function body.
+
+    A ``def`` or ``lambda`` runs its decorators, defaults and annotations where it stands,
+    but its body only when called; a class body runs where the class statement stands.
+    """
+    pending: list[ast.AST] = [module]
+    while pending:
+        node = pending.pop()
+        yield node
+        if isinstance(node, _FunctionNode):
+            pending.extend(node.decorator_list)
+            pending.append(node.args)
+            if node.returns is not None:
+                pending.append(node.returns)
+        elif isinstance(node, ast.Lambda):
+            pending.append(node.args)
+        else:
+            pending.extend(ast.iter_child_nodes(node))
+
+
+def _starts(module: ast.Module, nodes: Iterable[ast.AST]) -> set[int]:
+    """The reportable first lines of ``nodes`` (statements, decorators, clauses)."""
     docstrings = {
         id(docstring)
         for node in ast.walk(module)
         if isinstance(node, _Owner) and (docstring := _docstring(node)) is not None
     }
     starts: set[int] = set()
-    for node in ast.walk(module):
+    for node in nodes:
         if isinstance(node, ast.stmt) and id(node) not in docstrings and not _uncompiled(node):
             starts.add(node.lineno)
         if isinstance(node, (_FunctionNode, ast.ClassDef)):
@@ -229,3 +256,21 @@ def bind_target_line(module_text: str, line: int) -> int:
                 return line  # coverage.py never reports a module or class docstring.
     start = logical.first.get(line, line)
     return start if start in _reportable_starts(module) else line
+
+
+def runs_at_import(module_text: str, line: int) -> bool:
+    """Whether coverage reports bound ``line`` when the module is merely imported.
+
+    ``line`` is the bound target line (``bind_target_line``). True when it starts a
+    statement, decorator or clause whose innermost enclosing scope is the module or a
+    class body reached from it, so the import executes it whatever the recipe call
+    did and its coverage in both runs shows nothing about that call. A line in any
+    function body (the entry, a helper it calls, a nested function or a class defined
+    inside a function) runs only when called and is never import-time here; neither is
+    a line coverage never reports, nor anything in a module that does not parse.
+    """
+    try:
+        module = ast.parse(module_text.removeprefix("\ufeff"))
+    except (SyntaxError, ValueError, RecursionError):
+        return False
+    return line in _starts(module, _import_time_nodes(module))

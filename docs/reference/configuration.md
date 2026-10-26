@@ -69,7 +69,7 @@ provider request <= model episode < activity window <= remaining investigation t
 | Provider request | `120` s | `min(request_timeout_seconds, episode)`. Applied to the LiteLLM connector; the native Gemini route is bounded by the episode only. With the live `300` s setting the effective request bound is `285` s for the producer and `165` s for the auditor. |
 | `corsair.evidence` activity | `105` s | `2 * probe_timeout_seconds + 45`: two sandboxed roles, each bounded by `probe_timeout_seconds` in the Docker adapter, plus container overhead. |
 | `corsair.record` activity | `30` s per attempt | Three attempts inside a `90` s schedule-to-close bound (`bounded-finalization-v1`). |
-| Activity heartbeat timeout | `15` s | `min(15, activity)`. Model episodes heartbeat every 2 s; evidence heartbeats from the Docker wait loop. |
+| Activity heartbeat timeout | `15` s | `min(15, activity)`. Model episodes and both blocking prepare calls (image resolution and source admission) heartbeat every 2 s while they run; evidence heartbeats from the Docker wait loop. |
 
 Isolated agent evaluation runs an episode without an activity; it uses the window a fresh investigation would grant the role (`min(300, max_elapsed_seconds)` for the producer, `180` s for the auditor), so its episodes are bounded as in production. The activity values are recorded in workflow histories: changing one changes scheduled activity options and needs a `workflow.patched` gate and a replay test. There is no per-request knob for a model slower than its activity window; such a run stops with `episode_timeout` (see [troubleshooting](../operations/troubleshooting.md#a-model-episode-stops-with-episode_timeout)).
 

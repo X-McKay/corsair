@@ -36,8 +36,9 @@ the trusted driver is [`drivers/c/driver.py`](../../src/corsair/adapters/sandbox
 The driver compiles the admitted C source plus a fixed harness under AddressSanitizer with
 gcov coverage, never running the target's own Makefile, and emits the same `corsair.driver/1`
 record as the Python driver. The only trusted assertion for a violation is a machine-readable
-sanitizer report of the operator-fixed class in a frame naming the target file; a plain crash,
-a signal, or a compile failure is `ERROR`, never a violation. Because a compiled-to-native
+sanitizer report of the operator-fixed class in a frame naming the target file, together with
+the sanitizer's own halt status (`ASAN_EXITCODE`); a plain crash, a signal, report text from a
+run that exits any other way, or a compile failure is `ERROR`, never a violation. Because a compiled-to-native
 runtime must execute the binary it builds, that image's `/work` tmpfs drops `noexec` (keeping
 every other container control); this is recorded in the image identity and is scoped to
 `NATIVE_EXEC_KINDS` in `contracts/recipes/`. Qualified on Linux amd64 only with `corsair verify`; see

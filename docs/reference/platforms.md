@@ -118,4 +118,13 @@ is intrinsic to a compiled-to-native runtime and is recorded in the image identi
 weakening of the Python sandbox. Qualified on Linux amd64 only; macOS arm64 and the live chain
 are unrun. See [the C corpus survey](corpus/c.md).
 
+A C `VIOLATION` needs both a target-bound AddressSanitizer report for the recipe's class and
+the sanitizer's own halt status (`ASAN_EXITCODE`, 86); report text from a run that exits any
+other way, including 0, is `ERROR` (`execution_error`). The limit is that both signals come
+from the target's process: the report is read from the stderr the target also writes, and the
+gcov counters (`.gcda` files in `/work`) are written by the target binary, so hostile C source
+can still print the report and exit 86, or write its own counters. This is the documented
+observer boundary of [the risk assessment](../../src/corsair/policies/risk.md), not
+hostile-source attestation.
+
 The implementation sandbox is Linux ARM, outside the requested matrix. Its local full-suite results are regression evidence; target-platform qualification comes from the actual Linux amd64/macOS arm64 CI jobs. See [environment setup](../development/setup.md) and [current plans](../plans/README.md) for exact receipts and remaining limits.

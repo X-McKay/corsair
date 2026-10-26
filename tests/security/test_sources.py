@@ -8,15 +8,17 @@ from pathlib import Path
 
 import pytest
 
+from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm import local as sources
 from corsair.adapters.scm.local import (
     SourceAdmissionError,
+    iter_snapshot_files,
     prepare_case,
     read_source,
     snapshot_source,
 )
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import Case, Finding, PythonRecipe, RunManifest, Source
+from corsair.contracts import Case, Finding, PreparedCase, PythonRecipe, RunManifest, Source
 from corsair.settings import Settings
 
 
@@ -233,3 +235,63 @@ def test_prefixed_oracles_never_enter_source_snapshots(tmp_path, filename):
         snapshot_source(
             Source(path="project"), _settings(tmp_path), ArtifactStore(tmp_path / "store")
         )
+
+
+# Repository-private state the shipped defaults place inside source_root "." (artifact
+# evidence, persistent configuration, scratch, the virtualenv), one representative file each.
+PRIVATE_STATE = {
+    ".runs/blobs/ab12": "prior run artifact",
+    ".runs/operations/cd34": "operation manifest",
+    ".state/settings.json": '{"source_root": "/private"}',
+    ".work/notes.txt": "scratch investigation",
+    ".venv/lib/site.py": "import os\n",
+    "pkg/.work/nested.txt": "nested scratch",
+}
+
+
+def _admitted_names(prepared: PreparedCase, store: ArtifactStore, tmp_path: Path) -> set[str]:
+    """Names the investigator can list and the container receives for one snapshot."""
+    listed = {name for name, _ in iter_snapshot_files(prepared.source, store)}
+    materialized = tmp_path / "materialized"
+    DockerSandbox._materialize_source(materialized, prepared, store)
+    received = {
+        path.relative_to(materialized).as_posix()
+        for path in materialized.rglob("*")
+        if path.is_file()
+    }
+    assert listed == received
+    return listed
+
+
+def test_private_state_directories_are_never_admitted(tmp_path: Path) -> None:
+    project = _source_tree(tmp_path)
+    (project / "pkg").mkdir()
+    (project / "pkg" / "helper.py").write_text("X = 1\n", encoding="utf-8")
+    for relative, text in PRIVATE_STATE.items():
+        path = project / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    settings = Settings(source_root=str(project), artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+
+    prepared = prepare_case(_case(Source(path=".")), settings, store, _manifest())
+
+    assert _admitted_names(prepared, store, tmp_path) == {"pkg/helper.py", "reader.py"}
+    for relative in PRIVATE_STATE:
+        with pytest.raises(SourceAdmissionError, match="absent from snapshot"):
+            read_source(prepared.source, relative, store, 10_000)
+
+
+def test_configured_artifact_root_inside_source_is_skipped_by_identity(tmp_path: Path) -> None:
+    project = _source_tree(tmp_path)
+    evidence = project / "evidence"
+    settings = Settings(source_root=str(project), artifact_root=str(evidence))
+    store = ArtifactStore(settings.artifact_root)
+    store.put(b"prior run artifact")
+    # The same name elsewhere is ordinary source: the skip is by identity, not by name.
+    (project / "pkg" / "evidence").mkdir(parents=True)
+    (project / "pkg" / "evidence" / "rules.py").write_text("RULES = []\n", encoding="utf-8")
+
+    prepared = prepare_case(_case(Source(path=".")), settings, store, _manifest())
+
+    assert _admitted_names(prepared, store, tmp_path) == {"pkg/evidence/rules.py", "reader.py"}
