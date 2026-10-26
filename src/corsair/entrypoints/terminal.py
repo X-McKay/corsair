@@ -95,9 +95,17 @@ class Terminal:
         elif isinstance(rendered, dict) and ("summary" in rendered or "attempts" in rendered):
             summary = rendered.get("summary", rendered)
             table = Table.grid(padding=(0, 2))
+            counts: dict[str, dict] = {}
             for key, detail in summary.items():
+                if isinstance(detail, dict):
+                    if detail:
+                        counts[key] = detail
+                        continue
+                    detail = "none"
                 table.add_row(Text(key.replace("_", " "), style="cyan"), _text(detail))
             self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
+            for key, detail in counts.items():
+                self._counts(key, detail)
             if "report" in rendered:
                 self.out.print(Text("Report: ") + _text(rendered["report"]))
         else:
@@ -108,6 +116,14 @@ class Terminal:
                     border_style="cyan",
                 )
             )
+
+    def _counts(self, key: str, counts: dict) -> None:
+        """Render one per-gate count mapping, such as the evaluation gate ledger."""
+        table = Table("Gate", "Count", expand=True)
+        for gate, count in counts.items():
+            table.add_row(_text(gate), _text(count))
+        title = f"Corsair · {key.replace('_', ' ').capitalize()}"
+        self.out.print(Panel(table, title=title, border_style="cyan"))
 
     def _result(self, value: dict[str, Any]) -> None:
         """Render a validated investigation result without exposing model content."""
