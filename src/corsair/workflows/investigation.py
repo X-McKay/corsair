@@ -47,10 +47,10 @@ with workflow.unsafe.imports_passed_through():
 NEGATIVE_THRESHOLD = 2
 MAX_SESSIONS = 2
 
-# A payload-pair proposal that was not refined by the producer on retry.
-_BLIND_RETRY_REASON = (
-    "Prior structural checks passed; propose a different source-grounded candidate payload pair."
-)
+# A payload-pair proposal that was not refined by the producer on retry. It carries
+# no outcome and no structural claim (a prior round may have been rejected or marked
+# invalid): it only asks for a fresh source-grounded candidate.
+_BLIND_RETRY_REASON = "Propose a different source-grounded candidate payload pair."
 
 
 def _retry_feedback(audit: AuditOutput) -> Feedback:
@@ -201,6 +201,7 @@ class InvestigationWorkflow:
             disposition=Disposition.INCONCLUSIVE,
             execution_status=ExecutionStatus.COMPLETED,
             reason="No admissible observation was collected.",
+            scope=request.case.finding.claim_scope,
             fix_status=(
                 FixStatus.UNVERIFIED if request.case.fixed_source else FixStatus.NOT_REQUESTED
             ),

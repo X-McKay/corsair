@@ -19,7 +19,7 @@ from corsair.adapters.inference.adk import AdkInference
 from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import Disposition, FixStatus, Verdict, digest
+from corsair.contracts import Disposition, FixStatus, Scope, Verdict, digest
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.evaluation.scoring import load_dataset
 from corsair.observability.logging import LifecycleLoggingInterceptor
@@ -121,6 +121,8 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     # The canonical label is decided by code from the vulnerable-revision differential;
     # the supplied fixed revision confirms (DEMONSTRATION_BLOCKED) but is not required.
     assert result.verdict == Verdict.EXPLOIT_DEMONSTRATED
+    # The result carries the finding's claimed scope (case01 is a component claim).
+    assert result.scope == Scope.COMPONENT
     assert result.fix_status == FixStatus.DEMONSTRATION_BLOCKED
     assert result.execution_status.value == "COMPLETED"
     assert result.rounds[0].observation.cleanup_confirmed

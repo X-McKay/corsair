@@ -23,6 +23,17 @@ from corsair.policies.verdicts import decide, fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
 
+# A case is "correctly resolved" only when the canonical label decided by code is a
+# decisive demonstration or non-demonstration -- never the internal disposition, and
+# never INCONCLUSIVE / UNABLE_TO_RUN / ERROR.
+_DECISIVE_VERDICTS = frozenset(
+    {
+        Verdict.EXPLOIT_DEMONSTRATED,
+        Verdict.COMPONENT_EXPLOIT_DEMONSTRATED,
+        Verdict.EXPLOIT_NOT_DEMONSTRATED,
+    }
+)
+
 
 class Oracle(Contract):
     acceptable: list[Disposition] = Field(min_length=1)
@@ -165,7 +176,7 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         "fix_correct": fix_correct,
         "verdict_allowed": verdict_allowed,
         "forbidden_label": result.disposition in oracle.forbidden,
-        "correctly_resolved": passed and result.disposition != Disposition.INCONCLUSIVE,
+        "correctly_resolved": passed and result.verdict in _DECISIVE_VERDICTS,
         **usage_metrics(result),
         "config_digest": result.manifest.config_digest if result.manifest else None,
         "reason": result.reason,
