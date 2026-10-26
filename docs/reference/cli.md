@@ -18,7 +18,7 @@ corsair doctor --format human --no-animation --settings .state/settings.json
 | Switch | Values / argument | Effect |
 | --- | --- | --- |
 | `--settings PATH` | Settings JSON | Selects the Docker, artifact, Temporal, and model configuration. Credentials remain in the worker environment. |
-| `--format MODE` | `auto`, `human`, `json` | Selects command-result output. `auto` is human on a TTY and JSON when stdout is not a TTY. |
+| `--format MODE` | `auto`, `human`, `json`, `markdown` | Selects command-result output. `auto` is human on a TTY and JSON when stdout is not a TTY. `markdown` writes a GitHub-flavoured Markdown record of a `report`, `compare`, `eval` or `rescore` result (see [`report`](#report-reportjson)); any other command's JSON receipt is written unchanged inside a fenced `json` block. |
 | `--no-color` | none | Disables terminal colour in human output. It has no effect on JSON. |
 | `--no-animation` | none | Disables the human-terminal spinner/watch animation. It has no effect on JSON. |
 | `--log-format FORMAT` | `text`, `json` | Selects stderr log encoding. The optional file mirror is always structured JSON Lines. |
@@ -228,6 +228,12 @@ corsair report .runs/evaluations/dev.json
 
 Reads an existing evaluation report. Human output shows the summary, the report's dataset digest and one table row per scored attempt (case, run, status, verdict or disposition or match kind, usage and reason); unknown usage is shown as `unknown`. `--format json` emits the complete saved report (`rows`, `summary` and `dataset_digest`). It does not re-run, re-score, or repair the report.
 
+```bash
+corsair --format markdown report .runs/evaluations/dev.json > record.md
+```
+
+`--format markdown` writes the same report as a record to paste into a baseline README, a pull request or a plan: the baseline-policy caveats (a candidate diagnostic, not a promoted baseline; unknown usage stays `unknown`; a gate the record does not show as run is unrun, not passed; and, for an all-`live-model-fixture` report, that no target code, Docker, Temporal or full chain ran), an identity table (dataset digest, the distinct `config_digest` values and model names recorded in rows, or `unknown`, plus agent-resources digests, agents and cohorts when rows carry them), the scalar summary, one row per attempt (case, repeat, run, status, label, stopping gate and usage) and the `gate_ledger` and `failure_stops` tables. The stopping gate is the row's final gate-ledger `gate`, or an isolated row's feedback `gate`. Rows never show their `reason`, which can carry an auditor's review or a producer's abstention text, and never payloads. Every cell is sanitized and escaped, so a pipe or newline in a value cannot break a table. The renderer is [`entrypoints/markdown.py`](../../src/corsair/entrypoints/markdown.py): `report_markdown(report)`, `comparison_markdown(comparison)` and the dispatcher `to_markdown(value)` take the JSON-mode result and return text.
+
 ### `compare BASELINE.json CANDIDATE.json`
 
 ```bash
@@ -239,7 +245,7 @@ Compares two saved evaluation reports without contacting services or re-scoring.
 
 The comparison is refused (exit `2`) when the dataset digests differ or either report does not declare one. `--allow-dataset-mismatch` compares them anyway; the result then carries `dataset_match: false`, the human output opens with a mismatch warning and a `compare.dataset_mismatch` warning is logged. A mismatched comparison is not a statement about one frozen dataset.
 
-The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output lists only attempts whose status, label, forbidden flag or presence changed; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts` and `summary_delta`.
+The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output lists only attempts whose status, label, forbidden flag or presence changed; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts` and `summary_delta`. `--format markdown` writes the result line, the caveats (a dataset mismatch first), an identity table per side (report path, dataset digest, config digests, cohorts), the counts, the summary deltas, the regressions and the changed attempts with their usage deltas; a side an attempt is missing from is `absent`. The exit codes are the same in every format.
 
 ## Watching and recovery
 
