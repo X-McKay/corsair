@@ -28,7 +28,15 @@ Recipe arguments after `just -- RECIPE` go directly to pytest or the CLI. Use `-
 | All native gates | `CORSAIR_LIVE_CONFIG=/operator/settings.json just -- test-all -q -W error` | `test-all` enables Docker and Temporal and installs the optional provider dependency. A real-provider smoke still requires the explicit operator settings path; without it, that test skips. |
 | Isolated producer/auditor diagnostic | `just -- eval-agent AGENT DATASET --settings /operator/settings.json --repeats N` | Requires an operator-configured provider. Runs the production role factory against frozen inputs without target execution; it is not a whole-system result. |
 
-`test-docker` also selects tests marked `temporal`; set `CORSAIR_TEST_TEMPORAL=1` as shown so those fixture-backed durable tests execute instead of skip. `test-live` selects only the live marker and installs the provider extra, but it neither creates credentials nor sets `CORSAIR_LIVE_CONFIG`.
+`test-docker` also selects tests marked `temporal`; set `CORSAIR_TEST_TEMPORAL=1` as shown so those fixture-backed durable tests execute instead of skip.
+
+### Concurrent suites on one daemon
+
+Several worktrees may run `test-docker` against one Docker daemon at the same time. An operation id becomes the `corsair.operation` container label, and the operation-reconciliation gate refuses any operation whose label already exists on the daemon (`an uncommitted labeled sandbox exists; operation will not be replayed`, with `cleanup_confirmed` false). That gate is the behaviour under test, so the tests keep identities apart instead of relaxing it:
+
+- Every operation id in [test_docker.py](../../tests/integration/test_docker.py) comes from the session-scoped `session_operation` fixture as `pytest-<12 hex>.<label>`, one random prefix per pytest session. Tests assert that format, not a literal id.
+- Temporal workflow ids, run ids and task queues come from `temporal_id` in [workflow/temporal.py](../../tests/workflow/temporal.py), which is unique per call; each session also starts its own Temporal test server. Operation ids in the chain and CLI tests derive from those run ids.
+- At session teardown the fixture lists labelled sandboxes whose operation id carries its own prefix, removes them by immutable id, and fails with their names, so a leak is never silent. It never touches another prefix, because another suite may still hold that identity. A start-of-session sweep would be a no-op for a fresh prefix. Containers left by older fixed-id runs are not removed and no longer collide. `test-live` selects only the live marker and installs the provider extra, but it neither creates credentials nor sets `CORSAIR_LIVE_CONFIG`.
 
 The CI workflow uses the locked Nix shell. Linux amd64 covers offline/package, Docker/Temporal native conformance, and durable workflow jobs; macOS arm64 covers offline/package and Temporal. Hosted macOS does not stand in for physical Docker Desktop/Colima nested virtualization. See [platforms](../reference/platforms.md) for the support and host-qualification boundary.
 
