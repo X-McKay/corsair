@@ -71,6 +71,7 @@ class Settings(Contract):
     # Independent clean negatives required before a case may be EXPLOIT_NOT_DEMONSTRATED,
     # and the cap on independent sessions per case. A lone clean negative stays
     # INCONCLUSIVE; the costly false EXPLOIT_NOT_DEMONSTRATED must be the hardest to reach.
+    # The prepare activity admits both into RunManifest, which the workflow reads.
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
     models: ModelSettings = Field(default_factory=ModelSettings)

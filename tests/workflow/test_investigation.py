@@ -818,3 +818,92 @@ async def test_component_demonstration_survives_a_crashed_fixed_revision_run(
     assert result.execution_status is ExecutionStatus.ERROR
     assert result.verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
     assert [item.fixed for item in acts.evidence_inputs] == [False, True]
+
+
+def _sessions_budget(sessions: int) -> Budget:
+    """One round per session, with room for each session's producer and audit call."""
+    return Budget(
+        max_rounds=1,
+        max_llm_calls=2 * sessions,
+        episode_llm_calls=1,
+        max_tool_calls=2 * sessions,
+        max_output_tokens=256,
+        max_elapsed_seconds=60,
+        probe_timeout_seconds=1,
+    )
+
+
+async def _run_policy(server, store, label, scenario, sessions_budget):
+    async with server.worker(store, scenario) as (task_queue, activities):
+        result = await server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request(label, budget=_sessions_budget(sessions_budget)),
+            id=temporal_id(label),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+    return result, activities
+
+
+async def test_admitted_threshold_three_is_not_met_by_the_default_two_sessions(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(outcomes=(_HELD,), negative_threshold=3, max_sessions=2)
+    result, acts = await _run_policy(
+        temporal_server, temporal_artifact_store, "threshold-three", scenario, 3
+    )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert result.manifest is not None
+    assert (result.manifest.negative_threshold, result.manifest.max_sessions) == (3, 2)
+    # Two sessions can never reach three clean negatives, so the second is not spent.
+    assert acts.call_counts["corsair.produce"] == 1
+
+
+async def test_admitted_session_cap_one_schedules_exactly_one_session(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(outcomes=(_HELD,), max_sessions=1)
+    result, acts = await _run_policy(
+        temporal_server, temporal_artifact_store, "cap-one", scenario, 3
+    )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert {item.session for item in result.rounds} == {1}
+    assert acts.call_counts["corsair.produce"] == 1
+
+
+async def test_admitted_threshold_and_cap_three_require_three_clean_sessions(
+    temporal_server, temporal_artifact_store
+):
+    workflow_id = temporal_id("three-of-three")
+    scenario = ActivityScenario(outcomes=(_HELD,), negative_threshold=3, max_sessions=3)
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("three-of-three", budget=_sessions_budget(3)),
+            id=workflow_id,
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+    assert [item.operation_id for item in acts.evidence_inputs] == [
+        f"{workflow_id}.r1",
+        f"{workflow_id}.s2.r1",
+        f"{workflow_id}.s3.r1",
+    ]
+
+
+async def test_two_clean_sessions_under_threshold_three_stay_non_decisive(
+    temporal_server, temporal_artifact_store
+):
+    # Two clean sessions under threshold three stay non-decisive when the root
+    # budget admits no third session.
+    scenario = ActivityScenario(outcomes=(_HELD,), negative_threshold=3, max_sessions=3)
+    result, acts = await _run_policy(
+        temporal_server, temporal_artifact_store, "three-starved", scenario, 2
+    )
+
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert acts.call_counts["corsair.produce"] == 2

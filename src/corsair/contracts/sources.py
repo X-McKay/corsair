@@ -149,6 +149,11 @@ class RunManifest(Contract):
     image_id: str
     models: dict[str, str]
     capabilities: dict[str, dict] = Field(default_factory=dict)
+    # The admitted evidence policy, fixed when the case is prepared and replayed
+    # from history: independent clean negatives required for
+    # EXPLOIT_NOT_DEMONSTRATED, and the cap on independent producer sessions.
+    negative_threshold: int = Field(default=2, ge=2, le=8)
+    max_sessions: int = Field(default=2, ge=1, le=8)
 
 
 class PreparedCase(Contract):

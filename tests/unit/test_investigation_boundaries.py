@@ -165,3 +165,60 @@ def test_root_identity_rejects_lengths_that_leave_no_suffix_headroom():
     validate_root_identity("r" * 60)
     with pytest.raises(ValueError, match="operation suffixes"):
         validate_root_identity("r" * 61)
+
+
+# --- the admitted session policy is replayed data, not worker Settings ----------
+
+
+def test_admitted_threshold_three_keeps_two_clean_sessions_non_decisive():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    rounds = [_round(1, _clean_negative(), _audit())]
+    verdict = _aggregate_case_verdict(_prepared(), rounds, _result(), [first], 3)
+    assert verdict is Verdict.INCONCLUSIVE
+
+
+def test_manifest_carries_the_admitted_session_policy_readably(tmp_path):
+    from pathlib import Path
+
+    from corsair.contracts import InvestigationRequest
+    from corsair.settings import Settings
+    from corsair.steps.manifest import build_manifest
+
+    request = InvestigationRequest.model_validate_json(
+        Path("evals/fixtures/case01/request.json").read_bytes()
+    )
+    settings = Settings(artifact_root=str(tmp_path), negative_threshold=3, max_sessions=4)
+    manifest = build_manifest(request, settings, "sha256:" + "a" * 64)
+    assert (manifest.negative_threshold, manifest.max_sessions) == (3, 4)
+    assert build_manifest(request, Settings(), "x").negative_threshold == 2
+
+
+async def test_prepare_rejects_a_session_cap_beyond_terminal_round_capacity(tmp_path):
+    from pathlib import Path
+
+    import pytest
+    from temporalio.exceptions import ApplicationError
+    from temporalio.testing import ActivityEnvironment
+
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import Budget, InvestigationRequest
+    from corsair.settings import Settings
+    from corsair.steps.activities import Activities
+
+    class Sandbox:
+        image_id = "sha256:" + "a" * 64
+
+    request = InvestigationRequest.model_validate_json(
+        Path("evals/fixtures/case01/request.json").read_bytes()
+    ).model_copy(update={"budget": Budget(max_rounds=16)})
+    activities = Activities(
+        Settings(artifact_root=str(tmp_path), max_sessions=3),
+        store=ArtifactStore(tmp_path / "store"),
+        inference=None,  # ty: ignore[invalid-argument-type]
+        sources=None,  # ty: ignore[invalid-argument-type]
+        sandbox=Sandbox(),  # ty: ignore[invalid-argument-type]
+    )
+    with pytest.raises(ApplicationError) as rejected:
+        await ActivityEnvironment().run(activities.prepare, request)
+    assert rejected.value.type == "PREPARE_BLOCKED"
+    assert rejected.value.non_retryable

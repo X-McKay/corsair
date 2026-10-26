@@ -7,6 +7,7 @@ from temporalio.exceptions import ApplicationError
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    MAX_TERMINAL_ROUNDS,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -65,6 +66,13 @@ class Activities:
                 non_retryable=True,
             ) from exc
         manifest = build_manifest(request, self.settings, image_id)
+        if request.budget.max_rounds * manifest.max_sessions > MAX_TERMINAL_ROUNDS:
+            raise ApplicationError(
+                f"max_rounds {request.budget.max_rounds} x max_sessions {manifest.max_sessions} "
+                f"exceeds the {MAX_TERMINAL_ROUNDS}-round terminal result capacity",
+                type="PREPARE_BLOCKED",
+                non_retryable=True,
+            )
         try:
             return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
         except (ValueError, FileNotFoundError, PermissionError) as exc:
