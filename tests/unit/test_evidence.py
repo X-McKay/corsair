@@ -39,7 +39,11 @@ def _prepared() -> PreparedCase:
     return PreparedCase(
         case_id="case",
         finding=Finding(
-            title="secret path", description="component finding", file="reader.py", line=4
+            title="secret path",
+            description="component finding",
+            file="reader.py",
+            line=4,
+            claim_scope=Scope.COMPONENT,
         ),
         recipe=PythonRecipe(
             module_file="reader.py",

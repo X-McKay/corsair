@@ -96,6 +96,19 @@ def test_scope_requires_at_least_one_supplied_repository():
         ScannerScope(application="svc", repositories=[])
 
 
+def test_a_finding_without_a_scope_defaults_to_application():
+    """The conservative default: an unspecified scope is application, so a
+    demonstration caps at COMPONENT_EXPLOIT_DEMONSTRATED unless the finding
+    explicitly claims component scope. Scanner findings, which omit a provable
+    scope, inherit this (Al 2026-10-26)."""
+    from corsair.contracts import Finding
+
+    scopeless = Finding(title="t", description="d", file="x.py", line=4)
+    assert scopeless.claim_scope is Scope.APPLICATION
+    explicit = Finding(title="t", description="d", file="x.py", claim_scope=Scope.COMPONENT)
+    assert explicit.claim_scope is Scope.COMPONENT
+
+
 def test_unusual_severity_strings_are_carried_not_rejected():
     """Severity is untrusted producer text, read only for reporting, so an
     unexpected value is preserved rather than rejected (it cannot affect a verdict)."""

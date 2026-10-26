@@ -30,7 +30,11 @@ class Finding(Contract):
     description: str = Field(min_length=1, max_length=12000)
     file: str
     line: int | None = Field(default=None, ge=1)
-    claim_scope: Scope = Scope.COMPONENT
+    # An unspecified scope is treated as application: the conservative direction, so
+    # a demonstration caps at COMPONENT_EXPLOIT_DEMONSTRATED unless the finding
+    # explicitly claims component scope. Scanner findings, which omit a provable
+    # scope, land here by default (Al 2026-10-26).
+    claim_scope: Scope = Scope.APPLICATION
     # The upstream scanner's untrusted self-assessment, carried for reporting only.
     # The verdict kernel never reads this; see corsair.contracts.intake.
     scanner: ScannerClaim | None = None
