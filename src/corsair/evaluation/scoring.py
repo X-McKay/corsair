@@ -20,7 +20,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
-from corsair.evaluation.ledger import gate_ledger, ledger_counts, verified_rounds
+from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
 from corsair.policies.verdicts import decide, fix_status, session_verdict
 from corsair.settings import Settings
 
@@ -297,12 +297,11 @@ def summarize(rows: list[dict]) -> dict:
         "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
         # Every recorded stop, then the final stop of each failed row: where accuracy
-        # was lost. Rows without a ledger (unavailable, agent-only) contribute nothing.
-        "gate_ledger": ledger_counts(row.get("gate_ledger") or [] for row in rows),
+        # was lost. Isolated agent rows saved without a ledger derive their one entry;
+        # rows without either (unavailable results) contribute nothing.
+        "gate_ledger": ledger_counts(row_ledger(row) for row in rows),
         "failure_stops": ledger_counts(
-            row["gate_ledger"][-1:]
-            for row in rows
-            if row.get("status") == "fail" and row.get("gate_ledger")
+            row_ledger(row)[-1:] for row in rows if row.get("status") == "fail"
         ),
     }
 
