@@ -44,6 +44,7 @@ images:
     docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
     docker build -f deploy/javascript/Dockerfile -t corsair-javascript:0.1 .
     docker build -f deploy/ruby/Dockerfile -t corsair-ruby:0.1 .
+    docker build -f deploy/perl/Dockerfile -t corsair-perl:0.1 .
     docker build -f deploy/c/Dockerfile -t corsair-c:0.1 .
 
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.

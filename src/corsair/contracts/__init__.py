@@ -39,6 +39,7 @@ from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .recipes_c import CRecipe as CRecipe
 from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
+from .recipes_perl import PerlRecipe as PerlRecipe
 from .recipes_python import PythonCommandSentinel as PythonCommandSentinel
 from .recipes_ruby import RubyRecipe as RubyRecipe
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS

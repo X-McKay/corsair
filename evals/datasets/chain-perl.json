@@ -1,0 +1,14 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "perl-xss-b",
+      "family": "ih-perl-xss",
+      "split": "dev",
+      "request": "datasets/corpus/perl-xss-b.request.json",
+      "oracle": "datasets/corpus/perl-xss-b.oracle.json",
+      "request_digest": "e05b0937192010b8339d378d727e43bb2e53be6955b6d6404227b96199fc39fa",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    }
+  ]
+}

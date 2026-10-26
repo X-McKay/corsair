@@ -8,6 +8,8 @@ These checks do not attest an arbitrary network, FUSE, synchronized-cloud or rem
 
 The Ruby recipe `ruby.secret_disclosure/1` runs in `corsair-ruby:0.1` (`deploy/ruby/Dockerfile`, Ruby 3.1 pinned by digest), selected through its `Settings.images` entry; `just images` builds it with the other reviewed images. The Ruby recipe is qualified on **Linux amd64 only**; its macOS arm64 and live-model gates are unrun. See the [Ruby corpus survey](corpus-ruby.md).
 
+The Perl recipe `perl.html_injection/1` runs in `corsair-perl:0.1` (`deploy/perl/Dockerfile`, Perl 5.40 pinned by digest; Test::More and JSON::PP are core, line coverage is a core-only `Devel::LineCover` tracer the driver writes). Its real-Docker evidence (`tests/integration/test_docker_perl.py`, `corsair verify`) is recorded on **Linux amd64 only**; macOS arm64 and the live chain are unrun. See the [Perl corpus survey](corpus-perl.md).
+
 ## Development and CI
 
 ```bash
