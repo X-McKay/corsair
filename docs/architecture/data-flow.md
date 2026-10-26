@@ -37,7 +37,7 @@ verdict table in code ──► one of six labels ──► immutable result art
 
 The request identifies the recipe, the finding (file, exact target line, CWE), a bounded budget, the source to admit, and an optional fix revision. `prepare` resolves the configured immutable image identity, then admits the source through the local snapshot adapter. Admission uses descriptor/no-follow checks, rejects unsafe/sensitive entries, produces deterministic bounded archive bytes, and can enforce an expected digest. The resulting `PreparedCase` refers to an artifact rather than a live checkout path.
 
-A `RunManifest` records request/configuration identity, image ID, model names, prompt and agent-spec digests, output-schema digests, budget digest, `negative_threshold`, and risk-assessment digest. These identities make a receipt attributable to the resources actually used; they do not make the source or target trustworthy.
+A `RunManifest` records request/configuration identity, image ID, model names, prompt and agent-spec digests, output-schema digests, budget digest, risk-assessment digest, and the admitted `negative_threshold` and `max_sessions` as readable fields. These identities make a receipt attributable to the resources actually used; they do not make the source or target trustworthy.
 
 ## 2. Pre-model gates
 

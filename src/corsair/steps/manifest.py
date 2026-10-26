@@ -43,4 +43,6 @@ def build_manifest(request: InvestigationRequest, settings: Settings, image_id: 
         image_id=image_id,
         models={"producer": settings.models.producer, "auditor": settings.models.auditor},
         capabilities=capabilities,
+        negative_threshold=settings.negative_threshold,
+        max_sessions=settings.max_sessions,
     )

@@ -62,6 +62,8 @@ class ActivityScenario:
     # Outcomes for a later independent session (operation ids ".s<n>.r<i>");
     # None replays ``outcomes`` there too.
     later_session_outcomes: tuple[tuple[RoleOutcome, RoleOutcome], ...] | None = None
+    negative_threshold: int = 2
+    max_sessions: int = 2
     block_prepare: bool = False
     pause_prepare: bool = False
     pause_produce: bool = False
@@ -96,8 +98,7 @@ class FakeActivities:
         self.release_prepare = asyncio.Event()
         self.recorded = asyncio.Event()
 
-    @staticmethod
-    def _manifest(request: InvestigationRequest) -> RunManifest:
+    def _manifest(self, request: InvestigationRequest) -> RunManifest:
         return RunManifest(
             package_version="temporal-test",
             request_digest=digest(request),
@@ -106,6 +107,8 @@ class FakeActivities:
             auditor_prompt_digest="2" * 64,
             image_id="sha256:temporal-test",
             models={"producer": "offline", "auditor": "offline"},
+            negative_threshold=self.scenario.negative_threshold,
+            max_sessions=self.scenario.max_sessions,
         )
 
     @activity.defn(name="corsair.prepare")

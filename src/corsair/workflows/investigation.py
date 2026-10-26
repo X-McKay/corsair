@@ -42,10 +42,11 @@ with workflow.unsafe.imports_passed_through():
 
 
 # The canonical case layer aggregates independent sessions. A lone clean negative
-# must never become EXPLOIT_NOT_DEMONSTRATED, so the threshold is 2 and sessions are
-# capped at 2 by default. See Settings.negative_threshold / Settings.max_sessions.
-NEGATIVE_THRESHOLD = 2
-MAX_SESSIONS = 2
+# must never become EXPLOIT_NOT_DEMONSTRATED. The threshold and the session cap are
+# the admitted policy recorded in PreparedCase.manifest by the prepare activity, so
+# scheduling and aggregation read the same replayed values, never worker Settings.
+# Histories recorded before those fields existed decode to these defaults.
+DEFAULT_NEGATIVE_THRESHOLD = 2
 
 # A payload-pair proposal that was not refined by the producer on retry. It carries
 # no outcome and no structural claim (a prior round may have been rejected or marked
@@ -108,6 +109,7 @@ def _aggregate_case_verdict(
     rounds: list[RoundResult],
     result: InvestigationResult,
     earlier: Sequence[SessionOutcome] = (),
+    negative_threshold: int = DEFAULT_NEGATIVE_THRESHOLD,
 ) -> Verdict:
     """Pure aggregation of independent sessions into the canonical case verdict.
 
@@ -116,7 +118,7 @@ def _aggregate_case_verdict(
     negatives, so a lone clean negative stays INCONCLUSIVE.
     """
     outcomes = [*earlier, _session_outcome(prepared, rounds, result)]
-    verdict, _reason = case_verdict(outcomes, NEGATIVE_THRESHOLD)
+    verdict, _reason = case_verdict(outcomes, negative_threshold)
     return verdict
 
 
@@ -219,7 +221,9 @@ class InvestigationWorkflow:
             # Sessions share the root LLM/tool budget and the elapsed deadline; only
             # rounds restart per session.
             calls_left, tools_left = budget.max_llm_calls, budget.max_tool_calls
-            for session in range(1, MAX_SESSIONS + 1):
+            max_sessions = prepared.manifest.max_sessions
+            threshold = prepared.manifest.negative_threshold
+            for session in range(1, max_sessions + 1):
                 self.session_index = session
                 prefix = _operation_prefix(run_id, session)
                 session_rounds = []
@@ -390,11 +394,14 @@ class InvestigationWorkflow:
                 # Another session runs only while every earlier one ended in an
                 # independent clean negative and the threshold is still unmet; any
                 # other outcome is already final for case_verdict.
-                if session == MAX_SESSIONS:
+                if session == max_sessions:
                     break
                 outcome = _session_outcome(prepared, session_rounds, result)
                 clean = sum(o.clean_negative for o in finished) + outcome.clean_negative
-                if not outcome.clean_negative or clean >= NEGATIVE_THRESHOLD:
+                if not outcome.clean_negative or clean >= threshold:
+                    break
+                if clean + (max_sessions - session) < threshold:
+                    # The remaining sessions cannot reach the threshold.
                     break
                 elapsed = (workflow.now() - started).total_seconds()
                 if calls_left < 2 or tools_left < 1 or elapsed >= budget.max_elapsed_seconds:
@@ -439,7 +446,15 @@ class InvestigationWorkflow:
             result = result.model_copy(update={"rounds": rounds})
             result = result.model_copy(
                 update={
-                    "verdict": _aggregate_case_verdict(prepared, session_rounds, result, finished)
+                    "verdict": _aggregate_case_verdict(
+                        prepared,
+                        session_rounds,
+                        result,
+                        finished,
+                        prepared.manifest.negative_threshold
+                        if prepared is not None
+                        else DEFAULT_NEGATIVE_THRESHOLD,
+                    )
                 }
             )
             result = await self._record_result(result)
