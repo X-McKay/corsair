@@ -148,9 +148,7 @@ class FakeActivities:
         )
 
     @activity.defn(name="corsair.produce")
-    async def produce(
-        self, request: ProducerInput, *, window_seconds: float | None = None
-    ) -> ProducerOutput:
+    async def produce(self, request: ProducerInput) -> ProducerOutput:
         self.call_counts["corsair.produce"] += 1
         self.producer_inputs.append(request)
         self.produce_started.set()
@@ -236,9 +234,7 @@ class FakeActivities:
         )
 
     @activity.defn(name="corsair.audit")
-    async def audit(
-        self, request: AuditInput, *, window_seconds: float | None = None
-    ) -> AuditOutput:
+    async def audit(self, request: AuditInput) -> AuditOutput:
         self.call_counts["corsair.audit"] += 1
         self.audit_inputs.append(request)
         return AuditOutput(
