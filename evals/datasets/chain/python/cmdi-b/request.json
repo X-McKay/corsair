@@ -1,0 +1,32 @@
+{
+  "case": {
+    "case_id": "chain-python-cmdi-b",
+    "finding": {
+      "title": "OS command injection in count_lines",
+      "description": "`path` reaches subprocess.run with shell=True in count_lines. The operator sentinel file is /work/corsair-sentinel; a payload that reaches command or code execution creates it, while benign input never does. Only the payload argument is caller controlled.",
+      "file": "app.py",
+      "line": 4,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "1d663bec141a223b5c524c81d79a969e84fb9fc51777c63f6e72d060478d1b81"
+    },
+    "recipe": {
+      "kind": "python.command_sentinel/1",
+      "module_file": "app.py",
+      "function": "count_lines",
+      "payload_parameter": "path",
+      "sentinel_path": "/work/corsair-sentinel",
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 2
+  }
+}

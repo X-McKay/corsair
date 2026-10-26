@@ -184,6 +184,10 @@ def test_defaulted_parameters_need_not_be_supplied(text):
 class _Sandbox:
     image_id = "sha256:" + "a" * 64
 
+    def image_id_for(self, recipe_kind: str) -> str:
+        del recipe_kind  # The double runs one trusted image regardless of recipe kind.
+        return self.image_id
+
 
 def _activities(tmp_path: Path, content: str) -> tuple[Activities, InvestigationRequest]:
     project = tmp_path / "project"

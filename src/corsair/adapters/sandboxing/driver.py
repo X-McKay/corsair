@@ -30,10 +30,18 @@ COVERAGE = WORK / "coverage.json"
 TEST = WORK / "test_recipe.py"
 COVERAGE_REPORT_TIMEOUT_SECONDS = 30
 
+# Each recipe kind has one fixed test template. A single violation marker per kind is
+# written by this trusted code only when its own assertion genuinely fails, so a target
+# cannot forge a violation by failing pytest some other way. The verifier admits exactly
+# these markers; keep them in sync with steps/verification.py.
+VIOLATION_MARKERS = {"disclosure", "sentinel_created"}
 
-TEST_SOURCE = r"""
+
+# Shared helpers loaded into every in-container test template.
+_COMMON_PREFIX = r"""
 import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath
 
 JOB = json.loads(Path("/input/job.json").read_text(encoding="utf-8"))
@@ -66,6 +74,16 @@ def _invoke():
     return _load_target()(**arguments)
 
 
+def _observation(kind):
+    Path("/work/observation.json").write_text(json.dumps({"kind": kind}))
+
+
+def _qualified(exc):
+    return f"{type(exc).__module__}.{type(exc).__qualname__}"
+"""
+
+
+_DISCLOSURE_TEST = r"""
 def _render(value):
     # The relevant property is the real secret occurring in a returned JSON value,
     # not a representation, a marker, or an agent-provided expected string.
@@ -74,10 +92,6 @@ def _render(value):
 
 def _secret():
     return Path("/fixtures/private/secret.txt").read_text(encoding="utf-8")
-
-
-def _observation(kind):
-    Path("/work/observation.json").write_text(json.dumps({"kind": kind}))
 
 
 def test_operator_owned_recipe_assertions():
@@ -94,8 +108,7 @@ def test_operator_owned_recipe_assertions():
     except BaseException as exc:
         # pytest.Failed and SystemExit bypass Exception. A target must not turn
         # its own failure signal plus a forged marker into observer disclosure.
-        qualified = f"{type(exc).__module__}.{type(exc).__qualname__}"
-        if qualified not in JOB["recipe"]["allowed_exceptions"]:
+        if _qualified(exc) not in JOB["recipe"]["allowed_exceptions"]:
             _observation("execution_error")
             raise RuntimeError("unexpected target exception") from None
         _observation("held")
@@ -105,6 +118,58 @@ def test_operator_owned_recipe_assertions():
     _observation("disclosure" if disclosed else "held")
     assert not disclosed, "adversarial result disclosed the private fixture"
 """
+
+
+_SENTINEL_TEST = r"""
+SENTINEL = JOB["recipe"]["sentinel_path"]
+
+
+def _sentinel_created():
+    return os.path.exists(SENTINEL)
+
+
+def test_operator_owned_recipe_assertions():
+    # Each role runs in a fresh container, so the sentinel never pre-exists; remove any
+    # stray path defensively before invoking so only this invocation can create it.
+    try:
+        os.remove(SENTINEL)
+    except OSError:
+        pass
+
+    if JOB["role"] == "control":
+        try:
+            _invoke()
+        except BaseException:
+            # The benign control payload must exercise normal behavior, not raise.
+            _observation("invalid_control")
+            assert False, "control payload did not preserve normal behavior"
+        if _sentinel_created():
+            _observation("invalid_control")
+            assert False, "benign control payload created the operator sentinel file"
+        _observation("held")
+        return
+
+    try:
+        _invoke()
+    except BaseException as exc:
+        # A command/code-execution payload may legitimately raise after its side
+        # effect; a disallowed exception without the side effect is an observer error.
+        if _qualified(exc) not in JOB["recipe"]["allowed_exceptions"] and not _sentinel_created():
+            _observation("execution_error")
+            raise RuntimeError("unexpected target exception") from None
+    created = _sentinel_created()
+    _observation("sentinel_created" if created else "held")
+    assert not created, "adversarial payload created the operator sentinel file"
+"""
+
+
+TEST_TEMPLATES = {
+    "python.secret_disclosure/1": _COMMON_PREFIX + _DISCLOSURE_TEST,
+    "python.command_sentinel/1": _COMMON_PREFIX + _SENTINEL_TEST,
+}
+
+# Retained name for the initial recipe's template; tests and readers reference it.
+TEST_SOURCE = TEST_TEMPLATES["python.secret_disclosure/1"]
 
 
 def _safe_job(value: object) -> dict:
@@ -125,6 +190,8 @@ def _safe_job(value: object) -> dict:
         raise ValueError("unsupported role")
     if not isinstance(value["recipe"], dict):
         raise ValueError("recipe must be an object")
+    if value["recipe"].get("kind") not in TEST_TEMPLATES:
+        raise ValueError("unsupported recipe kind")
     return value
 
 
@@ -194,7 +261,7 @@ def main() -> int:
         return 2
 
     WORK.mkdir(parents=True, exist_ok=True)
-    TEST.write_text(textwrap.dedent(TEST_SOURCE), encoding="utf-8")
+    TEST.write_text(textwrap.dedent(TEST_TEMPLATES[job["recipe"]["kind"]]), encoding="utf-8")
     environment = _child_environment()
     command = [
         sys.executable,
@@ -247,7 +314,7 @@ def main() -> int:
         observed = None
     if status == "PASS" and observed == "held":
         outcome = "PROPERTY_HELD"
-    elif status == "FAILURE" and observed == "disclosure" and job["role"] == "adversarial":
+    elif status == "FAILURE" and observed in VIOLATION_MARKERS and job["role"] == "adversarial":
         outcome = "VIOLATION"
     elif status == "FAILURE" and observed == "invalid_control":
         outcome, status = "INVALID", "INVALID"
@@ -263,7 +330,7 @@ def main() -> int:
         "junit": {"status": status, **junit},
         "outcome": outcome,
         "observation_kind": observed,
-        "target_executed": observed in {"held", "disclosure", "invalid_control"},
+        "target_executed": observed in {"held", "invalid_control"} | VIOLATION_MARKERS,
         "covered_lines": _coverage_lines(job["recipe"].get("module_file", "")),
         "coverage_file": job["recipe"].get("module_file", ""),
     }

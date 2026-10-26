@@ -90,6 +90,10 @@ class _FakeSandbox:
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
 
+    def image_id_for(self, recipe_kind: str) -> str:
+        del recipe_kind  # The double runs a single trusted image regardless of kind.
+        return self.image_id
+
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
         return self.unknown

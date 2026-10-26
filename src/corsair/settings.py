@@ -62,6 +62,13 @@ class Settings(Contract):
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
+    # Recipe kind to image tag. Both current Python recipes share one reviewed image
+    # and driver, so they map to the same tag; `image` remains the Python default and
+    # the fallback for any kind absent from this map. A future language/framework image
+    # is added here as a new row, not a new code path.
+    images: dict[str, str] = Field(
+        default_factory=lambda: {"python.secret_disclosure/1": "corsair-python:0.1"}
+    )
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)
@@ -75,6 +82,10 @@ class Settings(Contract):
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
     models: ModelSettings = Field(default_factory=ModelSettings)
+
+    def image_for(self, recipe_kind: str) -> str:
+        """Resolve the configured image tag for a recipe kind, defaulting to ``image``."""
+        return self.images.get(recipe_kind, self.image)
 
     @property
     def identity(self) -> str:

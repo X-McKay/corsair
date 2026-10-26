@@ -1,0 +1,32 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "chain-python-cmdi-b",
+      "family": "chain-python-cmdi",
+      "split": "chain",
+      "request": "datasets/chain/python/cmdi-b/request.json",
+      "oracle": "datasets/chain/python/cmdi-b/oracle-v3.json",
+      "request_digest": "211c68f7547ff65d50ff6d47155e02dc1e1b1a6a6bd93a72d629f9ba869a391b",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    },
+    {
+      "case_id": "chain-python-cmdi-a",
+      "family": "chain-python-cmdi",
+      "split": "chain",
+      "request": "datasets/chain/python/cmdi-a/request.json",
+      "oracle": "datasets/chain/python/cmdi-a/oracle-v3.json",
+      "request_digest": "3cb4959a5b6bc4e03eb3795357b3c700b47e30c71e8df1876d5ffb69c5a1c039",
+      "oracle_digest": "b2bbe264f9c938d3bcde7df16411829f608f09658995294aac19ca52e711436c"
+    },
+    {
+      "case_id": "chain-python-codeinjection-b",
+      "family": "chain-python-codeinjection",
+      "split": "chain",
+      "request": "datasets/chain/python/codeinjection-b/request.json",
+      "oracle": "datasets/chain/python/codeinjection-b/oracle-v3.json",
+      "request_digest": "5f244b5cc4be0a5bada33b43201e9aef85e4324c1f1adec4a08b09ac8f9e7c53",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    }
+  ]
+}

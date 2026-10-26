@@ -61,6 +61,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [CLI](reference/cli.md): commands, switches, output contracts and exits.
 - [Configuration](reference/configuration.md): canonical settings and constraints.
 - [Schemas](reference/schemas.md): canonical Pydantic models and schema inspection.
+- [Python corpus map](reference/corpus-python.md): which recipe each Python corpus row's property needs.
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
 

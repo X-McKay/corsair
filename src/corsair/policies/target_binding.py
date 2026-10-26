@@ -15,7 +15,7 @@ import ast
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, PythonRecipe
+from corsair.contracts import Finding, Recipe
 
 
 class TargetBindingReason(StrEnum):
@@ -79,9 +79,7 @@ def _bindings(module: ast.Module, name: str) -> list[ast.AST] | None:
     return found
 
 
-def _signature_failure(
-    function: ast.FunctionDef, recipe: PythonRecipe
-) -> TargetBindingFailure | None:
+def _signature_failure(function: ast.FunctionDef, recipe: Recipe) -> TargetBindingFailure | None:
     """The driver calls ``function(**fixed_kwargs, payload_parameter=payload)``."""
     arguments = function.args
     keyword_names = {argument.arg for argument in (*arguments.args, *arguments.kwonlyargs)}
@@ -120,7 +118,7 @@ def _signature_failure(
 
 
 def target_binding(
-    finding: Finding, recipe: PythonRecipe, module_text: str | None
+    finding: Finding, recipe: Recipe, module_text: str | None
 ) -> TargetBindingFailure | None:
     """Return the first certain structural reason the case cannot bind, else None.
 

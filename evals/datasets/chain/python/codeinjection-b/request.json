@@ -1,0 +1,32 @@
+{
+  "case": {
+    "case_id": "chain-python-codeinjection-b",
+    "finding": {
+      "title": "Code injection in compute_setting",
+      "description": "`expr` reaches eval() in compute_setting. The operator sentinel file is /work/corsair-sentinel; a payload that reaches command or code execution creates it, while benign input never does. Only the payload argument is caller controlled.",
+      "file": "app.py",
+      "line": 1,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "cad07ec868ccdbdd6a3629f7eeafaabc49202ef883ec69139e191544e4ca664b"
+    },
+    "recipe": {
+      "kind": "python.command_sentinel/1",
+      "module_file": "app.py",
+      "function": "compute_setting",
+      "payload_parameter": "expr",
+      "sentinel_path": "/work/corsair-sentinel",
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 2
+  }
+}

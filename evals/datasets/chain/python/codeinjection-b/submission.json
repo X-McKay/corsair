@@ -1,0 +1,15 @@
+{
+  "control_payload": "42",
+  "exploit_payload": "__import__('os').system('touch /work/corsair-sentinel')",
+  "hypothesis": "eval() executes an arbitrary expression supplied as the setting.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Show whether the caller-controlled value reaches execution",
+    "next_steps": [
+      "Read app.py",
+      "Submit benign and execution payloads"
+    ],
+    "reason": "The source and reported property specify one caller-controlled argument"
+  }
+}

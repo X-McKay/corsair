@@ -41,13 +41,13 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: PythonRecipe
+│   └── recipe: Recipe (PythonRecipe | PythonCommandSentinel, discriminated on kind)
 └── budget: Budget
 ```
 
 - A **finding** is the reported title, description, source file, optional line, and requested claim scope. It is not trusted evidence.
 - A **source** names a local source-tree path and may pin its expected snapshot digest. It is a proposed local input, not an admitted archive or a remote checkout.
-- A **recipe** is the operator-owned test shape. The initial recipe binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable. The recipe must bind to the finding's file.
+- A **recipe** is the operator-owned test shape, a discriminated union on a stable `kind` tag ([`Recipe`](../../src/corsair/contracts/sources.py)). Every member binds to one public Python callable and its actual module file; the investigator controls only the `payload_parameter` value, while fixed keyword arguments, public fixtures, and allowed-exception policy are not agent-editable, and the recipe must bind to the finding's file. `python.secret_disclosure/1` ([`PythonRecipe`](../../src/corsair/contracts/sources.py)) asserts a private fixture secret does not appear in the returned value, with an operator `expected_control`. `python.command_sentinel/1` ([`PythonCommandSentinel`](../../src/corsair/contracts/recipes_python.py)) asserts the benign input does not create the operator's `sentinel_path` file while an input reaching command or code execution does. A request written before the union may omit `kind`; it is read as `python.secret_disclosure/1`. The [Python corpus map](corpus-python.md) records which recipe each corpus row's property needs.
 - A **case** combines that finding, source, recipe, optional fixed source, and stable `case_id`. A case describes what to investigate; it has no run budget and no workflow identity.
 - An **investigation request** is a case plus a bounded `Budget`. The default budget is bounded in rounds, model/tool calls, output tokens, elapsed time, probe time, tool output, and source handling. `max_output_tokens` caps each model request of both the producer and the auditor; on a thinking model it includes reasoning tokens (see the `Budget` docstring in [`contracts/sources.py`](../../src/corsair/contracts/sources.py)). It is the typed Temporal input for one investigation.
 

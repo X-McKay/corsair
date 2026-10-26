@@ -682,7 +682,7 @@ def test_auditor_packet_truncates_only_the_source_to_stay_within_the_prompt_limi
 def test_auditor_instruction_states_the_rubric_ids_once_without_inviting_a_skill_reload():
     instruction = str(build_auditor("scripted", build_auditor_toolset()).instruction)
 
-    for rule_id in ("R1 mechanism", "R2 differential", "R3 production logic", "R4 disclosure"):
+    for rule_id in ("R1 mechanism", "R2 differential", "R3 production logic", "R4 real violation"):
         assert instruction.count(f"**{rule_id}") == 1
     for decision in ("`REJECT`", "`INSUFFICIENT_CONTEXT`", "`ACCEPT`"):
         assert decision in instruction

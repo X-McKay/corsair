@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
+from .recipes_python import PythonCommandSentinel
+
+DEFAULT_RECIPE_KIND = "python.secret_disclosure/1"
 
 
 class Source(Contract):
@@ -107,12 +110,33 @@ class PythonRecipe(Contract):
         return self
 
 
+def _recipe_kind(value: object) -> str:
+    """Extract the recipe discriminator, defaulting a tag-less recipe to the initial kind.
+
+    A frozen request written before the recipe union omits ``kind`` entirely; it names
+    the initial disclosure recipe. New requests carry an explicit ``kind``. An unknown
+    tag is rejected by the union rather than silently coerced.
+    """
+    if isinstance(value, dict):
+        return str(value.get("kind", DEFAULT_RECIPE_KIND))
+    return str(getattr(value, "kind", DEFAULT_RECIPE_KIND))
+
+
+# One discriminated union on ``kind``; add a member here as each concrete, tested
+# recipe lands. The callable discriminator keeps pre-union frozen requests valid.
+Recipe = Annotated[
+    Annotated[PythonRecipe, Tag(DEFAULT_RECIPE_KIND)]
+    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")],
+    Discriminator(_recipe_kind),
+]
+
+
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
 
     @model_validator(mode="after")
@@ -176,7 +200,7 @@ class RunManifest(Contract):
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str
