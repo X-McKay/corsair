@@ -2,7 +2,9 @@
 
 Role factories own concrete ADK construction. This module supplies immutable
 prompt text, validates declared role capabilities, and admits only the two
-small packaged procedural skills before native ADK receives them.
+small packaged procedural skills before native ADK receives them. Only the
+producer exposes the native skill loaders; the auditor's procedure is preloaded
+into its instruction and it declares no tools at all.
 """
 
 from __future__ import annotations
@@ -44,6 +46,21 @@ def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
             return ("semantic-review",)
 
 
+def _admitted_loader_tools(role: RoleName) -> tuple[str, ...]:
+    """Return the native skill loaders a role may expose.
+
+    The auditor's one procedure is preloaded into its instruction, so it exposes no
+    loader: a tool would only make ADK add tool-use guidance and, on routes without
+    native schema-with-tools support, a ``set_model_response`` round trip.
+    """
+
+    match role:
+        case "producer":
+            return _LOADER_TOOLS
+        case "auditor":
+            return ()
+
+
 class AgentSpec(Contract):
     """Declarative role metadata, deliberately separate from wire schemas."""
 
@@ -56,7 +73,7 @@ class AgentSpec(Contract):
     source_tools: list[str]
     loader_tools: list[str]
     runtime_skills: list[str]
-    loader_call_limit: int = Field(ge=1, le=_MAX_LOADER_CALLS)
+    loader_call_limit: int = Field(ge=0, le=_MAX_LOADER_CALLS)
     llm_call_limit: int | None = Field(default=None, ge=1, le=4)
     instruction_resource: str = Field(min_length=1, max_length=240)
     schema_ref: str = Field(min_length=1, max_length=240)
@@ -70,8 +87,13 @@ class AgentSpec(Contract):
 
     @model_validator(mode="after")
     def validated_runtime_layout(self) -> AgentSpec:
-        if tuple(self.loader_tools) != _LOADER_TOOLS:
-            raise ValueError(f"loader_tools must exactly equal {list(_LOADER_TOOLS)!r}")
+        expected_loaders = _admitted_loader_tools(self.name)
+        if tuple(self.loader_tools) != expected_loaders:
+            raise ValueError(
+                f"{self.name} loader_tools must exactly equal {list(expected_loaders)!r}"
+            )
+        if (self.loader_call_limit > 0) != bool(self.loader_tools):
+            raise ValueError("loader_call_limit must be positive exactly when loader tools exist")
         if tuple(self.runtime_skills) != _admitted_skill_slugs(self.name):
             raise ValueError("runtime_skills must exactly equal the role-local admitted skill")
         if self.tools != [*self.source_tools, *self.loader_tools]:
@@ -81,8 +103,8 @@ class AgentSpec(Contract):
                 raise ValueError("producer source_tools must exactly expose source reads")
             if self.llm_call_limit is not None:
                 raise ValueError("producer LLM calls are bounded by the input and budget")
-        elif self.source_tools:
-            raise ValueError("auditor must not expose source tools")
+        elif self.tools:
+            raise ValueError("auditor must not expose any tools")
         elif self.llm_call_limit is None:
             raise ValueError("auditor must declare its finite native LLM-call limit")
         return self
