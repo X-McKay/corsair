@@ -20,6 +20,7 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.target_binding import target_binding
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
 from corsair.ports.scm import SourceSnapshotPort
@@ -74,9 +75,23 @@ class Activities:
                 non_retryable=True,
             )
         try:
-            return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
+            prepared = await asyncio.to_thread(self.sources.prepare, request.case, manifest)
+            module_text = await asyncio.to_thread(
+                self.sources.read_text,
+                prepared.source,
+                prepared.recipe.module_file,
+                max_bytes=self.settings.source_limit_bytes,
+            )
         except (ValueError, FileNotFoundError, PermissionError) as exc:
             raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
+        # Pre-model target binding over the admitted bytes: a case that certainly cannot
+        # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
+        failure = target_binding(prepared.finding, prepared.recipe, module_text)
+        if failure is not None:
+            raise ApplicationError(
+                format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
+            )
+        return prepared
 
     async def _model_episode(self, awaitable):
         async def heartbeats():

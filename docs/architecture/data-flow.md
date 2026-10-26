@@ -41,12 +41,13 @@ A request may also originate from an upstream security scanner. The intake mappi
 
 ## 2. Request binding and admission
 
-Corsair does not run separate pre-model AST or build gates today; the Python-only pilot recipe has no build step. Two checks stand between a request and a producer session:
+The Python-only pilot recipe has no build step. Three checks stand between a request and a producer session:
 
 - At request load, a `Case` validator requires `finding.file == recipe.module_file`, so a finding that does not bind to its recipe's module is rejected before any work is spent. The admission contracts are in [`src/corsair/contracts/sources.py`](../../src/corsair/contracts/sources.py).
 - Admission snapshots the source into an immutable artifact, so every later run reads the same bytes.
+- The pre-model `target_binding` gate ([`src/corsair/policies/target_binding.py`](../../src/corsair/policies/target_binding.py)) reads the admitted recipe module and, with `ast`, blocks the case as a non-retryable `PREPARE_BLOCKED` (`UNABLE_TO_RUN`, with the typed reason) when the finding declares no line, the line is beyond the module, the module does not parse, the recipe function is not bound anywhere in the module or is a coroutine function, or, for one plain top-level `def`, `payload_parameter` or a `fixed_kwargs` key is not a keyword parameter (without `**kwargs`) or a required parameter is never supplied. It blocks only a certain violation: a decorated, conditionally defined, re-bound, imported or star-imported callable passes to the run-time gates. It does not require the line to lie inside the callable, since a target may sit in a helper or at module level, and it checks the vulnerable revision only.
 
-The target line itself is bound at verdict time, not before the model: a finding with no declared line is `UNABLE_TO_RUN`, and a declared line that does not execute in both runs is `INCONCLUSIVE` (see §4 and §6). A cheap pre-model `target_binding` gate (line present and within the recipe's callable) is planned follow-up; until it lands, a bad or absent line costs one producer session before the verdict-time gate catches it. The policy module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py).
+The verdict-time gates still bind the target line: a finding with no declared line is `UNABLE_TO_RUN`, and a declared line that does not execute in both runs is `INCONCLUSIVE` (see §4 and §6). The pre-model gate removes the producer session an absent, out-of-range or unbindable target used to cost; it never stands in for coverage. The policy module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py).
 
 ## 3. Producer session
 
@@ -80,7 +81,7 @@ The kernel assigns one of six labels; [`src/corsair/contracts/results.py`](../..
 | `COMPONENT_EXPLOIT_DEMONSTRATED` | The same genuine differential (both runs covered the target line, control held, exploit demonstrated, auditor did not reject), but the finding claimed application scope and only the component seam was exercised, so reachability to the claimed application entry point was not established. Developer next step: harden the component or prove an upstream guard blocks the input. |
 | `EXPLOIT_NOT_DEMONSTRATED` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
 | `INCONCLUSIVE` | Gates ran but did not settle a demonstration at any scope: coverage missed in either run, evidence disagreed, the auditor rejected, the exploit still demonstrated on a supplied fix revision, fewer than two independent negative sessions, or the budget ended first. |
-| `UNABLE_TO_RUN` | The case could not be exercised against a bound target: the finding declared no target line to bind the demonstration to, or a source-admission or sandbox-availability gate blocked before any evidence ran. (The no-target-line check is a verdict-time gate today, not a pre-model one.) |
+| `UNABLE_TO_RUN` | The case could not be exercised against a bound target: the finding declared no target line to bind the demonstration to, the pre-model `target_binding` gate found the line or recipe callable certainly unbindable, or a source-admission or sandbox-availability gate blocked before any evidence ran. (The no-target-line check runs both before the model, in `target_binding`, and at verdict time.) |
 | `ERROR` | An operational failure: provider, sandbox infrastructure, missing artifact, unknown cleanup, or uncertain operation. |
 
 `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR` are never negative clearance.

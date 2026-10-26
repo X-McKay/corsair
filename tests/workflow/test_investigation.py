@@ -382,6 +382,10 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
 
     assert result.execution_status is ExecutionStatus.BLOCKED
     assert result.disposition is Disposition.INCONCLUSIVE
+    # A blocked prepare (source admission or the pre-model target_binding gate) is an
+    # honest UNABLE_TO_RUN carrying the activity's reason, at zero model cost.
+    assert result.verdict is Verdict.UNABLE_TO_RUN
+    assert "test source admission was blocked" in result.reason
     assert result.rounds == []
     assert activities.call_counts["corsair.prepare"] == 1
     assert activities.call_counts["corsair.produce"] == 0
