@@ -16,6 +16,7 @@ from rich.console import Console, Group, RenderableType
 from rich.json import JSON
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress_bar import ProgressBar
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
@@ -100,6 +101,9 @@ _STOP_STYLES: dict[str, str] = {
 # ledger reason may repeat model text (an abstention, an audit reason) or the result's
 # own reason, so the human view names only the stage and gate.
 _CODE_REASON_STOPS = frozenset({"fix_not_blocked", "negative_threshold_unmet", "budget_exhausted"})
+# Evaluation child rows shown in the live panel; the query already orders them by state.
+_CHILD_TABLE_ROWS = 16
+_CHILD_STYLES = {"running": "cyan", "failed": "red", "completed": "green", "pending": "dim"}
 
 
 class TerminalOptions(Protocol):
@@ -549,7 +553,7 @@ def _count(value: object, limit: object) -> str:
 
 _PROGRESS_KEYS = frozenset(
     {"phase", "session", "round", "max_sessions", "max_rounds", "gate", "started", "deadline"}
-    | {"timeline", "completed", "total", "running", "errors"}
+    | {"timeline", "completed", "total", "running", "errors", "children", "children_omitted"}
 )
 
 
@@ -592,22 +596,106 @@ def progress_fields(
     return fields
 
 
+def _child_rows(status: Mapping[str, object] | None) -> list[Mapping[str, object]]:
+    """Evaluation child rows from a status query, in the order the workflow returned."""
+    children = status.get("children") if status else None
+    if not isinstance(children, list):
+        return []
+    return [row for row in children if isinstance(row, Mapping)]
+
+
+def _child_elapsed(row: Mapping[str, object], now: datetime) -> str:
+    """A running child's time so far, a finished child's duration, else nothing."""
+    started = _instant(row.get("started"))
+    if started is None:
+        return ""
+    finished = _instant(row.get("finished")) or now
+    return _clock((finished - started).total_seconds())
+
+
+def _child_table(status: Mapping[str, object], now: datetime) -> Table | None:
+    rows = _child_rows(status)
+    if not rows:
+        return None
+    table = Table("State", "Case", "Repeat", "Elapsed", "Run", box=None, pad_edge=False)
+    for row in rows[:_CHILD_TABLE_ROWS]:
+        state = safe_text(row.get("state"))
+        table.add_row(
+            Text(state, style=_CHILD_STYLES.get(state, "")),
+            _text(row.get("case_id")),
+            _text(row.get("repeat")),
+            _text(_child_elapsed(row, now)),
+            _text(row.get("run_id")),
+        )
+    omitted = status.get("children_omitted")
+    hidden = max(0, len(rows) - _CHILD_TABLE_ROWS)
+    hidden += omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
+    if hidden > 0:
+        table.add_row(_text(f"… {hidden} more"), "", "", "", "")
+    return table
+
+
+def child_changes(
+    seen: dict[str, str], status: Mapping[str, object] | None
+) -> list[Mapping[str, object]]:
+    """Rows whose state differs from the last one seen for that run; updates ``seen``.
+
+    A child first seen while still pending is not a change, so the first poll of a
+    large batch prints nothing per child.
+    """
+    changed: list[Mapping[str, object]] = []
+    for row in _child_rows(status):
+        run_id, state = safe_text(row.get("run_id")), safe_text(row.get("state"))
+        previous = seen.get(run_id)
+        if previous != state and not (previous is None and state == "pending"):
+            changed.append(row)
+        seen[run_id] = state
+    return changed
+
+
+def child_line(
+    label: str, row: Mapping[str, object], fields: list[tuple[str, str]], now: datetime
+) -> Text:
+    """One plain line for one evaluation child's state change, after the batch counts."""
+    child = [
+        ("case", f"{safe_text(row.get('case_id'))} r{safe_text(row.get('repeat'))}"),
+        ("state", safe_text(row.get("state"))),
+    ]
+    elapsed = _child_elapsed(row, now)
+    if elapsed:
+        child.append(("case elapsed", elapsed))
+    return progress_line(label, [*fields, *child])
+
+
 def progress_line(label: str, fields: list[tuple[str, str]]) -> Text:
     """One plain line for a non-animated terminal: no cursor movement."""
     return _text(" · ".join([label, *(f"{key} {value}" for key, value in fields)]))
 
 
 def progress_panel(
-    label: str, status: Mapping[str, object] | None, fields: list[tuple[str, str]]
+    label: str,
+    status: Mapping[str, object] | None,
+    fields: list[tuple[str, str]],
+    *,
+    now: datetime | None = None,
 ) -> Panel:
-    """Compact live view: current status fields and the most recent phase transitions."""
+    """Compact live view: status fields, then evaluation child rows with a progress bar or
+    the most recent phase transitions, whichever the status query carries."""
     summary = Table.grid(padding=(0, 2))
     phase = next((value for key, value in fields if key == "phase"), "in progress")
     summary.add_row(Spinner("dots", style="cyan"), Text(phase, style="bold"))
     for key, value in fields:
         if key != "phase":
             summary.add_row(Text(key.capitalize(), style="cyan"), _text(value))
+    total = status.get("total") if status else None
+    completed = status.get("completed") if status else None
+    if isinstance(total, int) and isinstance(completed, int) and total > 0:
+        bar = ProgressBar(total=total, completed=min(completed, total), width=30)
+        summary.add_row(Text("Progress", style="cyan"), bar)
     parts: list[RenderableType] = [summary]
+    children = _child_table(status, now or _utcnow()) if status else None
+    if children is not None:
+        parts.extend([Text(""), children])
     timeline = status.get("timeline") if status else None
     if isinstance(timeline, list) and timeline:
         started = _instant(status.get("started")) if status else None
@@ -1090,6 +1178,16 @@ class Terminal:
             **({} if remedy is None else {"remedy": remedy}),
         )
 
+    def _print_progress(
+        self, label: str, status: Mapping[str, object], seen: dict[str, str], begun: float
+    ) -> None:
+        """Plain mode: one line per evaluation child state change, else one status line."""
+        now = _utcnow()
+        fields = progress_fields(status, now, time.monotonic() - begun)
+        lines = [child_line(label, row, fields, now) for row in child_changes(seen, status)]
+        for line in lines or [progress_line(label, fields)]:
+            self.err.print(line, soft_wrap=True)
+
     async def wait(
         self,
         awaitable: Awaitable[T],
@@ -1100,14 +1198,17 @@ class Terminal:
         """Observe actual SDK completion; query failures never invent success or progress.
 
         With a status query, an animated terminal shows a live panel, a plain human terminal
-        prints one line per status change, and JSON mode writes nothing beyond the logs.
+        prints one line per status change (per child state change for an evaluation), and
+        JSON mode writes nothing beyond the logs.
         """
         begun = time.monotonic()
         last: Mapping[str, object] | None = None
+        seen: dict[str, str] = {}
 
         def frame() -> Panel:
-            fields = progress_fields(last, _utcnow(), time.monotonic() - begun)
-            return progress_panel(label, last, fields)
+            now = _utcnow()
+            fields = progress_fields(last, now, time.monotonic() - begun)
+            return progress_panel(label, last, fields, now=now)
 
         display: AbstractContextManager[object] = nullcontext()
         if self.animate and query is not None:
@@ -1139,10 +1240,7 @@ class Terminal:
                                 )
                                 last = actual
                                 if self.human and not self.animate:
-                                    fields = progress_fields(
-                                        last, _utcnow(), time.monotonic() - begun
-                                    )
-                                    self.err.print(progress_line(label, fields), soft_wrap=True)
+                                    self._print_progress(label, last, seen, begun)
                             query_failed = False
                         except Exception as error:
                             if not query_failed:

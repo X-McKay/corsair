@@ -15,7 +15,12 @@ from rich.console import Console
 
 from corsair.entrypoints import terminal as terminal_module
 from corsair.entrypoints.cli import execute, parser, validate_run_id
-from corsair.entrypoints.terminal import Terminal, progress_fields, progress_panel
+from corsair.entrypoints.terminal import (
+    Terminal,
+    child_changes,
+    progress_fields,
+    progress_panel,
+)
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
 
 
@@ -1062,6 +1067,179 @@ async def test_animated_wait_draws_the_live_panel_on_stderr(monkeypatch):
     assert result == "final"
     assert "Corsair · Evaluation" in frame
     assert "evidence" in frame and "2/4" in frame
+
+
+def _child(case_id: str, repeat: int, state: str, started=None, finished=None):
+    return {
+        "case_id": case_id,
+        "repeat": repeat,
+        "run_id": f"eval1.{case_id}.r{repeat}",
+        "state": state,
+        "started": started,
+        "finished": finished,
+    }
+
+
+def _batch(*children: dict[str, object], omitted: int = 0, total: int = 3) -> dict[str, object]:
+    states = [child["state"] for child in children]
+    return {
+        "completed": states.count("completed") + states.count("failed"),
+        "total": total,
+        "running": states.count("running"),
+        "errors": states.count("failed"),
+        "started": "2026-10-25T12:00:00+00:00",
+        "children": list(children),
+        "children_omitted": omitted,
+    }
+
+
+_T0 = "2026-10-25T12:00:00+00:00"
+_T1 = "2026-10-25T12:01:05+00:00"
+_T2 = "2026-10-25T12:03:00+00:00"
+
+
+def test_batch_progress_fields_use_the_batch_start_and_hide_child_rows():
+    status = _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending"), omitted=7)
+    assert progress_fields(status, _NOW, 1.0) == [
+        ("elapsed", "04:30"),
+        ("cases", "0/3"),
+        ("running", "1"),
+        ("errors", "0"),
+    ]
+
+
+def test_progress_panel_renders_child_rows_in_query_order_with_a_progress_bar():
+    status = _batch(
+        _child("slow", 0, "running", _T0),
+        _child("bad", 1, "failed", _T0, _T1),
+        _child("next", 0, "pending"),
+        _child("good", 0, "completed", _T1, _T2),
+        total=4,
+    )
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    fields = progress_fields(status, _NOW, 0)
+    console.print(progress_panel("Evaluation eval1", status, fields, now=_NOW))
+    frame = console.export_text()
+    lines = frame.splitlines()
+
+    assert "Corsair · Evaluation eval1" in frame
+    assert "Progress" in frame and "━" in frame
+    assert "State" in frame and "Elapsed" in frame
+    order = [
+        next(i for i, line in enumerate(lines) if f" {case} " in line)
+        for case in ("slow", "bad", "next", "good")
+    ]
+    assert order == sorted(order)
+    slow = lines[order[0]]
+    assert "running" in slow and "04:30" in slow and "eval1.slow.r0" in slow
+    assert "failed" in lines[order[1]] and "01:05" in lines[order[1]]
+    assert "pending" in lines[order[2]] and ":" not in lines[order[2]].split("pending")[1][:20]
+    assert "completed" in lines[order[3]] and "01:55" in lines[order[3]]
+    assert "earlier" not in frame
+
+
+def test_progress_panel_bounds_child_rows_and_counts_hidden_ones():
+    children = [_child(f"case{index:02}", 0, "running", _T0) for index in range(20)]
+    status = _batch(*children, omitted=30, total=50)
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    console.print(progress_panel("run", status, progress_fields(status, _NOW, 0), now=_NOW))
+    frame = console.export_text()
+
+    assert "case15" in frame and "case16" not in frame
+    assert "… 34 more" in frame
+
+    few = _batch(_child("a", 0, "running", _T0), omitted=2)
+    console = Console(file=io.StringIO(), width=120, color_system=None, record=True)
+    console.print(progress_panel("run", few, progress_fields(few, _NOW, 0), now=_NOW))
+    assert "… 2 more" in console.export_text()
+
+
+def test_child_changes_skip_first_seen_pending_rows_and_report_each_transition_once():
+    seen: dict[str, str] = {}
+    first = _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending"))
+    assert [row["case_id"] for row in child_changes(seen, first)] == ["a"]
+    assert child_changes(seen, first) == []
+    second = _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T2))
+    assert [(row["case_id"], row["state"]) for row in child_changes(seen, second)] == [
+        ("b", "running"),
+        ("a", "completed"),
+    ]
+    assert child_changes(seen, {"phase": "producer"}) == []
+
+
+async def test_plain_human_evaluation_wait_prints_one_line_per_child_state_change(
+    capsys, monkeypatch
+):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "--no-animation", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "pending"), _child("b", 0, "pending")),
+        _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending")),
+        _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T1)),
+        _batch(_child("b", 0, "failed", _T1, _T2), _child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(
+        _finish(done), "Evaluation eval1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "\x1b" not in captured.err
+    head = "Evaluation eval1 · elapsed 04:30"
+    assert captured.err.splitlines() == [
+        f"{head} · cases 0/3 · running 0 · errors 0",
+        f"{head} · cases 0/3 · running 1 · errors 0 · case a r0 · state running"
+        " · case elapsed 04:30",
+        f"{head} · cases 1/3 · running 1 · errors 0 · case b r0 · state running"
+        " · case elapsed 03:25",
+        f"{head} · cases 1/3 · running 1 · errors 0 · case a r0 · state completed"
+        " · case elapsed 01:05",
+        f"{head} · cases 2/3 · running 0 · errors 1 · case b r0 · state failed"
+        " · case elapsed 01:55",
+    ]
+
+
+async def test_json_evaluation_wait_prints_no_child_rows(capsys, monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "running", _T0)),
+        _batch(_child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(
+        _finish(done), "Evaluation eval1", query=_scripted_query(statuses, done)
+    )
+    captured = capsys.readouterr()
+
+    assert result == "final"
+    assert captured.out == ""
+    assert "eval1.a.r0" not in captured.err and "case a" not in captured.err
+
+
+async def test_animated_evaluation_wait_draws_the_child_table(monkeypatch):
+    monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
+    monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
+    terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
+    stream = io.StringIO()
+    terminal.err = Console(file=stream, force_terminal=True, color_system=None, width=120)
+    terminal.animate = True
+    done = asyncio.Event()
+    statuses = [
+        _batch(_child("a", 0, "running", _T0), _child("b", 0, "pending")),
+        _batch(_child("b", 0, "running", _T1), _child("a", 0, "completed", _T0, _T1)),
+    ]
+
+    result = await terminal.wait(_finish(done), "Evaluation", query=_scripted_query(statuses, done))
+    frame = stream.getvalue()
+
+    assert result == "final"
+    assert "eval1.b.r0" in frame and "completed" in frame and "━" in frame
 
 
 def _modules_loaded_by_cli(tmp_path: Path, *arguments: str) -> set[str]:
