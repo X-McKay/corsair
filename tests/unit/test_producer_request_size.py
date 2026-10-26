@@ -17,7 +17,7 @@ from google.adk.models.llm_request import LlmRequest
 from corsair.agents.producer.factory import producer_instruction
 from corsair.agents.resources import load_runtime_skills
 from corsair.evaluation import preview
-from corsair.evaluation.agents import load_frozen_fixture
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]

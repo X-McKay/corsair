@@ -14,7 +14,7 @@ import pytest
 
 from corsair.contracts import AuditInput
 from corsair.evaluation import preview
-from corsair.evaluation.agents import load_frozen_fixture
+from corsair.evaluation.datasets import load_frozen_fixture
 from corsair.settings import ModelSettings
 
 ROOT = Path(__file__).resolve().parents[2]
