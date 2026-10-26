@@ -32,7 +32,7 @@ from corsair.contracts import (
     ProducerOutput,
     digest,
 )
-from corsair.evaluation.scoring import _read_frozen_file, dataset_root
+from corsair.evaluation.scoring import dataset_root, read_frozen
 from corsair.policies.verdicts import fix_status
 from corsair.ports.sandboxing import SandboxPort
 from corsair.settings import Settings
@@ -59,9 +59,7 @@ def load_frozen_requests(path: Path) -> tuple[str, dict[str, tuple[Path, bytes]]
     root = dataset_root(path)
     inputs: dict[str, tuple[Path, bytes]] = {}
     for entry in entries:
-        inputs[entry["case_id"]] = _read_frozen_file(
-            root, entry["input"], entry["input_digest"], "input"
-        )
+        inputs[entry["case_id"]] = read_frozen(root, entry["input"], entry["input_digest"], "input")
     return digest(dataset), inputs
 
 

@@ -14,7 +14,7 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import uuid4
 
 from corsair.observability.logging import configure_logging, event, safe_text
@@ -54,6 +54,8 @@ class CliArguments(argparse.Namespace):
     baseline: str
     candidate: str
     allow_dataset_mismatch: bool
+    families: bool
+    family_dataset: str | None
     case: str | None
     limit: int | None
     evidence: bool
@@ -111,23 +113,35 @@ def _score_saved_result(
         return {"run_id": identity, "status": "unavailable", "reason": safe_text(error)}
 
 
-async def _handle_report(args: CliArguments, ui: Terminal) -> int:
-    """Display a saved evaluation report and its per-case rows without runtime services."""
+def _family_report(args: CliArguments, path: str) -> dict[str, Any]:
+    """Read one saved report, labelling its rows from ``--dataset`` when given."""
     from corsair.evaluation.comparison import read_report
 
-    ui.emit(read_report(Path(args.report)))
+    report = read_report(Path(path))
+    if args.family_dataset is not None:
+        from corsair.evaluation.families import label_report
+
+        report = label_report(report, Path(args.family_dataset))
+    return report
+
+
+async def _handle_report(args: CliArguments, ui: Terminal) -> int:
+    """Display a saved evaluation report and its per-case rows without runtime services."""
+    report = _family_report(args, args.report)
+    if args.families:
+        from corsair.evaluation.families import family_view
+
+        report = {**report, **family_view(report.get("rows", []))}
+    ui.emit(report)
     return 0
 
 
 async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
     """Compare two saved reports by case; exit 1 when the candidate regressed."""
-    from corsair.evaluation.comparison import compare_reports, read_report
+    from corsair.evaluation.comparison import compare_reports
 
-    diff = compare_reports(
-        read_report(Path(args.baseline)),
-        read_report(Path(args.candidate)),
-        allow_dataset_mismatch=args.allow_dataset_mismatch,
-    )
+    baseline, candidate = _family_report(args, args.baseline), _family_report(args, args.candidate)
+    diff = compare_reports(baseline, candidate, allow_dataset_mismatch=args.allow_dataset_mismatch)
     if not diff["dataset_match"]:
         digests = diff["dataset_digest"]
         event(
@@ -135,6 +149,10 @@ async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
             level=logging.WARNING,
             message=f"baseline={digests['baseline']} candidate={digests['candidate']}",
         )
+    if args.families:
+        from corsair.evaluation.families import family_deltas
+
+        diff["families"] = family_deltas(baseline["rows"], candidate["rows"], diff["regressions"])
     ui.emit({"baseline_report": args.baseline, "candidate_report": args.candidate, **diff})
     return 1 if diff["regression"] else 0
 
@@ -333,6 +351,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.adapters.temporal.client import connect, wait_for_result
     from corsair.contracts import BatchRequest, InvestigationResult, digest
+    from corsair.evaluation.families import label_rows
     from corsair.evaluation.scoring import load_dataset, save_report, score
     from corsair.workflows.evaluation import EvaluationWorkflow
 
@@ -375,7 +394,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
                 }
             )
     output = Path(args.output or f".runs/evaluations/{identity}.json")
-    report = save_report(output, rows, dataset_digest=digest(dataset))
+    report = save_report(output, label_rows(rows, dataset), dataset_digest=digest(dataset))
     ui.emit({"report": str(output), "summary": report["summary"]})
     event("evaluation.completed", run_id=identity, completed=len(items), total=len(items))
     return 0 if report["summary"]["failed"] == 0 else 1
@@ -385,6 +404,7 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     """Rescore committed evidence locally, retaining unavailable results in the report."""
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import digest
+    from corsair.evaluation.families import label_rows
     from corsair.evaluation.scoring import load_dataset, save_report
 
     settings = _settings(args)
@@ -394,7 +414,7 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
         _score_saved_result(store, validate_run_id(identity), oracles) for identity in args.run_ids
     ]
     output = Path(args.output or ".runs/evaluations/rescored.json")
-    report = save_report(output, rows, dataset_digest=digest(dataset))
+    report = save_report(output, label_rows(rows, dataset), dataset_digest=digest(dataset))
     ui.emit({"report": str(output), "summary": report["summary"]})
     return 0 if report["summary"]["failed"] == 0 else 1
 
@@ -625,6 +645,17 @@ def parser() -> argparse.ArgumentParser:
     replay.add_argument("dataset", help="The frozen agent dataset the report was run on")
     replay.add_argument("--run-id", help="Replay identity; operation ids are RUN_ID.c<row>")
     replay.add_argument("--output", help="Replay report path (default .runs/evaluations/)")
+    for name in ("report", "compare"):
+        commands[name].add_argument(
+            "--families",
+            action="store_true",
+            help="Add per-family and per-split pass, decisive and forbidden-label summaries",
+        )
+        commands[name].add_argument(
+            "--dataset",
+            dest="family_dataset",
+            help="Label rows of an older report from the manifest it was scored against",
+        )
     return root
 
 
