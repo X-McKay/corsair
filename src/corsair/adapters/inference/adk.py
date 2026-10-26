@@ -34,7 +34,6 @@ from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditInput, AuditOutput, AuditResult
 from corsair.agents.auditor.factory import build_auditor
-from corsair.agents.auditor.toolsets import build_auditor_toolset
 from corsair.agents.producer.contracts import (
     ProducerDecision,
     ProducerInput,
@@ -549,14 +548,18 @@ async def run_auditor(
     settings: Settings | ModelSettings,
     model_override: str | BaseLlm | None = None,
 ) -> AuditOutput:
-    """Run one fresh outcome-blind review with finite private procedure loaders."""
+    """Run one fresh outcome-blind review: a single tool-free structured request.
+
+    The auditor declares no tools, so its episode admits no tool call whatever tool
+    budget the caller still holds; ``audit_input.tool_call_limit`` is only an upper
+    bound the workflow checks the (always zero) reported tool usage against.
+    """
 
     started = time.perf_counter()
     spec = load_agent_spec("auditor")
     if spec.llm_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
         raise ValueError("auditor metadata must declare a finite native LLM-call limit")
     llm_limit = min(audit_input.llm_call_limit, spec.llm_call_limit)
-    tool_limit = min(audit_input.tool_call_limit, spec.loader_call_limit)
     if llm_limit == 0:
         return AuditOutput(
             usage=Usage(llm_calls=0, tool_calls=0, seconds=time.perf_counter() - started),
@@ -567,17 +570,13 @@ async def run_auditor(
             ),
         )
     model = model_for_role(settings, "auditor") if model_override is None else model_override
-    agent = build_auditor(model, build_auditor_toolset())
+    agent = build_auditor(model)
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
         max_llm_calls=llm_limit,
         max_output_tokens=audit_input.max_output_tokens,
-        max_tool_calls=tool_limit,
-        max_loader_calls=tool_limit,
         role=spec.name,
-        loader_tool_names=frozenset(spec.loader_tools),
-        allowed_skill_names=frozenset(spec.runtime_skills),
         skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(

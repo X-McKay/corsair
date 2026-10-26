@@ -95,14 +95,14 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     assert producer.source_tools == ["read_file", "list_files"]
     assert producer.loader_tools == ["load_skill", "load_skill_resource"]
     assert producer.tools == [*producer.source_tools, *producer.loader_tools]
-    assert auditor.source_tools == []
-    assert auditor.loader_tools == ["load_skill", "load_skill_resource"]
-    assert auditor.tools == auditor.loader_tools
+    # The auditor's procedure is preloaded; it declares no tool, loader or otherwise.
+    assert auditor.tools == auditor.source_tools == auditor.loader_tools == []
     assert producer.runtime_skills == ["source-grounding"]
     assert auditor.runtime_skills == ["semantic-review"]
     assert producer.llm_call_limit is None
-    assert auditor.llm_call_limit == 2
-    assert producer.loader_call_limit == auditor.loader_call_limit == 4
+    assert auditor.llm_call_limit == 1
+    assert producer.loader_call_limit == 4
+    assert auditor.loader_call_limit == 0
     assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
     assert producer.schema_ref == "corsair.contracts.ProducerDecision"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
@@ -119,14 +119,67 @@ def test_agent_spec_rejects_unknown_metadata_fields():
                 "execution_class": "durable",
                 "governance_tier": "review",
                 "risk_path": "risk",
-                "tools": ["load_skill", "load_skill_resource"],
+                "tools": [],
                 "source_tools": [],
-                "loader_tools": ["load_skill", "load_skill_resource"],
+                "loader_tools": [],
                 "runtime_skills": ["semantic-review"],
-                "loader_call_limit": 4,
-                "llm_call_limit": 2,
+                "loader_call_limit": 0,
+                "llm_call_limit": 1,
                 "instruction_resource": "resource",
                 "schema_ref": "corsair.contracts.AuditResult",
                 "model": "must-not-be-declared-here",
             }
         )
+
+
+def _auditor_spec(**overrides: object) -> dict[str, object]:
+    spec: dict[str, object] = {
+        "name": "auditor",
+        "contract_version": "corsair.agent/2",
+        "execution_class": "durable",
+        "governance_tier": "review",
+        "risk_path": "risk",
+        "tools": [],
+        "source_tools": [],
+        "loader_tools": [],
+        "runtime_skills": ["semantic-review"],
+        "loader_call_limit": 0,
+        "llm_call_limit": 1,
+        "instruction_resource": "resource",
+        "schema_ref": "corsair.contracts.AuditResult",
+    }
+    return {**spec, **overrides}
+
+
+def test_agent_spec_admits_the_tool_free_auditor():
+    assert AgentSpec.model_validate(_auditor_spec()).tools == []
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {
+                "tools": ["load_skill", "load_skill_resource"],
+                "loader_tools": ["load_skill", "load_skill_resource"],
+                "loader_call_limit": 4,
+            },
+            "auditor loader_tools must exactly equal \\[\\]",
+        ),
+        ({"loader_call_limit": 2}, "positive exactly when loader tools exist"),
+        ({"tools": ["read_file"], "source_tools": ["read_file"]}, "must not expose any tools"),
+    ],
+)
+def test_agent_spec_rejects_any_auditor_tool(overrides: dict[str, object], message: str):
+    with pytest.raises(ValueError, match=message):
+        AgentSpec.model_validate(_auditor_spec(**overrides))
+
+
+def test_agent_spec_still_requires_the_producer_loaders():
+    producer = load_agent_spec("producer").model_dump(mode="json")
+    with pytest.raises(ValueError, match="producer loader_tools must exactly equal"):
+        AgentSpec.model_validate(
+            {**producer, "tools": ["read_file", "list_files"], "loader_tools": []}
+        )
+    with pytest.raises(ValueError, match="positive exactly when loader tools exist"):
+        AgentSpec.model_validate({**producer, "loader_call_limit": 0})
