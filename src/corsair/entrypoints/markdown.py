@@ -358,8 +358,10 @@ def comparison_markdown(comparison: Mapping[str, Any]) -> str:
     counts, summary deltas, regressions and the attempts whose status, label, forbidden
     flag or presence changed.
     """
-    regression = comparison.get("regression")
-    result = "**REGRESSION**" if regression else "**NO REGRESSION**"
+    if not comparison.get("comparable"):
+        result = "**INCOMPARABLE**"
+    else:
+        result = "**REGRESSION**" if comparison.get("regression") else "**NO REGRESSION**"
     caveats = [] if comparison.get("dataset_match") else [_MISMATCH_CAVEAT]
     caveats += [_POLICY_CAVEAT, _COMPARISON_CAVEAT, _UNRUN_CAVEAT]
     counts = comparison.get("counts")

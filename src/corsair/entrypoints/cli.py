@@ -147,7 +147,8 @@ async def _handle_report(args: CliArguments, ui: Terminal) -> int:
 
 
 async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
-    """Compare two saved reports by case; exit 1 when the candidate regressed."""
+    """Compare two saved reports by case; exit 1 when the candidate regressed and 2 when the
+    reports cover different dataset digests, which is no comparison either way."""
     from corsair.evaluation.comparison import compare_reports
 
     baseline, candidate = _family_report(args, args.baseline), _family_report(args, args.candidate)
@@ -164,6 +165,8 @@ async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
 
         diff["families"] = family_deltas(baseline["rows"], candidate["rows"], diff["regressions"])
     ui.emit({"baseline_report": args.baseline, "candidate_report": args.candidate, **diff})
+    if not diff["comparable"]:
+        return 2
     return 1 if diff["regression"] else 0
 
 
@@ -691,7 +694,9 @@ def parser() -> argparse.ArgumentParser:
         "eval": "Run frozen cases with bounded child workflows and external oracles",
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
         "report": "Display an existing evaluation report and its per-case rows",
-        "compare": "Compare two evaluation reports by case; exit 1 on a regression",
+        "compare": (
+            "Compare two evaluation reports by case; exit 1 on a regression, 2 when incomparable"
+        ),
         "intake": "Dry-run a scanner report: which findings become admissible requests; "
         "no model or container",
         "dataset": (

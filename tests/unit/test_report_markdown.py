@@ -288,7 +288,8 @@ def test_comparison_markdown_opens_with_a_dataset_mismatch_and_reports_no_change
 
     rendered = comparison_markdown(diff)
 
-    assert rendered.startswith("## Corsair report comparison\n\nResult: **NO REGRESSION**\n\n")
+    assert rendered.startswith("## Corsair report comparison\n\nResult: **INCOMPARABLE**\n\n")
+    assert "NO REGRESSION" not in rendered
     assert "\n\n> **Dataset mismatch:**" in rendered
     assert "| Dataset digest | `sha256:a` | unknown |" in rendered
     assert "### Regressions\n\nNone." in rendered

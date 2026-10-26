@@ -177,6 +177,15 @@ def _family_deltas(console: Console, families: list[dict[str, Any]]) -> None:
     console.print(Panel(table, title="Corsair · Families", border_style="cyan"))
 
 
+def _comparison_result(value: Mapping[str, Any]) -> Text:
+    """INCOMPARABLE over different datasets (the deltas stay descriptive), else the verdict."""
+    if not value.get("comparable"):
+        return Text("INCOMPARABLE", style="bold yellow")
+    if value["regression"]:
+        return Text("REGRESSION", style="red")
+    return Text("NO REGRESSION", style="green")
+
+
 def print_comparison(console: Console, value: dict[str, Any]) -> None:
     """Render a report comparison: dataset identity first, then deltas and changed cases."""
     digests = value["dataset_digest"]
@@ -193,13 +202,7 @@ def print_comparison(console: Console, value: dict[str, Any]) -> None:
             )
         )
     grid = Table.grid(padding=(0, 2))
-    grid.add_row(
-        Text("Result", style="cyan"),
-        Text(
-            "REGRESSION" if value["regression"] else "NO REGRESSION",
-            style="red" if value["regression"] else "green",
-        ),
-    )
+    grid.add_row(Text("Result", style="cyan"), _comparison_result(value))
     if value["dataset_match"]:
         grid.add_row(Text("Dataset", style="cyan"), as_text(digests["baseline"]))
     gates = value.get("gate_delta", {})

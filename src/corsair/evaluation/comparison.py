@@ -205,7 +205,9 @@ def compare_reports(
     """Join two reports by case and repeat and decide whether the candidate regressed.
 
     Reports over different (or undeclared) frozen dataset digests are refused unless
-    the caller explicitly allows the mismatch; the result then records it."""
+    the caller explicitly allows the mismatch. Such a result is ``comparable: false`` with
+    ``regression: None``: its per-case changes and deltas are descriptive only, never a
+    regression verdict either way."""
     digests = {
         "baseline": baseline.get("dataset_digest"),
         "candidate": candidate.get("dataset_digest"),
@@ -225,7 +227,8 @@ def compare_reports(
     regressions = _regressions(cases, unidentified)
     summaries = {"baseline": _side_summary(baseline), "candidate": _side_summary(candidate)}
     return {
-        "regression": bool(regressions),
+        "comparable": dataset_match,
+        "regression": bool(regressions) if dataset_match else None,
         "dataset_match": dataset_match,
         "dataset_digest": digests,
         "config_digests": {

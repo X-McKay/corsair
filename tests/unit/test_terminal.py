@@ -270,8 +270,10 @@ async def test_execute_compare_refuses_mismatched_datasets_without_the_flag(tmp_
     args = parser().parse_args(
         ["--format", "json", "compare", str(baseline), str(other), "--allow-dataset-mismatch"]
     )
-    assert await execute(args) == 0
-    assert json.loads(capsys.readouterr().out)["dataset_match"] is False
+    assert await execute(args) == 2
+    diff = json.loads(capsys.readouterr().out)
+    assert diff["dataset_match"] is False and diff["comparable"] is False
+    assert diff["regression"] is None
 
 
 async def test_human_compare_warns_on_dataset_mismatch_and_lists_changed_cases(
@@ -292,12 +294,13 @@ async def test_human_compare_warns_on_dataset_mismatch_and_lists_changed_cases(
         ]
     )
 
-    assert await execute(args) == 1
+    assert await execute(args) == 2
 
     output = capsys.readouterr().out
     assert "Dataset mismatch" in output
     assert "sha256:frozen" in output and "sha256:b" in output
-    assert "REGRESSION" in output
+    assert "INCOMPARABLE" in _line(output, "Result")
+    assert "REGRESSION" not in output
     assert "pass to fail" in output
     assert "Changed cases" in output
 
