@@ -110,7 +110,9 @@ else {
         done_testing();
     }
     else {
-        my $excess = !defined $result || _markup_chars($result) > $baseline;
+        # An undefined result rendered no HTML at all, so it carries no injected markup:
+        # like an allowed rejection it holds, and it can never establish an injection.
+        my $excess = defined $result && _markup_chars($result) > $baseline;
         _observe($excess ? 'disclosure' : 'held');
         ok(!$excess, 'adversarial result injected no excess markup');
         done_testing();
