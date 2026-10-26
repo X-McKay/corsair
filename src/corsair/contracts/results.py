@@ -14,11 +14,13 @@ from .evidence import Observation
 from .sources import RunManifest, Scope
 
 TERMINAL_RESULT_MAX_BYTES = 1_000_000
-MAX_TERMINAL_ROUNDS = 16
+# Budget.max_rounds (16) per session, times the session cap (2).
+MAX_TERMINAL_ROUNDS = 32
 
 
 class RoundResult(Contract):
     index: int
+    session: int = Field(default=1, ge=1, le=8)
     producer: ProducerOutput
     observation: Observation | None = None
     audit: AuditOutput | None = None

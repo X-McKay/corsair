@@ -15,7 +15,9 @@ from corsair.contracts import (
 from corsair.workflows.investigation import (
     _BLIND_RETRY_REASON,
     _aggregate_case_verdict,
+    _operation_prefix,
     _retry_feedback,
+    _session_outcome,
 )
 from tests.unit.test_evidence import _audit, _prepared
 from tests.unit.test_verdicts import _clean_negative, _demonstrated
@@ -93,6 +95,51 @@ def test_completed_clean_negative_alone_is_inconclusive_at_threshold_two():
     result = _result(execution_status=ExecutionStatus.COMPLETED, reason="completed")
     verdict = _aggregate_case_verdict(_prepared(), rounds, result)
     assert verdict is Verdict.INCONCLUSIVE
+
+
+# --- independent sessions: only case_verdict promotes clean negatives ----------
+
+
+def test_two_independent_clean_negative_sessions_are_exploit_not_demonstrated():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    assert first.clean_negative
+    rounds = [_round(1, _clean_negative(), _audit())]
+    verdict = _aggregate_case_verdict(_prepared(), rounds, _result(), [first])
+    assert verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
+
+
+def test_second_session_operational_failure_is_not_a_clean_negative():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    rounds = [_round(1, _clean_negative(), _audit())]
+    result = _result(execution_status=ExecutionStatus.ERROR, reason="provider unavailable")
+    verdict = _aggregate_case_verdict(_prepared(), rounds, result, [first])
+    assert verdict is Verdict.ERROR
+
+
+def test_second_session_that_never_ran_a_round_stays_inconclusive():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    verdict = _aggregate_case_verdict(_prepared(), [], _result(), [first])
+    assert verdict is Verdict.INCONCLUSIVE
+
+
+def test_a_demonstration_in_the_second_session_is_exploit_demonstrated():
+    first = _session_outcome(_prepared(), [_round(1, _clean_negative(), _audit())], _result())
+    rounds = [_round(1, _demonstrated(), _audit())]
+    verdict = _aggregate_case_verdict(_prepared(), rounds, _result(), [first])
+    assert verdict is Verdict.EXPLOIT_DEMONSTRATED
+
+
+def test_later_sessions_use_disjoint_operation_ids_with_suffix_headroom():
+    root = "r" * 60
+    assert _operation_prefix(root, 1) == root
+    second = _operation_prefix(root, 2)
+    assert second != root and second.startswith(f"{root}.")
+    validate_root_identity(root)
+    from pydantic import TypeAdapter
+
+    from corsair.contracts.common import Identifier
+
+    TypeAdapter(Identifier).validate_python(f"{second}.fix16")
 
 
 # --- finding 3: the API/CLI boundary reserves operation-suffix headroom --------

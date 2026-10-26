@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -31,6 +32,7 @@ with workflow.unsafe.imports_passed_through():
         format_terminal_result,
     )
     from corsair.policies.verdicts import (
+        SessionOutcome,
         case_verdict,
         decide,
         fix_status,
@@ -66,17 +68,17 @@ def _retry_feedback(audit: AuditOutput) -> Feedback:
     return Feedback(gate="retry", reason=_BLIND_RETRY_REASON)
 
 
-def _aggregate_case_verdict(
+def _session_outcome(
     prepared: PreparedCase | None,
     rounds: list[RoundResult],
     result: InvestigationResult,
-) -> Verdict:
-    """Pure aggregation of the terminal round into the canonical case verdict.
+) -> SessionOutcome:
+    """Pure outcome of ONE session from its own rounds and terminal status.
 
     The last evaluated round decides a demonstration, but a later terminal
     operational failure (an ERROR/BLOCKED/CANCELLED round after it) must not be
     masked by an earlier non-decisive round: unless the earlier round positively
-    demonstrated the exploit, the operational failure carries into the verdict so
+    demonstrated the exploit, the operational failure carries into the outcome so
     the canonical five-label result keeps its operational-error signal.
     """
     terminal = next(
@@ -93,8 +95,29 @@ def _aggregate_case_verdict(
         and outcome.verdict is not Verdict.EXPLOIT_DEMONSTRATED
     ):
         outcome = status_outcome(result.execution_status, result.reason)
-    verdict, _reason = case_verdict([outcome], NEGATIVE_THRESHOLD)
+    return outcome
+
+
+def _aggregate_case_verdict(
+    prepared: PreparedCase | None,
+    rounds: list[RoundResult],
+    result: InvestigationResult,
+    earlier: Sequence[SessionOutcome] = (),
+) -> Verdict:
+    """Pure aggregation of independent sessions into the canonical case verdict.
+
+    ``earlier`` holds the outcomes of sessions that already ended; ``rounds`` and
+    ``result`` describe the last session. Only ``case_verdict`` may promote clean
+    negatives, so a lone clean negative stays INCONCLUSIVE.
+    """
+    outcomes = [*earlier, _session_outcome(prepared, rounds, result)]
+    verdict, _reason = case_verdict(outcomes, NEGATIVE_THRESHOLD)
     return verdict
+
+
+def _operation_prefix(run_id: str, session: int) -> str:
+    """Session 1 keeps the original operation ids so earlier histories replay."""
+    return run_id if session == 1 else f"{run_id}.s{session}"
 
 
 class BudgetExhausted(Exception):
@@ -105,12 +128,13 @@ class BudgetExhausted(Exception):
 class InvestigationWorkflow:
     def __init__(self) -> None:
         self.phase = "pending"
+        self.session_index = 0
         self.round_index = 0
         self.deadline: datetime | None = None
 
     @workflow.query
     def status(self) -> dict:
-        return {"phase": self.phase, "round": self.round_index}
+        return {"phase": self.phase, "session": self.session_index, "round": self.round_index}
 
     async def _execute_bounded_activity[Result](
         self, name: str, argument: Any, result_type: type[Result], seconds: int
@@ -177,6 +201,8 @@ class InvestigationWorkflow:
             ),
         )
         rounds: list[RoundResult] = []
+        session_rounds: list[RoundResult] = []
+        finished: list[SessionOutcome] = []
         prepared: PreparedCase | None = None
         try:
             self.phase = "prepare"
@@ -184,155 +210,192 @@ class InvestigationWorkflow:
                 "corsair.prepare", request, PreparedCase, 120
             )
             result = result.model_copy(update={"manifest": prepared.manifest})
+            # Sessions share the root LLM/tool budget and the elapsed deadline; only
+            # rounds restart per session.
             calls_left, tools_left = budget.max_llm_calls, budget.max_tool_calls
-            previous, feedback = None, None
-            for index in range(1, budget.max_rounds + 1):
-                self.round_index = index
+            for session in range(1, MAX_SESSIONS + 1):
+                self.session_index = session
+                prefix = _operation_prefix(run_id, session)
+                session_rounds = []
+                if session > 1:
+                    # Fresh, blind session: nothing from an earlier one is carried
+                    # over (no submission, feedback, operation id or outcome).
+                    result = result.model_copy(
+                        update={
+                            "disposition": Disposition.INCONCLUSIVE,
+                            "reason": "No admissible observation was collected.",
+                        }
+                    )
+                previous, feedback = None, None
+                for index in range(1, budget.max_rounds + 1):
+                    self.round_index = index
+                    elapsed = (workflow.now() - started).total_seconds()
+                    if calls_left < 2 or tools_left < 1 or elapsed >= budget.max_elapsed_seconds:
+                        result = result.model_copy(
+                            update={"reason": "Investigation budget exhausted."}
+                        )
+                        break
+                    self.phase = "producer"
+                    call_limit = min(budget.episode_llm_calls, calls_left - 1)
+                    producer = await self._execute_bounded_activity(
+                        "corsair.produce",
+                        ProducerInput(
+                            run_id=run_id,
+                            prepared=prepared,
+                            budget=budget,
+                            round_index=index,
+                            previous=previous,
+                            feedback=feedback,
+                            llm_call_limit=call_limit,
+                            tool_call_limit=tools_left,
+                        ),
+                        ProducerOutput,
+                        min(300, budget.max_elapsed_seconds - int(elapsed)),
+                    )
+                    calls_left -= producer.usage.llm_calls
+                    tools_left -= producer.usage.tool_calls
+                    if producer.usage.llm_calls > call_limit or tools_left < 0:
+                        raise ValueError("Producer returned usage outside its admitted sub-budget")
+                    round_result = RoundResult(index=index, session=session, producer=producer)
+                    session_rounds.append(round_result)
+                    rounds.append(round_result)
+                    decision = producer.decision
+                    if decision is not None and isinstance(decision.root, NoGroundedCandidate):
+                        if workflow.patched("producer-abstention-v1"):
+                            result = result.model_copy(
+                                update={"reason": f"Producer abstained: {decision.root.reason}"}
+                            )
+                            break
+                        feedback = Feedback(gate="producer", reason=decision.root.reason)
+                        result = result.model_copy(update={"reason": feedback.reason})
+                        continue
+                    submission = producer.submission_for_verification()
+                    if submission is None:
+                        feedback = producer.feedback or Feedback(
+                            gate="producer", reason="No submission"
+                        )
+                        result = result.model_copy(update={"reason": feedback.reason})
+                        if feedback.operational:
+                            result = result.model_copy(
+                                update={"execution_status": ExecutionStatus.ERROR}
+                            )
+                            break
+                        continue
+                    previous = submission
+                    self.phase = "evidence"
+                    observation = await self._execute_bounded_activity(
+                        "corsair.evidence",
+                        EvidenceInput(
+                            run_id=run_id,
+                            operation_id=f"{prefix}.r{index}",
+                            prepared=prepared,
+                            submission=previous,
+                            budget=budget,
+                        ),
+                        Observation,
+                        2 * budget.probe_timeout_seconds + 45,
+                    )
+                    round_result = round_result.model_copy(update={"observation": observation})
+                    session_rounds[-1] = round_result
+                    rounds[-1] = round_result
+                    if observation.feedback is not None:
+                        feedback = observation.feedback
+                        result = result.model_copy(update={"reason": feedback.reason})
+                        if feedback.operational:
+                            result = result.model_copy(
+                                update={"execution_status": ExecutionStatus.ERROR}
+                            )
+                            break
+                        continue
+                    if calls_left < 1:
+                        result = result.model_copy(
+                            update={"reason": "No budget remains for review."}
+                        )
+                        break
+                    self.phase = "audit"
+                    audit_llm_call_limit, audit_tool_call_limit = 1, 0
+                    if workflow.patched("auditor-runtime-budget-v1"):
+                        audit_llm_call_limit = min(2, calls_left)
+                        audit_tool_call_limit = min(4, tools_left)
+                        audit_request: AuditInput | dict[str, Any] = AuditInput(
+                            finding=prepared.finding,
+                            recipe=prepared.recipe,
+                            source_excerpt=prepared.source_excerpt,
+                            submission=previous,
+                            max_output_tokens=budget.max_output_tokens,
+                            llm_call_limit=audit_llm_call_limit,
+                            tool_call_limit=audit_tool_call_limit,
+                        )
+                    else:
+                        # Default-valued Pydantic fields serialize into Temporal payloads.
+                        # Retain this exact pre-limit command shape for old histories.
+                        audit_request = {
+                            "finding": prepared.finding,
+                            "recipe": prepared.recipe,
+                            "source_excerpt": prepared.source_excerpt,
+                            "submission": previous,
+                            "max_output_tokens": budget.max_output_tokens,
+                        }
+                    audit = await self._execute_bounded_activity(
+                        "corsair.audit",
+                        audit_request,
+                        AuditOutput,
+                        180,
+                    )
+                    calls_left -= audit.usage.llm_calls
+                    tools_left -= audit.usage.tool_calls
+                    if (
+                        audit.usage.llm_calls > audit_llm_call_limit
+                        or audit.usage.tool_calls > audit_tool_call_limit
+                        or calls_left < 0
+                        or tools_left < 0
+                    ):
+                        raise ValueError("Auditor returned usage outside its admitted sub-budget")
+                    round_result = round_result.model_copy(update={"audit": audit})
+                    session_rounds[-1] = round_result
+                    rounds[-1] = round_result
+                    label, status, reason = decide(prepared, observation, audit)
+                    result = result.model_copy(
+                        update={"disposition": label, "execution_status": status, "reason": reason}
+                    )
+                    if label in {Disposition.SUPPORTED, Disposition.CONDITIONAL}:
+                        if prepared.fixed_source is not None:
+                            self.phase = "fix"
+                            fixed = await self._execute_bounded_activity(
+                                "corsair.evidence",
+                                EvidenceInput(
+                                    run_id=run_id,
+                                    operation_id=f"{prefix}.fix{index}",
+                                    prepared=prepared,
+                                    submission=previous,
+                                    budget=budget,
+                                    fixed=True,
+                                ),
+                                Observation,
+                                2 * budget.probe_timeout_seconds + 45,
+                            )
+                            result = result.model_copy(
+                                update={"fix_status": fix_status(fixed), "fix_observation": fixed}
+                            )
+                        break
+                    if status != ExecutionStatus.COMPLETED:
+                        break
+                    feedback = _retry_feedback(audit)
+                # Another session runs only while every earlier one ended in an
+                # independent clean negative and the threshold is still unmet; any
+                # other outcome is already final for case_verdict.
+                if session == MAX_SESSIONS:
+                    break
+                outcome = _session_outcome(prepared, session_rounds, result)
+                clean = sum(o.clean_negative for o in finished) + outcome.clean_negative
+                if not outcome.clean_negative or clean >= NEGATIVE_THRESHOLD:
+                    break
                 elapsed = (workflow.now() - started).total_seconds()
                 if calls_left < 2 or tools_left < 1 or elapsed >= budget.max_elapsed_seconds:
-                    result = result.model_copy(update={"reason": "Investigation budget exhausted."})
                     break
-                self.phase = "producer"
-                call_limit = min(budget.episode_llm_calls, calls_left - 1)
-                producer = await self._execute_bounded_activity(
-                    "corsair.produce",
-                    ProducerInput(
-                        run_id=run_id,
-                        prepared=prepared,
-                        budget=budget,
-                        round_index=index,
-                        previous=previous,
-                        feedback=feedback,
-                        llm_call_limit=call_limit,
-                        tool_call_limit=tools_left,
-                    ),
-                    ProducerOutput,
-                    min(300, budget.max_elapsed_seconds - int(elapsed)),
-                )
-                calls_left -= producer.usage.llm_calls
-                tools_left -= producer.usage.tool_calls
-                if producer.usage.llm_calls > call_limit or tools_left < 0:
-                    raise ValueError("Producer returned usage outside its admitted sub-budget")
-                round_result = RoundResult(index=index, producer=producer)
-                rounds.append(round_result)
-                decision = producer.decision
-                if decision is not None and isinstance(decision.root, NoGroundedCandidate):
-                    if workflow.patched("producer-abstention-v1"):
-                        result = result.model_copy(
-                            update={"reason": f"Producer abstained: {decision.root.reason}"}
-                        )
-                        break
-                    feedback = Feedback(gate="producer", reason=decision.root.reason)
-                    result = result.model_copy(update={"reason": feedback.reason})
-                    continue
-                submission = producer.submission_for_verification()
-                if submission is None:
-                    feedback = producer.feedback or Feedback(
-                        gate="producer", reason="No submission"
-                    )
-                    result = result.model_copy(update={"reason": feedback.reason})
-                    if feedback.operational:
-                        result = result.model_copy(
-                            update={"execution_status": ExecutionStatus.ERROR}
-                        )
-                        break
-                    continue
-                previous = submission
-                self.phase = "evidence"
-                observation = await self._execute_bounded_activity(
-                    "corsair.evidence",
-                    EvidenceInput(
-                        run_id=run_id,
-                        operation_id=f"{run_id}.r{index}",
-                        prepared=prepared,
-                        submission=previous,
-                        budget=budget,
-                    ),
-                    Observation,
-                    2 * budget.probe_timeout_seconds + 45,
-                )
-                round_result = round_result.model_copy(update={"observation": observation})
-                rounds[-1] = round_result
-                if observation.feedback is not None:
-                    feedback = observation.feedback
-                    result = result.model_copy(update={"reason": feedback.reason})
-                    if feedback.operational:
-                        result = result.model_copy(
-                            update={"execution_status": ExecutionStatus.ERROR}
-                        )
-                        break
-                    continue
-                if calls_left < 1:
-                    result = result.model_copy(update={"reason": "No budget remains for review."})
+                if not workflow.patched("independent-sessions-v1"):
                     break
-                self.phase = "audit"
-                audit_llm_call_limit, audit_tool_call_limit = 1, 0
-                if workflow.patched("auditor-runtime-budget-v1"):
-                    audit_llm_call_limit = min(2, calls_left)
-                    audit_tool_call_limit = min(4, tools_left)
-                    audit_request: AuditInput | dict[str, Any] = AuditInput(
-                        finding=prepared.finding,
-                        recipe=prepared.recipe,
-                        source_excerpt=prepared.source_excerpt,
-                        submission=previous,
-                        max_output_tokens=budget.max_output_tokens,
-                        llm_call_limit=audit_llm_call_limit,
-                        tool_call_limit=audit_tool_call_limit,
-                    )
-                else:
-                    # Default-valued Pydantic fields serialize into Temporal payloads.
-                    # Retain this exact pre-limit command shape for old histories.
-                    audit_request = {
-                        "finding": prepared.finding,
-                        "recipe": prepared.recipe,
-                        "source_excerpt": prepared.source_excerpt,
-                        "submission": previous,
-                        "max_output_tokens": budget.max_output_tokens,
-                    }
-                audit = await self._execute_bounded_activity(
-                    "corsair.audit",
-                    audit_request,
-                    AuditOutput,
-                    180,
-                )
-                calls_left -= audit.usage.llm_calls
-                tools_left -= audit.usage.tool_calls
-                if (
-                    audit.usage.llm_calls > audit_llm_call_limit
-                    or audit.usage.tool_calls > audit_tool_call_limit
-                    or calls_left < 0
-                    or tools_left < 0
-                ):
-                    raise ValueError("Auditor returned usage outside its admitted sub-budget")
-                round_result = round_result.model_copy(update={"audit": audit})
-                rounds[-1] = round_result
-                label, status, reason = decide(prepared, observation, audit)
-                result = result.model_copy(
-                    update={"disposition": label, "execution_status": status, "reason": reason}
-                )
-                if label in {Disposition.SUPPORTED, Disposition.CONDITIONAL}:
-                    if prepared.fixed_source is not None:
-                        self.phase = "fix"
-                        fixed = await self._execute_bounded_activity(
-                            "corsair.evidence",
-                            EvidenceInput(
-                                run_id=run_id,
-                                operation_id=f"{run_id}.fix{index}",
-                                prepared=prepared,
-                                submission=previous,
-                                budget=budget,
-                                fixed=True,
-                            ),
-                            Observation,
-                            2 * budget.probe_timeout_seconds + 45,
-                        )
-                        result = result.model_copy(
-                            update={"fix_status": fix_status(fixed), "fix_observation": fixed}
-                        )
-                    break
-                if status != ExecutionStatus.COMPLETED:
-                    break
-                feedback = _retry_feedback(audit)
+                finished.append(outcome)
         except ActivityError as exc:
             cause_type = getattr(exc.cause, "type", "")
             # Operational failures must not erase a previously admitted source observation.
@@ -369,25 +432,9 @@ class InvestigationWorkflow:
         finally:
             result = result.model_copy(update={"rounds": rounds})
             result = result.model_copy(
-                update={"verdict": self._case_verdict(prepared, rounds, result)}
+                update={
+                    "verdict": _aggregate_case_verdict(prepared, session_rounds, result, finished)
+                }
             )
             result = await self._record_result(result)
         return result
-
-    # TODO(v3, parked): wire a SECOND fresh, independent producer session for the
-    # EXPLOIT_NOT_DEMONSTRATED path. After a first session ends in a clean negative
-    # with no EXPLOIT_DEMONSTRATED, a second blind producer session (new operation
-    # ids, no shared probe/feedback/result) should run, and both outcomes feed
-    # case_verdict(..., NEGATIVE_THRESHOLD). That requires restructuring this
-    # replay-sensitive round loop into a session loop and cannot be validated
-    # without a Temporal environment, so it is parked. Today exactly one session is
-    # aggregated, which by design yields INCONCLUSIVE (never LNE) for a lone clean
-    # negative -- the conservative, safe behaviour. Session cap: MAX_SESSIONS.
-    def _case_verdict(
-        self,
-        prepared: PreparedCase | None,
-        rounds: list[RoundResult],
-        result: InvestigationResult,
-    ) -> Verdict:
-        """Thin orchestration: defer every decision to the pure aggregation."""
-        return _aggregate_case_verdict(prepared, rounds, result)

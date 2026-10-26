@@ -59,6 +59,9 @@ class ActivityScenario:
     outcomes: tuple[tuple[RoleOutcome, RoleOutcome], ...] = (
         (RoleOutcome.HELD, RoleOutcome.VIOLATION),
     )
+    # Outcomes for a later independent session (operation ids ".s<n>.r<i>");
+    # None replays ``outcomes`` there too.
+    later_session_outcomes: tuple[tuple[RoleOutcome, RoleOutcome], ...] | None = None
     block_prepare: bool = False
     pause_prepare: bool = False
     pause_produce: bool = False
@@ -196,9 +199,10 @@ class FakeActivities:
         else:
             round_suffix = request.operation_id.rsplit(".r", 1)[-1]
             round_index = int(round_suffix) - 1 if round_suffix.isdigit() else 0
-            control, adversarial = self.scenario.outcomes[
-                min(max(round_index, 0), len(self.scenario.outcomes) - 1)
-            ]
+            outcomes = self.scenario.outcomes
+            if ".s" in request.operation_id.removeprefix(request.run_id):
+                outcomes = self.scenario.later_session_outcomes or outcomes
+            control, adversarial = outcomes[min(max(round_index, 0), len(outcomes) - 1)]
         selected_source = (
             request.prepared.fixed_source if request.fixed else request.prepared.source
         )

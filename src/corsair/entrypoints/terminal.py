@@ -120,6 +120,12 @@ class Terminal:
             table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(value.get(key)))
         for item in value.get("rounds", []):
             observation = item.get("observation") or {}
+            session = item.get("session", 1)
+            name = (
+                f"Round {item['index']}"
+                if session == 1
+                else f"Session {session} round {item['index']}"
+            )
             for role in ("control", "adversarial"):
                 evidence = observation.get(role) or {}
                 detail = (
@@ -127,12 +133,12 @@ class Terminal:
                     f"exit={evidence.get('native_exit_code')} · "
                     f"coverage={evidence.get('covered_lines', [])}"
                 )
-                table.add_row(_text(f"Round {item['index']} {role}"), _text(detail))
+                table.add_row(_text(f"{name} {role}"), _text(detail))
             audit = (item.get("audit") or {}).get("review") or {}
-            table.add_row(_text(f"Round {item['index']} audit"), _text(audit.get("decision")))
+            table.add_row(_text(f"{name} audit"), _text(audit.get("decision")))
             usage = item["producer"]["usage"]
             table.add_row(
-                _text(f"Round {item['index']} producer"),
+                _text(f"{name} producer"),
                 _text(f"{usage['llm_calls']} LLM / {usage['tool_calls']} tool calls"),
             )
             feedback = item["producer"].get("feedback") or observation.get("feedback")
