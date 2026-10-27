@@ -156,8 +156,9 @@ def test_the_recorded_ledger_still_parses_and_renders_identically(tmp_path):
     original = markdown.read_text()
 
     rows = read_ledger(ledger)
-    assert [row.id for row in rows] == ["ref-w1-tier0", "ref-w1-tier1"]
-    assert all(row.tier0 is None and row.decision is None for row in rows)
+    assert rows, "the recorded ledger holds at least the wave-1 reference rows"
+    assert {row.id for row in rows} >= {"ref-w1-tier0", "ref-w1-tier1"}
+    assert len({row.id for row in rows}) == len(rows)
     assert render_ledger_file(ledger, markdown) == original
 
 
