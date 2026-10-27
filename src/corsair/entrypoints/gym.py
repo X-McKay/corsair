@@ -11,14 +11,18 @@ edit gets a new tag (and so a new configuration identity).
 Runs persist in one store shared by every worktree of the repository,
 ``<main checkout>/.runs/gym/``: ``store/`` holds the content-addressed blobs and operation
 records, ``runs/<run-id>/`` each run directory and ``reference/`` the reference scorecards,
-so a run outlives the worktree that produced it.
+so a run outlives the worktree that produced it. ``lock/`` holds the run lock: one live
+``gym run`` or ``gym verify`` at a time per gym root, because every live run shares one model
+endpoint and overlapping runs skew each other's timing and failures.
 """
 
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -26,9 +30,17 @@ import signal
 import socket
 import subprocess
 import time
-from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Mapping, Sequence
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, replace
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Generator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager, nullcontext
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -98,6 +110,12 @@ _QUEUE_SLUG_LENGTH = 60
 _RUN_SLUG_LENGTH = 20
 _SERVER_READY_SECONDS = 60.0
 _SERVER_STOP_SECONDS = 20.0
+# The run lock under the gym root.
+LOCK_DIR = "lock"
+LOCK_FILE = "holder.json"
+DEFAULT_LOCK_TIMEOUT = 2 * 60 * 60.0
+LOCK_POLL_SECONDS = 2.0
+LOCK_NOTICE_SECONDS = 60.0
 
 type ActivityComposer = Callable[[Settings], Activities]
 type BatchObserver = Callable[[WorkflowHandle[Any, list[BatchItem]]], Awaitable[list[BatchItem]]]
@@ -491,6 +509,309 @@ async def temporal_endpoint(address: str | None, log: Path) -> AsyncGenerator[st
         yield started
 
 
+# The shared-root run lock
+
+
+class GymLockTimeout(GymRefused):
+    """The run lock stayed held by a live process for the whole ``--lock-timeout``."""
+
+
+@dataclass(frozen=True)
+class LockHolder:
+    """Who holds the gym root's run lock: written once, atomically, by the acquirer."""
+
+    run_id: str
+    pid: int
+    host: str
+    branch: str
+    commit: str
+    tier: str
+    started_at: str
+    # Unique per acquisition, so a release never removes another holder's lock.
+    token: str
+
+    def record(self) -> dict[str, Any]:
+        """The holder for run.json and views; the token stays in the lock file."""
+        return {key: value for key, value in asdict(self).items() if key != "token"}
+
+    def held_seconds(self) -> float:
+        try:
+            started = datetime.fromisoformat(self.started_at)
+        except ValueError:
+            return 0.0
+        return max(0.0, (datetime.now(UTC) - started).total_seconds())
+
+
+# A holder record that cannot be read names no live process; it is reclaimed.
+_UNREADABLE = LockHolder("unreadable", 0, "", "unknown", "unknown", "unknown", "", "")
+
+
+def new_lock_holder(run_id: str, *, tier: str, branch: str, commit: str) -> LockHolder:
+    """This process as the holder of the lock for ``run_id``."""
+    return LockHolder(
+        run_id=run_id,
+        pid=os.getpid(),
+        host=socket.gethostname(),
+        branch=branch,
+        commit=commit,
+        tier=tier,
+        started_at=_now(),
+        token=uuid4().hex,
+    )
+
+
+def lock_file(gym_root: Path) -> Path:
+    """``<gym root>/lock/holder.json``: present exactly while the lock is held."""
+    return gym_root / LOCK_DIR / LOCK_FILE
+
+
+def _parse_holder(text: str) -> LockHolder:
+    try:
+        value = json.loads(text)
+        fields = {name: value[name] for name in LockHolder.__dataclass_fields__}
+    except (ValueError, TypeError, KeyError):
+        return _UNREADABLE
+    if not isinstance(fields["pid"], int) or not all(
+        isinstance(item, str) for name, item in fields.items() if name != "pid"
+    ):
+        return _UNREADABLE
+    return LockHolder(**fields)
+
+
+def read_lock(gym_root: Path) -> LockHolder | None:
+    """The current holder, or None when the lock is free. The file is published whole."""
+    try:
+        return _parse_holder(lock_file(gym_root).read_text())
+    except FileNotFoundError:
+        return None
+
+
+def pid_alive(pid: int) -> bool:
+    """Whether a process with this pid exists on this host."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # It exists but belongs to another user.
+    return True
+
+
+def _holder_alive(holder: LockHolder, alive: Callable[[int], bool]) -> bool | None:
+    """True or False for a holder on this host; None (never stale) for another host's."""
+    if holder.pid <= 0:
+        return False
+    if holder.host != socket.gethostname():
+        return None
+    return alive(holder.pid)
+
+
+@contextmanager
+def _lock_guard(gym_root: Path) -> Generator[Path]:
+    """Serialise check, reclaim and publish between processes; never held across an await."""
+    directory = gym_root / LOCK_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / ".guard").open("a") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        try:
+            yield lock_file(gym_root)
+        finally:
+            fcntl.flock(guard, fcntl.LOCK_UN)
+
+
+def _try_lock(
+    gym_root: Path, holder: LockHolder, alive: Callable[[int], bool]
+) -> tuple[LockHolder | None, LockHolder | None]:
+    """One attempt: ``(live holder blocking us or None when taken, stale holder reclaimed)``."""
+    with _lock_guard(gym_root) as path:
+        current = read_lock(gym_root)
+        reclaimed = None
+        if current is not None:
+            if _holder_alive(current, alive) is not False:
+                return current, None
+            path.unlink()
+            reclaimed = current
+            event(
+                "gym.lock_reclaimed",
+                level=logging.WARNING,
+                run_id=current.run_id,
+                message=f"reclaimed the gym lock from {current.run_id}: process {current.pid} "
+                f"on {current.host or 'an unknown host'} is gone",
+            )
+        temporary = path.with_name(f".write-{holder.token}")
+        temporary.write_text(json.dumps(asdict(holder), indent=2, sort_keys=True) + "\n")
+        try:
+            os.link(temporary, path)  # Fails rather than replaces when the name exists.
+        finally:
+            temporary.unlink()
+        return None, reclaimed
+
+
+def duration_text(seconds: float) -> str:
+    """``2h 00m 00s``, ``4m 05s`` or ``12s``."""
+    total = round(seconds)
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {secs:02d}s"
+    return f"{minutes}m {secs:02d}s" if minutes else f"{secs}s"
+
+
+def _holder_text(holder: LockHolder) -> str:
+    return (
+        f"{holder.run_id} ({holder.tier}, {holder.branch}@{holder.commit[:7]}, pid {holder.pid} "
+        f"on {holder.host or 'an unknown host'})"
+    )
+
+
+@dataclass(frozen=True)
+class LockWait:
+    """How a run came to hold the lock: whom it waited for, how long, what it reclaimed."""
+
+    holder: LockHolder
+    seconds: float
+    waited_for: tuple[LockHolder, ...] = ()
+    reclaimed: tuple[LockHolder, ...] = ()
+
+    def record(self) -> dict[str, Any]:
+        """``run.json``'s ``lock`` entry."""
+        return {
+            "used": True,
+            "holder_run_id": self.holder.run_id,
+            "waited": bool(self.waited_for),
+            "wait_seconds": round(self.seconds, 1),
+            "waited_for": [item.record() for item in self.waited_for],
+            "reclaimed": [item.record() for item in self.reclaimed],
+        }
+
+
+async def acquire_lock(
+    gym_root: Path,
+    holder: LockHolder,
+    *,
+    timeout: float,
+    alive: Callable[[int], bool] = pid_alive,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> LockWait:
+    """Take the gym root's run lock, waiting while a live process holds it.
+
+    A holder whose process is gone on this host is reclaimed with a logged notice. While a
+    live holder keeps it, one line names the holder when the wait starts and every minute
+    after; after ``timeout`` seconds the wait ends with ``GymLockTimeout`` and nothing else.
+    """
+    begun = clock()
+    waited_for: list[LockHolder] = []
+    reclaimed: list[LockHolder] = []
+    notice_at = begun
+    while True:
+        blocking, stale = _try_lock(gym_root, holder, alive)
+        if stale is not None:
+            reclaimed.append(stale)
+        if blocking is None:
+            return LockWait(holder, clock() - begun, tuple(waited_for), tuple(reclaimed))
+        if all(item.token != blocking.token for item in waited_for):
+            waited_for.append(blocking)
+        waited = clock() - begun
+        if waited >= timeout:
+            raise GymLockTimeout(
+                f"the gym lock under {gym_root / LOCK_DIR} is still held by "
+                f"{_holder_text(blocking)} after waiting {duration_text(waited)}; nothing was "
+                "started. Wait for that run, raise --lock-timeout, or, if that process no "
+                "longer runs, release it with `corsair gym lock release --force`."
+            )
+        if clock() >= notice_at:
+            event(
+                "gym.lock_waiting",
+                run_id=blocking.run_id,
+                seconds=round(waited),
+                message=f"waiting for the gym lock held by {blocking.run_id} "
+                f"({blocking.tier}, held {duration_text(blocking.held_seconds())}); waited "
+                f"{duration_text(waited)} of {duration_text(timeout)}",
+            )
+            notice_at += LOCK_NOTICE_SECONDS
+        await sleep(min(LOCK_POLL_SECONDS, timeout - waited))
+
+
+def release_lock(gym_root: Path, holder: LockHolder) -> bool:
+    """Remove the lock when ``holder`` still holds it; never another holder's."""
+    with _lock_guard(gym_root) as path:
+        current = read_lock(gym_root)
+        if current is not None and current.token == holder.token:
+            path.unlink()
+            return True
+    event(
+        "gym.lock_lost",
+        level=logging.WARNING,
+        run_id=holder.run_id,
+        message="the gym lock was released or taken by another process while this run held it",
+    )
+    return False
+
+
+def force_release(gym_root: Path) -> LockHolder | None:
+    """Remove the lock whoever holds it; return that holder (None when it was free)."""
+    with _lock_guard(gym_root) as path:
+        current = read_lock(gym_root)
+        if current is not None:
+            path.unlink()
+        return current
+
+
+@asynccontextmanager
+async def gym_lock(
+    gym_root: Path,
+    holder: LockHolder,
+    *,
+    timeout: float,
+    alive: Callable[[int], bool] = pid_alive,
+) -> AsyncGenerator[LockWait]:
+    """Hold the run lock for the block; released on success, failure and cancellation."""
+    wait = await acquire_lock(gym_root, holder, timeout=timeout, alive=alive)
+    try:
+        yield wait
+    finally:
+        release_lock(gym_root, holder)
+
+
+def lock_status(
+    gym_root: Path, *, alive: Callable[[int], bool] = pid_alive
+) -> dict[str, Any] | None:
+    """The holder with ``alive`` (None on another host) and ``elapsed_seconds``, or None."""
+    holder = read_lock(gym_root)
+    if holder is None:
+        return None
+    return {
+        **holder.record(),
+        "alive": _holder_alive(holder, alive),
+        "elapsed_seconds": round(holder.held_seconds(), 1),
+    }
+
+
+_LIVENESS = {True: "running", False: "process gone", None: "liveness unknown on another host"}
+
+
+def lock_line(status: Mapping[str, Any]) -> str:
+    """One code-owned line for a held lock, from ``lock_status``."""
+    return (
+        f"Gym lock: held by `{status['run_id']}` ({status['tier']}, "
+        f"{status['branch']}@{str(status['commit'])[:7]}, pid {status['pid']} on "
+        f"{status['host'] or 'an unknown host'}, {_LIVENESS[status['alive']]}) for "
+        f"{duration_text(status['elapsed_seconds'])}."
+    )
+
+
+def _lock_scope(
+    options: GymOptions, gym_root: Path, holder: LockHolder, held: LockWait | None
+) -> AbstractAsyncContextManager[LockWait | None]:
+    """The caller's lock when it already holds one, none with ``--no-lock``, else a new one."""
+    if held is not None:
+        return nullcontext(held)
+    if not options.lock:
+        return nullcontext(None)
+    return gym_lock(gym_root, holder, timeout=options.lock_timeout)
+
+
 # The run
 
 
@@ -508,6 +829,9 @@ class GymOptions:
     run_id: str | None = None
     # The command line that started the run, recorded in run.json (sanitized).
     invocation: tuple[str, ...] = ()
+    # The shared-root run lock; off only for scripted tests (``--no-lock``).
+    lock: bool = True
+    lock_timeout: float = DEFAULT_LOCK_TIMEOUT
 
 
 @dataclass(frozen=True)
@@ -601,8 +925,12 @@ def run_record(
     git: Mapping[str, object],
     budgets: Mapping[str, str] | None,
     sliced: bool,
+    lock: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
-    """``run.json``: safe metadata on how and where a run executed; never settings values."""
+    """``run.json``: safe metadata on how and where a run executed; never settings values.
+
+    ``lock`` records whether the run held the gym root's lock and whom it waited for.
+    """
     return {
         "schema_version": "corsair.gym-run/1",
         "run_id": run_id,
@@ -620,6 +948,7 @@ def run_record(
         "sliced": sliced,
         "budgets": None if budgets is None else dict(budgets),
         "temporal": {"existing": options.temporal_address is not None},
+        "lock": None if lock is None else dict(lock),
         "started_at": _now(),
     }
 
@@ -630,9 +959,14 @@ async def run_gym(
     root: Path,
     compose_activities: ActivityComposer = compose_worker_activities,
     observe: BatchObserver = wait_for_result,
+    held: LockWait | None = None,
 ) -> GymRun:
-    """Run one tier, write report, trajectories and scorecard, and return the run."""
-    started = time.monotonic()
+    """Run one tier, write report, trajectories and scorecard, and return the run.
+
+    The gym root's run lock is taken after the run is admitted and before any image build
+    or Temporal server, and released when the run ends; ``held`` is the lock a caller
+    (``verify``) already holds for this run.
+    """
     _, requests, _ = load_dataset(options.dataset)
     selected = select_requests(requests, cases=options.cases, languages=options.languages)
     sliced = bool(options.cases or options.languages)
@@ -644,65 +978,75 @@ async def run_gym(
     branch, commit = git_revision(root)
     git = {"branch": branch, "commit": commit, "dirty": git_dirty(root)}
     paths = gym_paths(root, options.settings)
-    images = gym_images(root, options.settings)
-    used = {language_of(request.case.recipe.kind) for request in selected}
-    refs = {language_of(kind): ref for kind, ref in images.items() if language_of(kind) in used}
-    image_ids = ensure_images(root, refs)
     run_id = options.run_id or new_run_id(options.dataset)
-    run_dir = options.out or paths.runs / run_id
-    record = run_record(
-        options,
-        run_id=run_id,
-        run_dir=run_dir,
-        paths=paths,
-        git=git,
-        budgets=None
-        if budgets is None
-        else {"source": str(budgets_path), "digest": budgets_digest(budgets)},
-        sliced=sliced,
-    )
-    _write_json(run_dir / RUN_FILE, record)
-    if budgets_path is not None:
-        (run_dir / BUDGETS_FILE).write_bytes(budgets_path.read_bytes())
-    batch = BatchRequest(
-        batch_id=run_id,
-        requests=selected,
-        repeats=options.repeats,
-        concurrency=options.concurrency,
-    )
-    event("gym.started", run_id=run_id, total=len(selected) * options.repeats)
-    async with temporal_endpoint(options.temporal_address, run_dir / "temporal.log") as address:
-        settings = gym_settings(
-            options.settings,
-            temporal_address=address,
-            task_queue=gym_task_queue(branch, commit),
-            images=images,
-            store=paths.store,
+    holder = new_lock_holder(run_id, tier=tier_name(options.dataset), branch=branch, commit=commit)
+    async with _lock_scope(options, paths.root, holder, held) as lock:
+        # Wall time starts once the lock is held; the wait is recorded on its own.
+        started = time.monotonic()
+        images = gym_images(root, options.settings)
+        used = {language_of(request.case.recipe.kind) for request in selected}
+        refs = {language_of(kind): ref for kind, ref in images.items() if language_of(kind) in used}
+        image_ids = ensure_images(root, refs)
+        run_dir = options.out or paths.runs / run_id
+        record = run_record(
+            options,
+            run_id=run_id,
+            run_dir=run_dir,
+            paths=paths,
+            git=git,
+            budgets=None
+            if budgets is None
+            else {"source": str(budgets_path), "digest": budgets_digest(budgets)},
+            sliced=sliced,
+            lock={"used": False} if lock is None else lock.record(),
         )
-        items = await execute_batch(settings, batch, compose_activities, observe)
-    run = RunContext(
-        run_id=run_id,
-        git_branch=branch,
-        git_commit=commit,
-        temporal_namespace=settings.temporal_namespace,
-        task_queue=settings.task_queue,
-        concurrency=options.concurrency,
-        image_ids=image_ids,
-    )
-    trajectories, scorecard = write_run_records(
-        run_dir,
-        options.dataset,
-        items,
-        ArtifactStore(settings.artifact_root),
-        run=run,
-        budgets=budgets,
-        sliced=sliced,
-    )
-    wall = time.monotonic() - started
-    _write_json(
-        run_dir / RUN_FILE,
-        {**record, "completed_at": _now(), "wall_seconds": round(wall, 1), "episodes": len(items)},
-    )
+        _write_json(run_dir / RUN_FILE, record)
+        if budgets_path is not None:
+            (run_dir / BUDGETS_FILE).write_bytes(budgets_path.read_bytes())
+        batch = BatchRequest(
+            batch_id=run_id,
+            requests=selected,
+            repeats=options.repeats,
+            concurrency=options.concurrency,
+        )
+        event("gym.started", run_id=run_id, total=len(selected) * options.repeats)
+        async with temporal_endpoint(options.temporal_address, run_dir / "temporal.log") as address:
+            settings = gym_settings(
+                options.settings,
+                temporal_address=address,
+                task_queue=gym_task_queue(branch, commit),
+                images=images,
+                store=paths.store,
+            )
+            items = await execute_batch(settings, batch, compose_activities, observe)
+        run = RunContext(
+            run_id=run_id,
+            git_branch=branch,
+            git_commit=commit,
+            temporal_namespace=settings.temporal_namespace,
+            task_queue=settings.task_queue,
+            concurrency=options.concurrency,
+            image_ids=image_ids,
+        )
+        trajectories, scorecard = write_run_records(
+            run_dir,
+            options.dataset,
+            items,
+            ArtifactStore(settings.artifact_root),
+            run=run,
+            budgets=budgets,
+            sliced=sliced,
+        )
+        wall = time.monotonic() - started
+        _write_json(
+            run_dir / RUN_FILE,
+            {
+                **record,
+                "completed_at": _now(),
+                "wall_seconds": round(wall, 1),
+                "episodes": len(items),
+            },
+        )
     event("gym.completed", run_id=run_id, seconds=round(wall, 1), total=len(trajectories))
     return GymRun(
         run_dir=run_dir,
@@ -780,8 +1124,9 @@ async def verify_candidate(
     """Run and gate tier0, then tier1 unless tier0 was rejected.
 
     Each tier is gated against ``<reference>/<tier>.json``; ``tiers`` maps ``tier0`` and
-    ``tier1``, in that order, to their manifests. The canonical ``VerifyRecord`` is
-    written to ``verdict.json`` under the gym root.
+    ``tier1``, in that order, to their manifests. The gym root's run lock is held once
+    across every tier. The canonical ``VerifyRecord`` is written to ``verdict.json`` under
+    the gym root.
     """
     if tuple(tiers) != VERIFY_TIERS:
         raise ValueError(f"verify runs exactly {', '.join(VERIFY_TIERS)}, in that order")
@@ -794,25 +1139,35 @@ async def verify_candidate(
     gates: dict[str, TierGate] = {}
     runs: dict[str, GymRun] = {}
     skipped: dict[str, SkipReason] = {name: "skipped_by_request" for name in tiers if name in skip}
-    for name in wanted:
-        if "tier0" in gates and gates["tier0"].gate.decision is GateDecision.REJECTED:
-            skipped[name] = "rejected_at_tier0"
-            continue
-        run = await run_gym(
-            replace(options, dataset=tiers[name], out=None, run_id=None),
-            root=root,
-            compose_activities=compose_activities,
-            observe=observe,
-        )
-        runs[name] = run
-        gates[name] = TierGate(
-            reference=str(references[name]),
-            scorecard=str(run.run_dir / SCORECARD_FILE),
-            run_dir=str(run.run_dir),
-            gate=gate(baselines[name], run.scorecard),
-        )
-        if on_gate is not None:
-            on_gate(name, gates[name], baselines[name], run)
+    verify_id = new_verify_id()
+    gym_root = gym_paths(root, options.settings).root
+    branch, commit = git_revision(root)
+    holder = new_lock_holder(verify_id, tier="+".join(wanted), branch=branch, commit=commit)
+    # One lock across every tier, so no other run lands between tier0 and tier1.
+    async with _lock_scope(options, gym_root, holder, None) as held:
+        for name in wanted:
+            if "tier0" in gates and gates["tier0"].gate.decision is GateDecision.REJECTED:
+                skipped[name] = "rejected_at_tier0"
+                continue
+            run = await run_gym(
+                replace(options, dataset=tiers[name], out=None, run_id=None),
+                root=root,
+                compose_activities=compose_activities,
+                observe=observe,
+                held=held,
+            )
+            # Only the first tier waited; later tiers run under the lock already held.
+            if held is not None:
+                held = replace(held, seconds=0.0, waited_for=(), reclaimed=())
+            runs[name] = run
+            gates[name] = TierGate(
+                reference=str(references[name]),
+                scorecard=str(run.run_dir / SCORECARD_FILE),
+                run_dir=str(run.run_dir),
+                gate=gate(baselines[name], run.scorecard),
+            )
+            if on_gate is not None:
+                on_gate(name, gates[name], baselines[name], run)
     # REJECTED when any gate rejected, else INCOMPARABLE when any was, else ACCEPTED.
     decision = chain_decision([item.gate.decision for item in gates.values()])
     record = verify_record(
@@ -823,8 +1178,7 @@ async def verify_candidate(
         reference=reference,
         invocation=options.invocation,
     )
-    verify_dir = gym_paths(root, options.settings).root / "verify" / new_verify_id()
-    verdict_path = verify_dir / VERDICT_FILE
+    verdict_path = gym_root / "verify" / verify_id / VERDICT_FILE
     _write_json(verdict_path, record.model_dump(mode="json"))
     return Verification(decision, record, runs, verdict_path)
 

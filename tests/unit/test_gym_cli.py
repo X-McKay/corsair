@@ -366,8 +366,8 @@ def _fake_runs(monkeypatch, tmp_path: Path, cards: dict[str, dict[str, list[bool
     """Replace the runner: each tier returns a stored scorecard; the tiers run are recorded."""
     ran: list[str] = []
 
-    async def run_gym(options, *, root, compose_activities, observe):
-        del root, compose_activities, observe
+    async def run_gym(options, *, root, compose_activities, observe, held=None):
+        del root, compose_activities, observe, held
         tier = gym.tier_name(options.dataset)
         ran.append(tier)
         run_dir = tmp_path / "runs" / tier
@@ -492,3 +492,87 @@ async def test_a_verify_record_appends_to_the_ledger_and_renders(tmp_path, capsy
 def test_verify_defaults_to_the_standard_protocol():
     args = _arguments("gym", "verify")
     assert (args.reference, args.repeats, args.concurrency, args.skip_tier1) == (None, 3, 2, False)
+
+
+# The run lock
+
+
+def test_run_and_verify_take_the_lock_by_default_with_a_two_hour_timeout():
+    for argv in (("gym", "run", "tier0"), ("gym", "verify")):
+        args = _arguments(*argv)
+        assert (args.no_lock, args.lock_timeout) == (False, gym.DEFAULT_LOCK_TIMEOUT)
+    args = _arguments("gym", "run", "tier0", "--no-lock", "--lock-timeout", "30m")
+    assert (args.no_lock, args.lock_timeout) == (True, 1800.0)
+    assert _arguments("gym", "verify", "--lock-timeout", "90").lock_timeout == 90.0
+    assert _arguments("gym", "verify", "--lock-timeout", "1.5h").lock_timeout == 5400.0
+
+
+@pytest.mark.parametrize("value", ["soon", "2d", "-1h", ""])
+def test_a_malformed_lock_timeout_exits_with_usage(capsys, value):
+    with pytest.raises(SystemExit) as error:
+        cli.parser().parse_args(["gym", "run", "tier0", "--lock-timeout", value])
+    assert error.value.code == 2
+    assert "argument --lock-timeout" in capsys.readouterr().err
+
+
+def test_no_lock_says_it_is_for_scripted_tests_only(capsys):
+    with pytest.raises(SystemExit):
+        cli.parser().parse_args(["gym", "run", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "--no-lock Scripted tests only" in text
+
+
+def _held(root: Path, run_id: str = "gym-tier1-20261027t010000-aaaaaa") -> gym.LockHolder:
+    holder = gym.new_lock_holder(run_id, tier="tier1", branch="gym/h1", commit="c" * 40)
+    path = gym.lock_file(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({**holder.record(), "token": holder.token}))
+    return holder
+
+
+@pytest.mark.asyncio
+async def test_lock_status_and_a_forced_release_print_the_holder(tmp_path, capsys):
+    root = ["--root", str(tmp_path)]
+    assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
+    assert capsys.readouterr().out == f"Gym lock under `{tmp_path / 'lock'}` is free.\n"
+    assert await _run(_arguments("gym", "lock", "status", *root)) == 0
+    assert json.loads(capsys.readouterr().out) == {"held": False, "holder": None}
+
+    holder = _held(tmp_path)
+    assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert text.startswith(f"Gym lock: held by `{holder.run_id}` (tier1, gym/h1@ccccccc, pid ")
+    assert ", running) for " in text
+    assert await _run(_arguments("gym", "lock", "status", *root)) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["held"] is True and status["holder"]["run_id"] == holder.run_id
+    assert "token" not in status["holder"]
+
+    with pytest.raises(gym.GymRefused, match=f"held by `{holder.run_id}`.*pass --force"):
+        await _run(_arguments("gym", "lock", "release", *root))
+    assert gym.read_lock(tmp_path) == holder
+    release = ["gym", "lock", "release", "--force", *root]
+    assert await _run(_arguments(*release, format="markdown")) == 0
+    assert capsys.readouterr().out.startswith(f"Released the gym lock held by `{holder.run_id}`")
+    assert gym.read_lock(tmp_path) is None
+    assert await _run(_arguments(*release)) == 0
+    assert json.loads(capsys.readouterr().out) == {"released": False, "holder": None}
+
+
+@pytest.mark.asyncio
+async def test_runs_shows_a_held_lock_above_the_table(tmp_path, capsys):
+    root = tmp_path / "gym"
+    _stored_run(root, "gym-tier0-20261027t010807-479fc5", BASELINE)
+    args = ["gym", "runs", "--root", str(root)]
+    assert await _run(_arguments(*args, format="markdown")) == 0
+    assert capsys.readouterr().out.startswith("## Gym runs under")
+
+    holder = _held(root)
+    assert await _run(_arguments(*args, format="markdown")) == 0
+    first, blank, heading = capsys.readouterr().out.splitlines()[:3]
+    assert first.startswith(f"Gym lock: held by `{holder.run_id}` (tier1,")
+    assert (blank, heading) == ("", f"## Gym runs under `{root}`")
+    assert await _run(_arguments(*args)) == 0
+    assert [row["run_id"] for row in json.loads(capsys.readouterr().out)] == [
+        "gym-tier0-20261027t010807-479fc5"
+    ]
