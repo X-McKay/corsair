@@ -12,7 +12,7 @@ One wave, driven by CLI exit codes so no harness reproduces a judgment. Design a
 - **Orchestrator** (one per wave): writes briefs, runs gates, merges, captures fixtures, appends the ledger. Only this role writes `evals/experiments/ledger.jsonl`, `LEDGER.md` and the plan record.
 - **Auditor** (read/run only): runs tiers, clusters `failure_stops`, proposes 2 to 3 hypotheses with disjoint file scopes after checking the rejected table. The only role besides the orchestrator that sees tier2 (holdout) per-case results.
 - **Experimenter** (one per hypothesis, own worktree cut from the integration branch): one bounded change in its exclusive file scope; never edits oracles, fixtures, manifests, budgets, the ledger or the plan; never sees tier2.
-- **Case miner** (separate wave from prompt tuning): proposes `request.json` and `Oracle` files through intake; the owner reviews every oracle before it is frozen into a tier.
+- **Case miner** (separate wave from prompt tuning): proposes `request.json` and `Oracle` files through intake; the owner reviews every oracle before it is frozen into a tier. `dataset freeze` writes the review record (`corsair.dataset-review/1`: decisions, reviewers, reasons, frozen oracle digests) to `evals/datasets/reviews/<manifest stem>/`; commit it with the manifest, since the sheet stays in the ignored draft directory. A stand-in reviewer writes `pending owner audit` in the reviewer column, and `just dataset-audit` lists those rows (and `unreviewed` ones) for the owner. Remove a case miner's worktree only after its review record is tracked on the integration branch ([guide](../../../docs/guides/evaluation-gym.md#review-records-and-the-audit)).
 
 ## Wave
 

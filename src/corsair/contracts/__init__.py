@@ -33,8 +33,12 @@ from .evaluation import BatchItem as BatchItem
 from .evaluation import BatchRequest as BatchRequest
 from .evaluation import Dataset as Dataset
 from .evaluation import DatasetEntry as DatasetEntry
+from .evaluation import DatasetReview as DatasetReview
+from .evaluation import DatasetReviewEntry as DatasetReviewEntry
 from .evaluation import MatchKind as MatchKind
 from .evaluation import Oracle as Oracle
+from .evaluation import ReviewDecision as ReviewDecision
+from .evaluation import ReviewLicence as ReviewLicence
 from .evidence import EvidenceInput as EvidenceInput
 from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation

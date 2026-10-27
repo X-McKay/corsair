@@ -1,0 +1,124 @@
+{
+  "schema_version": "corsair.dataset-review/1",
+  "manifest": "evals/datasets/gym-tier2.json",
+  "new_manifest_digest": "2080d5129ef4a372996c046c951e0518d7bf6556088b10f8ff54914f90baa6f8",
+  "draft_id": "c2-secbenchjs",
+  "staged": true,
+  "split": "held_out",
+  "reconstructed": true,
+  "reconstructed_from": "orchestrator wave-4 agent reports; sheets lost with the agent worktrees. Freeze commit ca549c01 (c2, merged 81488dfb): SecBench.js staged drafts imported into evals/datasets/corpus/secbenchjs with licences retained; tier1 rows in split chain, tier2 rows in split held_out; manifest digests from the manifests before and after that commit. Draft, sheet and reviewed-oracle digests and the staging root were not recoverable. gym-tier2.json did not exist before the freeze. The nine rejected rows are the rest of the 18 staged rows (kind from the staged batch; licence files in both trees); which of the two drafts each rejection belonged to was not recoverable.",
+  "entries": [
+    {
+      "case_id": "sbj-javascript-deep-extend",
+      "family": "sbj-javascript-deep-extend",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-deep-extend"
+    },
+    {
+      "case_id": "sbj-javascript-json-schema",
+      "family": "sbj-javascript-json-schema",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-json-schema"
+    },
+    {
+      "case_id": "sbj-javascript-nestie",
+      "family": "sbj-javascript-nestie",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-nestie"
+    },
+    {
+      "case_id": "sbj-javascript-vega-util",
+      "family": "sbj-javascript-vega-util",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-vega-util"
+    },
+    {
+      "case_id": "sbj-javascript-dset",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: the key path is not the last argument",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-keyget",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: the key path is not the last argument",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-libnested",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: the key path is not the last argument",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-strikeentco-set",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: the key path is not the last argument",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-extend-merge",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: polluting input first, flag last",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-putil-merge",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: needs a trailing options argument after the payload",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-property-expr",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "recipe shape: the sink runs in a returned closure",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-keyd",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "sink is an instance method, not an export",
+      "licence": "retained"
+    },
+    {
+      "case_id": "sbj-javascript-json-ptr",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "fixed tree lacks index.js; sink is an inner function",
+      "licence": "retained"
+    }
+  ]
+}

@@ -85,6 +85,9 @@ class CliArguments(argparse.Namespace):
     against: list[str]
     import_into: str | None
     allow_noassertion: bool
+    record_review: str | None
+    manifests: list[str]
+    reviews: str | None
     agent_command: str
     role: Literal["producer", "auditor"]
     round: int
@@ -624,6 +627,7 @@ async def _handle_dataset_freeze(args: CliArguments, ui: Terminal) -> int:
         against=[Path(path) for path in args.against],
         import_into=Path(args.import_into) if args.import_into else None,
         allow_noassertion=args.allow_noassertion,
+        record_review=Path(args.record_review) if args.record_review else None,
     )
     ui.emit(result)
     if result["refusals"]:
@@ -646,6 +650,17 @@ async def _handle_dataset_freeze(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+async def _handle_dataset_audit(args: CliArguments, ui: Terminal) -> int:
+    """List every manifest row with its latest review record; always exit 0."""
+    from corsair.evaluation.reviews import audit_manifests
+
+    manifests = [Path(path) for path in args.manifests] or sorted(
+        Path("evals/datasets").glob("gym-tier*.json")
+    )
+    ui.emit(audit_manifests(manifests, Path(args.reviews) if args.reviews else None))
+    return 0
+
+
 async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     """Dispatch one ``corsair dataset`` subcommand."""
     if args.dataset_command == "validate":
@@ -658,6 +673,8 @@ async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
         return await _handle_dataset_draft(args, ui)
     if args.dataset_command == "freeze":
         return await _handle_dataset_freeze(args, ui)
+    if args.dataset_command == "audit":
+        return await _handle_dataset_audit(args, ui)
     raise ValueError("Unknown dataset command")
 
 
@@ -1410,7 +1427,7 @@ def parser() -> argparse.ArgumentParser:
         "no model or container",
         "dataset": (
             "Frozen dataset tools: validate offline; refreeze stale digests; "
-            "replay-candidates natively in Docker; draft and freeze reviewed intake"
+            "replay-candidates natively in Docker; draft, freeze and audit reviewed intake"
         ),
         "agent": "Inspect agent roles offline; no model provider, target or services",
         "gym": "Evaluation gym: run a frozen tier in the corsair-gym namespace, score, gate, "
@@ -1559,6 +1576,29 @@ def parser() -> argparse.ArgumentParser:
         "--allow-noassertion",
         action="store_true",
         help="Import a tree without a licence file, recording licence NOASSERTION",
+    )
+    freeze.add_argument(
+        "--record-review",
+        metavar="DIR",
+        help="Directory for the review record <DIR>/<manifest stem>/<draft>-<split>.json "
+        "(default: reviews/ beside the manifest); the record is always written",
+    )
+    audit_help = (
+        "List every manifest row with its latest review record; flag unreviewed rows and "
+        "pending owner audits; always exit 0"
+    )
+    audit = datasets.add_parser("audit", help=audit_help, description=audit_help)
+    _presentation_options(audit)
+    audit.add_argument(
+        "manifests",
+        nargs="*",
+        metavar="MANIFEST",
+        help="Dataset manifest JSON (default evals/datasets/gym-tier*.json)",
+    )
+    audit.add_argument(
+        "--reviews",
+        metavar="DIR",
+        help="Review records directory (default: reviews/ beside each manifest)",
     )
     for name in ("report", "compare"):
         commands[name].add_argument(
