@@ -44,6 +44,16 @@ def test_docs_checker_reports_missing_local_target(tmp_path: Path):
     assert "README.md: docs/missing.md: missing target" in result.stderr
 
 
+def test_docs_checker_reports_merge_conflict_markers(tmp_path: Path):
+    # A diff3 base marker survived one merge; a setext underline is not a marker.
+    (tmp_path / "CHANGELOG.md").write_text("Title\n=======\n\n- one\n||||||| ddbc0641\n- two\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 1
+    assert result.stderr == "CHANGELOG.md: line 5: merge conflict marker\n"
+
+
 def test_docs_checker_reports_missing_heading_anchor(tmp_path: Path):
     (tmp_path / "README.md").write_text("# Project\n\n[Guide](guide.md#not-here)\n")
     (tmp_path / "guide.md").write_text("# Guide\n")

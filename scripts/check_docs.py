@@ -38,6 +38,9 @@ HTML_ANCHOR_PATTERN = re.compile(
     re.IGNORECASE,
 )
 HEADING_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+# A merge conflict marker left in maintained Markdown; a bare ``=======`` is a setext
+# heading underline, so only the three unambiguous marker shapes are reported.
+CONFLICT_MARKER_PATTERN = re.compile(r"^(<<<<<<< |>>>>>>> |\|\|\|\|\|\|\| )")
 
 
 @dataclass(frozen=True, order=True)
@@ -168,9 +171,11 @@ def check(root: Path) -> list[Issue]:
     issues: list[Issue] = []
     for source in markdown_files(root):
         relative_source = source.relative_to(root).as_posix()
-        for match in LINK_PATTERN.finditer(
-            "\n".join(prose_lines(source.read_text(encoding="utf-8")))
-        ):
+        markdown = source.read_text(encoding="utf-8")
+        for number, line in enumerate(markdown.splitlines(), start=1):
+            if CONFLICT_MARKER_PATTERN.match(line):
+                issues.append(Issue(relative_source, f"line {number}", "merge conflict marker"))
+        for match in LINK_PATTERN.finditer("\n".join(prose_lines(markdown))):
             destination = destination_url(match.group("destination"))
             reference = local_reference(destination)
             if reference is None:
