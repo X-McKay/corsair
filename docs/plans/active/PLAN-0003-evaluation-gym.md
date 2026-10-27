@@ -180,8 +180,10 @@ content-addressed tags and cannot contaminate parallel runs.
 
 ## Owner decisions still open
 
-1. Integration branch and publication: accepted branches merge locally into `gym/loop` (cut from `main`); pushing or
-   opening a PR to `main` happens only on explicit instruction per wave.
+1. Integration branch and publication: accepted branches merge locally into `gym/loop` (cut from `main`). On
+   2026-10-27 the owner instructed the push: `gym/loop` is on `origin` and PR #210 to `main` is open; later waves
+   push to the same branch. Corpus decisions made by the orchestrator under that instruction are marked
+   `pending owner audit` in the review sheets and listed in the record.
 2. Whether the gate tolerance (majority-of-3) is acceptable, or a stricter paired rule is wanted at higher repeat counts.
 
 ## Record
@@ -564,3 +566,9 @@ content-addressed tags and cannot contaminate parallel runs.
   `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` 64 passed, 1 skipped (long probe). Of the 18 staged
   JavaScript rows: 4 bind by name, 7 now bind with the marker (recipe authoring decides the marker per row), 7 remain
   unbindable (5 not exported by name, 2 UMD factories). Sourcing wave closed pending owner review of both sheets.
+- 2026-10-27 published: `gym/loop` pushed at baec5990 and PR #210 opened against `main` (owner instruction). Wave 4
+  launched in parallel worktrees from baec5990: c1 (local sibling rows into tier1 through the reviewed intake,
+  orchestrator decisions pending owner audit), c2 (SecBench.js rows into a new held-out `gym-tier2.json` with
+  imported licensed trees and a provenance code), s12 (noise band record and an INCONCLUSIVE gate verdict for deltas
+  inside the band), and an auditor pass over the stored tier1 runs to rank the next behavioural hypotheses. The
+  live route is idle until tier1 changes: the next reference is taken on the enlarged tier1, twice, to seed the band.
