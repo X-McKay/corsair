@@ -535,3 +535,13 @@ content-addressed tags and cannot contaminate parallel runs.
   rows under ZPL-2.1, python-libnmap) need an operator wrapper or carry CPython 3.12 risk. Shortlist of 10 recorded.
   Conclusion so far: public datasets feed the existing kinds only through JavaScript prototype pollution in volume;
   Python yields single digits; C, Java, Ruby and Perl need new kinds (owner rubrics).
+- 2026-10-27 JavaScript external staging (SecBench.js pointers at 5d362353, no licence file, metadata only; npm
+  tarballs verified against `dist.integrity`; nothing executed): 193 entries → 121 with a fixed version → 100 with a
+  parsable sink → 58 dependency-free CommonJS → 24 ranked → 18 with a licence file in both versions (MIT 16,
+  BSD-3-Clause 1, AFL-2.1-or-BSD-3-Clause 1; six excluded for no licence file). Staged under
+  `.work/intake/external/secbenchjs/` (licence index, SOURCE.json, registry manifests, trees) and
+  `.work/intake/wave3-js/chain/javascript/<name>/` (18 case.json/input.json; locations from the sink field; the
+  symbol is a regex guess flagged for review). Binding facts: 7 rows export the function as the module itself,
+  which `driver.mjs` (`require(module_file)[function]`) cannot find by name; several are path setters whose payload is
+  not the last argument (recipe shape; authoring). Drafting waits for s11 (`draft --source-root`); provenance will
+  read `unk` unless a code is added. Backfill from ranks 25–49 possible.
