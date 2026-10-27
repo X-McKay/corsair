@@ -211,3 +211,26 @@ content-addressed tags and cannot contaminate parallel runs.
   with a reason; kernel cases are replayed before being written and never overwrite. On `gym/loop` after both merges:
   `just check` exit 0 (after sorting re-exports, 43de2bc6), `just -- test -q -W error` 1124 passed, 107 deselected.
   Docker, Temporal and live gates not run for WP2 (offline scope).
+- 2026-10-27 WP3 merged (4915df02, branch `gym/wp3-runner` c7cb1371): `entrypoints/gym.py`, `corsair gym
+  run|score|gate|replay|capture|export-grpo|budgets|images|ledger`, content-addressed image tags (sha256 over the
+  working-tree bytes of `deploy/<lang>/` and the language's driver directory, first 7 hex), `Settings.identity`
+  without transport/storage fields (`TRANSPORT_FIELDS`), `evals/datasets/gym-tier0.json` (digest 97fc4873…7501, 6
+  cases) and `gym-tier1.json` (digest ec8cd985…bd17, 15 cases), `docs/guides/evaluation-gym.md`, just recipes
+  `images-gym`, `gym-run`, `gym-gate`, `gym-replay`, `gym-capture`, `gym-ledger`. Worktree gates: `just -- test -q -W
+  error` 1179 passed, 109 deselected, 0 warnings; `just check` exit 0; `just -- test-temporal -q -W error` 55 passed,
+  11 skipped (docker-marked without CORSAIR_TEST_DOCKER), 109 s; `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W
+  error` 59 passed, 1 skipped (long-probe opt-in), 103 s; `dataset validate` both tiers exit 0; `just build` ok.
+  Runner integration test (scripted inference, real ephemeral Temporal, real Docker): server starts and stops,
+  workflow in namespace `corsair-gym` only, queue `gym-<branch-slug>-<sha7>`, three files written, `sliced` with
+  `--case`, refusal without the namespace. Live production path `just -- gym-run tier0 --repeats 1` on c7cb1371,
+  `hosted_vllm/Qwen3.6-35B-A3B-NVFP4`, concurrency 2, 181 s: 6/6 `EXPLOIT_DEMONSTRATED` in one round, no failure
+  stops, J 1.500, macro effective tokens 28874, per-language effective tokens python 20309, javascript 30242, ruby
+  28355, java 21151, perl 37844, c 35342; agent p50 seconds 41.1 to 79.6 (sandbox seconds unknown until WP1b);
+  repeats 1 so gate-INCOMPARABLE by design. Image ids equal to the `:0.1` ids (BuildKit cache hit, no from-scratch
+  rebuild). That run directory lived in the WP3 worktree and was removed with it; later runs use the `gym/loop`
+  worktree's `.runs/gym/`. Deviations: `corsair gym images` added; gym commands default to `.state/settings.json` and
+  to `evals/experiments/budgets.json` when present (not created yet); `gym run` refuses `--concurrency` above
+  `max_concurrent_activities`; the row-scoring loop is duplicated as `gym.score_batch` (dedupe candidate with
+  `_handle_eval`). Not run: tier1, 3-repeat runs, no-cache image rebuild, `--temporal-address` success path, wheel
+  install outside the checkout. On `gym/loop` after the merge: `just check` exit 0, `just -- test -q -W error` 1179
+  passed, 109 deselected.
