@@ -43,6 +43,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | h4 | accuracy | `gym/h4-probe-error-classification@0b1b600` | — | — | — | — | rejected | Premise false: raw receipts show the bound line covered in 19 of 20 mappable adversarial-ERROR episodes; the not-executed picture came from the verifier error path discarding receipt coverage. The narrow rule is a no-op; a wider rule (target-side exception outside allowed exceptions becomes INVALID) is an evidence-policy ruling for the owner |
 | h2a | efficiency | `gym/h2a-decision-shape@873a8c5` | ACCEPTED (objective_below_threshold) | REJECTED (language_regressed, objective_below_threshold; regressed: python, ruby) | -0.111 / -0.600 | 0.974 / 0.985 | rejected | Validation retries 16 to 4 (tier0) and 41 to 17 (tier1) but tokens only -2.6% / -1.5%; tier1 regressed python (provider_max_tokens 2 to 5) and ruby (2 of 3 execution_error, evidence_unverified); J is dominated by target-side exception ERRORs and reasoning-cap exhaustion, both prerequisites |
+| s7 | dx | `gym/s7-verify-score-nits@890616e` | — | — | — | — | merged `6c4228b` | Offline; 9 tests; gates on gym/loop after merge: check clean, 1345 tests, Docker 61 passed |
 
 ## Rejected ideas (do not retry without new evidence)
 

@@ -420,3 +420,8 @@ content-addressed tags and cannot contaminate parallel runs.
   Wave-2 state: h4 premise false (owner ruling pending on target-side exceptions), h2a rejected; the next
   behavioural experiments wait on the owner's two rulings (evidence policy for target-side exceptions; the
   verifier's coverage discard on ERROR), because J is dominated by those episodes in every run so far.
+- 2026-10-27 s7 merged (6c4228b8, 890616e9): `verify` writes its `VERDICT:` line to stderr in every format;
+  `score` takes the run context from `run.json`, else the scorecard beside the report, else `--run-id`/
+  `--git-commit`/`--git-branch`, else warns; recovers `run.json` for imported runs; `gym run` stores the run block in
+  `run.json`. Gates on `gym/loop` at 6c4228b8: `just check` exit 0; `just -- test -q -W error` 1345 passed, 113
+  deselected; `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` 61 passed, 1 skipped.
