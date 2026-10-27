@@ -629,3 +629,14 @@ content-addressed tags and cannot contaminate parallel runs.
   the new-corpus references (tier1 twice, tier2 once) are queued from `ref-494f2523`. Gates at 1c698fb4: check
   exit 0, 1544 passed, 116 deselected; Docker suite at af03912d 64 passed, 1 skipped; wheel at af03912d installs
   outside the checkout and loads its packaged skills, instructions and gym modules.
+- 2026-10-27 h6 rejected (run 4b2307 vs ref-w4-tier1): the producer now proposes on chain-python-cmdi-a in every
+  round-1 attempt, but the auditor rejects the pair on R1 in 2 of 3 and `references/command-sentinel.md` still tells
+  it to abstain, so the case stays 0/3; python fell 8/11 → 6/11 (adversarial02 reached the output cap after "even
+  if defended"; safety02 target exceptions); the +0.46 J was ruby flipping 0 → 1 on one case. Lesson: the
+  abstention rule lives in the per-kind reference text and the R1 rubric, not step 7; and a one-case language can
+  outweigh a two-case Python regression in J. Merged s15 (run pinning, 91b5ece5) and s16 (decoding block in the
+  configuration identity, b261324f; unset keeps every recorded identity; the route accepts temperature 0 and seed
+  7). Owner question open: whether production and the gym share greedy decoding. Launched from the detached
+  worktree `ref-greedy-b261324f` (settings plus `models.decoding = {temperature: 0, seed: 7}`, config identity
+  334e2547…): two tier1 runs on the 21-row corpus to measure the greedy band against the sampled band. s17 (gate
+  decides on languages with ≥ 3 cases, paired per-case outcomes) in progress.
