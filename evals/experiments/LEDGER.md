@@ -31,6 +31,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | s3 | dx | `gym/s3-family-check@b27b8d0` | — | — | — | — | merged `46fcaa6` | Offline; 45 tests; stricter rules surface no violation in the checked-in manifests; gym tiers checked as a pair |
 | s1 | dx | `gym/s1-runner-streamline@74910d1` | — | — | — | — | merged `ce197d5` | Offline plus scripted Temporal/Docker; rescoring both references identical; verify record reconciled to the VerifyRecord contract in a73a8ebc |
 | s4 | dx | `gym/s4-dataset-intake-draft@875db9d` | — | — | — | — | merged `c88ec3f` | Offline; 25 tests; xxe pair drafted in scratch only; proposed oracles are wide by design and need owner review before any tier |
+| h2 | efficiency | `gym/h2-producer-decisiveness@a41fed0` | ACCEPTED | REJECTED (language_regressed, objective_below_threshold; regressed: java, perl, python) | +0.097 / -1.039 | 0.640 / 0.785 | inconclusive | tier0 ACCEPTED (-36% tokens, J +0.097); tier1 REJECTED but java 3/3 and perl 1/3 failed on activity heartbeat timeouts while h1 overlapped (sliced re-run 6/6); python provider_max_tokens rose 2 to 6; clean tier1 re-run pending; the decision-shape sentence alone removed 16 of 17 validation retries on tier0 |
 
 ## Rejected ideas (do not retry without new evidence)
 

@@ -332,3 +332,17 @@ content-addressed tags and cannot contaminate parallel runs.
   runs and the reference scorecards were copied (no-clobber) into the shared store `/home/al/git/corsair/.runs/gym/`.
   The s2 test pinning the recorded ledger's row ids was loosened to parse-and-byte-identical-render (3a854c52).
   Protocol change: experimenters now run `just -- gym-verify <reference>`; the skill's step 3 says so.
+- 2026-10-27 h2 (efficiency, `gym/h2-producer-decisiveness` a41fed02; new producer capability identity, prompt digest
+  29624ad8 → cd7f1df2; scorecard identity digests did not change because prompts and skills are outside
+  `Settings.identity`: gap recorded for s6). Diagnosis: most producer episodes spent one extra model call on a
+  `set_model_response` validation retry (a top-level `reason` that `ProducerDecision` rejects); reference tier0 had 16
+  retries in 18 episodes, tier1 36 in 45. Change: one decision-shape sentence in `system.md` plus kind-neutral stop
+  criteria in the source-grounding skill (+283 B). `eval-agent producer-expanded --repeats 1`: 2/3 → 3/3, llm_calls
+  5 → 3, effective tokens 39,465 → 24,964. tier0 #1 (57ba4e99) REJECTED on ruby aim misses; tier0 #2 (a41fed02)
+  ACCEPTED: J 1.455 → 1.553, tokens 37,512 → 23,999, p50 76.2 → 64.8 s, retries 16 → 1. tier1 REJECTED: J 1.403 →
+  0.363, java 1.0 → 0.0 and perl 1.0 → 0.0 on `evidence_not_run` + `execution_error` "activity Heartbeat timeout"
+  while h1's runs overlapped the endpoint (a sliced java+perl re-run passed 6/6, INCOMPARABLE by design); python 0.8
+  → 0.7 with `provider_max_tokens` 2 → 6 (the h1 failure mode); tokens −21.5 %, thought tokens flat (saving comes
+  from fewer calls). Decision: inconclusive; clean tier1 re-run after h1 finishes, then either accept or split the
+  decision-shape sentence into its own experiment. Lessons: live tier runs must not overlap (s5: run lock in the
+  shared store); operational stops must be visible on the scorecard and the gate (s6).
