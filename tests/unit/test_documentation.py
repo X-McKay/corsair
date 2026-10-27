@@ -78,6 +78,22 @@ def test_docs_checker_ignores_private_tool_configuration_markdown(tmp_path: Path
     assert result.returncode == 0, result.stderr
 
 
+def test_docs_checker_skips_imported_package_trees_beside_their_provenance(tmp_path: Path):
+    """An imported corpus case (``provenance.json`` beside its ``source``/``fixed`` trees)
+    holds upstream package bytes frozen by digest; its Markdown is not maintained docs."""
+    case = tmp_path / "evals/datasets/corpus/secbenchjs/sbj-javascript-demo"
+    (case / "source").mkdir(parents=True)
+    (case / "provenance.json").write_text("{}\n")
+    (case / "source/README.md").write_text("[Upstream](../../issues/new)\n")
+    (tmp_path / "evals/datasets/corpus/SOURCE.md").write_text("[Missing](absent.md)\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 1
+    assert "SOURCE.md: absent.md" in result.stderr + result.stdout
+    assert "issues/new" not in result.stderr + result.stdout
+
+
 def test_public_skills_have_unique_matching_frontmatter_and_checked_links():
     names: list[str] = []
     for skill_name in PUBLIC_SKILL_NAMES:
