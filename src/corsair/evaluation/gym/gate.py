@@ -54,6 +54,17 @@ compared by its majority outcome (``pass_to_fail``, ``fail_to_pass``, ``stable_p
 rejects with ``paired_regression`` when, among the deciding languages, more cases went
 from pass to fail than from fail to pass. With a band, a flip in a language whose band is
 a whole case (±1.0) is noise and never counts.
+
+Slice screens (``slice=True``): a sliced candidate (``gym run --case``) is gated against
+an unsliced baseline, or one sliced to exactly the same cases, on the candidate's cases
+only, by their paired majority outcomes alone. It is REJECTED with ``slice_regressed``
+when a slice case went from pass to fail outside the noise band and with
+``slice_not_improved`` when none went from fail to pass outside it; otherwise ACCEPTED,
+which is a screen for the full tier run and never an acceptance. Different datasets or
+budgets, too few repeats on either side, a band of another dataset, budgets or baseline
+repeat count, and a slice the baseline did not score (``slice_mismatch``) are INCOMPARABLE.
+J, macro accuracy, tokens and language deltas are recomputed over the slice and reported;
+they never decide, and neither does unknown token usage.
 """
 
 from collections import Counter
@@ -76,7 +87,7 @@ from corsair.contracts import (
     Scorecard,
     Trajectory,
 )
-from corsair.evaluation.gym.scoring import case_outcomes, objective_terms
+from corsair.evaluation.gym.scoring import build_scorecard, case_outcomes, objective_terms
 
 MIN_REPEATS = 3
 MIN_OBJECTIVE_GAIN = 0.01
@@ -556,6 +567,130 @@ def _paired_regressed(
     )
 
 
+def slice_scorecard(
+    card: Scorecard, trajectories: Sequence[Trajectory], cases: Collection[str]
+) -> Scorecard:
+    """``card`` re-aggregated from its trajectories over ``cases`` only: its run, dataset
+    and budgets digests, marked sliced, with the repeats those cases ran."""
+    kept = [item for item in trajectories if item.case_id in cases]
+    sliced = build_scorecard(
+        kept,
+        run=card.run,
+        dataset_digest=card.dataset_digest,
+        cases={item.case_id: item.kind for item in kept},
+        sliced=True,
+    )
+    return sliced.model_copy(update={"budgets_digest": card.budgets_digest})
+
+
+def _case_repeats(trajectories: Sequence[Trajectory], cases: Collection[str]) -> int:
+    """The fewest repeats any of ``cases`` ran."""
+    counts = Counter(item.case_id for item in trajectories)
+    return min((counts[case] for case in cases), default=0)
+
+
+def admit_slice(
+    *,
+    smoke: bool,
+    track: GateTrack,
+    target_language: str | None,
+    min_cases: int,
+    sides: Sequence[tuple[Scorecard, Sequence[Trajectory] | None]],
+) -> None:
+    """A slice gate decides on paired outcomes alone, from trajectories of both scorecards."""
+    if smoke or track != "objective" or target_language is not None or min_cases != 1:
+        raise ValueError(
+            "a slice gate decides on paired outcomes only; --smoke, --track, "
+            "--target-language and --min-cases do not apply"
+        )
+    for card, trajectories in sides:
+        if trajectories is None:
+            raise ValueError("a slice gate reads both runs' trajectories")
+        if not trajectories_reproduce(card, trajectories):
+            raise ValueError(
+                f"the trajectories given for run {card.run.run_id} do not reproduce its scorecard"
+            )
+
+
+def _slice_mismatch(baseline: Scorecard, scored: Collection[str], cases: Collection[str]) -> bool:
+    """No slice, a candidate case the baseline did not score, or another sliced baseline."""
+    return (
+        not cases
+        or not set(cases) <= set(scored)
+        or (baseline.sliced and set(scored) != set(cases))
+    )
+
+
+def _slice_gate(
+    baseline: Scorecard,
+    candidate: Scorecard,
+    *,
+    min_repeats: int,
+    noise: NoiseBand | None,
+    baseline_trajectories: Sequence[Trajectory],
+    candidate_trajectories: Sequence[Trajectory],
+) -> GateVerdict:
+    """The slice screen (module docstring): paired outcomes of the candidate's cases."""
+    cases = sorted(case_outcomes(candidate_trajectories))
+    scored = sorted(case_outcomes(baseline_trajectories))
+    mismatch = _slice_mismatch(baseline, scored, cases)
+    before_repeats = _case_repeats(baseline_trajectories, scored if mismatch else cases)
+    after_repeats = _case_repeats(candidate_trajectories, cases)
+    checks = (
+        (GateReason.DATASET_MISMATCH, baseline.dataset_digest != candidate.dataset_digest),
+        (GateReason.BUDGETS_MISMATCH, baseline.budgets_digest != candidate.budgets_digest),
+        (GateReason.REPEATS_BELOW_MINIMUM, min(before_repeats, after_repeats) < min_repeats),
+        (GateReason.SLICE_MISMATCH, mismatch),
+        (
+            GateReason.NOISE_MISMATCH,
+            noise is not None
+            and (
+                noise.dataset_digest != baseline.dataset_digest
+                or noise.budgets_digest != baseline.budgets_digest
+                or noise.repeats != before_repeats
+            ),
+        ),
+    )
+    reasons = [reason for reason, failed in checks if failed]
+    before, after = baseline, candidate
+    if not mismatch:
+        before = slice_scorecard(baseline, baseline_trajectories, cases)
+        after = slice_scorecard(candidate, candidate_trajectories, cases)
+    decision = GateDecision.INCOMPARABLE
+    paired: PairedOutcomes | None = None
+    if not reasons:
+        paired = paired_outcomes(
+            [item for item in baseline_trajectories if item.case_id in cases],
+            candidate_trajectories,
+            deciding=list(after.languages),
+            noise=noise,
+        )
+        if any(not case.within_noise for case in paired.pass_to_fail_cases):
+            reasons.append(GateReason.SLICE_REGRESSED)
+        if all(case.within_noise for case in paired.fail_to_pass_cases):
+            reasons.append(GateReason.SLICE_NOT_IMPROVED)
+        decision = GateDecision.REJECTED if reasons else GateDecision.ACCEPTED
+    return GateVerdict(
+        decision=decision,
+        reasons=reasons,
+        baseline_run_id=baseline.run.run_id,
+        candidate_run_id=candidate.run.run_id,
+        delta_j=after.objective_j - before.objective_j,
+        delta_macro_verified_accuracy=after.macro_verified_accuracy
+        - before.macro_verified_accuracy,
+        token_ratio=token_ratio(before, after),
+        seconds_ratio=seconds_ratio(before, after),
+        language_deltas=language_deltas(before, after),
+        identity_changes=identity_changes(baseline, candidate),
+        single_case_languages=single_case_languages(baseline),
+        noise=noise,
+        paired=paired,
+        slice=True,
+        slice_cases=cases,
+        slice_repeats=after_repeats,
+    )
+
+
 def gate(
     baseline: Scorecard,
     candidate: Scorecard,
@@ -568,6 +703,7 @@ def gate(
     min_cases: int = 1,
     baseline_trajectories: Sequence[Trajectory] | None = None,
     candidate_trajectories: Sequence[Trajectory] | None = None,
+    slice: bool = False,
 ) -> GateVerdict:
     """ACCEPTED iff no language regressed and the track's criterion holds (module docstring).
 
@@ -576,8 +712,26 @@ def gate(
     (and, with ``min_cases``, a deciding one). ``noise`` reads every delta against a noise
     band; a regression inside it is INCONCLUSIVE rather than REJECTED. ``min_cases`` above
     1 lets only languages with that many baseline cases decide. Both runs' trajectories
-    add the paired per-case outcomes and ``paired_regression``.
+    add the paired per-case outcomes and ``paired_regression``. ``slice`` makes a slice
+    screen instead (module docstring): it needs both runs' trajectories and takes no track,
+    target language, smoke or ``min_cases``.
     """
+    if slice:
+        admit_slice(
+            smoke=smoke,
+            track=track,
+            target_language=target_language,
+            min_cases=min_cases,
+            sides=[(baseline, baseline_trajectories), (candidate, candidate_trajectories)],
+        )
+        return _slice_gate(
+            baseline,
+            candidate,
+            min_repeats=min_repeats,
+            noise=noise,
+            baseline_trajectories=baseline_trajectories or [],
+            candidate_trajectories=candidate_trajectories or [],
+        )
     admit_track(baseline, track, target_language)
     admit_min_cases(baseline, min_cases, target_language)
     deciders = deciding_languages(baseline, min_cases)

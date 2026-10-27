@@ -57,6 +57,16 @@ REASON_TEXT: dict[GateReason, str] = {
         "More cases of the deciding languages went from a majority pass to a majority fail "
         "than the reverse."
     ),
+    GateReason.SLICE_MISMATCH: (
+        "The candidate's slice is not a set of cases the baseline scored, or the baseline "
+        "is sliced to other cases."
+    ),
+    GateReason.SLICE_REGRESSED: (
+        "A slice case went from a majority pass to a majority fail outside the noise band."
+    ),
+    GateReason.SLICE_NOT_IMPROVED: (
+        "No slice case went from a majority fail to a majority pass outside the noise band."
+    ),
     GateReason.IDENTITY_MISMATCH: (
         "The runs recorded different, or unknown, configuration identities."
     ),
@@ -100,6 +110,24 @@ DECIDING_TEXT = (
     "Only these languages decide language regressions, the accuracy criterion and the "
     "accuracy floor; the others are shown with their deltas but do not decide. J, its "
     "threshold and the token ratio are unchanged."
+)
+
+SLICE_TEXT = (
+    "Slice gate: a slice screen, not an acceptance. It decides only on the paired majority "
+    "outcomes of the slice cases: a slice case going from pass to fail outside the noise "
+    "band rejects, and at least one must go from fail to pass outside it. J, macro "
+    "accuracy, tokens and language deltas are over the slice and do not decide. A passing "
+    "screen goes on to the full tier run; it never merges anything."
+)
+
+SLICE_NOISE_TEXT = (
+    "A slice gate reads the band per case only: a flip in a language whose band is a whole "
+    "case is within noise and counts neither way."
+)
+
+SLICE_PAIRED_TEXT = (
+    "Each slice case, by whether the majority of its repeats verified. Every slice case "
+    "decides; flips within the noise band do not count."
 )
 
 PAIRED_TEXT = (
@@ -149,8 +177,10 @@ def _identity_line(changes: Mapping[str, bool | None]) -> str:
 
 def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard) -> str:
     """The gate decision, its fixed reasons and a side-by-side metric table."""
-    labels = (["smoke"] if verdict.smoke else []) + (
-        [] if verdict.track == "objective" else [f"{verdict.track} track"]
+    labels = (
+        (["slice"] if verdict.slice else [])
+        + (["smoke"] if verdict.smoke else [])
+        + ([] if verdict.track == "objective" else [f"{verdict.track} track"])
     )
     title = f" ({', '.join(labels)})" if labels else ""
     lines = [
@@ -158,9 +188,13 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         "",
         f"Baseline `{verdict.baseline_run_id}`, candidate `{verdict.candidate_run_id}`.",
         "",
-        TRACK_TEXT[verdict.track],
+        SLICE_TEXT if verdict.slice else TRACK_TEXT[verdict.track],
         "",
     ]
+    if verdict.slice:
+        cases = ", ".join(f"`{case}`" for case in verdict.slice_cases) or "none"
+        repeats = _count(verdict.slice_repeats)
+        lines.extend([f"Slice: {len(verdict.slice_cases)} cases × {repeats} repeats: {cases}.", ""])
     if verdict.target_language is not None:
         lines.extend([f"Target language: {verdict.target_language}.", ""])
     if verdict.smoke:
@@ -288,6 +322,8 @@ def _reported_only(card: Scorecard, language: str) -> str:
 
 
 def _regressed(verdict: GateVerdict, language: str, baseline: Scorecard) -> str:
+    if verdict.slice:
+        return "not decided (slice)"
     if language in verdict.reported_languages:
         return _reported_only(baseline, language)
     if language not in verdict.regressed_languages:
@@ -338,7 +374,8 @@ def _paired_lines(verdict: GateVerdict, baseline: Scorecard) -> list[str]:
             "",
         ]
     )
-    lines = ["", f"Paired per-case outcomes. {PAIRED_TEXT}", ""]
+    text = SLICE_PAIRED_TEXT if verdict.slice else PAIRED_TEXT
+    lines = ["", f"Paired per-case outcomes. {text}", ""]
     lines.extend(
         _table(
             ["Language", "Pass to fail", "Fail to pass", "Stable pass", "Stable fail", "Decides"],
@@ -381,6 +418,8 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     if noise is None:
         return []
     runs = ", ".join(f"`{run}`" for run in noise.runs)
+    if verdict.slice:
+        return [f"Noise band from {noise.n_runs} runs: {runs}. {SLICE_NOISE_TEXT}", ""]
     lines = [f"Noise band from {noise.n_runs} runs: {runs}. {NOISE_TEXT}", ""]
     if verdict.decision is GateDecision.INCOMPARABLE:
         # Nothing was compared, so no delta was read against the band.

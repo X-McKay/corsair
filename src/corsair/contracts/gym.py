@@ -341,6 +341,16 @@ class GateReason(StrEnum):
     # majority pass to a majority fail than the reverse, on a gate that would otherwise
     # accept (accuracy or objective track).
     PAIRED_REGRESSION = "paired_regression"
+    # Slice gate only (``GateVerdict.slice``): the candidate ran cases the baseline did
+    # not score, a sliced baseline ran other cases than the candidate, or no case was
+    # scored on both sides; INCOMPARABLE.
+    SLICE_MISMATCH = "slice_mismatch"
+    # Slice gate only: a slice case went from a majority pass to a majority fail outside
+    # the noise band.
+    SLICE_REGRESSED = "slice_regressed"
+    # Slice gate only: no slice case went from a majority fail to a majority pass outside
+    # the noise band.
+    SLICE_NOT_IMPROVED = "slice_not_improved"
     # ``corsair gym noise`` only, never a gate reason: the runs recorded different (or
     # unknown) configuration identities, or different repeat counts, so their spread is
     # not one configuration's noise.
@@ -539,6 +549,14 @@ class GateVerdict(Contract):
     objective_j_deciding: DecidingMetric | None = None
     # Paired per-case majority outcomes, when both runs' trajectories were read.
     paired: PairedOutcomes | None = None
+    # A slice screen (``gate(..., slice=True)``): decided only on the paired outcomes of
+    # ``slice_cases`` (the candidate's cases, each also scored by the baseline), run
+    # ``slice_repeats`` times each by the candidate. J, accuracy, tokens and language
+    # deltas are then over the slice and never decide; an ACCEPTED slice is a screen
+    # for a full run, never an acceptance. Records before slices decode as full gates.
+    slice: bool = False
+    slice_cases: list[Identifier] = Field(default_factory=list)
+    slice_repeats: int | None = Field(default=None, ge=0)
 
     @property
     def exit_code(self) -> int:
@@ -643,6 +661,9 @@ class LedgerRow(Contract):
     lesson: str = Field(default="", max_length=500)
     # The noise band files the row's gates read (``--noise``, or the verify record's).
     noise: list[str] = Field(default_factory=list, max_length=8)
+    # A signal-slice screen of the candidate against the tier1 reference (``--slice``):
+    # a screen before the full tier1 run, never an acceptance by itself.
+    slice: TierGate | None = None
 
     @model_validator(mode="after")
     def coherent_entry(self):
@@ -652,6 +673,15 @@ class LedgerRow(Contract):
             raise ValueError("a baseline row needs a scorecard and its tier")
         if (self.decision == "merged") != (self.merge_commit is not None):
             raise ValueError("a merged decision needs its merge commit, and only it has one")
+        if self.slice is not None and not self.slice.gate.slice:
+            raise ValueError("a slice row's gate must be a slice gate")
+        if any(gated is not None and gated.gate.slice for gated in (self.tier0, self.tier1)):
+            raise ValueError("a slice gate belongs in the row's slice, not a tier gate")
+        accepted = self.decision in ("accepted", "merged")
+        if self.slice is not None and self.tier1 is None and accepted:
+            raise ValueError(
+                "a slice screen alone is never an acceptance; gate the full tier1 run first"
+            )
         return self
 
 

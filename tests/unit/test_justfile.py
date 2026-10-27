@@ -175,6 +175,23 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             + ["--min-cases", "3", "--root", "gym root"],
         ),
         (
+            "gym-gate",
+            ["base.json", "slice $(touch SHOULD_NOT_EXIST)/scorecard.json", "--slice"]
+            + ["--noise", "noise-tier1.json", "--root", "gym root"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate"]
+            + ["slice $(touch SHOULD_NOT_EXIST)/scorecard.json", "--slice"]
+            + ["--noise", "noise-tier1.json", "--root", "gym root"],
+        ),
+        (
+            "gym-ledger",
+            ["append", "--id", "s1", "--entry", "experiment"]
+            + ["--slice", "run dir; touch SHOULD_NOT_EXIST"]
+            + ["--reference-tier1", "ref tier1.json", "--root", "gym root"],
+            [*GYM, "ledger", "append", "--id", "s1", "--entry", "experiment"]
+            + ["--slice", "run dir; touch SHOULD_NOT_EXIST", "--reference-tier1", "ref tier1.json"]
+            + ["--root", "gym root"],
+        ),
+        (
             "gym-noise",
             ["run a", "run $(touch SHOULD_NOT_EXIST)", "run c", "--out", "band file.json"],
             [*GYM, "noise", "run a", "run $(touch SHOULD_NOT_EXIST)", "run c"]

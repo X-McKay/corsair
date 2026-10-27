@@ -18,6 +18,7 @@ from corsair.contracts import (
     RunContext,
     Scorecard,
     TierGate,
+    Trajectory,
 )
 from corsair.evaluation.gym.gate import gate as gate_scorecards
 from corsair.evaluation.gym.scoring import SCORECARD_FILE, read_scorecard
@@ -28,6 +29,8 @@ ABSENT = "—"
 GATED_TIERS = ("tier0", "tier1")
 
 type Identity = tuple[str | None, str | None]
+# Finds the trajectories behind a scorecard file (for paired outcomes), else ``None``.
+type TrajectoryFinder = Callable[[Path, Scorecard], list[Trajectory] | None]
 
 
 def candidate_identity(sources: Sequence[Identity]) -> Identity:
@@ -61,10 +64,12 @@ def build_ledger_row(
     lesson: str = "",
     scorecard_path: str | None = None,
     noise: Sequence[str] = (),
+    slice: TierGate | None = None,
 ) -> LedgerRow:
     """One ledger row; scorecard metrics are recorded only when a scorecard is given.
 
-    ``noise`` names the noise band files the row's gates read.
+    ``noise`` names the noise band files the row's gates read; ``slice`` is a signal-slice
+    screen of the candidate.
     """
     sources: list[Identity] = [(branch, commit)]
     if scorecard is not None:
@@ -107,6 +112,7 @@ def build_ledger_row(
             "merge_commit": merge_commit,
             "lesson": lesson,
             "noise": list(noise),
+            "slice": slice,
         }
     )
 
@@ -130,15 +136,34 @@ def latest_baseline(rows: Sequence[LedgerRow], tier: str) -> str:
 
 
 def gate_tier(
-    rows: Sequence[LedgerRow], candidate: Path, reference: str, noise: NoiseBand | None = None
+    rows: Sequence[LedgerRow],
+    candidate: Path,
+    reference: str,
+    noise: NoiseBand | None = None,
+    *,
+    slice: bool = False,
+    trajectories: TrajectoryFinder | None = None,
 ) -> tuple[TierGate, RunContext]:
     """Gate one tier's candidate (a run directory or a scorecard file) against a reference,
-    reading its deltas against ``noise`` when a band is given."""
+    reading its deltas against ``noise`` when a band is given. ``slice`` gates a slice
+    screen, on both scorecards' trajectories as ``trajectories`` finds them."""
     run_dir = candidate if candidate.is_dir() else None
     path = candidate / SCORECARD_FILE if run_dir is not None else candidate
     card = read_scorecard(path)
+    reference_path = reference_scorecard(rows, reference)
+    baseline = read_scorecard(reference_path)
+    found = (
+        (None, None)
+        if trajectories is None
+        else (trajectories(reference_path, baseline), trajectories(path, card))
+    )
     verdict = gate_scorecards(
-        read_scorecard(reference_scorecard(rows, reference)), card, noise=noise
+        baseline,
+        card,
+        noise=noise,
+        slice=slice,
+        baseline_trajectories=found[0],
+        candidate_trajectories=found[1],
     )
     gated = TierGate(
         reference=reference,
@@ -204,6 +229,21 @@ def gate_cell(verdict: GateVerdict | None) -> str:
     return f"{decision} ({details})" if details else decision
 
 
+def slice_cell(verdict: GateVerdict) -> str:
+    """A slice screen: ``slice: <gate cell> (<n> cases × <repeats>)``."""
+    repeats = "unknown" if verdict.slice_repeats is None else str(verdict.slice_repeats)
+    return f"slice: {gate_cell(verdict)} ({len(verdict.slice_cases)} cases × {repeats})"
+
+
+def _tier_cell(row: LedgerRow, tier: str) -> str:
+    """A tier's gate cell; a row's slice screen leads its tier1 cell."""
+    cell = gate_cell(tier_gate(row, tier))
+    if tier != "tier1" or row.slice is None:
+        return cell
+    screen = slice_cell(row.slice.gate)
+    return screen if tier_gate(row, tier) is None else f"{screen}; {cell}"
+
+
 def tier_gate(row: LedgerRow, tier: str) -> GateVerdict | None:
     """A row's gate for one tier: its tier gate, else a ``--baseline`` gate of that tier."""
     gated = row.tier0 if tier == "tier0" else row.tier1
@@ -257,7 +297,7 @@ def _wave_rows(rows: Sequence[LedgerRow], wave: int) -> list[list[str]]:
             _cell(row.id),
             _cell(row.track),
             f"`{_cell(row.branch)}@{_cell(row.commit[:7])}`",
-            *(gate_cell(tier_gate(row, tier)) for tier in GATED_TIERS),
+            *(_tier_cell(row, tier) for tier in GATED_TIERS),
             _per_tier(row, lambda verdict: _signed(verdict.delta_j)),
             _per_tier(row, lambda verdict: _number(verdict.token_ratio)),
             _decision(row),
@@ -269,10 +309,14 @@ def _wave_rows(rows: Sequence[LedgerRow], wave: int) -> list[list[str]]:
 
 
 def _gates_summary(row: LedgerRow) -> str:
+    screen = [] if row.slice is None else [slice_cell(row.slice.gate)]
     return "; ".join(
-        f"{tier} {gate_cell(verdict)}"
-        for tier in GATED_TIERS
-        if (verdict := tier_gate(row, tier)) is not None
+        screen
+        + [
+            f"{tier} {gate_cell(verdict)}"
+            for tier in GATED_TIERS
+            if (verdict := tier_gate(row, tier)) is not None
+        ]
     )
 
 

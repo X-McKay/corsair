@@ -11,7 +11,14 @@ from pathlib import Path
 import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import GateDecision, NoiseBand, RunContext, Scorecard, VerifyRecord
+from corsair.contracts import (
+    GateDecision,
+    GateReason,
+    NoiseBand,
+    RunContext,
+    Scorecard,
+    VerifyRecord,
+)
 from corsair.entrypoints import cli, gym
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.gym.budgets import load_budgets
@@ -31,6 +38,7 @@ from tests.unit.evaluation.test_gym_capture import CASE, _evals_root, _gym_run
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, CASES, NONE, _trajectory
 from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED_BASELINE
 from tests.unit.evaluation.test_gym_paired import _side as paired_side
+from tests.unit.evaluation.test_gym_slice import _sliced as sliced_side
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -1027,3 +1035,86 @@ async def test_verify_min_cases_narrows_the_tier1_gate_only(tmp_path, capsys, mo
     with pytest.raises(ValueError, match="no baseline language has 4 or more cases"):
         await _run(_arguments(*verify, "--min-cases", "4"))
     assert ran == []
+
+
+# Signal-slice screens (--slice)
+
+FIVE, FIVE_NONE = [True] * 5, [False] * 5
+
+
+def _slice_run(directory: Path, verified: dict[str, list[bool]], run_id: str) -> Path:
+    """A sliced run directory (``gym run --case``) with its scorecard and trajectories."""
+    card, rows = sliced_side(verified, run_id)
+    write_scorecard(directory / SCORECARD_FILE, card)
+    write_trajectories(directory / TRAJECTORIES_FILE, rows)
+    return directory
+
+
+def _reference_copy(root: Path) -> Path:
+    """``<root>/reference/tier1.json``, a copy of a run whose trajectories stay in runs/."""
+    base = _paired_run(root / "runs/base", PAIRED_BASELINE, "base")
+    reference = root / "reference/tier1.json"
+    reference.parent.mkdir(parents=True)
+    shutil.copy(base, reference)
+    return reference
+
+
+@pytest.mark.asyncio
+async def test_gate_slice_screens_a_sliced_candidate_on_its_paired_outcomes(tmp_path, capsys):
+    root = tmp_path / "gym"
+    reference = _reference_copy(root)
+    run = _slice_run(root / "runs/slice", {"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}, "slice")
+    pair = ["gym", "gate", "--baseline", str(reference), "--candidate", str(run / SCORECARD_FILE)]
+
+    assert await _run(_arguments(*pair)) == 2
+    assert json.loads(capsys.readouterr().out)["reasons"] == ["sliced", "repeats_below_minimum"]
+
+    screen = [*pair, "--slice", "--root", str(root)]
+    assert await _run(_arguments(*screen)) == 0
+    verdict = json.loads(capsys.readouterr().out)
+    assert (verdict["decision"], verdict["slice"], verdict["reasons"]) == ("ACCEPTED", True, [])
+    assert (verdict["slice_cases"], verdict["slice_repeats"]) == (["py-a", "py-b", "py-c"], 5)
+    assert verdict["paired"]["fail_to_pass_cases"][0]["case_id"] == "py-c"
+    assert await _run(_arguments(*screen, format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert text.startswith("## Gate (slice): ACCEPTED\n")
+    assert "| Repeats | 3 | 5 |  |" in text
+    assert "| python | 0.667 | 1.000 | +0.333 | not decided (slice) |" in text
+
+    stuck = _slice_run(root / "runs/stuck", {"py-a": FIVE, "py-b": FIVE, "py-c": FIVE_NONE}, "s2")
+    stuck_pair = [*pair[:-1], str(stuck / SCORECARD_FILE), "--slice", "--root", str(root)]
+    assert await _run(_arguments(*stuck_pair)) == 1
+    assert json.loads(capsys.readouterr().out)["reasons"] == ["slice_not_improved"]
+    with pytest.raises(ValueError, match="--track"):
+        await _run(_arguments(*screen, "--track", "accuracy"))
+    (root / "runs/base" / TRAJECTORIES_FILE).unlink()
+    with pytest.raises(ValueError, match="reads both runs' trajectories"):
+        await _run(_arguments(*screen))
+    assert "Warning: paired per-case outcomes are unknown" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_ledger_append_records_a_slice_screen_against_the_tier1_reference(tmp_path, capsys):
+    root = tmp_path / "gym"
+    reference = _reference_copy(root)
+    run = _slice_run(root / "runs/slice", {"py-a": FIVE, "py-b": FIVE, "py-c": FIVE_NONE}, "s")
+    ledger, markdown = tmp_path / "ledger.jsonl", tmp_path / "LEDGER.md"
+    shutil.copy(ROOT / "evals/experiments/LEDGER.md", markdown)
+    append = ["gym", "ledger", "append", "--ledger", str(ledger), "--entry", "experiment"]
+    append += ["--wave", "4", "--branch", "gym/h7-x", "--commit", "b" * 40, "--root", str(root)]
+    screen = ["--slice", str(run), "--reference-tier1", str(reference)]
+
+    assert await _run(_arguments(*append, "--id", "s1", *screen, "--decision", "rejected")) == 0
+    (row,) = read_ledger(ledger)
+    assert row.slice is not None and row.tier1 is None
+    assert (row.slice.reference, row.slice.run_dir) == (str(reference), str(run))
+    assert row.slice.gate.slice and row.slice.gate.reasons == [GateReason.SLICE_NOT_IMPROVED]
+    render = ["gym", "ledger", "render", "--ledger", str(ledger), "--markdown", str(markdown)]
+    assert await _run(_arguments(*render)) == 0
+    assert "| slice: REJECTED (slice_not_improved) (3 cases × 5) |" in markdown.read_text()
+    capsys.readouterr()
+    with pytest.raises(ValueError, match="a slice screen alone is never an acceptance"):
+        await _run(_arguments(*append, "--id", "s2", *screen, "--decision", "accepted"))
+    with pytest.raises(ValueError, match="drop --tier0/--tier1/--slice/--noise"):
+        await _run(_arguments(*append, "--id", "s3", "--slice", str(run), "--verdict", "v.json"))
+    assert len(read_ledger(ledger)) == 1

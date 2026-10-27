@@ -130,6 +130,7 @@ class CliArguments(argparse.Namespace):
     ledger_verdict: str | None
     ledger_decision: Literal["accepted", "rejected", "inconclusive", "merged"] | None
     ledger_merge_commit: str | None
+    ledger_slice: str | None
     gym_dataset: str | None
     gym_root: str | None
     git_commit: str | None
@@ -148,6 +149,7 @@ class CliArguments(argparse.Namespace):
     noise_first: str
     noise_rest: list[str]
     min_cases: int | None
+    slice: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -932,14 +934,15 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
     """Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable, 3 inconclusive."""
-    from corsair.evaluation.gym.gate import gate
+    from corsair.contracts import GateReason
+    from corsair.evaluation.gym.gate import gate, slice_scorecard
     from corsair.evaluation.gym.noise import read_noise
     from corsair.evaluation.gym.render import render_gate
     from corsair.evaluation.gym.scoring import read_scorecard
 
     baseline, candidate = read_scorecard(Path(args.baseline)), read_scorecard(Path(args.candidate))
     trajectories: dict[str, list[Trajectory] | None] = {"baseline": None, "candidate": None}
-    if args.min_cases is not None:
+    if args.min_cases is not None or args.slice:
         trajectories = {
             side: _gate_trajectories(args, Path(path), card)
             for side, path, card in (
@@ -957,8 +960,16 @@ async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
         min_cases=args.min_cases or 1,
         baseline_trajectories=trajectories["baseline"],
         candidate_trajectories=trajectories["candidate"],
+        slice=args.slice,
     )
-    _emit_view(ui, render_gate(verdict, baseline, candidate), verdict)
+    views = (baseline, candidate)
+    if verdict.slice and GateReason.SLICE_MISMATCH not in verdict.reasons:
+        # A slice gate read both trajectories; its view shows both sides over the slice.
+        views = (
+            slice_scorecard(baseline, trajectories["baseline"] or [], verdict.slice_cases),
+            slice_scorecard(candidate, trajectories["candidate"] or [], verdict.slice_cases),
+        )
+    _emit_view(ui, render_gate(verdict, *views), verdict)
     return verdict.exit_code
 
 
@@ -1075,17 +1086,19 @@ def _ledger_references(args: CliArguments, rows: Sequence[LedgerRow]) -> dict[st
     given = {"tier0": args.ledger_reference_tier0, "tier1": args.ledger_reference_tier1}
     references = {} if args.ledger_baseline is None else {"baseline": args.ledger_baseline}
     if args.ledger_verdict is not None:
-        if any(candidates.values()) or any(given.values()) or args.noise:
+        if any(candidates.values()) or any(given.values()) or args.noise or args.ledger_slice:
             raise ValueError(
-                "--verdict already carries the tier gates; drop --tier0/--tier1/--noise"
+                "--verdict already carries the tier gates; drop --tier0/--tier1/--slice/--noise"
             )
         return references
     for tier, candidate in candidates.items():
         if candidate is None:
-            if given[tier] is not None:
+            if given[tier] is not None and not (tier == "tier1" and args.ledger_slice):
                 raise ValueError(f"--reference-{tier} needs --{tier}")
             continue
         references[tier] = given[tier] or latest_baseline(rows, tier)
+    if args.ledger_slice is not None:
+        references["slice"] = given["tier1"] or latest_baseline(rows, "tier1")
     return references
 
 
@@ -1114,6 +1127,18 @@ def _ledger_tier_gates(
             rows, Path(candidate), references[tier], None if band is None else band[1]
         )
         gated_tiers[tier] = gated
+        identities.append((run.git_branch, run.git_commit))
+    if args.ledger_slice is not None:
+        band = noise.get("slice")
+        gated, run = gate_tier(
+            rows,
+            Path(args.ledger_slice),
+            references["slice"],
+            None if band is None else band[1],
+            slice=True,
+            trajectories=lambda path, card: _gate_trajectories(args, path, card),
+        )
+        gated_tiers["slice"] = gated
         identities.append((run.git_branch, run.git_commit))
     return gated_tiers, identities, list(args.noise or ())
 
@@ -1191,6 +1216,7 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
         lesson=args.lesson,
         scorecard_path=args.scorecard,
         noise=noise_files,
+        slice=gates.get("slice"),
     )
     append_ledger(Path(args.ledger), row)
     ui.emit(row)
@@ -1855,10 +1881,17 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     _noise_option(gate_cmd, repeatable=False)
     _min_cases_option(gate_cmd, scope="")
     gate_cmd.add_argument(
+        "--slice",
+        action="store_true",
+        help="Slice screen: gate a sliced candidate (gym run --case) against an unsliced or "
+        "identically sliced baseline on the candidate's cases, by their paired majority "
+        "outcomes only (slice_regressed, slice_not_improved); never an acceptance",
+    )
+    gate_cmd.add_argument(
         "--root",
         dest="gym_root",
         help="Gym root whose runs/<run id>/ holds a reference copy's trajectories, for "
-        "--min-cases (default <main checkout>/.runs/gym)",
+        "--min-cases and --slice (default <main checkout>/.runs/gym)",
     )
     noise_cmd = command(
         "noise",
@@ -1993,6 +2026,19 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
             metavar="REFERENCE",
             help=f"Ledger row id or scorecard (default: the latest {tier} baseline row)",
         )
+    append.add_argument(
+        "--slice",
+        dest="ledger_slice",
+        metavar="RUN-DIR|SCORECARD",
+        help="A signal-slice run, slice-gated against --reference-tier1 (default: the latest "
+        "tier1 baseline row); recorded as the row's slice screen",
+    )
+    append.add_argument(
+        "--root",
+        dest="gym_root",
+        help="Gym root whose runs/<run id>/ holds a reference copy's trajectories, for "
+        "--slice (default <main checkout>/.runs/gym)",
+    )
     append.add_argument(
         "--verdict",
         dest="ledger_verdict",
