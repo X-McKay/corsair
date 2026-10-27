@@ -1,23 +1,45 @@
-"""Request shaping before local source admission: source anchoring and scanner intake."""
+"""Request shaping before local source admission: source anchoring, scanner and chain intake."""
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any, get_args
+
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from corsair.contracts import (
+    Budget,
     Case,
     Finding,
     InvestigationRequest,
-    PythonRecipe,
+    Recipe,
     ScannerClaim,
     ScannerFinding,
     Scope,
     Source,
 )
 
-# A recipe template is a PythonRecipe without ``module_file``: intake binds that field
-# to each finding's file. Validation uses this placeholder module only.
+# A recipe template is one ``Recipe`` union member without the fields intake binds per
+# finding (always ``module_file``). Up-front validation uses this placeholder module; a
+# member whose module suffix differs is validated completely when it is bound.
 _TEMPLATE_MODULE = "template.py"
+_DEFAULT_KIND = "python.secret_disclosure/1"
+# The field naming a recipe's callable: ``method`` for Java, ``function`` elsewhere.
+CALLABLE_FIELDS = ("function", "method")
+_RECIPE = TypeAdapter[Any](Recipe)
+
+
+def _recipe_members() -> dict[str, type[BaseModel]]:
+    """Each admitted recipe kind and its contract, read from the ``Recipe`` union itself."""
+    union = get_args(Recipe)[0]
+    members: dict[str, type[BaseModel]] = {}
+    for option in get_args(union):
+        model = get_args(option)[0]
+        members[model.model_fields["kind"].default] = model
+    return members
+
+
+RECIPE_MEMBERS = _recipe_members()
 
 
 def normalize_request_sources(
@@ -65,21 +87,94 @@ def finding_from_scanner(scanner_finding: ScannerFinding) -> Finding:
     )
 
 
-def load_recipe_template(path: Path) -> dict[str, object]:
-    """Read one operator-owned recipe template: a ``PythonRecipe`` without ``module_file``.
+def recipe_member(template: Mapping[str, object]) -> type[BaseModel]:
+    """The union member a template's ``kind`` names; a kind outside the union is refused.
 
-    The template is validated as a complete recipe up front, so a malformed template
-    fails the command rather than blocking every finding with the same reason.
+    A template without ``kind`` is the original Python secret-disclosure recipe, as for a
+    request. No kind is invented here: a new kind needs its own contract, observer and
+    human-authored auditor rubric first.
+    """
+    kind = template.get("kind", _DEFAULT_KIND)
+    member = RECIPE_MEMBERS.get(kind) if isinstance(kind, str) else None
+    if member is None:
+        raise ValueError(
+            f"recipe kind {kind!r} is not an admitted Recipe kind; "
+            f"admitted: {', '.join(sorted(RECIPE_MEMBERS))}"
+        )
+    return member
+
+
+def callable_field(member: type[BaseModel]) -> str:
+    """The field of ``member`` that names the bound callable."""
+    return next(name for name in CALLABLE_FIELDS if name in member.model_fields)
+
+
+def load_recipe_template(
+    path: Path, *, bound: Sequence[str] = ("module_file",)
+) -> dict[str, object]:
+    """Read one operator-owned recipe template: a ``Recipe`` member without its bound fields.
+
+    ``bound`` names the fields intake binds per finding (``module_file`` always; chain
+    drafting also binds the callable). The template may not set them. Every other field is
+    validated up front against the kind's contract, so a malformed template fails the
+    command rather than blocking every finding with the same reason.
     """
     template = json.loads(path.read_bytes())
     if not isinstance(template, dict):
         raise ValueError("a recipe template must be a JSON object")
-    if "module_file" in template:
-        raise ValueError(
-            "a recipe template may not set module_file; intake binds it to each finding's file"
+    for name in bound:
+        if name in template:
+            raise ValueError(
+                f"a recipe template may not set {name}; intake binds it to each finding"
+            )
+    member = recipe_member(template)
+    try:
+        member.model_validate({**template, "module_file": _TEMPLATE_MODULE})
+    except ValidationError as error:
+        fields = sorted(
+            {
+                ".".join(str(part) for part in item["loc"])
+                for item in error.errors()
+                if item["loc"][:1] != ("module_file",)
+                and not (item["type"] == "missing" and item["loc"][0] in bound)
+            }
         )
-    PythonRecipe.model_validate({**template, "module_file": _TEMPLATE_MODULE})
+        if fields:
+            raise ValueError(f"invalid recipe template field(s): {fields}") from None
     return template
+
+
+def recipe_from_template(
+    recipe_template: Mapping[str, object], *, module_file: str, function: str | None = None
+) -> Recipe:
+    """Bind a template to one module (and, when given, one callable) as a ``Recipe``."""
+    values = {**recipe_template, "module_file": module_file}
+    if function is not None:
+        values[callable_field(recipe_member(recipe_template))] = function
+    return _RECIPE.validate_python(values)
+
+
+def request_from_template(
+    finding: Finding,
+    *,
+    case_id: str,
+    source: Source,
+    recipe_template: Mapping[str, object],
+    function: str | None = None,
+    fixed_source: Source | None = None,
+    budget: Budget | None = None,
+) -> InvestigationRequest:
+    """Assemble one candidate request: the operator's recipe bound to the finding's file.
+
+    The recipe comes only from the template, with ``module_file`` set to the finding's
+    file (the binding ``Case`` requires) and, when ``function`` is given, the kind's
+    callable field set to it. Nothing is read from finding narrative.
+    """
+    recipe = recipe_from_template(recipe_template, module_file=finding.file, function=function)
+    case = Case(
+        case_id=case_id, finding=finding, source=source, recipe=recipe, fixed_source=fixed_source
+    )
+    return InvestigationRequest(case=case, budget=budget or Budget())
 
 
 def request_from_scanner(
@@ -91,16 +186,13 @@ def request_from_scanner(
 ) -> InvestigationRequest:
     """Bind an operator recipe template to one scanner finding: a candidate request.
 
-    The recipe comes only from the operator's template, with its ``module_file`` set to
-    the finding's file (the binding ``Case`` requires). Nothing is read from the
-    finding's description or any other scanner narrative, and no line is invented:
-    a line-less finding stays line-less here and prepare binds it from the recipe.
+    Nothing is read from the finding's description or any other scanner narrative, and
+    no line is invented: a line-less finding stays line-less here and prepare binds it
+    from the recipe.
     """
-    recipe = PythonRecipe.model_validate({**recipe_template, "module_file": scanner_finding.file})
-    case = Case(
+    return request_from_template(
+        finding_from_scanner(scanner_finding),
         case_id=case_id,
-        finding=finding_from_scanner(scanner_finding),
         source=source,
-        recipe=recipe,
+        recipe_template=recipe_template,
     )
-    return InvestigationRequest(case=case)

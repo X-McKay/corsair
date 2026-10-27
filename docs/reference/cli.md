@@ -407,6 +407,26 @@ corsair inspect "$RUN_ID" --online --settings .state/settings.json
 corsair inspect "$RUN_ID" --settings .state/settings.json
 ```
 
+### `dataset draft CHAIN_DIR...`
+
+```bash
+corsair dataset draft evals/datasets/chain/python/xxe-a evals/datasets/chain/python/xxe-b \
+  --recipe-template .work/intake/wave1/recipe-python-xxe.json --split held_out \
+  --out .work/intake/wave1/draft [--budget budget.json]
+```
+
+Drafts reviewed intake for up to 64 chain directories, offline. For each directory it assembles `<case id>/request.json` from `case.json` and `input.json` and the operator's recipe template (an admitted `Recipe` member without `module_file` or the callable field; title, file, line and callable come from `input.json` only, `claim_scope` is `component`, and `source`/`fixed_source` are admitted in place, with the legacy `../../../../../benchmarks/corpus/` prefix mapped to `evals/datasets/corpus/`), a mechanical `<case id>/oracle.proposed.json`, `draft.json` (`corsair.dataset-draft/1`, refused by every dataset loader) and the code-owned `review.md` (case id, kind, family, split, source digest, proposed acceptable verdicts, proposed `expected_fix`, proposal basis, validator blockers, and empty decision, reviewer and reviewed oracle digest columns). It never reads a directory's `README.md`, `manifest.json`, `submission.json`, `verification/` or legacy narrative, and never writes under the evals tree. See [intake](../guides/evaluation-gym.md#intake-drafting-and-freezing-reviewed-cases) for ids, provenance and the proposal rules. It exits `0` when every row passes the `dataset validate` checks, `1` when a drafted row has blockers, and `2` (nothing written) when an input is refused: an unknown recipe kind, a template that sets a bound field or does not bind, an unreadable or inadmissible directory or source, or a non-empty `--out`.
+
+### `dataset freeze DRAFT_DIR --review REVIEW.md --into MANIFEST --against MANIFEST...`
+
+```bash
+corsair dataset freeze .work/intake/wave1/draft --review .work/intake/wave1/review.md \
+  --into evals/datasets/gym-tier2.json \
+  --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json
+```
+
+Freezes the rows of a reviewed draft whose decision is `accept` (the proposed oracle) or `amend` (the `oracle.json` the reviewer wrote in the row's draft directory) into a `corsair.dataset/1` manifest with frozen digests, appending to an existing manifest. It refuses with exit `2` and writes nothing when any row lacks a decision or has an invalid one, a code-owned cell was edited, a draft file changed, a filled reviewed oracle digest does not match, an accepted row fails the `dataset validate` checks, a family, case, chain pair or source tree (variant stem or snapshot digest) sits in a different split in an `--against` manifest or the existing `--into` manifest, a case is already frozen there, or the result would exceed 64 entries; each refusal names its rule. After writing it logs `dataset.frozen` with the old (`none`) and new dataset digests, re-validates the manifest, and exits `1`: a new cohort identity to review and commit. It exits `0` without writing when every row was rejected.
+
 Do not delete an intent to obtain a pass, reuse a run ID with a different request, or blindly rerun an uncertain operation. Preserve the run ID, inspect owned resource identifiers, and record uncertainty. Temporal history alone cannot restore a separate local artifact filesystem after host loss.
 
 ## Exit statuses
@@ -414,7 +434,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression, or an `intake` dry run blocked a finding. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression, an `intake` dry run blocked a finding, a `dataset draft` row has validator blockers, or `dataset refreeze`/`dataset freeze` wrote a manifest. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 
