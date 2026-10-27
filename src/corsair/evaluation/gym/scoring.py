@@ -25,6 +25,7 @@ from corsair.contracts import (
     GroupSummary,
     InvestigationResult,
     ModelCall,
+    Observation,
     OperationalEpisode,
     OperationalReason,
     Oracle,
@@ -311,15 +312,17 @@ def shaping(row: Mapping[str, Any], rounds: Sequence[RoundSummary]) -> float:
 
 
 def operational_stop(
-    row: Mapping[str, Any], rounds: Sequence[RoundSummary]
+    row: Mapping[str, Any], rounds: Sequence[RoundSummary], *, sandbox_fault: bool = False
 ) -> OperationalReason | None:
-    """Why a failed episode stopped operationally, from code-owned ledger gates only.
+    """Why a failed episode stopped operationally, from code-owned records only.
 
-    An unavailable row lost its result. Otherwise a recorded role ``ERROR`` (a payload
-    that raised in the sandbox) keeps the episode behavioural. Then the episode's
-    terminal stop decides: the workflow's ``execution_cancelled``; an ``execution_error``
-    whose reason is a Temporal activity timeout; a final round stopped by an operational
-    gate in ``_OPERATIONAL_ROUND_GATES``; or a final round with no observation
+    An unavailable row lost its result. Otherwise a recorded role ``ERROR`` decides:
+    ``sandbox_fault`` when the stored raw receipts show the sandbox produced it
+    (``sandbox_fault(store, result)``), else the episode is behavioural (a payload or the
+    target raised in the sandbox). Then the episode's terminal stop decides: the
+    workflow's ``execution_cancelled``; an ``execution_error`` whose reason is a Temporal
+    activity timeout; a final round stopped by an operational gate in
+    ``_OPERATIONAL_ROUND_GATES``; or a final round with no observation
     (``evidence_not_run``) that the workflow ended with an ``execution_*`` stop. Reasons
     of other gates, which may hold model-authored text, are never read.
     """
@@ -331,7 +334,7 @@ def operational_stop(
     if any(
         RoleOutcome.ERROR in (item.control_outcome, item.adversarial_outcome) for item in rounds
     ):
-        return None
+        return OperationalReason.SANDBOX_FAULT if sandbox_fault else None
     ledger = [entry for entry in row_ledger(row) if isinstance(entry, Mapping)]
     execution = next(
         (
@@ -392,6 +395,71 @@ def _target_exception_receipt(
     )
 
 
+def _errored_roles(observation: Observation) -> list[str]:
+    return [
+        role
+        for role in _ROLES
+        if (item := getattr(observation, role)) is not None and item.outcome is RoleOutcome.ERROR
+    ]
+
+
+def _driver_recorded(raw: object, *, operation_id: str, role: str) -> bool:
+    """This operation and role's raw receipt carries a driver record: the driver ran."""
+    if not isinstance(raw, dict) or raw.get("schema_version") != "corsair.raw-evidence/1":
+        return False
+    record = raw.get("driver")
+    return (
+        raw.get("operation_id") == operation_id
+        and raw.get("role") == role
+        and isinstance(record, dict)
+        and record.get("schema_version") == "corsair.driver/1"
+    )
+
+
+def _round_sandbox_fault(store: ArtifactStore, observation: Observation) -> bool:
+    errored = _errored_roles(observation)
+    if not errored:
+        return False
+    if observation.artifact is None:
+        return True
+    try:
+        bundle = store.get_json(observation.artifact)
+        if (
+            not isinstance(bundle, dict)
+            or bundle.get("schema_version") != "corsair.evidence/1"
+            or bundle.get("operation_id") != observation.operation_id
+        ):
+            return True
+        receipts = {
+            role: store.get_json(ArtifactRef.model_validate(bundle["roles"][role]))
+            for role in errored
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        return True
+    return not all(
+        _driver_recorded(receipts[role], operation_id=observation.operation_id, role=role)
+        for role in errored
+    )
+
+
+def sandbox_fault(store: ArtifactStore, result: InvestigationResult | None) -> bool:
+    """Whether a recorded role ``ERROR`` came from the sandbox, from stored raw receipts.
+
+    A round whose admitted observation records a role ``ERROR`` is a sandbox fault when
+    its evidence bundle is missing, unreadable or another operation's, or when an errored
+    role's raw receipt is missing, unreadable, another operation's or role's, or carries
+    no driver record (the sandbox adapter's own record, e.g. ``SandboxExecutionError``).
+    A receipt with a driver record, whether a target-side exception or a payload-level
+    ``ERROR``, is not: the payload or the target raised, which stays behavioural.
+    """
+    if result is None:
+        return False
+    return any(
+        item.observation is not None and _round_sandbox_fault(store, item.observation)
+        for item in result.rounds
+    )
+
+
 def target_exception(store: ArtifactStore, result: InvestigationResult | None) -> bool:
     """Whether a terminal ``ERROR`` was an exception the target raised, from raw receipts.
 
@@ -406,11 +474,7 @@ def target_exception(store: ArtifactStore, result: InvestigationResult | None) -
     observation = result.rounds[-1].observation
     if observation is None or observation.artifact is None:
         return False
-    errored = [
-        role
-        for role in _ROLES
-        if (item := getattr(observation, role)) is not None and item.outcome is RoleOutcome.ERROR
-    ]
+    errored = _errored_roles(observation)
     if not errored:
         return False
     try:
@@ -502,12 +566,15 @@ def trajectory(
     git_commit: str | None = None,
     output_cap: int | None = None,
     target_exception: bool = False,
+    sandbox_fault: bool = False,
 ) -> Trajectory:
     """Score one report row; ``result`` is its stored result, or None when unavailable.
 
     ``output_cap`` is the request's per-call output cap; it only sets the reasoning
     markers, which no reward, verified flag or gate reads. ``target_exception`` is
     ``target_exception(store, result)``; it applies only to a failed ``ERROR`` row.
+    ``sandbox_fault`` is ``sandbox_fault(store, result)``; it names a failed row's recorded
+    role ``ERROR`` operational (``operational_stop``) and never changes a reward.
     """
     status = row.get("status")
     status = status if status in {"pass", "fail"} else "unavailable"
@@ -547,7 +614,7 @@ def trajectory(
         bonus_tokens = phi_tokens(tokens, budget.effective_tokens)
         bonus_time = phi_time(seconds, budget.seconds)
     shaped = shaping(row, rounds)
-    operational = None if target else operational_stop(row, rounds)
+    operational = None if target else operational_stop(row, rounds, sandbox_fault=sandbox_fault)
     reward = r_verdict + BONUS_WEIGHT * bonus_tokens + BONUS_WEIGHT * bonus_time + shaped
     disposition, execution = row.get("disposition"), row.get("execution_status")
     return Trajectory(
@@ -821,8 +888,9 @@ def score_report(
 ) -> tuple[list[Trajectory], Scorecard]:
     """Score a saved report against its frozen dataset; ``results`` is keyed by run id.
 
-    ``results`` from ``load_results`` also name the target-side exception runs; a plain
-    mapping names none, so every ``ERROR`` keeps its operational reward.
+    ``results`` from ``load_results`` also name the target-side exception and sandbox
+    fault runs; a plain mapping names none, so every ``ERROR`` keeps its operational reward
+    and every recorded role ``ERROR`` stays behavioural.
     """
     dataset, requests, oracles = load_dataset(dataset_path)
     dataset_digest = digest(dataset)
@@ -832,7 +900,9 @@ def score_report(
     # The per-call output cap each case ran under; results and manifests do not carry
     # the budget, but the frozen request does and ``request_digest`` binds it.
     caps = {request.case.case_id: request.budget.max_output_tokens for request in requests}
-    targets = results.target_exceptions if isinstance(results, StoredResults) else frozenset()
+    stored = isinstance(results, StoredResults)
+    targets = results.target_exceptions if stored else frozenset()
+    faults = results.sandbox_faults if stored else frozenset()
     rows = [row for row in report.get("rows", []) if isinstance(row, Mapping)]
     unknown = sorted({str(row.get("case_id")) for row in rows} - set(kinds))
     if unknown:
@@ -848,6 +918,7 @@ def score_report(
             git_commit=run.git_commit,
             output_cap=caps[row["case_id"]],
             target_exception=str(row.get("run_id")) in targets,
+            sandbox_fault=str(row.get("run_id")) in faults,
         )
         for row, repeat in zip(rows, _row_repeats(rows), strict=True)
     ]
@@ -864,15 +935,18 @@ def score_report(
 
 class StoredResults(dict[str, InvestigationResult | None]):
     """Each run's committed result by run id, and the runs whose stored raw receipts show
-    a terminal ``ERROR`` as a target-side exception (``target_exception``)."""
+    a terminal ``ERROR`` as a target-side exception (``target_exception``) or a recorded
+    role ``ERROR`` as a sandbox fault (``sandbox_fault``)."""
 
     def __init__(
         self,
         results: Mapping[str, InvestigationResult | None],
         target_exceptions: Iterable[str] = (),
+        sandbox_faults: Iterable[str] = (),
     ):
         super().__init__(results)
         self.target_exceptions = frozenset(target_exceptions)
+        self.sandbox_faults = frozenset(sandbox_faults)
 
 
 def load_results(store: ArtifactStore, run_ids: Iterable[str]) -> StoredResults:
@@ -889,6 +963,7 @@ def load_results(store: ArtifactStore, run_ids: Iterable[str]) -> StoredResults:
     return StoredResults(
         results,
         (run_id for run_id, result in results.items() if target_exception(store, result)),
+        (run_id for run_id, result in results.items() if sandbox_fault(store, result)),
     )
 
 

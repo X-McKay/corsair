@@ -130,6 +130,8 @@ class CliArguments(argparse.Namespace):
     reference: str | None
     skip_tier1: bool
     smoke: bool
+    track: Literal["accuracy", "efficiency", "objective"]
+    target_language: str | None
     lock_command: Literal["status", "release"]
     force: bool
     no_lock: bool
@@ -885,7 +887,13 @@ async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
     from corsair.evaluation.gym.scoring import read_scorecard
 
     baseline, candidate = read_scorecard(Path(args.baseline)), read_scorecard(Path(args.candidate))
-    verdict = gate(baseline, candidate, smoke=args.smoke)
+    verdict = gate(
+        baseline,
+        candidate,
+        smoke=args.smoke,
+        track=args.track,
+        target_language=args.target_language,
+    )
     _emit_view(ui, render_gate(verdict, baseline, candidate), verdict)
     return verdict.exit_code
 
@@ -1140,6 +1148,8 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         root=root,
         tiers=tiers,
         skip=("tier1",) if args.skip_tier1 else (),
+        track=args.track,
+        target_language=args.target_language,
         observe=_gym_observer(ui),
         on_gate=show,
     )
@@ -1526,6 +1536,23 @@ def _lock_options(command: argparse.ArgumentParser) -> None:
     )
 
 
+def _gate_track_options(parsed: argparse.ArgumentParser) -> None:
+    """``--track`` and ``--target-language``: what ``gate`` decides on."""
+    parsed.add_argument(
+        "--track",
+        choices=("accuracy", "efficiency", "objective"),
+        default="objective",
+        help="objective: J +0.01 and tokens <= 1.10x; accuracy: verified accuracy up by one "
+        "case's majority and tokens <= 1.10x; efficiency: tokens or comparable p50 seconds "
+        "<= 0.90x with accuracy held. Every track needs no language regression",
+    )
+    parsed.add_argument(
+        "--target-language",
+        help="Accuracy track only: a baseline language whose verified accuracy rising also "
+        "qualifies",
+    )
+
+
 def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     """``corsair gym`` subcommands; each prints code-owned text or a JSON record."""
     commands = gym.add_subparsers(dest="gym_command", required=True, title="gym commands")
@@ -1576,8 +1603,10 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     gate_cmd.add_argument(
         "--smoke",
         action="store_true",
-        help="Report the objective margin without rejecting on it (a smoke result only)",
+        help="Report the track's improvement criterion without rejecting on it (a smoke "
+        "result only)",
     )
+    _gate_track_options(gate_cmd)
     replay_cmd = command(
         "replay", "One case's round timeline, per-call usage and failure stop; no services"
     )
@@ -1627,6 +1656,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     verify.add_argument(
         "--skip-tier1", action="store_true", help="Stop after tier0 (a smoke result only)"
     )
+    _gate_track_options(verify)
     verify.add_argument(
         "--temporal-address", help="Existing server; it must already have namespace corsair-gym"
     )

@@ -282,6 +282,24 @@ def test_a_two_tier_row_renders_both_gates_and_is_a_rejected_idea():
     ) in text
 
 
+def test_a_track_gate_names_its_track_in_the_ledger():
+    base = _gym_card(BASELINE, run_id="ref")
+    better = gate(base, _gym_card({**BASELINE, "py-b": ALL}, run_id="t1"), track="accuracy")
+    row = build_ledger_row(
+        None,
+        row_id="h1",
+        recorded_on=date(2026, 10, 27),
+        wave=1,
+        entry="experiment",
+        branch="gym/h1-x",
+        commit="b" * 40,
+        track="accuracy",
+        tier1=TierGate(reference="ref-w1-tier1", scorecard="t1.json", gate=better),
+    )
+    text = render_ledger([row], "# Ledger\n")
+    assert "| h1 | accuracy | `gym/h1-x@bbbbbbb` | — | ACCEPTED [accuracy] | — / +0.250 |" in text
+
+
 # CLI
 
 

@@ -42,6 +42,7 @@ from .evidence import RoleOutcome as RoleOutcome
 from .gym import Budgets as Budgets
 from .gym import GateDecision as GateDecision
 from .gym import GateReason as GateReason
+from .gym import GateTrack as GateTrack
 from .gym import GateVerdict as GateVerdict
 from .gym import GroupSummary as GroupSummary
 from .gym import KernelCase as KernelCase

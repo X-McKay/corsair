@@ -9,6 +9,7 @@ from typing import Any
 
 from corsair.contracts import (
     GateReason,
+    GateTrack,
     GateVerdict,
     GroupSummary,
     OperationalEpisode,
@@ -29,11 +30,39 @@ REASON_TEXT: dict[GateReason, str] = {
         "A regressed language would not regress had its operational stops verified; "
         "re-run cleanly before reading it."
     ),
+    GateReason.ACCURACY_NOT_IMPROVED: (
+        "Neither macro nor the target language's verified accuracy rose by one case's majority."
+    ),
+    GateReason.ACCURACY_BELOW_BASELINE: "Macro verified accuracy fell below the baseline's.",
+    GateReason.EFFICIENCY_NOT_IMPROVED: (
+        "Neither macro effective tokens nor comparable macro p50 seconds fell by 10 %."
+    ),
+    GateReason.LATENCY_NOT_COMPARABLE: (
+        "Latency was not counted: the runs recorded different or unknown concurrency, or an "
+        "operational episode (or an unknown count of them)."
+    ),
+}
+
+TRACK_TEXT: dict[GateTrack, str] = {
+    "objective": (
+        "Objective track: no language regressed, J gained at least 0.01 and macro "
+        "effective tokens stayed within 1.10x."
+    ),
+    "accuracy": (
+        "Accuracy track: no language regressed, macro (or the target language's) verified "
+        "accuracy rose by at least one case's majority, and macro effective tokens stayed "
+        "within 1.10x; J is reported, not decided on."
+    ),
+    "efficiency": (
+        "Efficiency track: no language regressed, macro verified accuracy held, and macro "
+        "effective tokens or comparable macro p50 seconds fell to 0.90x or below; J is "
+        "reported, not decided on."
+    ),
 }
 
 
 SMOKE_TEXT = (
-    "Smoke gate: the objective margin is reported but does not decide; "
+    "Smoke gate: the track's improvement criterion is reported but does not decide; "
     "an ACCEPTED smoke gate is not an acceptance."
 )
 
@@ -78,12 +107,20 @@ def _identity_line(changes: Mapping[str, bool | None]) -> str:
 
 def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard) -> str:
     """The gate decision, its fixed reasons and a side-by-side metric table."""
+    labels = (["smoke"] if verdict.smoke else []) + (
+        [] if verdict.track == "objective" else [f"{verdict.track} track"]
+    )
+    title = f" ({', '.join(labels)})" if labels else ""
     lines = [
-        f"## Gate{' (smoke)' if verdict.smoke else ''}: {verdict.decision.value}",
+        f"## Gate{title}: {verdict.decision.value}",
         "",
         f"Baseline `{verdict.baseline_run_id}`, candidate `{verdict.candidate_run_id}`.",
         "",
+        TRACK_TEXT[verdict.track],
+        "",
     ]
+    if verdict.target_language is not None:
+        lines.extend([f"Target language: {verdict.target_language}.", ""])
     if verdict.smoke:
         lines.extend([SMOKE_TEXT, ""])
     lines.extend([_identity_line(verdict.identity_changes), ""])
@@ -123,6 +160,8 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         for name, before, after in metrics
     ]
     rows.append(["Repeats", str(baseline.repeats), str(candidate.repeats), ""])
+    rows.append(["Token ratio", "", _number(verdict.token_ratio), ""])
+    rows.append(["p50 seconds ratio", "", _number(verdict.seconds_ratio), ""])
     lines.extend(_table(["Metric", "Baseline", "Candidate", "Delta"], rows))
     lines.append("")
     language_rows = []

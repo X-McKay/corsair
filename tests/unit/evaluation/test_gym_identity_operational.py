@@ -153,6 +153,23 @@ def test_a_payload_level_execution_error_with_a_role_error_is_behavioural():
     assert operational_stop(_failed(HEARTBEAT), [errored]) is None
 
 
+def test_a_sandbox_faulted_role_error_is_operational():
+    errored = _round(control_outcome=RoleOutcome.ERROR, adversarial_outcome=RoleOutcome.ERROR)
+    assert operational_stop(_failed(PAYLOAD_ERROR), [errored], sandbox_fault=True) is (
+        OperationalReason.SANDBOX_FAULT
+    )
+    assert operational_stop(_failed(PAYLOAD_ERROR), [errored]) is None
+    # Without a recorded role error the flag changes nothing; the ledger still decides.
+    assert operational_stop(_failed(PAYLOAD_ERROR), [], sandbox_fault=True) is None
+    assert operational_stop(_failed(HEARTBEAT), [], sandbox_fault=True) is (
+        OperationalReason.HEARTBEAT_TIMEOUT
+    )
+    assert (
+        operational_stop(_failed(PAYLOAD_ERROR, status="pass"), [errored], sandbox_fault=True)
+        is None
+    )
+
+
 def test_passed_rows_are_never_operational_and_unavailable_rows_always_are():
     assert operational_stop(_failed(HEARTBEAT, status="pass"), []) is None
     unavailable = {"run_id": "r", "case_id": "c", "status": "unavailable", "reason": "lost"}

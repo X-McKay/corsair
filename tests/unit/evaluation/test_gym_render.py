@@ -2,7 +2,12 @@
 
 from corsair.contracts import GateReason, RunContext, Trajectory
 from corsair.evaluation.gym.gate import gate
-from corsair.evaluation.gym.render import REASON_TEXT, render_gate, render_scorecard
+from corsair.evaluation.gym.render import (
+    REASON_TEXT,
+    TRACK_TEXT,
+    render_gate,
+    render_scorecard,
+)
 from corsair.evaluation.gym.scoring import build_scorecard
 
 CASES = {"py-a": "python.k/1", "rb-a": "ruby.k/1"}
@@ -47,6 +52,24 @@ def test_gate_table_is_deterministic_and_code_owned():
     assert "ACCEPTED" in text
     assert "| ruby |" in text
     assert "| Objective J |" in text
+
+
+def test_the_gate_view_names_its_track_and_rule():
+    baseline, candidate = _card("base", False), _card("cand", True)
+    objective = render_gate(gate(baseline, candidate), baseline, candidate)
+    assert objective.startswith("## Gate: ACCEPTED\n")
+    assert TRACK_TEXT["objective"] in objective
+    verdict = gate(baseline, candidate, track="accuracy", target_language="ruby")
+    text = render_gate(verdict, baseline, candidate)
+    assert text.startswith("## Gate (accuracy track): ACCEPTED\n")
+    assert TRACK_TEXT["accuracy"] in text
+    assert "Target language: ruby." in text
+    assert "| Token ratio |  | 1.000 |  |" in text
+    smoke = gate(baseline, baseline, track="efficiency", smoke=True)
+    view = render_gate(smoke, baseline, baseline)
+    assert view.startswith("## Gate (smoke, efficiency track): ACCEPTED\n")
+    assert REASON_TEXT[GateReason.EFFICIENCY_NOT_IMPROVED] in view
+    assert REASON_TEXT[GateReason.LATENCY_NOT_COMPARABLE] in view
 
 
 def test_scorecard_summary_lists_languages_kinds_and_failure_stops():
