@@ -3,7 +3,8 @@
 These exercise the content-tagged corsair-javascript image (just images-gym) and
 drivers/javascript/driver.mjs: a control that holds, an adversarial violation on
 vulnerable source, a safe variant that holds, an unexpected target exception, absent
-relevant coverage, and confirmed cleanup.
+relevant coverage, confirmed cleanup, and the callable bound through each code-owned
+export form (named property, the ``module.exports`` marker, ``default``).
 Marked docker so the suite stays independent; operation ids are per-process unique so
 concurrent suites in sibling worktrees never collide on a labelled container.
 """
@@ -105,6 +106,31 @@ module.exports = { mergePreferences };
 """
 
 
+# The module export itself is the callable (an anonymous function, so it has no name).
+MODULE_EXPORT = """module.exports = function (target, source) {
+  for (const key of Object.keys(source)) {
+    const value = source[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      if (!target[key] || typeof target[key] !== "object") {
+        target[key] = {};
+      }
+      module.exports(target[key], value);
+    } else {
+      target[key] = value;
+    }
+  }
+  return target;
+};
+"""
+
+# The callable is the export's `default` property (transpiled-ESM style CommonJS).
+DEFAULT_EXPORT = VULNERABLE.replace(
+    "module.exports = { mergePreferences };",
+    'Object.defineProperty(exports, "__esModule", { value: true });\n'
+    "exports.default = mergePreferences;",
+)
+
+
 def _docker_client() -> docker.DockerClient:
     try:
         client = docker.from_env()
@@ -143,13 +169,15 @@ def _submission() -> Submission:
     )
 
 
-def _prepared(tmp_path: Path, image_id: str, source_js: str, *, line: int):
+def _prepared(
+    tmp_path: Path, image_id: str, source_js: str, *, line: int, function: str = "mergePreferences"
+):
     project = tmp_path / "project"
     (project / "src").mkdir(parents=True)
     (project / "src" / "merge.js").write_text(source_js, encoding="utf-8")
     recipe = JavaScriptRecipe(
         module_file="src/merge.js",
-        function="mergePreferences",
+        function=function,
         fixed_arguments=[{}],
     )
     case = Case(
@@ -187,9 +215,11 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
     assert containers == []
 
 
-def _evaluate(client, tmp_path, source_js, *, line, operation):
+def _evaluate(client, tmp_path, source_js, *, line, operation, function="mergePreferences"):
     image_id = DockerSandbox(with_content_images(Settings()), client=client).image_id_for(JS_KIND)
-    settings, store, prepared = _prepared(tmp_path, image_id, source_js, line=line)
+    settings, store, prepared = _prepared(
+        tmp_path, image_id, source_js, line=line, function=function
+    )
     sandbox = DockerSandbox(settings, client=client, store=store)
     verifier = EvidenceVerifier(settings, store, sandbox)
     observation = verifier.evaluate(
@@ -257,4 +287,46 @@ def test_real_docker_js_absent_relevant_coverage_is_invalid(tmp_path: Path) -> N
     assert observation.control is not None
     assert observation.control.outcome.value == "INVALID"
     assert 3 not in observation.control.covered_lines
+    _assert_cleanup(client, operation)
+
+
+@pytest.mark.parametrize(
+    ("source_js", "function"),
+    [(MODULE_EXPORT, "module.exports"), (DEFAULT_EXPORT, "default")],
+    ids=["module-exports-marker", "default-property"],
+)
+def test_real_docker_js_binds_the_export_marker_callable(
+    tmp_path: Path, source_js: str, function: str
+) -> None:
+    client = _docker_client()
+    operation = _operation()
+    observation = _evaluate(
+        client, tmp_path, source_js, line=2, operation=operation, function=function
+    )
+
+    assert observation.cleanup_confirmed
+    assert observation.feedback is None
+    assert observation.control is not None and observation.adversarial is not None
+    # The receipt binds the callable: the control ran its body and held.
+    assert observation.control.outcome.value == "PROPERTY_HELD"
+    assert observation.control.target_executed
+    assert 2 in observation.control.covered_lines
+    assert observation.adversarial.outcome.value == "VIOLATION"
+    assert observation.adversarial.target_executed
+    assert 2 in observation.adversarial.covered_lines
+    _assert_cleanup(client, operation)
+
+
+def test_real_docker_js_module_export_is_never_bound_by_its_name(tmp_path: Path) -> None:
+    client = _docker_client()
+    operation = _operation()
+    # Without the explicit marker the driver does not guess: the named property is
+    # absent, so the existing callable-not-found path reports ERROR on the control.
+    named = MODULE_EXPORT.replace("module.exports = function (", "module.exports = function merge(")
+    observation = _evaluate(client, tmp_path, named, line=2, operation=operation, function="merge")
+
+    assert observation.cleanup_confirmed
+    assert observation.control is not None
+    assert observation.control.outcome.value == "ERROR"
+    assert not observation.control.target_executed
     _assert_cleanup(client, operation)

@@ -7,6 +7,18 @@ of ``PythonRecipe``: the investigator controls only the final positional argumen
 merge source); the callable, the module file and the leading fixed arguments are not
 editable. Support is deliberately CommonJS, dependency-free ``.js`` modules with one
 exported function, observed by Node's built-in test runner and V8 line coverage.
+
+``function`` names the callable the trusted driver binds, by one code-owned rule:
+
+- a public identifier binds the module export's property of that name
+  (``require(module_file)[function]``); ``"default"`` is such a name and binds
+  ``require(module_file).default``, the transpiled-ESM default export;
+- the exact marker ``"module.exports"`` binds the module export itself
+  (``module.exports = function ...``), never a property and never by the function's
+  ``.name``, so binding is never a guess.
+
+Anything that is not a function there is the driver's unchanged callable-not-found
+path. The finding line is bound to the same ``module_file`` coverage either way.
 """
 
 from __future__ import annotations
@@ -21,6 +33,8 @@ from ..common import Contract, safe_path
 
 # A conservative public JavaScript identifier (ASCII; `$` permitted, no leading digit).
 _JS_IDENTIFIER = re.compile(r"[A-Za-z$][A-Za-z0-9_$]*")
+# The one non-identifier ``function`` value: the module export itself is the callable.
+_MODULE_EXPORTS_MARKER = "module.exports"
 
 
 def _default_fixed_arguments() -> list[JsonValue]:
@@ -35,7 +49,9 @@ class JavaScriptRecipe(Contract):
     as the final positional argument to ``function(*fixed_arguments, payload)``. The
     module file, the callable and the fixed leading arguments are not editable. No
     private fixture or secret is involved: the observed property is whether invoking the
-    callable adds any enumerable property to ``Object.prototype``.
+    callable adds any enumerable property to ``Object.prototype``. ``function`` is a
+    named export property (``"default"`` included) or the ``"module.exports"`` marker for
+    a module whose export is the callable itself; see the module docstring.
     """
 
     kind: Literal["javascript.prototype_pollution/1"] = "javascript.prototype_pollution/1"
@@ -56,8 +72,8 @@ class JavaScriptRecipe(Contract):
     @field_validator("function")
     @classmethod
     def identifier(cls, value: str) -> str:
-        if not _JS_IDENTIFIER.fullmatch(value):
-            raise ValueError("expected a public JavaScript identifier")
+        if value != _MODULE_EXPORTS_MARKER and not _JS_IDENTIFIER.fullmatch(value):
+            raise ValueError("expected a public JavaScript identifier or 'module.exports'")
         return value
 
     @field_validator("fixed_arguments")
