@@ -1,0 +1,30 @@
+{
+  "c.integer_overflow/1": {
+    "effective_tokens": 37887.0,
+    "seconds": 63.05568812508136
+  },
+  "java.secret_disclosure/1": {
+    "effective_tokens": 64425.0,
+    "seconds": 165.45706344465725
+  },
+  "javascript.prototype_pollution/1": {
+    "effective_tokens": 45256.0,
+    "seconds": 87.58742326986976
+  },
+  "perl.html_injection/1": {
+    "effective_tokens": 35555.0,
+    "seconds": 86.14906284678727
+  },
+  "python.command_sentinel/1": {
+    "effective_tokens": 41248.0,
+    "seconds": 85.42083664308302
+  },
+  "python.secret_disclosure/1": {
+    "effective_tokens": 174386.0,
+    "seconds": 425.26873087789863
+  },
+  "ruby.secret_disclosure/1": {
+    "effective_tokens": 35848.0,
+    "seconds": 61.62675676983781
+  }
+}
