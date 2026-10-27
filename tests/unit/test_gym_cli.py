@@ -751,9 +751,15 @@ NOISY = {**BASELINE, "rb-a": NONE}
 
 
 def _identified(
-    path: Path, verified: dict[str, list[bool]], *, run_id: str, tokens: float = 100.0
+    path: Path,
+    verified: dict[str, list[bool]],
+    *,
+    run_id: str,
+    tokens: float = 100.0,
+    trajectories: bool = False,
 ) -> Path:
-    """A scorecard of the noise configuration: one recorded identity, one dataset."""
+    """A scorecard of the noise configuration: one recorded identity, one dataset; with
+    ``trajectories``, its per-case record beside it."""
     rows = [
         _trajectory(case, repeat, flag, tokens)
         for case, flags in verified.items()
@@ -762,6 +768,8 @@ def _identified(
     run = RunContext(run_id=run_id, git_branch="gym/loop", git_commit="a" * 40)
     card = build_scorecard(rows, run=run, dataset_digest="d" * 64, cases=CASES)
     write_scorecard(path, card.model_copy(update={"run_identity": NOISE_IDENTITY}))
+    if trajectories:
+        write_trajectories(path.parent / TRAJECTORIES_FILE, rows)
     return path
 
 
@@ -812,6 +820,32 @@ async def test_noise_refuses_runs_of_another_configuration_and_needs_a_tier_or_o
     assert out.is_file()
     with pytest.raises(SystemExit):
         _arguments("gym", "noise", str(first))
+
+
+@pytest.mark.asyncio
+async def test_noise_reads_per_case_stability_from_the_trajectories_beside_each_scorecard(
+    tmp_path, capsys
+):
+    root = tmp_path / "gym"
+    first = root / "runs/gym-tier1-20261027t012146-ade22e"
+    second = root / "runs/gym-tier1-20261027t111450-29968e"
+    _identified(first / SCORECARD_FILE, BASELINE, run_id=first.name, trajectories=True)
+    _identified(second / SCORECARD_FILE, NOISY, run_id=second.name)
+    args = ["gym", "noise", str(first), str(second), "--root", str(root)]
+    # The second run's trajectories are missing: no per-case stability, and why.
+    assert await _run(_arguments(*args, "--out", str(tmp_path / "partial.json"))) == 0
+    partial = json.loads(capsys.readouterr().out)
+    assert partial["cases"] is None
+    assert partial["cases_unknown"] == "trajectories_missing"
+    assert partial["cases_unknown_runs"] == [second.name]
+    _identified(second / SCORECARD_FILE, NOISY, run_id=second.name, trajectories=True)
+    complete = _arguments(*args, "--out", str(tmp_path / "band.json"), format="markdown")
+    assert await _run(complete) == 0
+    assert "- Unstable (a flip counts neither way): `rb-a`" in capsys.readouterr().out
+    band = read_noise(tmp_path / "band.json")
+    assert band.cases is not None
+    unstable = [case.case_id for case in band.cases if case.stability == "unstable"]
+    assert unstable == ["rb-a"]
 
 
 def _band(tmp_path: Path) -> Path:
@@ -946,7 +980,13 @@ async def test_gate_min_cases_decides_on_deciding_languages_with_paired_outcomes
     # The reference copy's trajectories come from <root>/runs/<its run id>/.
     assert (paired["pass_to_fail"], paired["fail_to_pass"]) == (1, 1)
     assert paired["pass_to_fail_cases"] == [
-        {"case_id": "rb-a", "language": "ruby", "deciding": False, "within_noise": False}
+        {
+            "case_id": "rb-a",
+            "language": "ruby",
+            "deciding": False,
+            "within_noise": False,
+            "noise_reason": None,
+        }
     ]
     assert (paired["deciding_pass_to_fail"], paired["deciding_fail_to_pass"]) == (0, 1)
     assert await _run(_arguments(*narrowed, format="markdown")) == 0

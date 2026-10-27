@@ -385,9 +385,120 @@ def test_a_single_case_flip_inside_a_whole_case_band_is_noise_never_a_regression
     assert GateReason.PAIRED_REGRESSION not in with_band.reasons
     assert with_band.paired is not None
     assert with_band.paired.pass_to_fail_cases == [
-        PairedCase(case_id="rb-a", language="ruby", within_noise=True)
+        PairedCase(case_id="rb-a", language="ruby", within_noise=True, noise_reason="language_band")
     ]
     assert with_band.paired.deciding_pass_to_fail == 0
+
+
+# Per-case stability from the band: a coin-flip case's flip is noise, a stable case's is not
+
+# Three runs of one configuration in which python's accuracy never moves (its band is
+# zero) while each of its cases loses its majority once: every python case is a coin-flip.
+COIN_FLIPS = (
+    BASELINE,
+    {**BASELINE, "py-a": NONE, "py-c": ALL},
+    {**BASELINE, "py-b": NONE, "py-c": ALL},
+)
+
+
+def _case_band(*runs: dict[str, list[bool]], cases: bool = True) -> NoiseBand:
+    sides = [_side(verified, f"ref-{index}") for index, verified in enumerate(runs)]
+    trajectories = [rows for _, rows in sides] if cases else None
+    return noise_band([card for card, _ in sides], trajectories)
+
+
+def test_a_flip_on_a_case_the_band_classifies_unstable_is_noise_and_counts_neither_way():
+    band = _case_band(*COIN_FLIPS)
+    assert band.languages["python"].band == 0.0
+    record = {**BASELINE, "py-a": NONE, "py-c": ALL}
+    paired = paired_outcomes(
+        _rows(BASELINE, "base"), _rows(record, "cand"), deciding=["python"], noise=band
+    )
+    assert paired.pass_to_fail_cases == [
+        PairedCase(
+            case_id="py-a", language="python", within_noise=True, noise_reason="unstable_case"
+        )
+    ]
+    assert paired.fail_to_pass_cases == [
+        PairedCase(
+            case_id="py-c", language="python", within_noise=True, noise_reason="unstable_case"
+        )
+    ]
+    assert (paired.deciding_pass_to_fail, paired.deciding_fail_to_pass) == (0, 0)
+    # Without a band, or with one that recorded no cases, both flips count as before.
+    for other in (None, _case_band(*COIN_FLIPS, cases=False)):
+        plain = paired_outcomes(
+            _rows(BASELINE, "base"), _rows(record, "cand"), deciding=["python"], noise=other
+        )
+        assert (plain.deciding_pass_to_fail, plain.deciding_fail_to_pass) == (1, 1)
+        assert all(case.noise_reason is None for case in plain.pass_to_fail_cases)
+
+
+def test_a_flip_on_a_stable_case_stays_a_flip_and_decides_the_paired_regression():
+    band = _case_band(*COIN_FLIPS)
+    better = {**BASELINE, "py-c": ALL}
+    fallen = {**BASELINE, "py-a": NONE, "py-b": NONE, "py-c": ALL}
+    options = {"track": "accuracy", "target_language": "python"}
+    assert _crossed(BASELINE, better, fallen, **options).reasons == [GateReason.PAIRED_REGRESSION]
+    # Every python flip is a coin-flip in the band: nothing deciding fell.
+    noise = _crossed(BASELINE, better, fallen, noise=band, **options)
+    assert noise.decision is GateDecision.ACCEPTED
+    assert noise.paired is not None
+    assert (noise.paired.deciding_pass_to_fail, noise.paired.deciding_fail_to_pass) == (0, 0)
+    # jv-a passes in every band run: its fall is a real flip.
+    stable = _crossed(BASELINE, better, {**fallen, "jv-a": NONE}, noise=band, **options)
+    assert stable.reasons == [GateReason.PAIRED_REGRESSION]
+    assert stable.paired is not None
+    jv_a = next(case for case in stable.paired.pass_to_fail_cases if case.case_id == "jv-a")
+    assert (jv_a.within_noise, jv_a.noise_reason) == (False, None)
+
+
+def test_a_coin_flip_case_in_a_whole_case_language_is_named_by_its_case():
+    flipped = {**BASELINE, "rb-a": NONE}
+    record = {**BASELINE, "rb-a": NONE}
+    for cases, reason in ((True, "unstable_case"), (False, "language_band")):
+        band = _case_band(BASELINE, flipped, cases=cases)
+        paired = paired_outcomes(
+            _rows(BASELINE, "base"), _rows(record, "cand"), deciding=["ruby"], noise=band
+        )
+        assert [(case.within_noise, case.noise_reason) for case in paired.pass_to_fail_cases] == [
+            (True, reason)
+        ]
+
+
+def test_a_noise_reason_needs_a_flip_within_noise_and_old_records_decode():
+    with pytest.raises(ValueError, match="within noise"):
+        PairedCase(case_id="py-a", language="python", noise_reason="unstable_case")
+    # A flip recorded within noise before reasons existed decodes without one.
+    old = PairedCase.model_validate({"case_id": "rb-a", "language": "ruby", "within_noise": True})
+    assert old.noise_reason is None
+
+
+def test_the_paired_view_names_why_a_flip_is_noise_and_the_bands_classification():
+    band = _case_band(*COIN_FLIPS)
+    better = {**BASELINE, "py-c": ALL}
+    fallen = {**BASELINE, "py-a": NONE, "py-c": ALL, "jv-a": NONE}
+    verdict = _crossed(
+        BASELINE, better, fallen, track="accuracy", target_language="python", noise=band
+    )
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(better, "cand")
+    text = render_gate(verdict, before, after)
+    assert "- Pass to fail: `jv-a` (java), `py-a` (python, within noise: unstable case)" in text
+    assert "- Fail to pass: `py-c` (python, within noise: unstable case)" in text
+    assert "- Noise band per-case stability: 2 stable pass, 1 stable fail, 3 unstable." in text
+    assert "- Unstable in the band: `py-a`, `py-b`, `py-c`" in text
+    assert "- Stable fail in the band: `jv-b`" in text
+    language = _crossed(
+        BASELINE,
+        better,
+        {**BASELINE, "rb-a": NONE, "py-c": ALL},
+        track="accuracy",
+        target_language="python",
+        noise=_case_band(BASELINE, {**BASELINE, "rb-a": NONE}, cases=False),
+    )
+    view = render_gate(language, before, after)
+    assert "`rb-a` (ruby, within noise: language band)" in view
+    assert "- Noise band per-case stability: unknown (the band recorded none)." in view
 
 
 def test_an_incomparable_gate_reads_no_paired_outcomes():

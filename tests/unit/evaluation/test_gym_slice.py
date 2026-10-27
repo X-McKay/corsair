@@ -168,7 +168,7 @@ def test_a_single_case_language_flip_inside_a_whole_case_band_is_noise_in_a_slic
     assert with_band.decision is GateDecision.ACCEPTED
     assert with_band.paired is not None
     assert with_band.paired.pass_to_fail_cases == [
-        PairedCase(case_id="rb-a", language="ruby", within_noise=True)
+        PairedCase(case_id="rb-a", language="ruby", within_noise=True, noise_reason="language_band")
     ]
     # A rise inside a whole-case band is no improvement either.
     risen = _screen({"py-a": FIVE, "rb-a": FIVE}, flipped, noise=band)
@@ -176,6 +176,65 @@ def test_a_single_case_language_flip_inside_a_whole_case_band_is_noise_in_a_slic
     # The band must be the baseline's (dataset, budgets, repeats); the slice may run 5.
     other = band.model_copy(update={"repeats": 5})
     assert _screen(candidate, noise=other).reasons == [GateReason.NOISE_MISMATCH]
+
+
+def _case_band(again: dict[str, list[bool]], *, cases: bool = True):
+    """The band of the baseline configuration and one repeat run, with per-case stability."""
+    (ref, ref_rows), (second, second_rows) = _side(BASELINE, "ref"), _side(again, "again")
+    return noise_band([ref, second], [ref_rows, second_rows] if cases else None)
+
+
+def test_a_slice_verdict_names_the_slice_cases_the_band_classifies_unstable():
+    # py-a lost its majority in the band's second run: a coin-flip sentinel.
+    band = _case_band({**BASELINE, "py-a": [True, False, False]})
+    verdict = _screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}, noise=band)
+    assert verdict.decision is GateDecision.ACCEPTED
+    assert verdict.slice_unstable_cases == ["py-a"]
+    # The coin-flip sentinel falling is noise, never a slice regression.
+    fallen = _screen({"py-a": FIVE_NONE, "py-b": FIVE, "py-c": FIVE}, noise=band)
+    assert fallen.decision is GateDecision.ACCEPTED
+    assert fallen.paired is not None
+    assert fallen.paired.pass_to_fail_cases == [
+        PairedCase(
+            case_id="py-a", language="python", within_noise=True, noise_reason="unstable_case"
+        )
+    ]
+    # A stable sentinel falling still regresses the slice.
+    stable = _screen({"py-a": FIVE, "py-b": FIVE_NONE, "py-c": FIVE}, noise=band)
+    assert stable.reasons == [GateReason.SLICE_REGRESSED]
+    # A coin-flip target rising is no improvement.
+    target = _case_band({**BASELINE, "py-c": [True, True, False]})
+    risen = _screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}, noise=target)
+    assert risen.reasons == [GateReason.SLICE_NOT_IMPROVED]
+    assert risen.slice_unstable_cases == ["py-c"]
+    # No band, or a band that recorded no cases: nothing named, decisions as before.
+    for other in (None, _case_band({**BASELINE, "py-a": [True, False, False]}, cases=False)):
+        plain = _screen({"py-a": FIVE_NONE, "py-b": FIVE, "py-c": FIVE}, noise=other)
+        assert plain.slice_unstable_cases == []
+        assert plain.reasons == [GateReason.SLICE_REGRESSED]
+
+
+def test_the_slice_view_names_its_unstable_cases_or_says_they_are_unknown():
+    candidate = {"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}
+    before, before_rows = _side(BASELINE, "base")
+    after, after_rows = _sliced(candidate, "cand")
+    views = (
+        slice_scorecard(before, before_rows, list(SLICE)),
+        slice_scorecard(after, after_rows, list(SLICE)),
+    )
+    band = _case_band({**BASELINE, "py-a": [True, False, False]})
+    text = render_gate(_screen(candidate, noise=band), *views)
+    assert (
+        "Unstable in the noise band (a flip there counts neither way; a sentinel there "
+        "guards nothing): `py-a`."
+    ) in text
+    steady = render_gate(_screen(candidate, noise=_case_band(BASELINE)), *views)
+    assert "Unstable in the noise band (a flip there counts neither way" in steady
+    assert "guards nothing): none." in steady
+    unknown = _case_band({**BASELINE, "py-a": [True, False, False]}, cases=False)
+    view = render_gate(_screen(candidate, noise=unknown), *views)
+    assert "Unstable in the noise band: unknown (the band recorded no per-case stability)." in view
+    assert "Unstable in the noise band" not in render_gate(_screen(candidate), *views)
 
 
 def test_a_slice_gate_refuses_options_that_do_not_apply_and_foreign_trajectories():

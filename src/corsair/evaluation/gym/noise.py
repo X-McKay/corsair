@@ -5,15 +5,27 @@ the gate could compare them (same dataset and budgets, unsliced, enough repeats,
 token usage) and they also recorded one configuration identity and one repeat count, so
 their spread is that configuration's run-to-run noise. A gate given the band reads a
 delta inside it as noise (``evaluation.gym.gate``).
+
+Given each run's trajectories, the band also classifies every case scored in all runs by
+its majority outcome per run (``case_outcomes``): ``stable_pass``, ``stable_fail`` or
+``unstable``. A run without trajectories reproducing its scorecard leaves the cases
+unknown, with the reason and the run named; nothing is guessed.
 """
 
 import json
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from corsair.contracts import GateReason, NoiseBand, Scorecard
-from corsair.evaluation.gym.gate import MIN_REPEATS, incomparable_reasons, spread
+from corsair.contracts import CaseStability, GateReason, NoiseBand, NoiseCase, Scorecard, Trajectory
+from corsair.evaluation.gym.gate import (
+    MIN_REPEATS,
+    incomparable_reasons,
+    spread,
+    trajectories_reproduce,
+)
 from corsair.evaluation.gym.render import REASON_TEXT
+from corsair.evaluation.gym.scoring import case_outcomes
 
 
 class NoiseRefused(ValueError):
@@ -38,8 +50,15 @@ def noise_refusals(cards: Sequence[Scorecard], min_repeats: int = MIN_REPEATS) -
     return [reason for reason in GateReason if reason in reasons]
 
 
-def noise_band(cards: Sequence[Scorecard]) -> NoiseBand:
-    """The band of two or more distinct runs of one configuration; refused otherwise."""
+def noise_band(
+    cards: Sequence[Scorecard],
+    trajectories: Sequence[Sequence[Trajectory] | None] | None = None,
+) -> NoiseBand:
+    """The band of two or more distinct runs of one configuration; refused otherwise.
+
+    ``trajectories`` follow ``cards``; each run's must reproduce its scorecard for the
+    band to classify cases, and without them every run is named as missing its own.
+    """
     if len(cards) < 2:
         raise ValueError("a noise band needs at least two runs")
     runs = [card.run.run_id for card in cards]
@@ -48,9 +67,17 @@ def noise_band(cards: Sequence[Scorecard]) -> NoiseBand:
     reasons = noise_refusals(cards)
     if reasons:
         raise NoiseRefused(reasons)
+    if trajectories is not None and len(trajectories) != len(cards):
+        raise ValueError("a noise band reads one trajectory record per run")
     first = cards[0]
     seconds = [card.macro_p50_seconds for card in cards]
     languages = sorted(set().union(*(card.languages for card in cards)))
+    records = list(trajectories) if trajectories is not None else [None] * len(cards)
+    missing = [
+        card.run.run_id
+        for card, rows in zip(cards, records, strict=True)
+        if rows is None or not trajectories_reproduce(card, rows)
+    ]
     return NoiseBand(
         dataset_digest=first.dataset_digest,
         budgets_digest=first.budgets_digest,
@@ -73,7 +100,36 @@ def noise_band(cards: Sequence[Scorecard]) -> NoiseBand:
             language: spread([_verified(card, language) for card in cards])
             for language in languages
         },
+        cases=None if missing else _noise_cases([rows or [] for rows in records]),
+        cases_unknown="trajectories_missing" if missing else None,
+        cases_unknown_runs=missing,
     )
+
+
+def _noise_cases(runs: Sequence[Sequence[Trajectory]]) -> list[NoiseCase]:
+    """Every case scored in all ``runs``, by its majority outcome and verified count per run."""
+    outcomes = [case_outcomes(rows) for rows in runs]
+    verified = [Counter(item.case_id for item in rows if item.verified) for rows in runs]
+    shared = set(outcomes[0]).intersection(*outcomes[1:])
+    cases = []
+    for case in sorted(shared):
+        majority = [run[case][1] for run in outcomes]
+        cases.append(
+            NoiseCase(
+                case_id=case,
+                language=outcomes[0][case][0],
+                majority_verified=majority,
+                verified_episodes=[counts[case] for counts in verified],
+                stability=_stability(majority),
+            )
+        )
+    return cases
+
+
+def _stability(majority: Sequence[bool]) -> CaseStability:
+    if all(majority):
+        return "stable_pass"
+    return "unstable" if any(majority) else "stable_fail"
 
 
 def _verified(card: Scorecard, language: str) -> float:

@@ -989,14 +989,20 @@ def _gate_trajectories(args: CliArguments, path: Path, card: Scorecard) -> list[
 
 async def _handle_gym_noise(args: CliArguments, ui: Terminal) -> int:
     """Write the noise band of two or more runs of one configuration; refuse others (exit 2)."""
-    from corsair.entrypoints.gym import noise_tier, run_scorecard
+    from corsair.entrypoints.gym import noise_tier, run_scorecard, scorecard_trajectories
     from corsair.evaluation.gym.noise import noise_band, write_noise
     from corsair.evaluation.gym.render import render_noise
     from corsair.evaluation.gym.scoring import read_scorecard
 
     paths = [Path(path) for path in (args.noise_first, *args.noise_rest)]
     cards = [read_scorecard(run_scorecard(path)) for path in paths]
-    band = noise_band(cards)
+    # Per-case stability reads each run's trajectories; a run without them is named.
+    runs = _gym_root(args) / "runs"
+    trajectories = [
+        scorecard_trajectories(run_scorecard(path), card, runs)[0]
+        for path, card in zip(paths, cards, strict=True)
+    ]
+    band = noise_band(cards, trajectories)
     if args.out:
         out = Path(args.out)
     else:

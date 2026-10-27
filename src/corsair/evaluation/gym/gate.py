@@ -53,7 +53,10 @@ compared by its majority outcome (``pass_to_fail``, ``fail_to_pass``, ``stable_p
 ``stable_fail``). On the accuracy or objective track a gate that would otherwise accept
 rejects with ``paired_regression`` when, among the deciding languages, more cases went
 from pass to fail than from fail to pass. With a band, a flip in a language whose band is
-a whole case (±1.0) is noise and never counts.
+a whole case (±1.0) is noise and never counts (``language_band``), and so is a flip of a
+case the band classifies ``unstable``: its majority outcome already differed between runs
+of the reference configuration (``unstable_case``). A flip of a ``stable_pass`` or
+``stable_fail`` case stays a flip; a band without per-case stability reads languages only.
 
 Slice screens (``slice=True``): a sliced candidate (``gym run --case``) is gated against
 an unsliced baseline, or one sliced to exactly the same cases, on the candidate's cases
@@ -64,7 +67,9 @@ which is a screen for the full tier run and never an acceptance. Different datas
 budgets, too few repeats on either side, a band of another dataset, budgets or baseline
 repeat count, and a slice the baseline did not score (``slice_mismatch``) are INCOMPARABLE.
 J, macro accuracy, tokens and language deltas are recomputed over the slice and reported;
-they never decide, and neither does unknown token usage.
+they never decide, and neither does unknown token usage. The verdict names the slice
+cases the band classifies ``unstable`` (``slice_unstable_cases``), so a coin-flip sentinel
+is visible; that is reported, never a refusal.
 """
 
 from collections import Counter
@@ -73,6 +78,7 @@ from statistics import mean
 
 from corsair.contracts import (
     DecidingMetric,
+    FlipNoise,
     GateDecision,
     GateReason,
     GateTrack,
@@ -314,6 +320,25 @@ def _whole_case(band: NoiseSpread | None) -> bool:
     return band is not None and band.band >= 1.0 - _EPSILON
 
 
+def unstable_cases(noise: NoiseBand | None) -> set[str]:
+    """The cases ``noise`` classifies ``unstable``; none without a band or its cases."""
+    if noise is None or noise.cases is None:
+        return set()
+    return {case.case_id for case in noise.cases if case.stability == "unstable"}
+
+
+def _flip_noise(
+    noise: NoiseBand | None, case: str, language: str, unstable: Collection[str]
+) -> FlipNoise | None:
+    """Why a flip is within ``noise``: the case is a coin-flip, or its language's band is
+    a whole case; ``None`` when it is a real flip."""
+    if noise is None:
+        return None
+    if case in unstable:
+        return "unstable_case"
+    return "language_band" if _whole_case(noise.languages.get(language)) else None
+
+
 _PAIRING = {
     (True, True): "stable_pass",
     (True, False): "pass_to_fail",
@@ -333,9 +358,10 @@ def paired_outcomes(
 
     A flip in a language outside ``deciding`` is listed but never counted in
     ``deciding_pass_to_fail``/``deciding_fail_to_pass``; with ``noise`` neither is a flip in
-    a language whose band is a whole case.
+    a language whose band is a whole case or of a case the band classifies ``unstable``.
     """
     before, after = case_outcomes(baseline), case_outcomes(candidate)
+    unstable = unstable_cases(noise)
     totals: Counter[str] = Counter()
     languages: dict[str, Counter[str]] = {}
     flips: dict[str, list[PairedCase]] = {"pass_to_fail": [], "fail_to_pass": []}
@@ -347,11 +373,13 @@ def paired_outcomes(
         languages.setdefault(language, Counter())[outcome] += 1
         if outcome not in flips:
             continue
+        reason = _flip_noise(noise, case, language, unstable)
         flip = PairedCase(
             case_id=case,
             language=language,
             deciding=language in deciding,
-            within_noise=noise is not None and _whole_case(noise.languages.get(language)),
+            within_noise=reason is not None,
+            noise_reason=reason,
         )
         flips[outcome].append(flip)
         if flip.deciding and not flip.within_noise:
@@ -688,6 +716,12 @@ def _slice_gate(
         slice=True,
         slice_cases=cases,
         slice_repeats=after_repeats,
+        # A band of another dataset or repeat count names nothing about these cases.
+        slice_unstable_cases=(
+            []
+            if GateReason.NOISE_MISMATCH in reasons
+            else sorted(unstable_cases(noise) & set(cases))
+        ),
     )
 
 
