@@ -57,6 +57,7 @@ from corsair.contracts import (
     BatchRequest,
     Budgets,
     GateDecision,
+    GateTrack,
     InvestigationRequest,
     InvestigationResult,
     RunContext,
@@ -72,7 +73,7 @@ from corsair.entrypoints.worker import compose_worker, compose_worker_activities
 from corsair.evaluation.datasets import load_dataset
 from corsair.evaluation.families import label_rows
 from corsair.evaluation.gym.budgets import budgets_digest, load_budgets
-from corsair.evaluation.gym.gate import chain_decision, gate
+from corsair.evaluation.gym.gate import admit_track, chain_decision, gate
 from corsair.evaluation.gym.ledger import candidate_identity
 from corsair.evaluation.gym.scoring import (
     REPORT_FILE,
@@ -1145,6 +1146,7 @@ def verify_record(
     decision: GateDecision,
     reference: Path,
     invocation: Sequence[str],
+    track: GateTrack = "objective",
 ) -> VerifyRecord:
     """``verdict.json``: the candidate's identity, the chain decision and each tier's gate.
 
@@ -1157,6 +1159,7 @@ def verify_record(
     return VerifyRecord(
         branch=branch,
         commit=commit,
+        track=track,
         tier0=gates.get("tier0"),
         tier1=gates.get("tier1"),
         decision=decision,
@@ -1178,13 +1181,16 @@ async def verify_candidate(
     compose_activities: ActivityComposer = compose_worker_activities,
     observe: BatchObserver = wait_for_result,
     on_gate: GateObserver | None = None,
+    track: GateTrack = "objective",
+    target_language: str | None = None,
 ) -> Verification:
     """Run and gate tier0, then tier1 unless tier0 was rejected.
 
-    Each tier is gated against ``<reference>/<tier>.json``; ``tiers`` maps ``tier0`` and
-    ``tier1``, in that order, to their manifests. The gym root's run lock is held once
-    across every tier. The canonical ``VerifyRecord`` is written to ``verdict.json`` under
-    the gym root.
+    Each tier is gated against ``<reference>/<tier>.json`` on ``track`` (tier0 as a smoke
+    gate); ``tiers`` maps ``tier0`` and ``tier1``, in that order, to their manifests. A
+    ``target_language`` is checked against every reference before any tier runs. The gym
+    root's run lock is held once across every tier. The canonical ``VerifyRecord`` is
+    written to ``verdict.json`` under the gym root.
     """
     if tuple(tiers) != VERIFY_TIERS:
         raise ValueError(f"verify runs exactly {', '.join(VERIFY_TIERS)}, in that order")
@@ -1194,6 +1200,9 @@ async def verify_candidate(
     if missing:
         raise ValueError(f"no reference scorecard {', '.join(missing)}")
     baselines = {name: read_scorecard(path) for name, path in references.items()}
+    for baseline in baselines.values():
+        # Refuse a target language a reference lacks now, not after an hour of runs.
+        admit_track(baseline, track, target_language)
     gates: dict[str, TierGate] = {}
     runs: dict[str, GymRun] = {}
     skipped: dict[str, SkipReason] = {name: "skipped_by_request" for name in tiers if name in skip}
@@ -1222,8 +1231,15 @@ async def verify_candidate(
                 reference=str(references[name]),
                 scorecard=str(run.run_dir / SCORECARD_FILE),
                 run_dir=str(run.run_dir),
-                # tier0 is the smoke gate: the objective margin is reported, never rejecting.
-                gate=gate(baselines[name], run.scorecard, smoke=(name == "tier0")),
+                # tier0 is the smoke gate: the track's improvement criterion is reported,
+                # never rejecting.
+                gate=gate(
+                    baselines[name],
+                    run.scorecard,
+                    smoke=(name == "tier0"),
+                    track=track,
+                    target_language=target_language,
+                ),
             )
             if on_gate is not None:
                 on_gate(name, gates[name], baselines[name], run)
@@ -1236,6 +1252,7 @@ async def verify_candidate(
         decision=decision,
         reference=reference,
         invocation=options.invocation,
+        track=track,
     )
     verdict_path = gym_root / "verify" / verify_id / VERDICT_FILE
     _write_json(verdict_path, record.model_dump(mode="json"))

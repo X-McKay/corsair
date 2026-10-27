@@ -83,6 +83,11 @@ def test_gym_run_defaults_and_filters():
         (["gym", "run", "tier0", "--repeats", "9"], "argument --repeats: invalid choice"),
         (["gym", "replay", "run-dir"], "the following arguments are required: --case"),
         (["gym", "ledger"], "the following arguments are required: ledger_command"),
+        (
+            ["gym", "gate", "--baseline", "a", "--candidate", "b", "--track", "speed"],
+            "argument --track: invalid choice",
+        ),
+        (["gym", "verify", "--track", "latency"], "argument --track: invalid choice"),
     ],
 )
 def test_malformed_gym_commands_exit_with_usage(capsys, arguments, message):
@@ -126,6 +131,29 @@ async def test_gate_markdown_is_the_rendered_view(tmp_path, capsys):
     out = capsys.readouterr().out
     assert out.startswith("## Gate: REJECTED")
     assert "The objective J gained less than the required margin." in out
+
+
+@pytest.mark.asyncio
+async def test_gate_decides_on_the_requested_track(tmp_path, capsys):
+    baseline = _card(tmp_path / "base.json", BASELINE, run_id="base")
+    better = _card(tmp_path / "cand.json", {**BASELINE, "py-b": ALL}, run_id="cand")
+    pair = ["gym", "gate", "--baseline", str(baseline)]
+
+    same = _arguments(*pair, "--candidate", str(baseline), "--track", "accuracy")
+    assert await _run(same) == 1
+    verdict = json.loads(capsys.readouterr().out)
+    assert (verdict["track"], verdict["reasons"]) == ("accuracy", ["accuracy_not_improved"])
+    targeted = [*pair, "--candidate", str(better), "--track", "accuracy"]
+    assert await _run(_arguments(*targeted, "--target-language", "python")) == 0
+    verdict = json.loads(capsys.readouterr().out)
+    assert (verdict["track"], verdict["target_language"]) == ("accuracy", "python")
+    efficiency = [*pair, "--candidate", str(baseline), "--track", "efficiency"]
+    assert await _run(_arguments(*efficiency, format="markdown")) == 1
+    assert capsys.readouterr().out.startswith("## Gate (efficiency track): REJECTED")
+    assert await _run(_arguments(*pair, "--candidate", str(better))) == 0
+    assert json.loads(capsys.readouterr().out)["track"] == "objective"
+    with pytest.raises(ValueError, match="only to the accuracy track"):
+        await _run(_arguments(*pair, "--candidate", str(better), "--target-language", "python"))
 
 
 # budgets, export and ledger
@@ -592,6 +620,33 @@ async def test_a_verify_record_appends_to_the_ledger_and_renders(tmp_path, capsy
 def test_verify_defaults_to_the_standard_protocol():
     args = _arguments("gym", "verify")
     assert (args.reference, args.repeats, args.concurrency, args.skip_tier1) == (None, 3, 2, False)
+    assert (args.track, args.target_language) == ("objective", None)
+
+
+@pytest.mark.asyncio
+async def test_verify_gates_every_tier_on_its_track_and_records_it(tmp_path, capsys, monkeypatch):
+    ran = _fake_runs(monkeypatch, tmp_path, {"tier0": BASELINE, "tier1": {**BASELINE, "py-b": ALL}})
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    verify = ["gym", "verify", "--reference", str(_reference(tmp_path)), *settings]
+
+    assert await _run(_arguments(*verify, "--track", "accuracy")) == 0
+    record = VerifyRecord.model_validate_json(
+        Path(json.loads(capsys.readouterr().out)["verdict"]).read_text()
+    )
+    assert record.track == "accuracy"
+    assert record.tier0 is not None and record.tier1 is not None
+    # tier0 is the smoke gate: its unchanged accuracy is reported, never rejecting.
+    assert record.tier0.gate.track == record.tier1.gate.track == "accuracy"
+    assert record.tier0.gate.reasons == ["accuracy_not_improved"]
+    assert record.tier1.gate.decision is GateDecision.ACCEPTED
+    assert ran == ["tier0", "tier1"]
+
+    ran.clear()
+    with pytest.raises(ValueError, match="not a baseline language"):
+        await _run(_arguments(*verify, "--track", "accuracy", "--target-language", "c"))
+    with pytest.raises(ValueError, match="only to the accuracy track"):
+        await _run(_arguments(*verify, "--target-language", "python"))
+    assert ran == []
 
 
 # The run lock

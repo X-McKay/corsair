@@ -98,8 +98,9 @@ class RunIdentity(Contract):
 class OperationalReason(StrEnum):
     """Why a failed episode stopped for an operational, not a behavioural, reason.
 
-    Derived only from code-owned gate-ledger gates and workflow-owned reason text (see
-    ``evaluation.gym.scoring.operational_stop``); never from model-authored text.
+    Derived only from code-owned gate-ledger gates, workflow-owned reason text and the
+    stored raw receipts' structure (see ``evaluation.gym.scoring.operational_stop``);
+    never from model-authored text.
     """
 
     HEARTBEAT_TIMEOUT = "heartbeat_timeout"
@@ -110,6 +111,10 @@ class OperationalReason(StrEnum):
     EXECUTION_CANCELLED = "execution_cancelled"
     EVIDENCE_NOT_RUN = "evidence_not_run"
     RESULT_UNAVAILABLE = "result_unavailable"
+    # A recorded role ``ERROR`` whose stored raw receipt has no driver record (the sandbox
+    # adapter's own record, e.g. ``SandboxExecutionError``), or whose evidence bundle or
+    # raw receipt is missing: the sandbox, not the payload or the target, failed.
+    SANDBOX_FAULT = "sandbox_fault"
 
 
 class OperationalEpisode(Contract):
@@ -305,6 +310,21 @@ class GateReason(StrEnum):
     # Names a rejection, never causes one: a regressed language would not regress had
     # its operational episodes verified, so the orchestrator orders a clean re-run.
     OPERATIONALLY_CONFOUNDED = "operationally_confounded"
+    # Accuracy track: neither macro nor the target language's verified accuracy rose.
+    ACCURACY_NOT_IMPROVED = "accuracy_not_improved"
+    # Efficiency track: macro verified accuracy fell below the baseline's.
+    ACCURACY_BELOW_BASELINE = "accuracy_below_baseline"
+    # Efficiency track: neither macro effective tokens nor (comparable) p50 seconds fell 10 %.
+    EFFICIENCY_NOT_IMPROVED = "efficiency_not_improved"
+    # Never causes a rejection: p50 seconds were not counted, because the runs recorded
+    # different or unknown concurrency, or either run had (or may have had) an
+    # operational episode.
+    LATENCY_NOT_COMPARABLE = "latency_not_comparable"
+
+
+# Which criterion a gate decides on (see ``evaluation.gym.gate.gate``): the overall
+# objective J, an accuracy hypothesis or an efficiency hypothesis.
+GateTrack = Literal["accuracy", "efficiency", "objective"]
 
 
 _EXIT_CODES = {GateDecision.ACCEPTED: 0, GateDecision.REJECTED: 1, GateDecision.INCOMPARABLE: 2}
@@ -315,8 +335,17 @@ class GateVerdict(Contract):
     reasons: list[GateReason] = Field(default_factory=list)
     baseline_run_id: Identifier
     candidate_run_id: Identifier
+    # The track decided on; records written before tracks existed were objective gates.
+    track: GateTrack = "objective"
+    # The accuracy track's named target language, when one was given.
+    target_language: str | None = Field(default=None, min_length=1, max_length=64)
+    # Always reported, whatever the track.
     delta_j: float | None = None
+    # Candidate minus baseline macro (majority) verified accuracy.
+    delta_macro_verified_accuracy: float | None = None
     token_ratio: float | None = None
+    # Candidate over baseline macro p50 seconds; reported even when not comparable.
+    seconds_ratio: float | None = None
     language_deltas: dict[str, float | None] = Field(default_factory=dict)
     regressed_languages: list[str] = Field(default_factory=list)
     # Regressed languages explained entirely by operational episodes.
@@ -376,6 +405,8 @@ class VerifyRecord(Contract):
     schema_version: Literal["corsair.gym-verify/1"] = "corsair.gym-verify/1"
     branch: str | None = Field(default=None, min_length=1, max_length=200)
     commit: str | None = Field(default=None, min_length=7, max_length=64)
+    # The track every tier was gated on; unknown on records written before tracks.
+    track: GateTrack | None = None
     tier0: TierGate | None = None
     tier1: TierGate | None = None
     decision: GateDecision | None = None

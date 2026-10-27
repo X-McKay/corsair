@@ -178,13 +178,17 @@ def _table(header: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
 
 
 def gate_cell(verdict: GateVerdict | None) -> str:
-    """Code-owned gate result: the decision, its reason codes and any regressed languages."""
+    """Code-owned gate result: the decision, a non-objective track, its reason codes and
+    any regressed languages. An objective gate (every gate before tracks) names no track."""
     if verdict is None:
         return ABSENT
+    decision = verdict.decision.value
+    if verdict.track != "objective":
+        decision += f" [{verdict.track}]"
     details = ", ".join(reason.value for reason in verdict.reasons)
     if verdict.regressed_languages:
         details += "; regressed: " + ", ".join(verdict.regressed_languages)
-    return f"{verdict.decision.value} ({details})" if details else verdict.decision.value
+    return f"{decision} ({details})" if details else decision
 
 
 def tier_gate(row: LedgerRow, tier: str) -> GateVerdict | None:

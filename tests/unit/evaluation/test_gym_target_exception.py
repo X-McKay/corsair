@@ -19,6 +19,8 @@ from corsair.contracts import (
     Finding,
     InvestigationResult,
     Observation,
+    OperationalEpisode,
+    OperationalReason,
     Oracle,
     PreparedCase,
     ProducerOutput,
@@ -43,6 +45,7 @@ from corsair.evaluation.gym.scoring import (
     REWARD_TARGET_EXCEPTION,
     StoredResults,
     load_results,
+    sandbox_fault,
     score_report,
     target_exception,
     trajectory,
@@ -308,6 +311,81 @@ def test_load_results_carries_the_target_exception_runs(store):
     assert loaded["run-1"] is not None and loaded["run-1"].verdict is Verdict.ERROR
 
 
+# The sandbox-fault rule: a role ERROR the sandbox, not the payload or target, produced
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param({**SANDBOX_FAULT, "role": "adversarial"}, id="sandbox-execution-error"),
+        pytest.param(None, id="missing-receipt"),
+        pytest.param(_receipt("adversarial", operation_id="run-2.s1.r1"), id="stale-receipt"),
+        pytest.param(_receipt("control"), id="receipt-of-the-other-role"),
+        pytest.param(_receipt("adversarial", driver={"schema_version": "x"}), id="no-driver"),
+    ],
+)
+def test_a_role_error_without_a_driver_record_is_a_sandbox_fault(store, receipt):
+    result = _stored(store, {"control": HELD, "adversarial": receipt})
+    assert sandbox_fault(store, result) is True
+    assert target_exception(store, result) is False
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(_receipt("adversarial"), id="target-exception"),
+        # A payload-level ERROR: the driver ran and recorded no observation kind.
+        pytest.param(
+            _receipt("adversarial", driver={"observation_kind": None}), id="payload-error"
+        ),
+        pytest.param(
+            _receipt("adversarial", driver={"driver_error": "invalid job"}), id="driver-error"
+        ),
+    ],
+)
+def test_a_role_error_with_a_driver_record_is_not_a_sandbox_fault(store, receipt):
+    result = _stored(store, {"control": HELD, "adversarial": receipt})
+    assert sandbox_fault(store, result) is False
+
+
+def test_a_missing_bundle_or_one_faulted_role_is_a_sandbox_fault(store):
+    receipts = {"control": HELD, "adversarial": _receipt("adversarial")}
+    unbundled = _stored(store, receipts)
+    observation = unbundled.rounds[0].observation
+    assert observation is not None
+    bare = observation.model_copy(update={"artifact": None})
+    unbundled = unbundled.model_copy(
+        update={"rounds": [unbundled.rounds[0].model_copy(update={"observation": bare})]}
+    )
+    assert sandbox_fault(store, unbundled) is True
+    both = {"control": _ROLE_ERROR, "adversarial": _ROLE_ERROR}
+    mixed = {
+        "control": {**SANDBOX_FAULT, "role": "control"},
+        "adversarial": _receipt("adversarial"),
+    }
+    assert sandbox_fault(store, _stored(store, mixed, outcomes=both)) is True
+
+
+def test_only_a_recorded_role_error_is_considered_for_a_sandbox_fault(store):
+    held = {"control": _ROLE_HELD, "adversarial": _ROLE_HELD}
+    fault = {"control": HELD, "adversarial": {**SANDBOX_FAULT, "role": "adversarial"}}
+    assert sandbox_fault(store, _stored(store, fault, outcomes=held)) is False
+    assert sandbox_fault(store, None) is False
+    unobserved = _stored(store, fault).model_copy(
+        update={"rounds": [RoundResult(index=1, producer=ProducerOutput())]}
+    )
+    assert sandbox_fault(store, unobserved) is False
+
+
+def test_load_results_carries_the_sandbox_fault_runs(store):
+    _stored(store, {"control": HELD, "adversarial": _receipt("adversarial")}, run_id="run-1")
+    fault = {"control": HELD, "adversarial": {**SANDBOX_FAULT, "role": "adversarial"}}
+    _stored(store, fault, run_id="run-2")
+    loaded = load_results(store, ["run-1", "run-2", "run-3"])
+    assert loaded.sandbox_faults == frozenset({"run-2"})
+    assert loaded.target_exceptions == frozenset({"run-1"})
+
+
 # The reward
 
 
@@ -438,15 +516,25 @@ def test_scoring_reclassifies_only_the_target_exception_episode(store):
     assert (after[0].reward, before[0].reward) == (0.0, -0.5)
     assert after[1].reward == before[1].reward == -0.5
     assert after[1].failure_stop == "execution_error"
-    for old_item, new_item in zip(before[1:], after[1:], strict=True):
+    for old_item, new_item in zip(before[2:], after[2:], strict=True):
         assert new_item.model_dump_json() == old_item.model_dump_json()
+    reclassified = {"operational": True, "operational_reason": OperationalReason.SANDBOX_FAULT}
+    assert after[1] == before[1].model_copy(update=reclassified)
     assert new.target_exception_episodes == 1
     assert old.target_exception_episodes == 0
     assert new.target_exceptions == [
         TargetExceptionEpisode(case_id="case01", repeat=0, language="python")
     ]
     assert new.languages["python"].target_exception_episodes == 1
-    assert new.operational_episodes == old.operational_episodes == 0
+    # run-1's sandbox fault is now visible as operational; its reward is unchanged.
+    assert old.operational_episodes == 0
+    assert new.operational_episodes == 1
+    assert new.operational_stops == [
+        OperationalEpisode(
+            case_id="case02", repeat=0, language="python", reason=OperationalReason.SANDBOX_FAULT
+        )
+    ]
+    assert (after[1].operational, before[1].operational) == (True, False)
     # One of nine python episodes moves from -0.5 to 0: the case mean by 0.5/3, J by 0.5/9.
     assert new.objective_j - old.objective_j == pytest.approx(0.5 / 9)
 

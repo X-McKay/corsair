@@ -7,21 +7,56 @@ the decision and never change it: a different prompt, skill, image or model is w
 candidate is, an operational stop keeps its ERROR score, and a target-side exception
 already scores 0 on its scorecard.
 
+A gate decides on one track; every track first requires that no language's majority
+verified accuracy fell, and every verdict reports ΔJ, the token ratio and the p50 seconds
+ratio:
+
+- ``objective``: J gained at least ``MIN_OBJECTIVE_GAIN`` and macro effective tokens
+  stayed within ``MAX_TOKEN_RATIO`` of the baseline.
+- ``accuracy``: macro verified accuracy rose by at least ``min_accuracy_gain`` (one
+  case's majority flipping in the language with the most cases), or the named target
+  language rose by at least one flip of its own, and tokens stayed within
+  ``MAX_TOKEN_RATIO``. J is reported, never decided on: with one case in a language one
+  ERROR episode moves J by more than its margin.
+- ``efficiency``: macro verified accuracy is at least the baseline's, and macro
+  effective tokens or macro p50 seconds fell to ``MAX_EFFICIENT_RATIO`` or below. Seconds
+  count only when both runs record the same concurrency and no operational episode;
+  otherwise ``latency_not_comparable`` is reported and only tokens can qualify.
+
 A smoke gate (``smoke=True``, for a tier where every language already verifies, so the
-objective margin is noise) still reports ``objective_below_threshold`` but decides only on
-language regressions, the token ceiling and the INCOMPARABLE conditions; its verdict says
-``smoke`` so its ACCEPTED is never read as an acceptance.
+track's improvement criterion is noise) still reports that criterion's reason but decides
+only on language regressions, the token ceiling, the accuracy floor and the INCOMPARABLE
+conditions; its verdict says ``smoke`` so its ACCEPTED is never read as an acceptance.
 """
 
 from collections.abc import Sequence
 
-from corsair.contracts import GateDecision, GateReason, GateVerdict, RunIdentity, Scorecard
+from corsair.contracts import (
+    GateDecision,
+    GateReason,
+    GateTrack,
+    GateVerdict,
+    RunIdentity,
+    Scorecard,
+)
 
 MIN_REPEATS = 3
 MIN_OBJECTIVE_GAIN = 0.01
 MAX_TOKEN_RATIO = 1.10
+# The efficiency track's ceiling on the token or p50 seconds ratio: at least 10 % lower.
+MAX_EFFICIENT_RATIO = 0.90
 # Floating-point slack so a gain or ratio exactly at its threshold is decided as written.
 _EPSILON = 1e-9
+# Each track's improvement criterion: reported by a smoke gate, never deciding it.
+_IMPROVEMENT = frozenset(
+    {
+        GateReason.OBJECTIVE_BELOW_THRESHOLD,
+        GateReason.ACCURACY_NOT_IMPROVED,
+        GateReason.EFFICIENCY_NOT_IMPROVED,
+    }
+)
+# Reasons that explain a verdict without ever causing a rejection.
+_INFORMATIONAL = frozenset({GateReason.OPERATIONALLY_CONFOUNDED, GateReason.LATENCY_NOT_COMPARABLE})
 
 
 def incomparable_reasons(
@@ -89,20 +124,128 @@ def token_ratio(baseline: Scorecard, candidate: Scorecard) -> float | None:
     return after / before
 
 
+def seconds_ratio(baseline: Scorecard, candidate: Scorecard) -> float | None:
+    before, after = baseline.macro_p50_seconds, candidate.macro_p50_seconds
+    if before is None or after is None or before <= 0:
+        return None
+    return after / before
+
+
+def latency_comparable(baseline: Scorecard, candidate: Scorecard) -> bool:
+    """Seconds compare only at one recorded concurrency and with no operational episode."""
+    return (
+        baseline.run.concurrency is not None
+        and baseline.run.concurrency == candidate.run.concurrency
+        and baseline.operational_episodes == 0
+        and candidate.operational_episodes == 0
+    )
+
+
+def language_step(card: Scorecard, language: str) -> float | None:
+    """How far one case's majority flip moves ``language``'s verified accuracy: 1/cases."""
+    summary = card.languages.get(language)
+    return None if summary is None or summary.cases == 0 else 1 / summary.cases
+
+
+def min_accuracy_gain(card: Scorecard) -> float:
+    """The smallest macro verified accuracy change one case's majority flip can make.
+
+    Macro accuracy is the mean over languages of each language's fraction of cases whose
+    majority of repeats verified, so one flip in language L moves it by
+    1 / (languages x cases of L); the smallest such step is in the language with the most
+    cases: 1 / (languages x max cases). With six languages and ten python cases that is
+    1/60. Any rise with no language regressed is at least this step.
+    """
+    cases = [summary.cases for summary in card.languages.values() if summary.cases]
+    if not cases:
+        raise ValueError("a scorecard without cases has no accuracy step")
+    return 1 / (len(card.languages) * max(cases))
+
+
+def _at_least(gain: float | None, step: float | None) -> bool:
+    return gain is not None and step is not None and gain >= step - _EPSILON
+
+
+def _within(ratio: float | None, ceiling: float) -> bool:
+    return ratio is not None and ratio <= ceiling + _EPSILON
+
+
+def _track_reasons(
+    baseline: Scorecard,
+    candidate: Scorecard,
+    *,
+    track: GateTrack,
+    target_language: str | None,
+    deltas: dict[str, float | None],
+    delta_j: float,
+    accuracy: float,
+    tokens: float | None,
+    seconds: float | None,
+) -> list[GateReason]:
+    """The track's own reasons, after the shared language-regression check."""
+    if track == "objective":
+        reasons = []
+        if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON:
+            reasons.append(GateReason.OBJECTIVE_BELOW_THRESHOLD)
+        if not _within(tokens, MAX_TOKEN_RATIO):
+            reasons.append(GateReason.TOKENS_ABOVE_CEILING)
+        return reasons
+    if track == "accuracy":
+        reasons = []
+        target = None if target_language is None else deltas.get(target_language)
+        improved = _at_least(accuracy, min_accuracy_gain(baseline)) or (
+            target_language is not None
+            and _at_least(target, language_step(baseline, target_language))
+        )
+        if not improved:
+            reasons.append(GateReason.ACCURACY_NOT_IMPROVED)
+        if not _within(tokens, MAX_TOKEN_RATIO):
+            reasons.append(GateReason.TOKENS_ABOVE_CEILING)
+        return reasons
+    reasons = []
+    if accuracy < -_EPSILON:
+        reasons.append(GateReason.ACCURACY_BELOW_BASELINE)
+    comparable = latency_comparable(baseline, candidate)
+    if not (
+        _within(tokens, MAX_EFFICIENT_RATIO)
+        or (comparable and _within(seconds, MAX_EFFICIENT_RATIO))
+    ):
+        reasons.append(GateReason.EFFICIENCY_NOT_IMPROVED)
+    if not comparable:
+        reasons.append(GateReason.LATENCY_NOT_COMPARABLE)
+    return reasons
+
+
+def admit_track(baseline: Scorecard, track: GateTrack, target_language: str | None) -> None:
+    """A target language belongs to the accuracy track and must be a baseline language."""
+    if target_language is None:
+        return
+    if track != "accuracy":
+        raise ValueError("a target language applies only to the accuracy track")
+    if target_language not in baseline.languages:
+        raise ValueError(f"{target_language} is not a baseline language")
+
+
 def gate(
     baseline: Scorecard,
     candidate: Scorecard,
     *,
     min_repeats: int = MIN_REPEATS,
     smoke: bool = False,
+    track: GateTrack = "objective",
+    target_language: str | None = None,
 ) -> GateVerdict:
-    """ACCEPTED iff no language regressed, J gained at least 0.01 and tokens stayed within 1.10x.
+    """ACCEPTED iff no language regressed and the track's criterion holds (module docstring).
 
-    With ``smoke`` the objective margin is reported but does not reject.
+    With ``smoke`` the track's improvement criterion is reported but does not reject.
+    ``target_language`` names the accuracy track's target; it must be a baseline language.
     """
+    admit_track(baseline, track, target_language)
     deltas = language_deltas(baseline, candidate)
     delta_j = candidate.objective_j - baseline.objective_j
-    ratio = token_ratio(baseline, candidate)
+    accuracy = candidate.macro_verified_accuracy - baseline.macro_verified_accuracy
+    tokens = token_ratio(baseline, candidate)
+    seconds = seconds_ratio(baseline, candidate)
     regressed = [
         language for language, delta in deltas.items() if delta is None or delta < -_EPSILON
     ]
@@ -115,14 +258,23 @@ def gate(
             confounded = operationally_confounded(baseline, candidate, regressed)
         if confounded:
             reasons.append(GateReason.OPERATIONALLY_CONFOUNDED)
-        if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON:
-            reasons.append(GateReason.OBJECTIVE_BELOW_THRESHOLD)
-        if ratio is None or ratio > MAX_TOKEN_RATIO + _EPSILON:
-            reasons.append(GateReason.TOKENS_ABOVE_CEILING)
+        reasons.extend(
+            _track_reasons(
+                baseline,
+                candidate,
+                track=track,
+                target_language=target_language,
+                deltas=deltas,
+                delta_j=delta_j,
+                accuracy=accuracy,
+                tokens=tokens,
+                seconds=seconds,
+            )
+        )
         deciding = [
             reason
             for reason in reasons
-            if not (smoke and reason is GateReason.OBJECTIVE_BELOW_THRESHOLD)
+            if reason not in _INFORMATIONAL and not (smoke and reason in _IMPROVEMENT)
         ]
         decision = GateDecision.REJECTED if deciding else GateDecision.ACCEPTED
     return GateVerdict(
@@ -130,8 +282,12 @@ def gate(
         reasons=reasons,
         baseline_run_id=baseline.run.run_id,
         candidate_run_id=candidate.run.run_id,
+        track=track,
+        target_language=target_language,
         delta_j=delta_j,
-        token_ratio=ratio,
+        delta_macro_verified_accuracy=accuracy,
+        token_ratio=tokens,
+        seconds_ratio=seconds,
         language_deltas=deltas,
         regressed_languages=regressed,
         operationally_confounded_languages=confounded,
