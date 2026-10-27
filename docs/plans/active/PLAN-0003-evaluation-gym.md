@@ -317,3 +317,18 @@ content-addressed tags and cannot contaminate parallel runs.
   order proposed: python xxe pair → operational rows natively re-checked → sibling rows into tier1 → reviewed python
   recipe adaptations (each a new identity) → one language per wave once its kind has a rubric. Open owner items:
   Perl licence (PLAN-0001/0002), NOASSERTION corpus trees (point in place, copy nothing), rubrics for new kinds.
+- 2026-10-27 Wave-1 side-streams merged on `gym/loop` (all offline or scripted; no live tiers): s2 ledger rows without
+  scorecards, per-tier gate outcomes, `VerifyRecord` contract (7e150a09 → 672f9cf); s3 family stems, `/v3` pair
+  layouts and source-tree overlap in the split check (b27b8d0b → 46fcaa6a; `just dataset-families` on all 20
+  manifests and on the tier pair: 0 violations); s1 shared run store `<main checkout>/.runs/gym/{store,runs,reference,
+  verify}`, `corsair gym runs`, `corsair gym verify` (tier0 → gate → tier1 → gate → `VERDICT:` line, exit 0/1/2,
+  `verdict.json`), `run.json` and `budgets.json` per run, `score_batch` deduplicated into `evaluation/scoring.py`
+  (74910d17 → ce197d5a); reconciliation so `verify` writes the canonical `VerifyRecord` that `ledger append
+  --verdict` reads (a73a8ebc; a verdict.json of the pre-reconciliation shape is not read; none existed); s4 reviewed
+  intake `corsair dataset draft|freeze` (875db9d9 → c88ec3f6; the python xxe pair drafted and frozen in scratch only;
+  frozen requests would live in `evals/datasets/corpus/` beside the Perl row; oracles need owner review). Gates on
+  `gym/loop` at c88ec3f6: `just check` exit 0; `just -- test -q -W error` 1287 passed, 111 deselected; at a73a8ebc
+  `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` 61 passed, 1 skipped (long probe). The three existing
+  runs and the reference scorecards were copied (no-clobber) into the shared store `/home/al/git/corsair/.runs/gym/`.
+  The s2 test pinning the recorded ledger's row ids was loosened to parse-and-byte-identical-render (3a854c52).
+  Protocol change: experimenters now run `just -- gym-verify <reference>`; the skill's step 3 says so.
