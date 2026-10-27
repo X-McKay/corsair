@@ -99,6 +99,14 @@ A role observation reports one of these **execution outcomes**:
 
 It also states whether the target actually executed, optional covered lines, reason, and optional native exit code. These are verifier-level facts about one role execution. They are not the final verdict, and an absent/invalid/error observation cannot be converted into a negative security conclusion.
 
+An `ERROR` role keeps the `covered_lines` its driver record reported for the recipe module (none when the record's `coverage_file` is another file), and `target_executed` follows that coverage exactly as for the other outcomes: the bound finding line on vulnerable source, any recipe-module line on fixed source. Trusted code also sets `error_kind` on every `ERROR` role it builds, from receipt facts only:
+
+- `target_exception`: the cleanup-confirmed driver record reports `ERROR` with `observation_kind` `execution_error`.
+- `harness`: the driver record reports `ERROR` with any other `observation_kind`.
+- `sandbox`: the receipt has no driver record and carries the adapter's `error` (for example `SandboxExecutionError`), the sandbox raised before any receipt, or the role was not run after an earlier sandbox fault.
+
+`error_kind` is `null` on every other outcome (a non-`ERROR` role with one is rejected). Neither field changes a decision: `decide` returns `ERROR` for any `ERROR` role before it reads coverage, and an `ERROR` role is never admitted on saved-evidence re-validation. `ERROR` roles saved before this change decode with `error_kind` `null`, `target_executed` false and no covered lines; such a result was not admissible before and is not now, and results without an `ERROR` role rebuild and re-validate unchanged.
+
 Three optional fields carry sandbox timing for efficiency scoring only; none enters an outcome, coverage, audit or verdict decision, and `null` means unknown, never zero:
 
 - `wall_seconds`: the trusted driver's `wall_usec`, wall time around its native target step (the test child for Python, JavaScript and Perl; compile plus run for Java and C; the in-process check for Ruby).

@@ -197,6 +197,7 @@ def test_disallowed_target_exception_is_error_not_violation(tmp_path: Path) -> N
     assert observation.control and observation.control.outcome.value == "PROPERTY_HELD"
     assert observation.adversarial and observation.adversarial.outcome.value == "ERROR"
     assert observation.adversarial.outcome.value != "VIOLATION"
+    assert observation.adversarial.error_kind == "target_exception"
 
 
 def test_absent_relevant_coverage_is_invalid(tmp_path: Path) -> None:

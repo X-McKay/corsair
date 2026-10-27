@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
@@ -13,20 +15,28 @@ from corsair.contracts import (
     AuditResult,
     AuditRule,
     Budget,
+    Disposition,
     EvidenceInput,
+    ExecutionStatus,
     Finding,
+    FixStatus,
+    KernelCase,
     Observation,
     PlanRevision,
     PreparedCase,
     PythonRecipe,
     RoleObservation,
     RoleOutcome,
+    RoundResult,
     RunManifest,
     Scope,
     Submission,
+    Verdict,
     digest,
 )
-from corsair.policies.verdicts import decide, fix_status
+from corsair.contracts.evidence import ErrorKind
+from corsair.policies.verdicts import decide, fix_status, session_verdict
+from corsair.ports.sandboxing import SandboxUnavailable
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
 
@@ -96,6 +106,15 @@ class _FakeSandbox:
     host_usec: object = None
     wall_usec: object = None
     cpu_usec: object = None
+    # A native ERROR adversarial record: its observation kind, covered lines and coverage
+    # file, as a driver writes them (target_executed is false for every ERROR kind).
+    adversarial_error: bool = False
+    error_kind: object = "execution_error"
+    error_lines: tuple[int, ...] = (4,)
+    error_coverage_file: str | None = None
+    # A receipt with no driver record and the adapter's error string for this role.
+    receipt_error: str | None = None
+    raises: dict[str, Exception] | None = None
 
     def image_id_for(self, kind: str) -> str:
         del kind  # The double resolves one trusted image regardless of recipe kind.
@@ -109,6 +128,8 @@ class _FakeSandbox:
         store = self.store
         del budget, heartbeat
         self.calls += 1
+        if self.raises and role in self.raises:
+            raise self.raises[role]
         violation = role == "adversarial" and self.adversarial_violates
         driver = {
             "schema_version": "corsair.driver/1",
@@ -130,6 +151,16 @@ class _FakeSandbox:
             "covered_lines": [4],
             "coverage_file": prepared.recipe.module_file,
         }
+        if role == "adversarial" and self.adversarial_error:
+            driver.update(
+                native_exit_code=1,
+                junit={"status": "ERROR", "tests": 1, "failures": 0, "errors": 1, "skipped": 0},
+                outcome="ERROR",
+                observation_kind=self.error_kind,
+                target_executed=False,
+                covered_lines=list(self.error_lines),
+                coverage_file=self.error_coverage_file or prepared.recipe.module_file,
+            )
         for key, value in (("wall_usec", self.wall_usec), ("cpu_usec", self.cpu_usec)):
             if value is not None:
                 driver[key] = value
@@ -144,9 +175,11 @@ class _FakeSandbox:
                 "corsair.role": role,
             },
             "cleanup_confirmed": self.cleanup_confirmed,
-            "docker_exit_code": 1 if violation else 0,
+            "docker_exit_code": driver["native_exit_code"],
             "driver": driver,
         }
+        if role == "adversarial" and self.receipt_error is not None:
+            raw.update(driver=None, error=self.receipt_error, docker_exit_code=2)
         if not self.omit_raw_image_id:
             raw["image_id"] = self.raw_image_id
         if self.host_usec is not None:
@@ -199,6 +232,7 @@ def test_unconfirmed_control_cleanup_preserves_receipt_and_skips_adversarial(
         outcome=RoleOutcome.ERROR,
         target_executed=False,
         reason="role was not executed",
+        error_kind="sandbox",
     )
     assert observation.cleanup_confirmed is False
     assert observation.artifact is not None
@@ -567,3 +601,341 @@ def test_driver_timing_fields_are_omitted_when_unknown() -> None:
 
     assert driver._timing(wall_usec=12, cpu_usec=None) == {"wall_usec": 12}
     assert driver._timing(wall_usec=12, cpu_usec=34) == {"wall_usec": 12, "cpu_usec": 34}
+
+
+# ERROR observations: receipt coverage and a code-owned error kind, never a verdict input.
+
+KERNEL_CASES = Path(__file__).resolve().parents[1] / "replay" / "kernel"
+ERROR_REASON = "native target execution or observer reporting failed"
+
+
+@pytest.mark.parametrize(
+    ("lines", "coverage_file", "kind", "covered", "executed", "error_kind"),
+    [
+        ((4,), None, "execution_error", [4], True, "target_exception"),
+        ((1, 2), None, "execution_error", [1, 2], False, "target_exception"),
+        ((), None, "execution_error", [], False, "target_exception"),
+        ((4,), "other.py", "execution_error", [], False, "target_exception"),
+        ((4,), None, None, [4], True, "harness"),
+        ((4,), None, "disclosure", [4], True, "harness"),
+    ],
+    ids=["bound-line", "other-lines", "no-lines", "other-file", "no-kind", "other-kind"],
+)
+def test_error_receipt_keeps_recipe_module_coverage_and_its_error_kind(
+    tmp_path: Path,
+    lines: tuple[int, ...],
+    coverage_file: str | None,
+    kind: object,
+    covered: list[int],
+    executed: bool,
+    error_kind: ErrorKind,
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    sandbox = _FakeSandbox(
+        store,
+        adversarial_error=True,
+        error_kind=kind,
+        error_lines=lines,
+        error_coverage_file=coverage_file,
+    )
+    observation = EvidenceVerifier(Settings(), store, sandbox).evaluate(_input())
+
+    assert observation.adversarial == RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=executed,
+        covered_lines=covered,
+        reason=ERROR_REASON,
+        native_exit_code=1,
+        error_kind=error_kind,
+    )
+    assert observation.control and observation.control.error_kind is None
+    assert decide(_prepared(), observation, _audit())[1:] == (
+        ExecutionStatus.ERROR,
+        "trusted probe execution errored",
+    )
+
+
+def test_fixed_source_error_counts_any_recipe_module_line(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    request = _input()
+    sandbox = _FakeSandbox(store, adversarial_error=True, error_lines=(1,))
+    raw = sandbox.execute_role(
+        request.prepared,
+        request.submission,
+        "adversarial",
+        request.budget,
+        lambda: None,
+        operation_id=request.operation_id,
+    )
+    verifier = EvidenceVerifier(Settings(), store)
+    common: dict[str, Any] = {
+        "expected_operation": request.operation_id,
+        "expected_role": "adversarial",
+        "expected_source": request.prepared.source.sha256,
+        "expected_submission": digest(request.submission),
+        "prepared": request.prepared,
+    }
+    vulnerable, vulnerable_valid = verifier._validate_raw(raw, fixed=False, **common)
+    fixed, fixed_valid = verifier._validate_raw(raw, fixed=True, **common)
+
+    # Line 1 is not the bound line 4, but fixed source may delete the finding line.
+    assert (vulnerable.target_executed, fixed.target_executed) == (False, True)
+    assert vulnerable.covered_lines == fixed.covered_lines == [1]
+    # An ERROR role is never admitted as valid evidence, with or without coverage.
+    assert (vulnerable_valid, fixed_valid) == (False, False)
+
+
+def test_sandbox_faults_are_classified_sandbox(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    receipt = EvidenceVerifier(
+        Settings(), store, _FakeSandbox(store, receipt_error="SandboxExecutionError")
+    ).evaluate(_input("receipt"))
+    assert receipt.adversarial == RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=False,
+        reason="trusted sandbox execution failed",
+        error_kind="sandbox",
+    )
+
+    lost = EvidenceVerifier(
+        Settings(), store, _FakeSandbox(store, raises={"control": SandboxUnavailable("lost")})
+    ).evaluate(_input("lost"))
+    assert lost.control and lost.control.error_kind == "sandbox"
+    assert lost.control.reason == "trusted sandbox became unavailable"
+    assert lost.adversarial and lost.adversarial.error_kind == "sandbox"
+    assert lost.adversarial.reason == "role was not executed"
+
+    failed = EvidenceVerifier(
+        Settings(), store, _FakeSandbox(store, raises={"adversarial": RuntimeError("boom")})
+    ).evaluate(_input("failed"))
+    assert failed.adversarial == RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=False,
+        reason="trusted sandbox role execution failed",
+        error_kind="sandbox",
+    )
+
+
+def test_error_kind_belongs_only_to_error_outcomes() -> None:
+    with pytest.raises(ValidationError, match="error_kind"):
+        RoleObservation(outcome=RoleOutcome.HELD, target_executed=True, error_kind="harness")
+    with pytest.raises(ValidationError):
+        RoleObservation.model_validate(
+            {"outcome": "ERROR", "target_executed": False, "error_kind": "model"}
+        )
+    # An ERROR observation saved before the field existed decodes with the kind unknown.
+    saved = RoleObservation.model_validate(_SAVED_BEFORE_ERROR_KIND["error"])
+    assert saved.error_kind is None
+    assert (saved.target_executed, saved.covered_lines) == (False, [])
+
+
+def _error_role(covered: bool, line: int) -> RoleObservation:
+    """An ERROR role as saved before (no coverage, no kind) and as built now."""
+    if not covered:
+        return RoleObservation.model_validate(_SAVED_BEFORE_ERROR_KIND["error"])
+    return RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=True,
+        covered_lines=[line],
+        reason=ERROR_REASON,
+        native_exit_code=1,
+        error_kind="target_exception",
+    )
+
+
+def _healthy(role: str) -> RoleObservation:
+    outcome = RoleOutcome.HELD if role == "control" else RoleOutcome.VIOLATION
+    return RoleObservation(
+        outcome=outcome,
+        target_executed=True,
+        covered_lines=[4],
+        native_exit_code=0 if role == "control" else 1,
+    )
+
+
+@pytest.mark.parametrize("errored", ["control", "adversarial"])
+@pytest.mark.parametrize("decision", [AuditDecision.ACCEPT, AuditDecision.REJECT])
+def test_decide_is_unchanged_by_coverage_on_an_error_role(
+    errored: str, decision: AuditDecision
+) -> None:
+    prepared = _prepared()
+    assert prepared.bound_line == 4
+    other = "adversarial" if errored == "control" else "control"
+    decisions = set()
+    for covered in (False, True):
+        observation = Observation(
+            operation_id="operation",
+            source_digest=SOURCE_DIGEST,
+            submission_digest="c" * 64,
+            artifact=ArtifactRef(sha256=ARTIFACT_DIGEST, size=1, media_type="application/json"),
+            cleanup_confirmed=True,
+        ).model_copy(update={errored: _error_role(covered, 4), other: _healthy(other)})
+        outcome = session_verdict(prepared, observation, _audit(decision), FixStatus.NOT_REQUESTED)
+        decisions.add(
+            (
+                decide(prepared, observation, _audit(decision)),
+                outcome.verdict,
+                outcome.reason,
+                outcome.clean_negative,
+                fix_status(observation),
+            )
+        )
+    assert decisions == {
+        (
+            (Disposition.INCONCLUSIVE, ExecutionStatus.ERROR, "trusted probe execution errored"),
+            Verdict.ERROR,
+            "trusted probe execution errored",
+            False,
+            FixStatus.UNVERIFIED,
+        )
+    }
+
+
+def _with_error_role(item: RoundResult, role: str, covered: bool, line: int) -> RoundResult:
+    assert item.observation is not None
+    observation = item.observation.model_copy(update={role: _error_role(covered, line)})
+    return item.model_copy(update={"observation": observation})
+
+
+def test_every_committed_kernel_case_replays_with_or_without_error_coverage() -> None:
+    """Coverage on an ERROR role never moves a committed kernel case's verdict."""
+    from corsair.evaluation.gym.capture import kernel_verdict
+
+    paths = sorted(KERNEL_CASES.glob("*.json"))
+    assert paths
+    variants = 0
+    for path in paths:
+        case = KernelCase.model_validate_json(path.read_bytes())
+        assert kernel_verdict(case) == case.recorded_verdict, path.name
+        line = case.prepared.bound_line if case.prepared is not None else None
+        for position, item in enumerate(case.rounds):
+            if item.observation is None or line is None:
+                continue
+            for role in ("control", "adversarial"):
+                verdicts = set()
+                for covered in (False, True):
+                    rounds = list(case.rounds)
+                    rounds[position] = _with_error_role(item, role, covered, line)
+                    verdicts.add(kernel_verdict(case.model_copy(update={"rounds": rounds})))
+                    variants += 1
+                assert len(verdicts) == 1, (path.name, position, role)
+    assert variants > 0
+
+
+# Role observations exactly as the evidence verifier at 39091887 committed them (from
+# a store it wrote): an ERROR role kept neither the receipt's coverage nor any kind.
+_SAVED_BEFORE_ERROR_KIND: dict[str, dict[str, Any]] = {
+    "control": {
+        "covered_lines": [4],
+        "cpu_seconds": None,
+        "host_seconds": None,
+        "native_exit_code": 0,
+        "outcome": "PROPERTY_HELD",
+        "reason": "validated native pytest/coverage evidence",
+        "target_executed": True,
+        "wall_seconds": None,
+    },
+    "violation": {
+        "covered_lines": [4],
+        "cpu_seconds": None,
+        "host_seconds": None,
+        "native_exit_code": 1,
+        "outcome": "VIOLATION",
+        "reason": "validated native pytest/coverage evidence",
+        "target_executed": True,
+        "wall_seconds": None,
+    },
+    "error": {
+        "covered_lines": [],
+        "cpu_seconds": None,
+        "host_seconds": None,
+        "native_exit_code": 1,
+        "outcome": "ERROR",
+        "reason": ERROR_REASON,
+        "target_executed": False,
+        "wall_seconds": None,
+    },
+}
+
+
+def _commit_saved_before_error_kind(
+    store: ArtifactStore, operation_id: str, adversarial: str
+) -> Observation:
+    """Commit one operation in the byte shape 39091887 wrote: same bundle, old role JSON."""
+    request = _saved_input(store, operation_id)
+    sandbox = _FakeSandbox(store, adversarial_error=adversarial == "error")
+    raw = {
+        role: sandbox.execute_role(
+            request.prepared,
+            request.submission,
+            role,
+            request.budget,
+            lambda: None,
+            operation_id=operation_id,
+        )
+        for role in ("control", "adversarial")
+    }
+    bundle = store.put_json(
+        {
+            "schema_version": "corsair.evidence/1",
+            "operation_id": operation_id,
+            "source_digest": request.prepared.source.sha256,
+            "submission_digest": digest(request.submission),
+            "prepared": store.put_json(request.prepared).model_dump(mode="json"),
+            "fixed": False,
+            "roles": {role: ref.model_dump(mode="json") for role, ref in raw.items()},
+        }
+    )
+    saved = {
+        "adversarial": _SAVED_BEFORE_ERROR_KIND[adversarial],
+        "artifact": bundle.model_dump(mode="json"),
+        "cleanup_confirmed": True,
+        "control": _SAVED_BEFORE_ERROR_KIND["control"],
+        "feedback": None,
+        "operation_id": operation_id,
+        "source_digest": request.prepared.source.sha256,
+        "submission_digest": digest(request.submission),
+    }
+    store.commit(operation_id, store.put_json(saved))
+    return Observation.model_validate(saved)
+
+
+def test_results_saved_before_error_kind_revalidate_as_before(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    verifier = EvidenceVerifier(Settings(), store)
+    manifest = _prepared().manifest
+
+    # A result without an ERROR role rebuilds exactly as saved and still re-validates.
+    held = _commit_saved_before_error_kind(store, "saved-violation", "violation")
+    assert verifier.validate_saved(held, _submission(), manifest) is not None
+
+    # A saved ERROR role decodes in its old shape and, as before, never re-validates:
+    # an ERROR role is not admissible evidence whatever coverage its receipt reports.
+    errored = _commit_saved_before_error_kind(store, "saved-error", "error")
+    assert errored.adversarial is not None
+    assert errored.adversarial.error_kind is None
+    assert errored.adversarial.covered_lines == []
+    assert verifier.validate_saved(errored, _submission(), manifest) is None
+
+    # The same receipt evaluated now keeps its coverage; the decision is unchanged.
+    current = EvidenceVerifier(
+        Settings(), store, _FakeSandbox(store, adversarial_error=True)
+    ).evaluate(_saved_input(store, "current-error"))
+    assert current.adversarial is not None
+    assert current.adversarial.covered_lines == [4]
+    assert current.adversarial.error_kind == "target_exception"
+    assert verifier.validate_saved(current, _submission(), manifest) is None
+    assert decide(_prepared(), errored, _audit()) == decide(_prepared(), current, _audit())
+    bundle = store.get_json(current.artifact) if current.artifact else {}
+    rebuilt, valid = verifier._validate_raw(
+        ArtifactRef.model_validate(bundle["roles"]["adversarial"]),
+        expected_operation="current-error",
+        expected_role="adversarial",
+        expected_source=current.source_digest,
+        expected_submission=digest(_submission()),
+        prepared=PreparedCase.model_validate(
+            store.get_json(ArtifactRef.model_validate(bundle["prepared"]))
+        ),
+        fixed=False,
+    )
+    assert (rebuilt, valid) == (current.adversarial, False)

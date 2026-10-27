@@ -335,6 +335,14 @@ def test_native_failures_and_canned_markers_never_become_positive(
     assert observation.control.outcome.value == expected_control
     assert observation.adversarial.outcome.value == expected_adversarial
     assert observation.adversarial.outcome.value != "VIOLATION"
+    if expected_adversarial == "ERROR":
+        # Each body raises after the bound def line ran: the ERROR role keeps that
+        # coverage, reports the target executed and is classified a target exception.
+        assert prepared.bound_line in observation.adversarial.covered_lines
+        assert observation.adversarial.target_executed is True
+        assert observation.adversarial.error_kind == "target_exception"
+    else:
+        assert observation.adversarial.error_kind is None
     _assert_cleanup(client, operation_id)
 
 
@@ -367,6 +375,10 @@ def test_native_timeout_removes_owned_container(tmp_path, session_operation):
     assert observation.cleanup_confirmed
     assert observation.control is not None
     assert observation.control.outcome.value == "ERROR"
+    # A deadline stop leaves no driver record: a sandbox fault with no admitted coverage.
+    assert observation.control.error_kind == "sandbox"
+    assert observation.control.target_executed is False
+    assert observation.control.covered_lines == []
     # A deadline stop leaves no driver record, but the host time it spent is still known.
     assert observation.control.wall_seconds is None
     assert observation.control.host_seconds is not None
