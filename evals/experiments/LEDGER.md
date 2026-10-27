@@ -22,6 +22,13 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 
 ## Waves
 
+### Wave 1
+
+| Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| h3 | dx | `gym/h3-scorecard-reasoning-markers@f645539` | — | — | — | — | merged `7d637e2` | Observation-only change; re-scoring the tier1 diagnostic reproduced every existing field; python.secret_disclosure had 5 capped-call episodes, 4 exhausted |
+| s2 | dx | `gym/s2-ledger-dx-rows@7e150a0` | — | — | — | — | merged `672f9cf` | Offline; 17 tests; existing rows re-render byte for byte |
+
 ## Rejected ideas (do not retry without new evidence)
 
 | Idea | Wave | Why it failed |
