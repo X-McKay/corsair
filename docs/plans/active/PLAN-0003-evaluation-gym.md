@@ -695,4 +695,11 @@ content-addressed tags and cannot contaminate parallel runs.
   not coin-flips at n=2 but sit at 1 of 3 and 2 of 3 in every run, one episode from flipping; `verified_episodes`
   keeps that visible, and a third reference run would sharpen the class. Greedy run 1 against the reference with
   the new band: INCONCLUSIVE, the only flip (case03) within noise.
+- 2026-10-27 merged s21 (88a4a7b6): `evidence_unverified` is qualified as `<cause>_<role>` from the verifier's own
+  receipts (`coverage`, `target_exception`, `execution_error`, `probe_invalid` × `control`, `adversarial`, `both`),
+  and `gym score` re-qualifies stored rows. Re-scoring the reference pair moves all 34 unverified rounds, none left
+  plain, with every other figure byte-identical: javascript 26 rounds are `coverage_control` or `coverage_both`
+  (the control-coverage miss the auditor found), python and ruby 7 are `target_exception_adversarial`, c 1 is
+  `execution_error_both`. Failure-stop names change once; scorecards scored before 88a4a7b6 keep the plain label.
+  Check exit 0, 1655 passed.
 
