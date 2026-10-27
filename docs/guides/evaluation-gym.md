@@ -45,6 +45,42 @@ Settings whose `artifact_root` is not the default `.runs` keep that directory as
 
 To bring runs made before the shared store into it, copy their run directories and their worktree's store without overwriting anything: `cp -a <worktree>/.runs/gym/<run-id> <gym root>/runs/`, `cp -an <worktree>/.runs/blobs/. <gym root>/store/blobs/`, `cp -an <worktree>/.runs/operations/. <gym root>/store/operations/` (and `cp -a <worktree>/.runs/gym/reference <gym root>/`). Names are content or operation digests, so a name that already exists holds the same record.
 
+### Intake: drafting and freezing reviewed cases
+
+A holdout tier is filled only through reviewed intake: an agent may draft cases, and only the owner's review decides which oracle is frozen. Two `corsair dataset` commands carry it, with the review sheet between them ([CLI reference](../reference/cli.md#dataset-draft-chain_dir)).
+
+1. The operator writes a recipe template: one admitted `Recipe` member (its `kind` and operator fields) without `module_file` and without the callable (`function`, or `method` for Java), which drafting binds from each directory's `input.json`. The template is operator-owned, like the recipe of any request; no kind is invented, and a kind outside the `Recipe` union is refused. For the Python XXE pair a secret-disclosure template modelled on [`evals/datasets/intake/recipe-read-file.json`](../../evals/datasets/intake/recipe-read-file.json) is:
+
+   ```json
+   {"kind": "python.secret_disclosure/1", "payload_parameter": "document", "fixed_kwargs": {},
+    "public_files": {"hello.txt": "hello"}, "expected_control": "hello",
+    "allowed_exceptions": ["builtins.ValueError"]}
+   ```
+
+2. Draft into an ignored directory (never under `evals/`):
+
+   ```bash
+   corsair dataset draft evals/datasets/chain/python/xxe-a evals/datasets/chain/python/xxe-b \
+     --recipe-template .work/intake/wave1/recipe-python-xxe.json --split held_out \
+     --out .work/intake/wave1/draft
+   ```
+
+   Each directory becomes `<case id>/request.json` (title, file, line and callable from `input.json` only; `claim_scope` component; source and fixed source admitted in place under `evals/datasets/corpus/` with their snapshot digests) and `<case id>/oracle.proposed.json`, plus `draft.json` (`corsair.dataset-draft/1`, which no dataset loader accepts) and `review.md`. Case ids are `<provenance>-<language>-<directory>` and families `<provenance>-<language>-<class>`, with provenance `ih`, `pr`, `syn` or `unk`. The proposal is mechanical: every decisive verdict the kind can reach for a component claim (a clean negative only for a kind with a qualified auditor rubric), no expected verdict, and `expected_fix` `NOT_REQUESTED` unless a fixed source exists. Legacy `expected_label`, `expected_rule` and the case's truth type are copied into the draft as data and never mapped onto the oracle. Drafting reads no `README.md`, `manifest.json`, `submission.json`, `verification/` or legacy narrative, and runs the `dataset validate` checks on every row, listing failures as blockers.
+
+3. The owner reviews `review.md` (a copy is fine) and fills only its last three columns per row: `accept` (freeze the proposal), `amend` (freeze the `oracle.json` they wrote beside the proposal) or `reject`; a reviewer name; and, optionally, the SHA-256 of the oracle file they reviewed.
+
+4. Freeze:
+
+   ```bash
+   corsair dataset freeze .work/intake/wave1/draft --review .work/intake/wave1/review.md \
+     --into evals/datasets/gym-tier2.json \
+     --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json
+   ```
+
+   It refuses (exit 2, nothing written) a row without a decision, an edited code-owned cell, a changed draft file, a reviewed digest that does not match, an accepted row that fails the dataset checks, a family, case, chain pair or source tree (stem or snapshot digest) that sits in another split in `--against` or the existing manifest, and more than 64 entries. Otherwise it appends the accepted and amended rows to the manifest (kept entries are unchanged), writes `<case id>.request.json` and `<case id>.oracle.json` in place beside the corpus (`evals/datasets/corpus/`, as for the existing Perl row, because admission refuses `..` in a source path) and exits 1 with the old (`none` for a new manifest) and new dataset digests: a new frozen cohort to review and commit, never a plain success. A manifest outside the evals tree (a scratch rehearsal) keeps absolute, machine-local sources under `<stem>/` and is validated with `--settings` naming that `source_root`.
+
+Freezing changes the tier's digest, so the next gate over it needs a new reference run.
+
 ## Run a tier
 
 ```bash

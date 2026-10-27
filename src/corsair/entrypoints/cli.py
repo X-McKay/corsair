@@ -73,6 +73,13 @@ class CliArguments(argparse.Namespace):
     recipe_template: str | None
     dataset_command: str
     datasets: list[str]
+    chain_dirs: list[str]
+    split: str
+    budget: str | None
+    draft_dir: str
+    review: str
+    into: str
+    against: list[str]
     agent_command: str
     role: Literal["producer", "auditor"]
     round: int
@@ -561,6 +568,64 @@ async def _handle_replay_candidates(args: CliArguments, ui: Terminal) -> int:
     return 1 if counts["unavailable"] else 0
 
 
+async def _handle_dataset_draft(args: CliArguments, ui: Terminal) -> int:
+    """Draft a review of chain directories; exit 1 when a drafted row has validator
+    blockers and 2 when an input is refused before anything is written."""
+    from corsair.evaluation.intake import DraftRefused, draft_dataset
+
+    # Both are required by the draft parser; the attributes are shared with other commands.
+    template, out = args.recipe_template, args.out
+    if template is None or out is None:
+        raise ValueError("dataset draft needs --recipe-template and --out")
+    try:
+        result = draft_dataset(
+            [Path(path) for path in args.chain_dirs],
+            recipe_template=Path(template),
+            split=args.split,
+            out=Path(out),
+            budget=Path(args.budget) if args.budget else None,
+        )
+    except DraftRefused as error:
+        message = safe_text(error)
+        event("dataset.draft_refused", level=logging.ERROR, message=message)
+        ui.emit({"draft": None, "refused": message})
+        return 2
+    ui.emit(result)
+    return 0 if result["blocked"] == 0 else 1
+
+
+async def _handle_dataset_freeze(args: CliArguments, ui: Terminal) -> int:
+    """Freeze a reviewed draft: exit 2 on any refusal (nothing written), 1 after writing a
+    manifest (a new dataset identity to review), 0 when no row was accepted."""
+    from corsair.evaluation.intake import freeze_dataset
+
+    result = freeze_dataset(
+        Path(args.draft_dir),
+        review=Path(args.review),
+        into=Path(args.into),
+        against=[Path(path) for path in args.against],
+    )
+    ui.emit(result)
+    if result["refusals"]:
+        rules = sorted({item["rule"] for item in result["refusals"]})
+        event(
+            "dataset.freeze_refused",
+            level=logging.ERROR,
+            message="nothing written; refused: " + ", ".join(rules),
+        )
+        return 2
+    if result["written"]:
+        identity = result["identity"]
+        event(
+            "dataset.frozen",
+            level=logging.WARNING,
+            message="manifest written; review the diff and commit; dataset digest "
+            f"{identity['old'] or 'none'} -> {identity['new']}",
+        )
+        return 1
+    return 0
+
+
 async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     """Dispatch one ``corsair dataset`` subcommand."""
     if args.dataset_command == "validate":
@@ -569,6 +634,10 @@ async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
         return await _handle_dataset_refreeze(args, ui)
     if args.dataset_command == "replay-candidates":
         return await _handle_replay_candidates(args, ui)
+    if args.dataset_command == "draft":
+        return await _handle_dataset_draft(args, ui)
+    if args.dataset_command == "freeze":
+        return await _handle_dataset_freeze(args, ui)
     raise ValueError("Unknown dataset command")
 
 
@@ -1143,7 +1212,7 @@ def parser() -> argparse.ArgumentParser:
         "no model or container",
         "dataset": (
             "Frozen dataset tools: validate offline; refreeze stale digests; "
-            "replay-candidates natively in Docker"
+            "replay-candidates natively in Docker; draft and freeze reviewed intake"
         ),
         "agent": "Inspect agent roles offline; no model provider, target or services",
         "gym": "Evaluation gym: run a frozen tier in the corsair-gym namespace, score, gate, "
@@ -1242,6 +1311,37 @@ def parser() -> argparse.ArgumentParser:
     replay.add_argument("dataset", help="The frozen agent dataset the report was run on")
     replay.add_argument("--run-id", help="Replay identity; operation ids are RUN_ID.c<row>")
     replay.add_argument("--output", help="Replay report path (default .runs/evaluations/)")
+    draft_help = (
+        "Draft requests, mechanical oracle proposals and a code-owned review sheet from "
+        "chain directories; writes only under --out, never a manifest"
+    )
+    draft = datasets.add_parser("draft", help=draft_help, description=draft_help)
+    _presentation_options(draft)
+    draft.add_argument("chain_dirs", nargs="+", metavar="CHAIN_DIR", help="Chain case directory")
+    draft.add_argument(
+        "--recipe-template",
+        required=True,
+        help="Operator-owned recipe JSON without module_file or the callable",
+    )
+    draft.add_argument("--split", required=True, help="Split for every drafted row")
+    draft.add_argument("--out", required=True, help="New draft directory outside the evals tree")
+    draft.add_argument("--budget", help="Budget JSON for every drafted request")
+    freeze_help = (
+        "Freeze a reviewed draft's accepted and amended rows into a manifest; refuse (exit 2) "
+        "incomplete reviews, invalid rows and cross-split overlap; exit 1 after writing"
+    )
+    freeze = datasets.add_parser("freeze", help=freeze_help, description=freeze_help)
+    _presentation_options(freeze)
+    freeze.add_argument("draft_dir", metavar="DRAFT_DIR", help="Directory written by draft")
+    freeze.add_argument("--review", required=True, help="The reviewed copy of review.md")
+    freeze.add_argument("--into", required=True, help="Manifest to create or extend")
+    freeze.add_argument(
+        "--against",
+        nargs="+",
+        required=True,
+        metavar="MANIFEST",
+        help="Manifests whose families and source trees must not cross into this split",
+    )
     for name in ("report", "compare"):
         commands[name].add_argument(
             "--families",
