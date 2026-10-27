@@ -527,3 +527,11 @@ content-addressed tags and cannot contaminate parallel runs.
   `.work/` cannot be drafted (s11: `draft --source-root` for staging; `freeze --import-into` copies reviewed trees
   with their licence files into `evals/datasets/corpus/` under owner authorisation). The JS external intake is
   staged but paused before draft until s11 lands.
+- 2026-10-27 Vul4Py triage (metadata only; clone at f80f8610, MIT; `.work/intake/external/vul4py/triage.json`): the
+  dataset lists only id, repo and fix commit; CWE and package came from OSV/GitHub advisories, dependencies from
+  PyPI at the fixed version. 20 rows map to `python.command_sentinel/1`, 10 to `python.secret_disclosure/1`, 70 to
+  neither (7 picklescan rows need a new kind). 7 candidates have an empty runtime dependency list; only CVE-2023-26145
+  (pydash, MIT) exposes a module-level function in the recipe's call shape; the others (asteval, 4 RestrictedPython
+  rows under ZPL-2.1, python-libnmap) need an operator wrapper or carry CPython 3.12 risk. Shortlist of 10 recorded.
+  Conclusion so far: public datasets feed the existing kinds only through JavaScript prototype pollution in volume;
+  Python yields single digits; C, Java, Ruby and Perl need new kinds (owner rubrics).
