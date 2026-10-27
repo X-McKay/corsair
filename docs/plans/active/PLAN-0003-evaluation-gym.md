@@ -388,3 +388,18 @@ content-addressed tags and cannot contaminate parallel runs.
   and its decision-shape sentence becomes h2a. Observation to check: c-intoverflow-a r0 in the h1 run hit the
   output cap but was recorded as `execution_error`, not `provider_max_tokens`. Run directories of h1/h2 copied into
   the shared store. Ledger rows `h1-tier1`, `h2-tier1` (rejected).
+- 2026-10-27 Docker suite on `gym/loop` at 0b1b600f: `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error`
+  61 passed, 1 skipped (long probe). h4 (wave 2, not implemented, no commit): read-only analysis of the 27
+  adversarial-ERROR raw receipts in the shared store corrects the earlier diagnosis. The bound finding line IS
+  covered in 19 of the 20 mappable receipts (reference 3/3, h1 run 3 of 3 with a role-ERROR adversarial, h2 clean
+  6/6); the "target not executed, empty coverage" picture came from `steps/verification.py:_error()` discarding the
+  receipt's `covered_lines` and setting `target_executed=False` for `observation_kind=execution_error`, and from
+  drivers setting `target_executed` only for held/invalid/violation kinds. So the briefed rule (INVALID only when the
+  target did not execute) matches 0 observed episodes and would not move J. The rule that would affect them (status
+  ERROR with `observation_kind=execution_error`, bound line covered, control HELD, cleanup confirmed, no harness
+  fault → INVALID with an explicit reason) reclassifies a target-side exception outside the recipe's
+  `allowed_exceptions`, which AGENTS.md keeps explicit; it is an owner ruling, not an experiment. Two genuine faults
+  remain ERROR correctly: c-intoverflow-a r0 in the h1 run (`SandboxExecutionError`, no driver record) and the java
+  control-role ERROR. Separate correctness defect, also for the owner: `_error()` discards coverage so stored ERROR
+  observations misreport execution; fixing it changes rebuilt observations and so saved-evidence re-validation of
+  old ERROR results. Ledger row `h4` (rejected: premise false).

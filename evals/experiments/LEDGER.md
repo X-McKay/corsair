@@ -37,9 +37,16 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | h1-tier1 | accuracy | `gym/h1-reasoning-cap@55c70ea` | — | REJECTED (objective_below_threshold) | — / -0.176 | — / 1.070 | rejected | Target met: provider_max_tokens 2 to 0, python verified 0.8 to 0.9, macro verified 0.983, no regression, tokens 1.07x; REJECTED on objective only (J -0.176) because 5 trusted-probe ERROR episodes after audit ACCEPT (the payload-raises-before-target defect, h4) score -0.5 each; retest after h4 |
 | h2-tier1 | efficiency | `gym/h2-producer-decisiveness@a41fed0` | — | REJECTED (language_regressed, objective_below_threshold; regressed: python) | — / -0.222 | — / 0.956 | rejected | java and perl recovered fully (heartbeat timeouts were operational); python regressed 0.8 to 0.6 on its merits (provider_max_tokens 4, probe ERROR 5); tokens only -4%; the stop-criteria text is rejected; the decision-shape sentence alone (validation retries 16 to 1 on tier0) becomes h2a |
 
+### Wave 2
+
+| Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| h4 | accuracy | `gym/h4-probe-error-classification@0b1b600` | — | — | — | — | rejected | Premise false: raw receipts show the bound line covered in 19 of 20 mappable adversarial-ERROR episodes; the not-executed picture came from the verifier error path discarding receipt coverage. The narrow rule is a no-op; a wider rule (target-side exception outside allowed exceptions becomes INVALID) is an evidence-policy ruling for the owner |
+
 ## Rejected ideas (do not retry without new evidence)
 
 | Idea | Wave | Why it failed |
 | --- | --- | --- |
 | h1 decisive tier1 at thinking_token_budget 4096, no overlapping runs | 1 | Target met: provider_max_tokens 2 to 0, python verified 0.8 to 0.9, macro verified 0.983, no regression, tokens 1.07x; REJECTED on objective only (J -0.176) because 5 trusted-probe ERROR episodes after audit ACCEPT (the payload-raises-before-target defect, h4) score -0.5 each; retest after h4 |
 | h2 clean tier1 re-run, no overlapping runs | 1 | java and perl recovered fully (heartbeat timeouts were operational); python regressed 0.8 to 0.6 on its merits (provider_max_tokens 4, probe ERROR 5); tokens only -4%; the stop-criteria text is rejected; the decision-shape sentence alone (validation retries 16 to 1 on tier0) becomes h2a |
+| Classify a completed adversarial run that did not execute the bound target as INVALID instead of ERROR | 2 | Premise false: raw receipts show the bound line covered in 19 of 20 mappable adversarial-ERROR episodes; the not-executed picture came from the verifier error path discarding receipt coverage. The narrow rule is a no-op; a wider rule (target-side exception outside allowed exceptions becomes INVALID) is an evidence-policy ruling for the owner |
