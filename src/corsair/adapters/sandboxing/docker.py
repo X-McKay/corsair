@@ -42,6 +42,11 @@ from corsair.settings import Settings
 Heartbeat = Callable[[], None]
 
 
+def _elapsed_usec(started_ns: int) -> int:
+    """Whole microseconds since a ``time.monotonic_ns()`` reading."""
+    return (time.monotonic_ns() - started_ns) // 1000
+
+
 class SandboxExecutionError(RuntimeError):
     """A role container did not leave parseable, cleanup-confirmed evidence."""
 
@@ -248,22 +253,23 @@ class DockerSandbox:
         cleanup_confirmed: bool = False,
         image_id: str | None = None,
         docker_exit_code: int | None = None,
+        host_usec: int | None = None,
     ) -> ArtifactRef:
-        ref = store.put_json(
-            {
-                "schema_version": "corsair.raw-evidence/1",
-                "operation_id": operation_id,
-                "role": role,
-                "container_id": container_id,
-                "labels": labels or {},
-                "image_id": image_id,
-                "docker_exit_code": docker_exit_code,
-                "driver": None,
-                "cleanup_confirmed": cleanup_confirmed,
-                "error": reason,
-            }
-        )
-        return ref
+        raw: dict[str, Any] = {
+            "schema_version": "corsair.raw-evidence/1",
+            "operation_id": operation_id,
+            "role": role,
+            "container_id": container_id,
+            "labels": labels or {},
+            "image_id": image_id,
+            "docker_exit_code": docker_exit_code,
+            "driver": None,
+            "cleanup_confirmed": cleanup_confirmed,
+            "error": reason,
+        }
+        if host_usec is not None:
+            raw["host_usec"] = host_usec
+        return store.put_json(raw)
 
     def execute_role(
         self,
@@ -309,6 +315,9 @@ class DockerSandbox:
         record: dict[str, Any] | None = None
         docker_exit_code: int | None = None
         error_reason: str | None = None
+        # Host-side timing: container create until its wait returns (or it is stopped).
+        created_ns: int | None = None
+        host_usec: int | None = None
         try:
             with tempfile.TemporaryDirectory(prefix="corsair-security-") as temporary:
                 workspace = Path(temporary)
@@ -328,6 +337,7 @@ class DockerSandbox:
                 os.chmod(job_path, 0o444)
                 os.chmod(input_root, 0o555)
 
+                created_ns = time.monotonic_ns()
                 container = client.containers.create(
                     image=image_id,
                     labels=labels,
@@ -378,6 +388,7 @@ class DockerSandbox:
                 wait_result = self._wait_with_heartbeat(
                     container, budget.probe_timeout_seconds, heartbeat
                 )
+                host_usec = _elapsed_usec(created_ns)
                 docker_exit_code = wait_result.get("StatusCode")
                 stdout = container.logs(stdout=True, stderr=False)
                 record = self._driver_record(stdout, budget)
@@ -404,6 +415,9 @@ class DockerSandbox:
             # Continue through finally, retaining only a generic non-secret reason.
             record = None
             error_reason = type(exc).__name__
+            if created_ns is not None and host_usec is None:
+                # A deadline stop or failed wait still spent this host time.
+                host_usec = _elapsed_usec(created_ns)
         finally:
             if container is not None:
                 cleanup_confirmed = self._cleanup(container, immutable_id, labels)
@@ -419,6 +433,7 @@ class DockerSandbox:
                 cleanup_confirmed=cleanup_confirmed,
                 image_id=image_id,
                 docker_exit_code=docker_exit_code,
+                host_usec=host_usec,
             )
         raw = {
             "schema_version": "corsair.raw-evidence/1",
@@ -430,6 +445,7 @@ class DockerSandbox:
             "image_id": image_id,
             "docker_exit_code": docker_exit_code,
             "driver": record,
+            "host_usec": host_usec,
         }
         raw_ref = store.put_json(raw)
         return raw_ref

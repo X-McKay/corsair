@@ -35,12 +35,14 @@ from corsair.contracts import (
 from corsair.policies.verdicts import fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import content_image
 
 pytestmark = pytest.mark.docker
 
 # Set CORSAIR_TEST_PERL_IMAGE to qualify a differently tagged scratch build of the driver.
-PERL_IMAGE = os.environ.get("CORSAIR_TEST_PERL_IMAGE", "corsair-perl:0.1")
 PERL_KIND = "perl.html_injection/1"
+PERL_IMAGE = os.environ.get("CORSAIR_TEST_PERL_IMAGE") or content_image(PERL_KIND)
 CORPUS = Path("evals/datasets/corpus/infosec-harness/perl/xss")
 
 
@@ -57,7 +59,8 @@ def _docker_client() -> docker.DockerClient:
     except DockerException as exc:
         if os.getenv("CORSAIR_TEST_DOCKER") == "1":
             pytest.fail(f"explicit real Docker test requires image: {type(exc).__name__}")
-        pytest.skip(f"real Docker image unavailable; build with just images: {type(exc).__name__}")
+        name = type(exc).__name__
+        pytest.skip(f"real Docker image unavailable; build with just images-gym: {name}")
     return client
 
 
@@ -170,6 +173,7 @@ def test_real_docker_perl_corpus_row_demonstrates_and_fix_verifies(tmp_path: Pat
     # The finding's sink line is executed in both runs.
     assert 10 in observation.control.covered_lines
     assert 10 in observation.adversarial.covered_lines
+    assert_sandbox_seconds(observation)
     _assert_cleanup(client, "perl-docker-vulnerable")
     # Two containers (control + adversarial). A test-side sanity ceiling, not the kernel's
     # per-role probe deadline (Budget.probe_timeout_seconds above); slower hosts were seen

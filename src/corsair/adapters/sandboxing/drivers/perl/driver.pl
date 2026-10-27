@@ -15,6 +15,7 @@
 use strict;
 use warnings;
 use JSON::PP ();
+use Time::HiRes ();
 
 my $JOB_PATH    = '/input/job.json';
 my $WORK        = '/work';
@@ -25,6 +26,8 @@ my $OBSERVATION = "$WORK/observation.json";
 my $COVERAGE    = "$WORK/coverage.json";
 my $TAP         = "$WORK/tap.txt";
 my $ERR         = "$WORK/err.txt";
+# The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+my $CPU_STAT    = '/sys/fs/cgroup/cpu.stat';
 
 # The fixed test. It reads the same job JSON, loads the pinned module, invokes the sub
 # with the operator-fixed leading arguments plus the single model payload, and makes the
@@ -209,6 +212,19 @@ sub coverage_lines {
     return [ map { 0 + $_ } sort { $a <=> $b } keys %seen ];
 }
 
+# The cgroup v2 usage_usec CPU total, or undef when the file or field is absent.
+sub cgroup_cpu_usec {
+    open(my $handle, '<', $CPU_STAT) or return undef;
+    while (my $line = <$handle>) {
+        if ($line =~ /\Ausage_usec ([0-9]+)\s*\z/) {
+            close $handle;
+            return 0 + $1;
+        }
+    }
+    close $handle;
+    return undef;
+}
+
 sub read_observation {
     return undef unless -e $OBSERVATION;
     my $text = eval { local (@ARGV, $/) = ($OBSERVATION); <> };
@@ -235,6 +251,7 @@ write_file($TEST_PATH,   $TEST_SOURCE);
 write_file($TRACER_PATH, $TRACER_SOURCE);
 
 my $exit_code;
+my $started = Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC());
 {
     open(my $old_out, '>&', \*STDOUT) or die "cannot save stdout: $!\n";
     open(my $old_err, '>&', \*STDERR) or die "cannot save stderr: $!\n";
@@ -249,6 +266,9 @@ my $exit_code;
     elsif ($status & 127) { $exit_code = 128 + ($status & 127); }
     else { $exit_code = $status >> 8; }
 }
+# Integer microseconds (0 + int) so the strict verifier sees a JSON integer.
+my $wall_usec = 0 + int(
+    (Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $started) * 1_000_000);
 
 my $observed = read_observation();
 my $module_file = $job->{recipe}{module_file} // '';
@@ -279,7 +299,7 @@ else {
 my %kinds = map { $_ => 1 } qw(held disclosure invalid_control);
 my $target_executed = (defined $observed && $kinds{$observed}) ? JSON::PP::true : JSON::PP::false;
 
-emit({
+my %record = (
     schema_version    => 'corsair.driver/1',
     operation_id      => $job->{operation_id},
     role              => $role,
@@ -292,7 +312,12 @@ emit({
     target_executed   => $target_executed,
     covered_lines     => coverage_lines($module_file),
     coverage_file     => $module_file,
-});
+);
+# Efficiency telemetry only: the verifier never admits an outcome from it.
+$record{wall_usec} = $wall_usec;
+my $cpu_usec = cgroup_cpu_usec();
+$record{cpu_usec} = $cpu_usec if defined $cpu_usec;
+emit(\%record);
 
 # Deliberately the child test's native status, so docker_exit_code matches native_exit_code.
 exit $exit_code;

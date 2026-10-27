@@ -26,6 +26,8 @@ WORK = "/work"
 JUNIT = File.join(WORK, "junit.xml")
 TARGET_LOG = File.join(WORK, "target.log")
 SECRET_PATH = "/fixtures/private/secret.txt"
+# The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+CPU_STAT = "/sys/fs/cgroup/cpu.stat"
 
 # A failed fixed assertion and an unexpected target exception are distinct native
 # signals, exactly as pytest's failure and error are in driver.py.
@@ -162,6 +164,19 @@ def safe_job(raw)
   value
 end
 
+# The cgroup v2 usage_usec CPU total, or nil when the file or field is absent.
+def cgroup_cpu_usec
+  File.foreach(CPU_STAT) do |line|
+    key, value = line.split(" ", 2)
+    next unless key == "usage_usec"
+
+    return value.to_s.strip.match?(/\A[0-9]+\z/) ? Integer(value.strip, 10) : nil
+  end
+  nil
+rescue SystemCallError, IOError
+  nil
+end
+
 def emit(record)
   puts JSON.generate(record)
 end
@@ -191,6 +206,7 @@ def main
 
   failure = nil
   observation_kind = nil
+  started = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond)
   Coverage.start(lines: true)
   begin
     load absolute if absolute
@@ -201,6 +217,7 @@ def main
     failure = RecipeError.new("trusted driver caught an unexpected error: #{exc.class.name}")
   end
   coverage = Coverage.result
+  wall_usec = Process.clock_gettime(Process::CLOCK_MONOTONIC, :microsecond) - started
 
   $stdout.reopen(original_stdout)
   log.close
@@ -248,6 +265,10 @@ def main
     "covered_lines" => covered,
     "coverage_file" => module_file,
   }
+  # Efficiency telemetry only: the verifier never admits an outcome from it.
+  record["wall_usec"] = wall_usec
+  cpu_usec = cgroup_cpu_usec
+  record["cpu_usec"] = cpu_usec unless cpu_usec.nil?
   emit(record)
   exit_code
 end

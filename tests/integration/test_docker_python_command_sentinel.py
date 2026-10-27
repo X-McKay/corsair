@@ -1,7 +1,8 @@
 """Real-Docker evidence for the python.command_sentinel/1 recipe.
 
-Build the trusted image first (``just images`` rebuilds ``corsair-python:0.1`` from the
-current driver; set ``CORSAIR_TEST_IMAGE`` to use a differently tagged scratch build).
+Build the trusted image first (``just images-gym`` builds the content-tagged
+``corsair-python`` image from the current driver; set ``CORSAIR_TEST_IMAGE`` to use a
+differently tagged scratch build).
 These cases cover the recipe's four native outcomes: a genuine control/violation
 differential, a non-executing adversarial payload, a disallowed target exception, and
 absent relevant coverage.
@@ -34,6 +35,8 @@ from corsair.contracts import (
 )
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import PYTHON_KIND, content_image
 
 pytestmark = pytest.mark.docker
 
@@ -63,7 +66,7 @@ RAISES = (
 
 
 def _image() -> str:
-    return os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
+    return os.environ.get("CORSAIR_TEST_IMAGE") or content_image(PYTHON_KIND)
 
 
 def _docker_client() -> docker.DockerClient:
@@ -170,6 +173,7 @@ def test_vulnerable_source_holds_control_and_violates_on_sentinel(tmp_path: Path
     assert observation.adversarial and observation.adversarial.outcome.value == "VIOLATION"
     assert observation.control.native_exit_code == 0
     assert observation.adversarial.native_exit_code != 0
+    assert_sandbox_seconds(observation)
     print(f"command_sentinel vulnerable: {timing}")
 
 

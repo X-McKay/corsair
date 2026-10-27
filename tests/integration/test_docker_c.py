@@ -1,6 +1,6 @@
 """Real-Docker qualification of the C integer-overflow recipe (c.integer_overflow/1).
 
-These tests need the reviewed ``corsair-c:0.1`` image (``just images``), or the image
+These tests need the content-tagged ``corsair-c`` image (``just images-gym``), or the image
 named by ``CORSAIR_TEST_C_IMAGE``, and a Docker daemon. They prove the control/violation
 differential and the failure modes on the actual hardened container: a plain crash, a
 forged sanitizer report from a target that returns normally, and a compile failure are
@@ -33,13 +33,15 @@ from corsair.contracts import (
 )
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import content_image, content_images
 
 pytestmark = pytest.mark.docker
 
 C_KIND = "c.integer_overflow/1"
 # A scratch build of deploy/c/Dockerfile can be qualified without retagging the
 # released image, e.g. CORSAIR_TEST_C_IMAGE=corsair-c:fix.
-C_IMAGE = os.environ.get("CORSAIR_TEST_C_IMAGE", "corsair-c:0.1")
+C_IMAGE = os.environ.get("CORSAIR_TEST_C_IMAGE") or content_image(C_KIND)
 
 # Vulnerable: `unsigned short total = n + 1` wraps to 0 at n=65535, so malloc(0) is
 # followed by a memcpy of n bytes. The overflow sink (memcpy) is line 11 here.
@@ -135,7 +137,7 @@ def _docker_client() -> docker.DockerClient:
 
 def _images() -> dict[str, str]:
     """The default recipe-kind image map with ``C_IMAGE`` for the C kind."""
-    return {**Settings().images, C_KIND: C_IMAGE}
+    return {**content_images(), C_KIND: C_IMAGE}
 
 
 def _image_id(client: docker.DockerClient) -> str:
@@ -236,6 +238,7 @@ def test_c_vulnerable_shows_control_held_and_exploit_violation(tmp_path: Path) -
     assert observation.adversarial and observation.adversarial.outcome.value == "VIOLATION"
     assert observation.control.covered_lines and 5 in observation.control.covered_lines
     assert 5 in observation.adversarial.covered_lines
+    assert_sandbox_seconds(observation)
     _assert_cleanup(client, "docker-c-vulnerable")
 
 
@@ -299,6 +302,8 @@ def test_c_compile_failure_is_operational_error(tmp_path: Path) -> None:
     assert driver["outcome"] == "ERROR"
     assert driver["observation_kind"] == "compile_error"
     assert driver["covered_lines"] == []
+    assert type(driver["wall_usec"]) is int and type(driver["cpu_usec"]) is int
+    assert type(raw["host_usec"]) is int and raw["host_usec"] > 0
     assert raw["cleanup_confirmed"] is True
     _assert_cleanup(client, "docker-c-compile")
 

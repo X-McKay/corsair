@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from corsair.settings import Settings
+from tests.integration.trusted_images import with_content_images
 from tests.workflow.temporal import temporal_id
 
 pytestmark = [pytest.mark.docker, pytest.mark.temporal, pytest.mark.asyncio(loop_scope="module")]
@@ -59,11 +60,13 @@ async def test_real_cli_rejects_eval_bounds_before_handler_io(tmp_path, option, 
 async def test_real_cli_worker_doctor_and_native_reference(temporal_server, tmp_path):
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for native CLI testing")
-    settings = Settings(
-        source_root=str(ROOT),
-        artifact_root=str(tmp_path / "artifacts"),
-        temporal_address=temporal_server.client.service_client.config.target_host,
-        task_queue=temporal_id("cli-worker"),
+    settings = with_content_images(
+        Settings(
+            source_root=str(ROOT),
+            artifact_root=str(tmp_path / "artifacts"),
+            temporal_address=temporal_server.client.service_client.config.target_host,
+            task_queue=temporal_id("cli-worker"),
+        )
     )
     config = tmp_path / "settings.json"
     config.write_text(settings.model_dump_json())
@@ -139,7 +142,9 @@ async def test_real_cli_reference_in_pseudo_terminal_has_animation(tmp_path):
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for native terminal testing")
     config = tmp_path / "settings.json"
     config.write_text(
-        Settings(source_root=str(ROOT), artifact_root=str(tmp_path / "artifacts")).model_dump_json()
+        with_content_images(
+            Settings(source_root=str(ROOT), artifact_root=str(tmp_path / "artifacts"))
+        ).model_dump_json()
     )
     master, slave = pty.openpty()
     process = subprocess.Popen(
