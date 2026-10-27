@@ -48,8 +48,11 @@ from .gym import KernelCase as KernelCase
 from .gym import KindBudget as KindBudget
 from .gym import LedgerDecision as LedgerDecision
 from .gym import LedgerRow as LedgerRow
+from .gym import OperationalEpisode as OperationalEpisode
+from .gym import OperationalReason as OperationalReason
 from .gym import RoundSummary as RoundSummary
 from .gym import RunContext as RunContext
+from .gym import RunIdentity as RunIdentity
 from .gym import Scorecard as Scorecard
 from .gym import SkipReason as SkipReason
 from .gym import TierGate as TierGate

@@ -126,6 +126,7 @@ class CliArguments(argparse.Namespace):
     runs_tier: str | None
     reference: str | None
     skip_tier1: bool
+    smoke: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -837,7 +838,7 @@ async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
     from corsair.evaluation.gym.scoring import read_scorecard
 
     baseline, candidate = read_scorecard(Path(args.baseline)), read_scorecard(Path(args.candidate))
-    verdict = gate(baseline, candidate)
+    verdict = gate(baseline, candidate, smoke=args.smoke)
     _emit_view(ui, render_gate(verdict, baseline, candidate), verdict)
     return verdict.exit_code
 
@@ -1442,6 +1443,11 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     )
     gate_cmd.add_argument("--baseline", required=True, metavar="SCORECARD")
     gate_cmd.add_argument("--candidate", required=True, metavar="SCORECARD")
+    gate_cmd.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Report the objective margin without rejecting on it (a smoke result only)",
+    )
     replay_cmd = command(
         "replay", "One case's round timeline, per-call usage and failure stop; no services"
     )

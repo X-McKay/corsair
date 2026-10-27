@@ -2,11 +2,19 @@
 
 INCOMPARABLE is never a regression verdict: different datasets or budgets, a sliced run,
 too few repeats or unknown token usage mean the two scorecards answer different questions.
+Identity changes and operational stops are reported beside the decision and never change
+it: a different prompt, skill, image or model is what a candidate is, and an operational
+stop keeps its ERROR score.
+
+A smoke gate (``smoke=True``, for a tier where every language already verifies, so the
+objective margin is noise) still reports ``objective_below_threshold`` but decides only on
+language regressions, the token ceiling and the INCOMPARABLE conditions; its verdict says
+``smoke`` so its ACCEPTED is never read as an acceptance.
 """
 
 from collections.abc import Sequence
 
-from corsair.contracts import GateDecision, GateReason, GateVerdict, Scorecard
+from corsair.contracts import GateDecision, GateReason, GateVerdict, RunIdentity, Scorecard
 
 MIN_REPEATS = 3
 MIN_OBJECTIVE_GAIN = 0.01
@@ -44,6 +52,35 @@ def language_deltas(baseline: Scorecard, candidate: Scorecard) -> dict[str, floa
     return deltas
 
 
+def identity_changes(baseline: Scorecard, candidate: Scorecard) -> dict[str, bool | None]:
+    """Per ``RunIdentity`` component, whether its recorded values differ; unknown if absent."""
+    changes: dict[str, bool | None] = {}
+    for component in RunIdentity.model_fields:
+        before = baseline.run_identity.get(component)
+        after = candidate.run_identity.get(component)
+        changes[component] = None if not before or not after else before != after
+    return changes
+
+
+def operationally_confounded(
+    baseline: Scorecard, candidate: Scorecard, regressed: Sequence[str]
+) -> list[str]:
+    """Regressed languages that would not regress had their operational episodes verified."""
+    confounded = []
+    for language in regressed:
+        before, after = baseline.languages.get(language), candidate.languages.get(language)
+        if before is None or after is None or before.verified_accuracy is None:
+            continue
+        ceiling = after.verified_accuracy_without_operational_failures
+        if (
+            after.operational_episodes
+            and ceiling is not None
+            and ceiling >= before.verified_accuracy - _EPSILON
+        ):
+            confounded.append(language)
+    return confounded
+
+
 def token_ratio(baseline: Scorecard, candidate: Scorecard) -> float | None:
     before, after = baseline.macro_effective_tokens, candidate.macro_effective_tokens
     if before is None or after is None or before <= 0:
@@ -52,9 +89,16 @@ def token_ratio(baseline: Scorecard, candidate: Scorecard) -> float | None:
 
 
 def gate(
-    baseline: Scorecard, candidate: Scorecard, *, min_repeats: int = MIN_REPEATS
+    baseline: Scorecard,
+    candidate: Scorecard,
+    *,
+    min_repeats: int = MIN_REPEATS,
+    smoke: bool = False,
 ) -> GateVerdict:
-    """ACCEPTED iff no language regressed, J gained at least 0.01 and tokens stayed within 1.10x."""
+    """ACCEPTED iff no language regressed, J gained at least 0.01 and tokens stayed within 1.10x.
+
+    With ``smoke`` the objective margin is reported but does not reject.
+    """
     deltas = language_deltas(baseline, candidate)
     delta_j = candidate.objective_j - baseline.objective_j
     ratio = token_ratio(baseline, candidate)
@@ -63,14 +107,23 @@ def gate(
     ]
     reasons = incomparable_reasons(baseline, candidate, min_repeats)
     decision = GateDecision.INCOMPARABLE
+    confounded: list[str] = []
     if not reasons:
         if regressed:
             reasons.append(GateReason.LANGUAGE_REGRESSED)
+            confounded = operationally_confounded(baseline, candidate, regressed)
+        if confounded:
+            reasons.append(GateReason.OPERATIONALLY_CONFOUNDED)
         if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON:
             reasons.append(GateReason.OBJECTIVE_BELOW_THRESHOLD)
         if ratio is None or ratio > MAX_TOKEN_RATIO + _EPSILON:
             reasons.append(GateReason.TOKENS_ABOVE_CEILING)
-        decision = GateDecision.REJECTED if reasons else GateDecision.ACCEPTED
+        deciding = [
+            reason
+            for reason in reasons
+            if not (smoke and reason is GateReason.OBJECTIVE_BELOW_THRESHOLD)
+        ]
+        decision = GateDecision.REJECTED if deciding else GateDecision.ACCEPTED
     return GateVerdict(
         decision=decision,
         reasons=reasons,
@@ -80,6 +133,9 @@ def gate(
         token_ratio=ratio,
         language_deltas=deltas,
         regressed_languages=regressed,
+        operationally_confounded_languages=confounded,
+        identity_changes=identity_changes(baseline, candidate),
+        smoke=smoke,
     )
 
 
