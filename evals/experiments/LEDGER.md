@@ -84,6 +84,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | s19 | dx | `gym/s19-selection-identity@ddf27bc` | — | — | — | — | merged `23f818d` | Offline only; 1628 passed. Selection unchanged (python secret_disclosure only). Both roles' skills digests move once, so the next reference pair must be run at or after 23f818d9 before any candidate's identity table reads cleanly. |
+| s20 | dx | `gym/s20-case-stability@cfb649c` | — | — | — | — | merged `8ae6e39` | Offline only; 1641 passed. Reference band rebuilt with cases: 13 stable pass, 5 stable fail, 3 unstable (case02, case03, deep-override). The majority-per-run rule at n=2 reads adversarial01/02 (1 of 3 each run) and mixin-deep/viking04 (2 of 3) as stable although they are episode-level coin-flips; verified_episodes keeps them visible. Greedy run vs reference: INCONCLUSIVE, only flip case03 within noise. |
 
 ## Rejected ideas (do not retry without new evidence)
 
