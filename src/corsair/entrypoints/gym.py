@@ -43,7 +43,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager, context
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from temporalio.client import Client, WorkflowHandle
@@ -263,6 +263,62 @@ def run_store(run_dir: Path, root: Path | None, settings: Settings) -> Path:
     if isinstance(recorded, str) and Path(recorded).is_dir():
         return Path(recorded)
     return gym_paths(root, settings).store
+
+
+type RunContextSource = Literal["run.json", "scorecard.json", "flags", "unknown"]
+
+
+def _recorded_context(record: Mapping[str, Any]) -> RunContext | None:
+    """``run.json``'s ``run`` block; a run.json written before it recorded one has none."""
+    block = record.get("run")
+    return RunContext.model_validate(block) if isinstance(block, dict) else None
+
+
+def recover_run_context(
+    run_dir: Path, *, explicit: RunContext | None, fallback: RunContext
+) -> tuple[RunContext, RunContextSource]:
+    """The run context to rescore ``run_dir``'s report under, and where it came from.
+
+    In order: ``run.json``'s ``run`` block; the run block of the scorecard beside the
+    report when it names a commit (a run imported without ``run.json``); the operator's
+    ``explicit`` flags; else ``fallback``, whose source is ``unknown``.
+    """
+    recorded = _recorded_context(read_run_record(run_dir))
+    if recorded is not None:
+        return recorded, "run.json"
+    previous = run_dir / SCORECARD_FILE
+    if previous.is_file():
+        run = read_scorecard(previous).run
+        if run.git_commit:
+            return run, "scorecard.json"
+    if explicit is not None:
+        return explicit, "flags"
+    return fallback, "unknown"
+
+
+def write_recovered_run_record(run_dir: Path, run: RunContext, *, store: Path) -> bool:
+    """Write ``run.json`` for a run imported without one, from the context its scorecard kept.
+
+    Returns False, writing nothing, when ``run.json`` already exists.
+    """
+    record = {
+        "schema_version": "corsair.gym-run/1",
+        "run_id": run.run_id,
+        "tier": _run_tier({}, run.run_id),
+        "git": {"branch": run.git_branch, "commit": run.git_commit},
+        "store": str(store),
+        "run_dir": str(run_dir),
+        "concurrency": run.concurrency,
+        "run": run.model_dump(mode="json"),
+        "recovered_from": SCORECARD_FILE,
+        "recovered_at": _now(),
+    }
+    try:
+        with (run_dir / RUN_FILE).open("x") as handle:
+            handle.write(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    except FileExistsError:
+        return False
+    return True
 
 
 def default_settings_path(root: Path) -> Path | None:
@@ -1045,6 +1101,8 @@ async def run_gym(
                 "completed_at": _now(),
                 "wall_seconds": round(wall, 1),
                 "episodes": len(items),
+                # The scorecard's run context, so a rescore of this run recovers it.
+                "run": run.model_dump(mode="json"),
             },
         )
     event("gym.completed", run_id=run_id, seconds=round(wall, 1), total=len(trajectories))
@@ -1213,6 +1271,8 @@ def run_summary(run_dir: Path) -> dict[str, Any]:
     """One stored run's headline figures from its scorecard and run.json."""
     card = read_scorecard(run_dir / SCORECARD_FILE)
     record = read_run_record(run_dir)
+    # A scorecard written without the run's context defers to the one run.json recorded.
+    run = card.run if card.run.git_commit else (_recorded_context(record) or card.run)
     known = [
         (summary.verified_accuracy, language)
         for language, summary in card.languages.items()
@@ -1220,11 +1280,11 @@ def run_summary(run_dir: Path) -> dict[str, Any]:
     ]
     worst = min(known) if known else None
     return {
-        "run_id": card.run.run_id,
-        "started_at": _started(run_dir, record, card.run.run_id),
-        "git_commit": card.run.git_commit,
+        "run_id": run.run_id,
+        "started_at": _started(run_dir, record, run.run_id),
+        "git_commit": run.git_commit,
         "git_dirty": record.get("git", {}).get("dirty"),
-        "tier": _run_tier(record, card.run.run_id),
+        "tier": _run_tier(record, run.run_id),
         "repeats": card.repeats,
         "sliced": card.sliced,
         "objective_j": card.objective_j,

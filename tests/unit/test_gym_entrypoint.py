@@ -14,12 +14,15 @@ from pathlib import Path
 import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import validate_root_identity
+from corsair.contracts import RunContext, validate_root_identity
 from corsair.entrypoints import gym
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.evaluation.datasets import load_dataset
+from corsair.evaluation.gym.scoring import SCORECARD_FILE, read_scorecard, write_scorecard
 from corsair.settings import TRANSPORT_FIELDS, ModelSettings, Settings
 from corsair.steps.manifest import build_manifest
+from tests.unit.evaluation.test_gym_gate import BASELINE
+from tests.unit.test_gym_cli import _card
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASETS = ROOT / "evals/datasets"
@@ -354,3 +357,22 @@ def test_the_invocation_keeps_arguments_but_not_endpoints_or_the_program_path():
 def test_the_tier_name_is_the_manifest_stem_without_its_prefix():
     assert gym.tier_name(DATASETS / "gym-tier1.json") == "tier1"
     assert gym.tier_name(Path("custom.json")) == "custom"
+
+
+def test_a_run_listing_takes_the_recorded_context_when_the_scorecard_names_none(tmp_path):
+
+    run_dir = tmp_path / "runs" / "gym-tier0-20261027t010807-479fc5"
+    card = read_scorecard(_card(run_dir / SCORECARD_FILE, BASELINE, run_id="report"))
+    write_scorecard(
+        run_dir / SCORECARD_FILE, card.model_copy(update={"run": RunContext(run_id="report")})
+    )
+    recorded = RunContext(run_id=run_dir.name, git_branch="gym/loop", git_commit="c" * 40)
+    (run_dir / gym.RUN_FILE).write_text(json.dumps({"run": recorded.model_dump(mode="json")}))
+
+    summary = gym.run_summary(run_dir)
+
+    assert (summary["run_id"], summary["git_commit"], summary["tier"]) == (
+        run_dir.name,
+        "c" * 40,
+        "tier0",
+    )
