@@ -346,3 +346,16 @@ content-addressed tags and cannot contaminate parallel runs.
   from fewer calls). Decision: inconclusive; clean tier1 re-run after h1 finishes, then either accept or split the
   decision-shape sentence into its own experiment. Lessons: live tier runs must not overlap (s5: run lock in the
   shared store); operational stops must be visible on the scorecard and the gate (s6).
+- 2026-10-27 h1 (accuracy, `gym/h1-reasoning-cap` 55c70eae; `ModelSettings.extra_body` admits
+  `thinking_token_budget`, new configuration identity). Endpoint probe: `reasoning_effort`, `reasoning.max_tokens`
+  and `thinking.budget_tokens` are ignored by the vLLM route; `thinking_token_budget` is honoured (256 → 255
+  reasoning tokens then STOP; works through ADK LiteLlm with a tool declared). tier0 at 8192 REJECTED (J −0.114 from
+  java r2 `execution_error`; budget engaged once); tier0 at 4096 REJECTED (J −0.014 from javascript r0
+  `clean_negative_unqualified`; budget not engaged); no language regressed in either. Sliced case02/adversarial01/02
+  ×3 (INCOMPARABLE): `provider_max_tokens` 2 → 0 at both budgets; at 8192 budget-length calls took 155–190 s on the
+  contended endpoint and produced 3 `episode_timeout`; at 4096 no timeouts, 4 `execution_error` evidence-side stops,
+  5/9 verified vs 7/9 reference. tier1 not run. `eval-agent producer-expanded` 2/3 both before and after. Decision:
+  inconclusive; a non-overlapping tier1 at 4096 is the decisive run. Protocol flaw found: tier0 is at 1.0 verified in
+  every language, so its objective margin is noise; the smoke gate must stop a candidate only on a language
+  regression or a token-ratio breach (folded into s6), and accuracy hypotheses whose target cases exist only in tier1
+  are gated on tier1.
