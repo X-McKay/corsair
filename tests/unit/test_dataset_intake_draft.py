@@ -687,6 +687,11 @@ def test_draft_and_freeze_parse_their_arguments():
         "x.json",
         ["a", "b"],
     )
+    repeated = cli.parser().parse_args(
+        ["dataset", "freeze", "d", "--review", "r.md", "--into", "x.json"]
+        + ["--against", "a", "--against", "b", "c"]
+    )
+    assert repeated.against == ["a", "b", "c"]
 
 
 async def test_cli_draft_then_freeze_exits_zero_two_and_one(tmp_path, evals, capsys):

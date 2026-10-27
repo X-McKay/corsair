@@ -1469,9 +1469,11 @@ def parser() -> argparse.ArgumentParser:
     freeze.add_argument(
         "--against",
         nargs="+",
+        action="extend",
         required=True,
         metavar="MANIFEST",
-        help="Manifests whose families and source trees must not cross into this split",
+        help="Manifests whose families and source trees must not cross into this split "
+        "(repeatable; every manifest given is checked)",
     )
     freeze.add_argument(
         "--import-into",
