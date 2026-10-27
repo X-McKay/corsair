@@ -66,6 +66,61 @@ class DominantCall(Contract):
     seconds: float = Field(ge=0)
 
 
+class RunIdentity(Contract):
+    """The full configuration identity one stored result's ``RunManifest`` records.
+
+    Read from the result, never from the checkout: the package version, the settings
+    identity (``config``), each role's instruction, agent spec, output schema and runtime
+    skills digests from the manifest's ``capabilities``, the risk-assessment and
+    budget-policy digests, the trusted image and each role's model. A value an older
+    manifest did not record stays ``None``. The per-case ``request_digest`` stays in
+    ``Trajectory.identity``; ``image`` varies per language and ``budget_policy`` per
+    request budget, so a scorecard keeps every distinct value of each component.
+    """
+
+    package_version: str | None = Field(default=None, max_length=64)
+    config: Digest | None = None
+    producer_prompt: Digest | None = None
+    auditor_prompt: Digest | None = None
+    producer_spec: str | None = Field(default=None, max_length=128)
+    auditor_spec: str | None = Field(default=None, max_length=128)
+    producer_output_schema: str | None = Field(default=None, max_length=128)
+    auditor_output_schema: str | None = Field(default=None, max_length=128)
+    producer_skills: str | None = Field(default=None, max_length=128)
+    auditor_skills: str | None = Field(default=None, max_length=128)
+    risk_assessment: str | None = Field(default=None, max_length=128)
+    budget_policy: str | None = Field(default=None, max_length=128)
+    image: str | None = Field(default=None, max_length=256)
+    producer_model: str | None = Field(default=None, max_length=256)
+    auditor_model: str | None = Field(default=None, max_length=256)
+
+
+class OperationalReason(StrEnum):
+    """Why a failed episode stopped for an operational, not a behavioural, reason.
+
+    Derived only from code-owned gate-ledger gates and workflow-owned reason text (see
+    ``evaluation.gym.scoring.operational_stop``); never from model-authored text.
+    """
+
+    HEARTBEAT_TIMEOUT = "heartbeat_timeout"
+    ACTIVITY_TIMEOUT = "activity_timeout"
+    EPISODE_TIMEOUT = "episode_timeout"
+    PROVIDER_TEMPORARY = "provider_temporary"
+    OPERATION_RECONCILIATION = "operation_reconciliation"
+    EXECUTION_CANCELLED = "execution_cancelled"
+    EVIDENCE_NOT_RUN = "evidence_not_run"
+    RESULT_UNAVAILABLE = "result_unavailable"
+
+
+class OperationalEpisode(Contract):
+    """One operational stop on a scorecard: which case and repeat, and why."""
+
+    case_id: Identifier
+    repeat: int = Field(ge=0)
+    language: str = Field(min_length=1, max_length=64)
+    reason: OperationalReason
+
+
 class Trajectory(Contract):
     """One scored row (one case, one repeat) with its reward decomposition."""
 
@@ -124,6 +179,17 @@ class Trajectory(Contract):
     identity: dict[str, str] = Field(default_factory=dict)
     models: dict[str, str] = Field(default_factory=dict)
     git_commit: str | None = None
+    # The stored result's full manifest identity; ``None`` without a stored manifest.
+    run_identity: RunIdentity | None = None
+    # Visibility only: an operational stop keeps its reward and counts against accuracy.
+    operational: bool = False
+    operational_reason: OperationalReason | None = None
+
+    @model_validator(mode="after")
+    def coherent_operational(self):
+        if self.operational != (self.operational_reason is not None):
+            raise ValueError("an operational episode needs its reason, and only it has one")
+        return self
 
 
 class GroupSummary(Contract):
@@ -145,6 +211,11 @@ class GroupSummary(Contract):
     mean_thought_share: float | None = None
     capped_call_episodes: int | None = Field(default=None, ge=0)
     reasoning_cap_exhausted: int | None = Field(default=None, ge=0)
+    # Operational stops (see ``Trajectory.operational``); unknown on older scorecards.
+    operational_episodes: int | None = Field(default=None, ge=0)
+    # Majority verified accuracy had every operational episode verified: the gate's
+    # confounding check, never an accuracy, reward or objective input.
+    verified_accuracy_without_operational_failures: float | None = None
 
 
 class RunContext(Contract):
@@ -180,6 +251,12 @@ class Scorecard(Contract):
     macro_thought_share: float | None = None
     capped_call_episodes: int | None = Field(default=None, ge=0)
     reasoning_cap_exhausted: int | None = Field(default=None, ge=0)
+    # Every distinct value of each ``RunIdentity`` component across the trajectories;
+    # a component no stored result recorded is absent (unknown).
+    run_identity: dict[str, list[str]] = Field(default_factory=dict)
+    # Operational stops: the total, unknown on older scorecards, and each episode.
+    operational_episodes: int | None = Field(default=None, ge=0)
+    operational_stops: list[OperationalEpisode] = Field(default_factory=list)
 
 
 class GateDecision(StrEnum):
@@ -199,6 +276,9 @@ class GateReason(StrEnum):
     LANGUAGE_REGRESSED = "language_regressed"
     OBJECTIVE_BELOW_THRESHOLD = "objective_below_threshold"
     TOKENS_ABOVE_CEILING = "tokens_above_ceiling"
+    # Names a rejection, never causes one: a regressed language would not regress had
+    # its operational episodes verified, so the orchestrator orders a clean re-run.
+    OPERATIONALLY_CONFOUNDED = "operationally_confounded"
 
 
 _EXIT_CODES = {GateDecision.ACCEPTED: 0, GateDecision.REJECTED: 1, GateDecision.INCOMPARABLE: 2}
@@ -213,6 +293,14 @@ class GateVerdict(Contract):
     token_ratio: float | None = None
     language_deltas: dict[str, float | None] = Field(default_factory=dict)
     regressed_languages: list[str] = Field(default_factory=list)
+    # Regressed languages explained entirely by operational episodes.
+    operationally_confounded_languages: list[str] = Field(default_factory=list)
+    # Per ``RunIdentity`` component: whether its values differ; ``None`` when unknown on
+    # either side. Reported only; identity never makes a gate INCOMPARABLE.
+    identity_changes: dict[str, bool | None] = Field(default_factory=dict)
+    # A smoke gate reports ``objective_below_threshold`` without rejecting on it, so its
+    # ACCEPTED is a smoke result, never an acceptance.
+    smoke: bool = False
 
     @property
     def exit_code(self) -> int:

@@ -7,7 +7,7 @@ and the fixed reason sentences below are printed; no model-authored text reaches
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from corsair.contracts import GateReason, GateVerdict, GroupSummary, Scorecard
+from corsair.contracts import GateReason, GateVerdict, GroupSummary, OperationalEpisode, Scorecard
 
 REASON_TEXT: dict[GateReason, str] = {
     GateReason.DATASET_MISMATCH: "The runs scored different frozen datasets.",
@@ -18,7 +18,17 @@ REASON_TEXT: dict[GateReason, str] = {
     GateReason.LANGUAGE_REGRESSED: "A language's majority verified accuracy fell.",
     GateReason.OBJECTIVE_BELOW_THRESHOLD: "The objective J gained less than the required margin.",
     GateReason.TOKENS_ABOVE_CEILING: "Effective tokens rose above the allowed ratio.",
+    GateReason.OPERATIONALLY_CONFOUNDED: (
+        "A regressed language would not regress had its operational stops verified; "
+        "re-run cleanly before reading it."
+    ),
 }
+
+
+SMOKE_TEXT = (
+    "Smoke gate: the objective margin is reported but does not decide; "
+    "an ACCEPTED smoke gate is not an acceptance."
+)
 
 
 def _number(value: float | int | None, digits: int = 3) -> str:
@@ -51,15 +61,29 @@ def _stops(stops: Mapping[str, int]) -> str:
     return ", ".join(f"{gate} {count}" for gate, count in stops.items()) or "none"
 
 
+def _identity_line(changes: Mapping[str, bool | None]) -> str:
+    """Which identity components differ, and which are unknown on either side."""
+    changed = [name for name, differs in changes.items() if differs]
+    unknown = [name for name, differs in changes.items() if differs is None]
+    line = "Identity changes: " + (", ".join(changed) or "none")
+    return line + (f"; unknown: {', '.join(unknown)}" if unknown else "") + "."
+
+
 def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard) -> str:
     """The gate decision, its fixed reasons and a side-by-side metric table."""
     lines = [
-        f"## Gate: {verdict.decision.value}",
+        f"## Gate{' (smoke)' if verdict.smoke else ''}: {verdict.decision.value}",
         "",
         f"Baseline `{verdict.baseline_run_id}`, candidate `{verdict.candidate_run_id}`.",
         "",
     ]
+    if verdict.smoke:
+        lines.extend([SMOKE_TEXT, ""])
+    lines.extend([_identity_line(verdict.identity_changes), ""])
     lines.extend(f"- {REASON_TEXT[reason]}" for reason in verdict.reasons)
+    if verdict.operationally_confounded_languages:
+        confounded = ", ".join(verdict.operationally_confounded_languages)
+        lines.append(f"- Operationally confounded: {confounded}")
     if verdict.reasons:
         lines.append("")
     metrics = [
@@ -99,6 +123,7 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         before = baseline.languages[language]
         after = candidate.languages.get(language)
         capped_after = None if after is None else after.capped_call_episodes
+        operational_after = None if after is None else after.operational_episodes
         language_rows.append(
             [
                 language,
@@ -109,6 +134,10 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 _count(before.capped_call_episodes),
                 _count(capped_after),
                 _count_delta(before.capped_call_episodes, capped_after),
+                _count(before.operational_episodes),
+                _count(operational_after),
+                _count_delta(before.operational_episodes, operational_after),
+                "yes" if language in verdict.operationally_confounded_languages else "no",
             ]
         )
     lines.extend(
@@ -122,6 +151,10 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 "Baseline capped eps",
                 "Candidate capped eps",
                 "Capped delta",
+                "Baseline operational eps",
+                "Candidate operational eps",
+                "Operational delta",
+                "Confounded",
             ],
             language_rows,
         )
@@ -146,6 +179,7 @@ def _group_rows(groups: Mapping[str, GroupSummary]) -> list[list[str]]:
             _count(summary.capped_call_episodes),
             _count(summary.reasoning_cap_exhausted),
             _stops(summary.failure_stops),
+            _count(summary.operational_episodes),
         ]
         for name, summary in groups.items()
     ]
@@ -165,7 +199,16 @@ _GROUP_HEADER = [
     "Capped eps",
     "Reasoning capped",
     "Failure stops",
+    "Operational eps",
 ]
+
+
+def _operational_lines(stops: Sequence[OperationalEpisode]) -> list[str]:
+    if not stops:
+        return []
+    lines = ["", "Operational stops (scored as failures; re-run before reading them):", ""]
+    lines.extend(f"- `{item.case_id}` repeat {item.repeat}: {item.reason.value}" for item in stops)
+    return lines
 
 
 def render_scorecard(scorecard: Scorecard) -> str:
@@ -183,6 +226,7 @@ def render_scorecard(scorecard: Scorecard) -> str:
         f"- Macro thought share: {_number(scorecard.macro_thought_share)}",
         f"- Capped-call episodes: {_count(scorecard.capped_call_episodes)}; "
         f"reasoning cap exhausted: {_count(scorecard.reasoning_cap_exhausted)}",
+        f"- Operational episodes: {_count(scorecard.operational_episodes)}",
         f"- Repeats: {scorecard.repeats}; sliced: {'yes' if scorecard.sliced else 'no'}",
         f"- Dataset digest: `{scorecard.dataset_digest}`",
         f"- Budgets digest: `{scorecard.budgets_digest or 'none'}`",
@@ -191,6 +235,7 @@ def render_scorecard(scorecard: Scorecard) -> str:
     lines.extend(_table(["Language", *_GROUP_HEADER], _group_rows(scorecard.languages)))
     lines.append("")
     lines.extend(_table(["Kind", *_GROUP_HEADER], _group_rows(scorecard.kinds)))
+    lines.extend(_operational_lines(scorecard.operational_stops))
     return "\n".join(lines) + "\n"
 
 

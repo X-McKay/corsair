@@ -126,6 +126,24 @@ The headline `objective_j` is the macro reward plus half the worst language's ve
 
 Each trajectory also records where the output budget went, as observations that no reward, verified flag, objective or gate reads: `thought_tokens` (the reported total, `null` when no call reported it), `thought_share` (thought over output tokens), `output_cap` (the per-call cap from the frozen request's `Budget.max_output_tokens`, which `request_digest` binds; results do not carry the budget), `capped_calls` (calls whose reported output reached that cap), `reasoning_cap_exhausted` (a capped call whose thought tokens filled its whole output) and `dominant_call` (position, episode index, output tokens and seconds of the largest call). Per kind and language the scorecard shows the case-mean thought share and the number of episodes with a capped call and with an exhausted cap, and the gate table shows the capped-episode delta per language. The counts stay unknown when a group has no cap or no per-call reports, so a scorecard written before the markers existed shows `unknown` until `corsair gym score` rescores its report. A call counts as capped when its reported output tokens reach the cap; on a route that reports reasoning outside the output count (ADK's native Gemini route) a capped call is not detected.
 
+### Run identity and operational stops
+
+Each trajectory carries `run_identity`, the full [`RunIdentity`](../../src/corsair/contracts/gym.py) read from its stored result's `RunManifest`: package version, configuration identity (`config`), each role's prompt, agent spec, output schema and runtime skills digests, the risk-assessment and budget-policy digests, the image id and each role's model. The scorecard's `run_identity` keeps every distinct value per component (images and budget policies differ per language and case), so a prompt- or skill-only change, which leaves `identity_digests` (the configuration identity) unchanged, is still visible. A result without a manifest, or a component an older manifest did not record, stays unknown.
+
+A failed trajectory is `operational`, with an `operational_reason`, when its stop is a fault of the run rather than of the agents. The rule reads only code-owned gate names and the workflow's own timeout reason, never model text, and a recorded role `ERROR` (a payload that raised in the sandbox) always keeps an episode behavioural:
+
+| Reason | Terminal stop in the gate ledger |
+| --- | --- |
+| `heartbeat_timeout`, `activity_timeout` | `execution_error` whose reason is `<phase>: activity Heartbeat timeout` (or `StartToClose`, `ScheduleToStart`, `ScheduleToClose`) |
+| `episode_timeout`, `provider_temporary`, `operation_reconciliation` | the last round stopped at `episode_timeout`, `provider_temporary` or `operation-reconciliation` (a replay refused after an unconfirmed execution, i.e. a lost host) |
+| `execution_cancelled` | `execution_cancelled` |
+| `evidence_not_run` | the last round has no observation and the workflow ended with an `execution_*` stop |
+| `result_unavailable` | the row has no stored result |
+
+`provider_max_tokens`, `packet_too_large`, `provider_permanent`, `producer_abstained`, audit rejects, coverage misses, budget exhaustion and a payload-level `execution_error` stay behavioural. Operational episodes keep their `ERROR` reward and count against verified accuracy and J; this is visibility, not forgiveness. Per kind and language the scorecard counts `operational_episodes`, lists every operational case and repeat under `operational_stops`, and records `verified_accuracy_without_operational_failures`, the majority verified accuracy had each operational episode verified. `render_scorecard` shows the count column and the list.
+
+The gate reports, without changing its decision, an `identity_changes` map (per component: changed, unchanged or unknown) printed as one `Identity changes:` line, and the per-language operational delta. When a regressed language would not regress against the baseline's verified accuracy had its operational episodes verified, the gate stays REJECTED, adds the reason `operationally_confounded` and names the language in `operationally_confounded_languages`, so the orchestrator orders a clean re-run before reading the regression. Identity differences never make a gate INCOMPARABLE.
+
 ## Gate a candidate
 
 ```bash
@@ -133,6 +151,8 @@ just -- gym-gate "<gym root>/reference/tier0.json" "<gym root>/runs/CAND/scoreca
 ```
 
 `corsair gym gate --baseline SCORECARD --candidate SCORECARD` prints the decision, its fixed reasons and a metric table, and exits 0 for ACCEPTED, 1 for REJECTED and 2 for INCOMPARABLE. ACCEPTED requires that no language's verified accuracy fell, that `objective_j` gained at least 0.01 and that macro effective tokens stayed within 1.10 × the baseline.
+
+`--smoke` makes a smoke gate for a tier where every language already verifies, so its objective margin is noise from single flaky episodes: `objective_below_threshold` is still listed among the reasons but does not reject, and only a language regression, the token ceiling and the INCOMPARABLE conditions decide. The verdict records `smoke: true` and the view's header reads `Gate (smoke)`, so an ACCEPTED smoke gate is never read as an acceptance. Without `--smoke` the gate is unchanged. (`corsair gym verify` does not use smoke mode yet.)
 
 INCOMPARABLE means the two scorecards answer different questions, so neither a win nor a regression can be read from them: different dataset digests, different budgets digests, a sliced run on either side, fewer than three repeats per case, or unknown token usage. Re-run both sides on the same tier, budgets and repeat count instead of reading the deltas.
 

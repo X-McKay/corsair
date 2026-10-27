@@ -9,6 +9,7 @@ Unknown usage stays unknown: it earns no efficiency bonus and is never counted a
 
 import json
 import math
+import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
@@ -23,11 +24,16 @@ from corsair.contracts import (
     GroupSummary,
     InvestigationResult,
     ModelCall,
+    OperationalEpisode,
+    OperationalReason,
     Oracle,
     RoleObservation,
+    RoleOutcome,
     RoundResult,
     RoundSummary,
     RunContext,
+    RunIdentity,
+    RunManifest,
     Scorecard,
     Trajectory,
     Usage,
@@ -48,6 +54,21 @@ _OPERATIONAL_STATUSES = frozenset({"ERROR", "BLOCKED", "CANCELLED"})
 # Ledger gates that cost a shaping penalty each: a request too large to send, or a
 # response cut off at the output cap.
 SHAPED_GATES = frozenset({"packet_too_large", "provider_max_tokens"})
+# Round gates whose feedback the adapters mark operational and that no agent output
+# causes: an episode's elapsed-time limit, a transient provider or connection fault,
+# and a replay refused after an earlier, unconfirmed execution (a lost host).
+# ``provider_max_tokens``, ``packet_too_large`` and ``provider_permanent`` stay
+# behavioural: the request or the reasoning spend can cause them.
+_OPERATIONAL_ROUND_GATES = {
+    "episode_timeout": OperationalReason.EPISODE_TIMEOUT,
+    "provider_temporary": OperationalReason.PROVIDER_TEMPORARY,
+    "operation-reconciliation": OperationalReason.OPERATION_RECONCILIATION,
+}
+# The workflow's terminal reason for a Temporal activity timeout: ``<phase>: <cause>``,
+# where the cause is the SDK's timeout message, e.g. ``evidence: activity Heartbeat timeout``.
+_ACTIVITY_TIMEOUT = re.compile(
+    r"[a-z]+: activity (Heartbeat|StartToClose|ScheduleToStart|ScheduleToClose) timeout"
+)
 
 REWARD_VERIFIED = 1.0
 REWARD_UNRESOLVED = 0.0
@@ -269,6 +290,84 @@ def shaping(row: Mapping[str, Any], rounds: Sequence[RoundSummary]) -> float:
     return SHAPING_PENALTY * (repeated + shaped)
 
 
+def operational_stop(
+    row: Mapping[str, Any], rounds: Sequence[RoundSummary]
+) -> OperationalReason | None:
+    """Why a failed episode stopped operationally, from code-owned ledger gates only.
+
+    An unavailable row lost its result. Otherwise a recorded role ``ERROR`` (a payload
+    that raised in the sandbox) keeps the episode behavioural. Then the episode's
+    terminal stop decides: the workflow's ``execution_cancelled``; an ``execution_error``
+    whose reason is a Temporal activity timeout; a final round stopped by an operational
+    gate in ``_OPERATIONAL_ROUND_GATES``; or a final round with no observation
+    (``evidence_not_run``) that the workflow ended with an ``execution_*`` stop. Reasons
+    of other gates, which may hold model-authored text, are never read.
+    """
+    status = row.get("status")
+    if status == "pass":
+        return None
+    if status != "fail":
+        return OperationalReason.RESULT_UNAVAILABLE
+    if any(
+        RoleOutcome.ERROR in (item.control_outcome, item.adversarial_outcome) for item in rounds
+    ):
+        return None
+    ledger = [entry for entry in row_ledger(row) if isinstance(entry, Mapping)]
+    execution = next(
+        (
+            entry
+            for entry in reversed(ledger)
+            if entry.get("stage") == "policy" and str(entry.get("gate")).startswith("execution_")
+        ),
+        None,
+    )
+    if execution is not None:
+        if execution.get("gate") == "execution_cancelled":
+            return OperationalReason.EXECUTION_CANCELLED
+        timeout = _ACTIVITY_TIMEOUT.fullmatch(str(execution.get("reason", "")))
+        if execution.get("gate") == "execution_error" and timeout is not None:
+            if timeout.group(1) == "Heartbeat":
+                return OperationalReason.HEARTBEAT_TIMEOUT
+            return OperationalReason.ACTIVITY_TIMEOUT
+    last_round = next((entry for entry in reversed(ledger) if entry.get("stage") != "policy"), None)
+    gate = None if last_round is None else last_round.get("gate")
+    if isinstance(gate, str) and gate in _OPERATIONAL_ROUND_GATES:
+        return _OPERATIONAL_ROUND_GATES[gate]
+    if gate == "evidence_not_run" and execution is not None:
+        return OperationalReason.EVIDENCE_NOT_RUN
+    return None
+
+
+def _capability(manifest: RunManifest, role: str, key: str) -> str | None:
+    value = manifest.capabilities.get(role, {}).get(key)
+    return value if isinstance(value, str) else None
+
+
+def run_identity(manifest: RunManifest | None) -> RunIdentity | None:
+    """The full identity a stored result's manifest records; ``None`` without one."""
+    if manifest is None:
+        return None
+    return RunIdentity(
+        package_version=manifest.package_version,
+        config=manifest.config_digest,
+        producer_prompt=manifest.producer_prompt_digest,
+        auditor_prompt=manifest.auditor_prompt_digest,
+        producer_spec=_capability(manifest, "producer", "spec_digest"),
+        auditor_spec=_capability(manifest, "auditor", "spec_digest"),
+        producer_output_schema=_capability(manifest, "producer", "output_schema_digest"),
+        auditor_output_schema=_capability(manifest, "auditor", "output_schema_digest"),
+        producer_skills=_capability(manifest, "producer", "runtime_skills_digest"),
+        auditor_skills=_capability(manifest, "auditor", "runtime_skills_digest"),
+        risk_assessment=_capability(manifest, "producer", "risk_assessment_digest")
+        or _capability(manifest, "auditor", "risk_assessment_digest"),
+        budget_policy=_capability(manifest, "producer", "budget_policy_digest")
+        or _capability(manifest, "auditor", "budget_policy_digest"),
+        image=manifest.image_id,
+        producer_model=manifest.models.get("producer"),
+        auditor_model=manifest.models.get("auditor"),
+    )
+
+
 def _identity(result: InvestigationResult | None, row: Mapping[str, Any]) -> dict[str, str]:
     if result is not None and result.manifest is not None:
         manifest = result.manifest
@@ -343,6 +442,7 @@ def trajectory(
         bonus_tokens = phi_tokens(tokens, budget.effective_tokens)
         bonus_time = phi_time(seconds, budget.seconds)
     shaped = shaping(row, rounds)
+    operational = operational_stop(row, rounds)
     reward = r_verdict + BONUS_WEIGHT * bonus_tokens + BONUS_WEIGHT * bonus_time + shaped
     disposition, execution = row.get("disposition"), row.get("execution_status")
     return Trajectory(
@@ -393,6 +493,9 @@ def trajectory(
         identity=_identity(result, row),
         models=dict(result.manifest.models) if result is not None and result.manifest else {},
         git_commit=git_commit,
+        run_identity=run_identity(None if result is None else result.manifest),
+        operational=operational is not None,
+        operational_reason=operational,
     )
 
 
@@ -428,6 +531,11 @@ def _majority_verified(repeats: Sequence[Trajectory]) -> bool:
     return 2 * sum(item.verified for item in repeats) > len(repeats)
 
 
+def _majority_verified_without_operational_failures(repeats: Sequence[Trajectory]) -> bool:
+    """The majority had every operational episode verified; the confounding counterfactual."""
+    return 2 * sum(item.verified or item.operational for item in repeats) > len(repeats)
+
+
 def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
     """Case-level majority accuracy; reward and tokens are means over repeats, then cases."""
     by_case: dict[str, list[Trajectory]] = defaultdict(list)
@@ -458,6 +566,10 @@ def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
             None if item.capped_calls is None else item.capped_calls > 0 for item in trajectories
         ),
         reasoning_cap_exhausted=_known_count(item.reasoning_cap_exhausted for item in trajectories),
+        operational_episodes=sum(item.operational for item in trajectories),
+        verified_accuracy_without_operational_failures=_fraction(
+            [_majority_verified_without_operational_failures(case) for case in cases]
+        ),
     )
 
 
@@ -471,6 +583,37 @@ def _grouped(trajectories: Sequence[Trajectory], field: str) -> dict[str, GroupS
 def _repeats(trajectories: Sequence[Trajectory], cases: Mapping[str, str]) -> int:
     counts = Counter(item.case_id for item in trajectories)
     return min((counts.get(case, 0) for case in cases), default=0)
+
+
+def _identity_components(trajectories: Sequence[Trajectory]) -> dict[str, list[str]]:
+    """Every distinct recorded value of each ``RunIdentity`` component, sorted."""
+    values: dict[str, set[str]] = defaultdict(set)
+    for item in trajectories:
+        if item.run_identity is None:
+            continue
+        for component, value in item.run_identity.model_dump().items():
+            if value is not None:
+                values[component].add(value)
+    return {
+        component: sorted(values[component])
+        for component in RunIdentity.model_fields
+        if values[component]
+    }
+
+
+def _operational_stops(trajectories: Sequence[Trajectory]) -> list[OperationalEpisode]:
+    return [
+        OperationalEpisode(
+            case_id=item.case_id,
+            repeat=item.repeat,
+            language=item.language,
+            reason=item.operational_reason,
+        )
+        for item in sorted(
+            trajectories, key=lambda item: (item.language, item.case_id, item.repeat)
+        )
+        if item.operational_reason is not None
+    ]
 
 
 def _macro(values: Iterable[float | None]) -> float | None:
@@ -530,6 +673,9 @@ def build_scorecard(
         reasoning_cap_exhausted=_known_total(
             summary.reasoning_cap_exhausted for summary in languages.values()
         ),
+        run_identity=_identity_components(trajectories),
+        operational_episodes=sum(item.operational for item in trajectories),
+        operational_stops=_operational_stops(trajectories),
     )
 
 
