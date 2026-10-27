@@ -412,3 +412,11 @@ content-addressed tags and cannot contaminate parallel runs.
   passed, `just check` exit 0, wheel resources load outside the checkout. Ledger row `h2a` (rejected). Instrument
   notes: `verify` prints JSON only when piped (no `VERDICT:` text line); the reference scorecards predate
   `run_identity`, so the gate's identity line reads unknown until the reference is re-scored.
+- 2026-10-27 Reference scorecards re-scored with the s6 scorer (`corsair gym score … --budgets
+  evals/experiments/budgets.json`): every metric and per-language value identical to `ref-w1-tier0/tier1`; the new
+  `run_identity` and operational fields populated (0 operational episodes); the original run block (0697ff08) kept
+  because `score` on an imported run directory without `run.json` stamps an empty run context (dx nit, s7);
+  originals saved as `reference/*.pre-s6.json`. Self-gate of tier1 now prints "Identity changes: none.".
+  Wave-2 state: h4 premise false (owner ruling pending on target-side exceptions), h2a rejected; the next
+  behavioural experiments wait on the owner's two rulings (evidence policy for target-side exceptions; the
+  verifier's coverage discard on ERROR), because J is dominated by those episodes in every run so far.
