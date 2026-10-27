@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    ArtifactRef,
     Digest,
     GroupSummary,
     InvestigationResult,
@@ -27,6 +28,7 @@ from corsair.contracts import (
     OperationalEpisode,
     OperationalReason,
     Oracle,
+    PreparedCase,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -35,6 +37,7 @@ from corsair.contracts import (
     RunIdentity,
     RunManifest,
     Scorecard,
+    TargetExceptionEpisode,
     Trajectory,
     Usage,
     Verdict,
@@ -70,8 +73,17 @@ _ACTIVITY_TIMEOUT = re.compile(
     r"[a-z]+: activity (Heartbeat|StartToClose|ScheduleToStart|ScheduleToClose) timeout"
 )
 
+# The gym's stop name for a terminal ``ERROR`` that the raw receipts show as an exception
+# the target raised (see ``target_exception``); the kernel's ledger gate stays
+# ``execution_error``.
+TARGET_EXCEPTION_STOP = "target_exception"
+_TARGET_EXCEPTION_KIND = "execution_error"
+_ROLES = ("control", "adversarial")
+
 REWARD_VERIFIED = 1.0
 REWARD_UNRESOLVED = 0.0
+# Neither a false label nor an infrastructure fault: scored like an abstention.
+REWARD_TARGET_EXCEPTION = 0.0
 REWARD_OPERATIONAL = -0.5
 REWARD_FALSE_LABEL = -1.0
 BONUS_WEIGHT = 0.25
@@ -143,12 +155,20 @@ def _operational(row: Mapping[str, Any], verdict: Verdict | None) -> bool:
     return verdict is None and row.get("execution_status") in _OPERATIONAL_STATUSES
 
 
-def verdict_reward(passed: bool, verified: bool, false_label: bool, operational: bool) -> float:
+def verdict_reward(
+    passed: bool,
+    verified: bool,
+    false_label: bool,
+    operational: bool,
+    target_exception: bool = False,
+) -> float:
     """The complete reward table, in precedence order."""
     if passed and verified:
         return REWARD_VERIFIED
     if false_label:
         return REWARD_FALSE_LABEL
+    if target_exception:
+        return REWARD_TARGET_EXCEPTION
     if operational:
         return REWARD_OPERATIONAL
     return REWARD_UNRESOLVED
@@ -338,6 +358,86 @@ def operational_stop(
     return None
 
 
+def _target_exception_receipt(
+    raw: object, *, operation_id: str, role: str, prepared: PreparedCase
+) -> bool:
+    """One role's raw receipt shows a completed native run that raised in the target.
+
+    The adapter's own record (``error``) or the driver's (``driver_error``), a missing
+    driver record, unconfirmed cleanup, or a run that never covered the bound finding
+    line in the recipe module is a harness or sandbox fault, not a target exception.
+    """
+    if not isinstance(raw, dict) or raw.get("schema_version") != "corsair.raw-evidence/1":
+        return False
+    if raw.get("operation_id") != operation_id or raw.get("role") != role:
+        return False
+    if raw.get("cleanup_confirmed") is not True or raw.get("error") is not None:
+        return False
+    record = raw.get("driver")
+    if not isinstance(record, dict) or record.get("schema_version") != "corsair.driver/1":
+        return False
+    junit, lines, line = record.get("junit"), record.get("covered_lines"), prepared.bound_line
+    return (
+        record.get("driver_error") is None
+        and record.get("operation_id") == operation_id
+        and record.get("role") == role
+        and record.get("outcome") == RoleOutcome.ERROR.value
+        and record.get("observation_kind") == _TARGET_EXCEPTION_KIND
+        and isinstance(junit, dict)
+        and junit.get("status") == "ERROR"
+        and record.get("coverage_file") == prepared.recipe.module_file == prepared.finding.file
+        and line is not None
+        and isinstance(lines, list)
+        and line in lines
+    )
+
+
+def target_exception(store: ArtifactStore, result: InvestigationResult | None) -> bool:
+    """Whether a terminal ``ERROR`` was an exception the target raised, from raw receipts.
+
+    The final round's evidence bundle names each role's stored raw receipt. Every role
+    the kernel admitted as ``ERROR`` must pass ``_target_exception_receipt``; one harness
+    or sandbox fault, a missing or unreadable receipt, or no observation keeps the
+    episode an ``ERROR``. The admitted ``RoleObservation`` is read only for its outcome,
+    so the answer holds whether or not it kept the receipt's coverage.
+    """
+    if result is None or result.verdict is not Verdict.ERROR or not result.rounds:
+        return False
+    observation = result.rounds[-1].observation
+    if observation is None or observation.artifact is None:
+        return False
+    errored = [
+        role
+        for role in _ROLES
+        if (item := getattr(observation, role)) is not None and item.outcome is RoleOutcome.ERROR
+    ]
+    if not errored:
+        return False
+    try:
+        bundle = store.get_json(observation.artifact)
+        if (
+            not isinstance(bundle, dict)
+            or bundle.get("schema_version") != "corsair.evidence/1"
+            or bundle.get("operation_id") != observation.operation_id
+        ):
+            return False
+        prepared = PreparedCase.model_validate(
+            store.get_json(ArtifactRef.model_validate(bundle["prepared"]))
+        )
+        receipts = {
+            role: store.get_json(ArtifactRef.model_validate(bundle["roles"][role]))
+            for role in errored
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return all(
+        _target_exception_receipt(
+            receipts[role], operation_id=observation.operation_id, role=role, prepared=prepared
+        )
+        for role in errored
+    )
+
+
 def _capability(manifest: RunManifest, role: str, key: str) -> str | None:
     value = manifest.capabilities.get(role, {}).get(key)
     return value if isinstance(value, str) else None
@@ -401,11 +501,13 @@ def trajectory(
     *,
     git_commit: str | None = None,
     output_cap: int | None = None,
+    target_exception: bool = False,
 ) -> Trajectory:
     """Score one report row; ``result`` is its stored result, or None when unavailable.
 
     ``output_cap`` is the request's per-call output cap; it only sets the reasoning
-    markers, which no reward, verified flag or gate reads.
+    markers, which no reward, verified flag or gate reads. ``target_exception`` is
+    ``target_exception(store, result)``; it applies only to a failed ``ERROR`` row.
     """
     status = row.get("status")
     status = status if status in {"pass", "fail"} else "unavailable"
@@ -413,7 +515,10 @@ def trajectory(
     passed = status == "pass"
     verified = passed and (verdict in DECISIVE or not expects_decisive(oracle))
     false_label = _false_label(row, oracle, verdict)
-    r_verdict = verdict_reward(passed, verified, false_label, _operational(row, verdict))
+    target = target_exception and status == "fail" and verdict is Verdict.ERROR
+    r_verdict = verdict_reward(
+        passed, verified, false_label, _operational(row, verdict), target_exception=target
+    )
     stops = _round_stops(row)
     rounds = [
         round_summary(item, stops.get((item.session, item.index)))
@@ -442,7 +547,7 @@ def trajectory(
         bonus_tokens = phi_tokens(tokens, budget.effective_tokens)
         bonus_time = phi_time(seconds, budget.seconds)
     shaped = shaping(row, rounds)
-    operational = operational_stop(row, rounds)
+    operational = None if target else operational_stop(row, rounds)
     reward = r_verdict + BONUS_WEIGHT * bonus_tokens + BONUS_WEIGHT * bonus_time + shaped
     disposition, execution = row.get("disposition"), row.get("execution_status")
     return Trajectory(
@@ -461,7 +566,7 @@ def trajectory(
         passed=passed,
         verified=verified,
         false_label=false_label,
-        failure_stop=None if passed else row_stop(dict(row)),
+        failure_stop=None if passed else (TARGET_EXCEPTION_STOP if target else row_stop(dict(row))),
         rounds=rounds,
         llm_calls=_int_or_none(row.get("llm_calls")),
         tool_calls=_int_or_none(row.get("tool_calls")),
@@ -496,6 +601,7 @@ def trajectory(
         run_identity=run_identity(None if result is None else result.manifest),
         operational=operational is not None,
         operational_reason=operational,
+        target_exception=target,
     )
 
 
@@ -570,6 +676,7 @@ def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
         verified_accuracy_without_operational_failures=_fraction(
             [_majority_verified_without_operational_failures(case) for case in cases]
         ),
+        target_exception_episodes=sum(item.target_exception for item in trajectories),
     )
 
 
@@ -613,6 +720,16 @@ def _operational_stops(trajectories: Sequence[Trajectory]) -> list[OperationalEp
             trajectories, key=lambda item: (item.language, item.case_id, item.repeat)
         )
         if item.operational_reason is not None
+    ]
+
+
+def _target_exceptions(trajectories: Sequence[Trajectory]) -> list[TargetExceptionEpisode]:
+    return [
+        TargetExceptionEpisode(case_id=item.case_id, repeat=item.repeat, language=item.language)
+        for item in sorted(
+            trajectories, key=lambda item: (item.language, item.case_id, item.repeat)
+        )
+        if item.target_exception
     ]
 
 
@@ -676,6 +793,8 @@ def build_scorecard(
         run_identity=_identity_components(trajectories),
         operational_episodes=sum(item.operational for item in trajectories),
         operational_stops=_operational_stops(trajectories),
+        target_exception_episodes=sum(item.target_exception for item in trajectories),
+        target_exceptions=_target_exceptions(trajectories),
     )
 
 
@@ -700,7 +819,11 @@ def score_report(
     budgets: Budgets | None = None,
     sliced: bool = False,
 ) -> tuple[list[Trajectory], Scorecard]:
-    """Score a saved report against its frozen dataset; ``results`` is keyed by run id."""
+    """Score a saved report against its frozen dataset; ``results`` is keyed by run id.
+
+    ``results`` from ``load_results`` also name the target-side exception runs; a plain
+    mapping names none, so every ``ERROR`` keeps its operational reward.
+    """
     dataset, requests, oracles = load_dataset(dataset_path)
     dataset_digest = digest(dataset)
     if report.get("dataset_digest") != dataset_digest:
@@ -709,6 +832,7 @@ def score_report(
     # The per-call output cap each case ran under; results and manifests do not carry
     # the budget, but the frozen request does and ``request_digest`` binds it.
     caps = {request.case.case_id: request.budget.max_output_tokens for request in requests}
+    targets = results.target_exceptions if isinstance(results, StoredResults) else frozenset()
     rows = [row for row in report.get("rows", []) if isinstance(row, Mapping)]
     unknown = sorted({str(row.get("case_id")) for row in rows} - set(kinds))
     if unknown:
@@ -723,6 +847,7 @@ def score_report(
             budgets,
             git_commit=run.git_commit,
             output_cap=caps[row["case_id"]],
+            target_exception=str(row.get("run_id")) in targets,
         )
         for row, repeat in zip(rows, _row_repeats(rows), strict=True)
     ]
@@ -737,9 +862,20 @@ def score_report(
     return trajectories, card
 
 
-def load_results(
-    store: ArtifactStore, run_ids: Iterable[str]
-) -> dict[str, InvestigationResult | None]:
+class StoredResults(dict[str, InvestigationResult | None]):
+    """Each run's committed result by run id, and the runs whose stored raw receipts show
+    a terminal ``ERROR`` as a target-side exception (``target_exception``)."""
+
+    def __init__(
+        self,
+        results: Mapping[str, InvestigationResult | None],
+        target_exceptions: Iterable[str] = (),
+    ):
+        super().__init__(results)
+        self.target_exceptions = frozenset(target_exceptions)
+
+
+def load_results(store: ArtifactStore, run_ids: Iterable[str]) -> StoredResults:
     """Each run's committed result receipt, or None when it is unavailable."""
     results: dict[str, InvestigationResult | None] = {}
     for run_id in run_ids:
@@ -750,7 +886,10 @@ def load_results(
             )
         except (OSError, ValueError):
             results[run_id] = None
-    return results
+    return StoredResults(
+        results,
+        (run_id for run_id, result in results.items() if target_exception(store, result)),
+    )
 
 
 def write_trajectories(path: Path, trajectories: Iterable[Trajectory]) -> None:

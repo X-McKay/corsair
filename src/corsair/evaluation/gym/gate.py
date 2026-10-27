@@ -2,9 +2,10 @@
 
 INCOMPARABLE is never a regression verdict: different datasets or budgets, a sliced run,
 too few repeats or unknown token usage mean the two scorecards answer different questions.
-Identity changes and operational stops are reported beside the decision and never change
-it: a different prompt, skill, image or model is what a candidate is, and an operational
-stop keeps its ERROR score.
+Identity changes, operational stops and target-side exception episodes are reported beside
+the decision and never change it: a different prompt, skill, image or model is what a
+candidate is, an operational stop keeps its ERROR score, and a target-side exception
+already scores 0 on its scorecard.
 
 A smoke gate (``smoke=True``, for a tier where every language already verifies, so the
 objective margin is noise) still reports ``objective_below_threshold`` but decides only on

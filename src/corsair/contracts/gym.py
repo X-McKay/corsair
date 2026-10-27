@@ -121,6 +121,18 @@ class OperationalEpisode(Contract):
     reason: OperationalReason
 
 
+class TargetExceptionEpisode(Contract):
+    """One target-side exception episode on a scorecard: which case and repeat.
+
+    See ``Trajectory.target_exception``; the stored raw receipts, never model text or the
+    admitted observation, decide it.
+    """
+
+    case_id: Identifier
+    repeat: int = Field(ge=0)
+    language: str = Field(min_length=1, max_length=64)
+
+
 class Trajectory(Contract):
     """One scored row (one case, one repeat) with its reward decomposition."""
 
@@ -184,11 +196,20 @@ class Trajectory(Contract):
     # Visibility only: an operational stop keeps its reward and counts against accuracy.
     operational: bool = False
     operational_reason: OperationalReason | None = None
+    # A terminal ``ERROR`` whose errored roles' raw receipts each show a completed native
+    # run with ``observation_kind=execution_error``, the bound finding line covered,
+    # cleanup confirmed and no ``error`` or ``driver_error``: an exception the target
+    # raised outside the recipe's allowed exceptions. The kernel's ``ERROR`` verdict is
+    # unchanged; the gym scores it 0, like an abstention, and names its stop
+    # ``target_exception``. Never operational.
+    target_exception: bool = False
 
     @model_validator(mode="after")
     def coherent_operational(self):
         if self.operational != (self.operational_reason is not None):
             raise ValueError("an operational episode needs its reason, and only it has one")
+        if self.operational and self.target_exception:
+            raise ValueError("a target-side exception episode is never operational")
         return self
 
 
@@ -216,6 +237,8 @@ class GroupSummary(Contract):
     # Majority verified accuracy had every operational episode verified: the gate's
     # confounding check, never an accuracy, reward or objective input.
     verified_accuracy_without_operational_failures: float | None = None
+    # Target-side exception episodes (see ``Trajectory``); unknown on older scorecards.
+    target_exception_episodes: int | None = Field(default=None, ge=0)
 
 
 class RunContext(Contract):
@@ -257,6 +280,9 @@ class Scorecard(Contract):
     # Operational stops: the total, unknown on older scorecards, and each episode.
     operational_episodes: int | None = Field(default=None, ge=0)
     operational_stops: list[OperationalEpisode] = Field(default_factory=list)
+    # Target-side exception episodes: the total, unknown on older scorecards, and each one.
+    target_exception_episodes: int | None = Field(default=None, ge=0)
+    target_exceptions: list[TargetExceptionEpisode] = Field(default_factory=list)
 
 
 class GateDecision(StrEnum):
