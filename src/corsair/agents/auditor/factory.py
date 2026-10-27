@@ -26,13 +26,16 @@ def auditor_instruction(skills: Sequence[Skill]) -> str:
     )
 
 
-def build_auditor(model: str | BaseLlm) -> LlmAgent:
+def build_auditor(
+    model: str | BaseLlm, *, decoding: types.GenerateContentConfig | None = None
+) -> LlmAgent:
     """Build a fresh, outcome-blind structured semantic reviewer with no tools.
 
     The admitted procedure is parsed by native ADK and preloaded into the
     instruction, so the agent needs no loader. With no tools, ADK sends the
     ``AuditResult`` response schema itself on every route instead of adding a
     ``set_model_response`` tool, and one JSON-mode request completes the review.
+    ``decoding`` carries only the configured sampling parameters; JSON mode is added to it.
     """
 
     spec = load_agent_spec("auditor")
@@ -54,7 +57,9 @@ def build_auditor(model: str | BaseLlm) -> LlmAgent:
         tools=[],
         include_contents="none",
         output_schema=AuditResult,
-        generate_content_config=types.GenerateContentConfig(response_mime_type="application/json"),
+        generate_content_config=(decoding or types.GenerateContentConfig()).model_copy(
+            update={"response_mime_type": "application/json"}
+        ),
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
     )

@@ -35,7 +35,7 @@ All contracts are frozen, reject unknown fields, and disallow non-finite floats.
 | `max_concurrent_workflow_tasks` | `100` | Integer from `2` through `1000`; the worker's workflow task slots (the SDK default; the SDK requires at least two while workflows are cached). Workflow tasks are short deterministic replays and rarely limit throughput. |
 | `models` | a default `ModelSettings` | Nested model-selection configuration below. |
 
-`Settings.identity` is a SHA-256 digest of the canonical JSON representation of the validated settings. It is used as configuration identity in run metadata; it is not a secret store. It covers operational fields too (for example `task_queue` and the worker slot counts), so changing one changes the identity.
+`Settings.identity` is a SHA-256 digest of the canonical JSON representation of the validated settings, without the transport and storage fields `artifact_root`, `source_root`, `temporal_address`, `temporal_namespace` and `task_queue` (`TRANSPORT_FIELDS`). It is used as configuration identity in run metadata (each result manifest's `config_digest`); it is not a secret store. It covers the other operational fields (for example the worker slot counts) and `models`, including `models.decoding`, so changing one changes the identity. A decoding block with every parameter unset is left out of the digest, so a configuration recorded before decoding was configurable keeps its identity; setting any parameter gives a new one, which is intended: decoding changes what the models do.
 
 ## `ModelSettings`
 
@@ -47,8 +47,19 @@ All contracts are frozen, reject unknown fields, and disallow non-finite floats.
 | `api_base` | `null` | Optional HTTP(S) endpoint with a hostname. It must contain no username, password, query, or fragment. It is valid only with `connector: "litellm"`; Gemini rejects a configured value. |
 | `request_timeout_seconds` | `120` | Integer from `1` through `300`; passed to LiteLLM when that connector is selected, lowered to the model episode bound when it is longer (see [time bounds](#time-bounds)). |
 | `extra_body` | `{}` | Mapping limited to the keys `reasoning`, `reasoning_effort`, and `thinking`. Other generation, credential, and tool-override keys are rejected. |
+| `decoding` | every parameter unset | A `RoleDecoding` with a `Decoding` for `producer` and for `auditor` (below). A flat block such as `{"temperature": 0, "seed": 7}` applies to both roles; `{"producer": {…}, "auditor": {…}}` sets each role. |
 
 The LiteLLM adapter receives only the selected model, allowlisted `api_base`, timeout, and `extra_body`; it explicitly uses zero LiteLLM retries. Gemini model names are resolved through the native ADK path. Neither route accepts provider credentials from `Settings`.
+
+### `Decoding`
+
+| Field | Default | Validation / use |
+| --- | --- | --- |
+| `temperature` | `null` | Number from `0` through `2`. |
+| `top_p` | `null` | Number greater than `0` and at most `1`. |
+| `seed` | `null` | Integer from `0` through `2147483647`. |
+
+`null` means the inference server's default: the parameter is not sent. The inference adapter gives each role's set parameters to its `LlmAgent` as the native `generate_content_config` ([`decoding_config`](../../src/corsair/adapters/inference/models.py)); ADK copies it into every request of the episode, the Gemini route sends it natively and ADK's LiteLLM route maps `temperature`, `top_p` and `seed` onto the LiteLLM request with the same names, omitting unset ones. The per-episode output cap is still applied on top. Whether a route honours a parameter (for example a reproducible `seed`) is the server's behaviour; `corsair doctor --model` sends each role's decoding with its probes, so a route that rejects one fails there. Production and the evaluation gym may share one decoding block or not; that is the owner's choice, and either way the block is part of the configuration identity.
 
 ## Time bounds
 

@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
+from google.adk.agents import LlmAgent
 from google.adk.tools.skill_toolset import SkillToolset
 
+from corsair.adapters.inference import adk
 from corsair.adapters.inference.adk import run_auditor, run_producer
+from corsair.adapters.inference.models import model_for_role
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditResult as RoleAuditResult
@@ -224,3 +229,160 @@ def test_role_local_skills_expose_only_text_and_admitted_names():
         assert skill.resources.assets == {}
         assert skill.resources.scripts == {}
         assert all(isinstance(content, str) for content in skill.resources.references.values())
+
+
+# Decoding: the configured sampling parameters reach both agents' native generation config.
+
+_DECODING_FIELDS = ("temperature", "top_p", "seed")
+
+
+def _decoding_sent(config: Any) -> dict[str, Any]:
+    """The decoding fields a native GenerateContentConfig would send (unset fields are None)."""
+    if config is None:
+        return {}
+    return {key: value for key in _DECODING_FIELDS if (value := getattr(config, key)) is not None}
+
+
+def _record_built_agents(monkeypatch: pytest.MonkeyPatch) -> list[LlmAgent]:
+    """Keep each agent the adapter builds, so a test can inspect it after the episode."""
+    built: list[LlmAgent] = []
+
+    def recording(factory: Callable[..., LlmAgent]) -> Callable[..., LlmAgent]:
+        def build(*args: Any, **kwargs: Any) -> LlmAgent:
+            built.append(factory(*args, **kwargs))
+            return built[-1]
+
+        return build
+
+    monkeypatch.setattr(adk, "build_producer", recording(adk.build_producer))
+    monkeypatch.setattr(adk, "build_auditor", recording(adk.build_auditor))
+    return built
+
+
+async def _run_both_roles(
+    tmp_path: Path, settings: ModelSettings, monkeypatch: pytest.MonkeyPatch
+) -> tuple[list[LlmAgent], ScriptedLlm, ScriptedLlm]:
+    store = ArtifactStore(tmp_path)
+    built = _record_built_agents(monkeypatch)
+    producer_model = ScriptedLlm(
+        model="scripted-decoding-producer",
+        structured_tools=False,
+        responses=[tool_response("set_model_response", _proposal_args())],
+    )
+    auditor_model = ScriptedLlm(
+        model="scripted-decoding-auditor",
+        responses=[
+            text_response(json.dumps({"decision": "ACCEPT", "rule": "ALL", "reason": "joins."}))
+        ],
+    )
+    produced = await run_producer(_producer_input(store), settings, store, producer_model)
+    audited = await run_auditor(_audit_input(store), settings, auditor_model)
+    assert produced.feedback is None and audited.feedback is None
+    return built, producer_model, auditor_model
+
+
+@pytest.mark.asyncio
+async def test_unset_decoding_leaves_both_agents_at_the_server_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    built, producer_model, auditor_model = await _run_both_roles(
+        tmp_path, ModelSettings(), monkeypatch
+    )
+
+    producer, auditor = built
+    # ADK gives an agent without a config an empty one; nothing is set on it.
+    assert producer.generate_content_config is not None
+    assert producer.generate_content_config.model_dump(exclude_none=True) == {}
+    assert auditor.generate_content_config is not None
+    assert auditor.generate_content_config.model_dump(exclude_none=True) == {
+        "response_mime_type": "application/json"
+    }
+    assert _decoding_sent(producer_model.requests[0].config) == {}
+    assert _decoding_sent(auditor_model.requests[0].config) == {}
+
+
+@pytest.mark.asyncio
+async def test_set_decoding_reaches_each_agent_with_exactly_the_set_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    settings = ModelSettings.model_validate(
+        {
+            "decoding": {
+                "producer": {"temperature": 0, "seed": 7},
+                "auditor": {"temperature": 0.3, "top_p": 0.9},
+            }
+        }
+    )
+
+    built, producer_model, auditor_model = await _run_both_roles(tmp_path, settings, monkeypatch)
+
+    producer, auditor = built
+    assert producer.generate_content_config is not None
+    assert producer.generate_content_config.model_dump(exclude_none=True) == {
+        "temperature": 0.0,
+        "seed": 7,
+    }
+    assert auditor.generate_content_config is not None
+    assert auditor.generate_content_config.model_dump(exclude_none=True) == {
+        "temperature": 0.3,
+        "top_p": 0.9,
+        "response_mime_type": "application/json",
+    }
+    # ADK copies the agent's config into each request; the output cap is still applied.
+    assert _decoding_sent(producer_model.requests[0].config) == {"temperature": 0.0, "seed": 7}
+    assert _decoding_sent(auditor_model.requests[0].config) == {"temperature": 0.3, "top_p": 0.9}
+    assert producer_model.requests[0].config.max_output_tokens == 512
+
+
+class _CapturingLiteLlmClient:
+    """Stands in for ADK's LiteLLM client: records the completion kwargs, sends nothing."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def acompletion(self, **kwargs: Any) -> Any:
+        import litellm
+
+        self.calls.append(kwargs)
+        content = json.dumps({"decision": "ACCEPT", "rule": "ALL", "reason": "joins."})
+        message = {"role": "assistant", "content": content}
+        return litellm.ModelResponse(choices=[{"message": message, "finish_reason": "stop"}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("decoding", "sent"),
+    [
+        ({}, {}),
+        ({"temperature": 0, "seed": 7}, {"temperature": 0.0, "seed": 7}),
+        ({"auditor": {"top_p": 0.5}}, {"top_p": 0.5}),
+    ],
+)
+async def test_litellm_request_carries_only_the_set_decoding_parameters(
+    tmp_path: Path, decoding: dict[str, Any], sent: dict[str, Any]
+):
+    """ADK's native LiteLlm maps the generation config onto the LiteLLM request; an unset
+    parameter is absent from the request, not sent as a null or a guessed default."""
+    from google.adk.models import LiteLlm
+
+    store = ArtifactStore(tmp_path)
+    settings = ModelSettings.model_validate(
+        {
+            "connector": "litellm",
+            "producer": "hosted_vllm/served-model",
+            "auditor": "hosted_vllm/served-model",
+            "api_base": "https://llm.example.test/v1",
+            "decoding": decoding,
+        }
+    )
+    model = model_for_role(settings, "auditor")
+    assert isinstance(model, LiteLlm)
+    client = _CapturingLiteLlmClient()
+    model.llm_client = cast(Any, client)
+
+    output = await run_auditor(_audit_input(store), settings, model)
+
+    assert output.feedback is None and output.review is not None
+    (request,) = client.calls
+    assert {key: request[key] for key in _DECODING_FIELDS if key in request} == sent
+    assert request["max_completion_tokens"] == 512

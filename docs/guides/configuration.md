@@ -57,6 +57,7 @@ The `models` object selects one `connector`, the producer and auditor model name
 - With `connector: "gemini"`, model names are passed to Google ADK as native model IDs. `api_base` must be absent.
 - With `connector: "litellm"`, install/run with the optional provider dependencies and choose model names understood by ADK's native LiteLLM path. `api_base`, if used, must be an `http` or `https` endpoint without user info, query parameters, or fragments. It is an endpoint selector, not a place for a key.
 - `extra_body` accepts only `reasoning`, `reasoning_effort`, or `thinking`; it cannot add headers, credentials, tools, or arbitrary provider controls. The adapter sets LiteLLM retries to zero.
+- `decoding` optionally sets `temperature`, `top_p` and `seed`, either once for both roles (`{"temperature": 0, "seed": 7}`) or per role (`{"producer": {…}, "auditor": {…}}`). Unset parameters are not sent, so the server's defaults apply. Any set parameter changes `Settings.identity`; see the [`Decoding` reference](../reference/configuration.md#decoding).
 
 Provide the selected provider's credentials only in the **worker process environment** (for example, the local shell or a host secret mechanism that launches the worker). Never put them in settings, request JSON, reports, artifacts, logs, endpoint URLs, or CLI arguments. Start a provider-enabled worker separately from clients:
 

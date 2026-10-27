@@ -25,12 +25,13 @@ from temporalio.api.workflowservice.v1 import DescribeNamespaceRequest, Describe
 from corsair.adapters.temporal.client import connect
 from corsair.entrypoints.terminal import failure_remedy
 from corsair.observability.logging import safe_text
-from corsair.settings import Settings
+from corsair.settings import Decoding, Settings
 
 if TYPE_CHECKING:
     from google.adk.models import BaseLlm
     from google.adk.models.llm_request import LlmRequest
     from google.adk.models.llm_response import LlmResponse
+    from google.genai import types
 
     from corsair.agents.resources import RoleName
 
@@ -216,13 +217,23 @@ def _api_base_host(api_base: str | None) -> str:
     return host if port is None else f"{host}:{port}"
 
 
+def _decoding_text(decoding: Decoding) -> str:
+    """Name each set sampling parameter, or the server default when none is set."""
+    if decoding.unset:
+        return "server default"
+    values = {"temperature": decoding.temperature, "top_p": decoding.top_p, "seed": decoding.seed}
+    return ", ".join(f"{key}={value}" for key, value in values.items() if value is not None)
+
+
 def _model_config_check(settings: Settings) -> dict:
     models = settings.models
     keys = ", ".join(sorted(models.extra_body)) or "none"
     detail = (
         f"connector={models.connector}; producer={models.producer}; auditor={models.auditor}; "
         f"api_base host={_api_base_host(models.api_base)}; "
-        f"request_timeout_seconds={models.request_timeout_seconds}; extra_body keys={keys}"
+        f"request_timeout_seconds={models.request_timeout_seconds}; extra_body keys={keys}; "
+        f"decoding producer={_decoding_text(models.decoding.producer)}; "
+        f"decoding auditor={_decoding_text(models.decoding.auditor)}"
     )
     return {"name": "model_config", "status": "pass", "detail": safe_text(detail)}
 
@@ -317,14 +328,21 @@ def _response_failure(name: str, response: LlmResponse) -> dict:
     return check if remedy is None else {**check, "remedy": remedy}
 
 
-def _probe_request(model: BaseLlm, *, tool: bool) -> LlmRequest:
-    """Build one minimal typed request: no agent prompt, no source, no Corsair content."""
+def _probe_request(
+    model: BaseLlm, *, tool: bool, decoding: types.GenerateContentConfig | None
+) -> LlmRequest:
+    """Build one minimal typed request: no agent prompt, no source, no Corsair content.
+
+    ``decoding`` is the role's sampling config exactly as its agent sends it (unset
+    parameters stay unset), so a route that rejects one fails here, not in an episode.
+    """
     from google.adk.models.llm_request import LlmRequest
     from google.genai import types
 
+    sampling = decoding or types.GenerateContentConfig()
     if not tool:
         text, cap = "Reply with the single word: ready", _TEXT_PROBE_OUTPUT_TOKENS
-        config = types.GenerateContentConfig(max_output_tokens=cap)
+        config = sampling.model_copy(update={"max_output_tokens": cap})
         return LlmRequest(
             model=model.model,
             contents=[types.Content(role="user", parts=[types.Part(text=text)])],
@@ -345,9 +363,11 @@ def _probe_request(model: BaseLlm, *, tool: bool) -> LlmRequest:
                 ],
             )
         ],
-        config=types.GenerateContentConfig(
-            max_output_tokens=_TOOL_PROBE_OUTPUT_TOKENS,
-            tools=[types.Tool(function_declarations=[declaration])],
+        config=sampling.model_copy(
+            update={
+                "max_output_tokens": _TOOL_PROBE_OUTPUT_TOKENS,
+                "tools": [types.Tool(function_declarations=[declaration])],
+            }
         ),
     )
     if model.capabilities.output_schema_and_tools:
@@ -442,11 +462,18 @@ def _tool_probe_check(response: LlmResponse | None, latency_ms: int, paired: boo
     }
 
 
-async def _probe_check(model: BaseLlm, role: str, *, tool: bool, timeout: float) -> dict:
+async def _probe_check(
+    model: BaseLlm,
+    role: str,
+    *,
+    tool: bool,
+    timeout: float,
+    decoding: types.GenerateContentConfig | None,
+) -> dict:
     """Run one probe and turn any raised provider failure into a sanitized failed check."""
     name = "model_producer_tools" if tool else f"model_{role}"
     try:
-        request = _probe_request(model, tool=tool)
+        request = _probe_request(model, tool=tool, decoding=decoding)
         paired = request.config.response_schema is not None
         response, latency_ms = await _send_probe(model, request, timeout)
     except Exception as error:
@@ -477,6 +504,10 @@ async def diagnose_model(
     """Check the configured model routes with minimal requests; never an agent prompt or source."""
     checks = [_model_config_check(settings), _model_credentials_check(settings)]
     try:
+        from corsair.adapters.inference.models import decoding_config
+
+        producer_decoding = decoding_config(settings.models.decoding.producer)
+        auditor_decoding = decoding_config(settings.models.decoding.auditor)
         if resolve_model is None:
             from corsair.adapters.inference.models import model_for_role
 
@@ -490,9 +521,27 @@ async def diagnose_model(
     with redirect_stdout(sys.stderr):
         checks.extend(
             await asyncio.gather(
-                _probe_check(models["producer"], "producer", tool=False, timeout=timeout),
-                _probe_check(models["producer"], "producer", tool=True, timeout=timeout),
-                _probe_check(models["auditor"], "auditor", tool=False, timeout=timeout),
+                _probe_check(
+                    models["producer"],
+                    "producer",
+                    tool=False,
+                    timeout=timeout,
+                    decoding=producer_decoding,
+                ),
+                _probe_check(
+                    models["producer"],
+                    "producer",
+                    tool=True,
+                    timeout=timeout,
+                    decoding=producer_decoding,
+                ),
+                _probe_check(
+                    models["auditor"],
+                    "auditor",
+                    tool=False,
+                    timeout=timeout,
+                    decoding=auditor_decoding,
+                ),
             )
         )
     return checks

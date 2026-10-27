@@ -8,6 +8,7 @@ from typing import Any
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
 from google.adk.skills import Skill
+from google.genai import types
 
 from corsair.agents.resources import load_agent_spec, load_runtime_skills, prompt_text
 
@@ -33,8 +34,17 @@ def producer_instruction(skills: Sequence[Skill]) -> str:
     )
 
 
-def build_producer(model: str | BaseLlm, tools: Sequence[Callable[..., Any]]) -> LlmAgent:
-    """Build the producer from exactly its two bound source tools and preloaded procedure."""
+def build_producer(
+    model: str | BaseLlm,
+    tools: Sequence[Callable[..., Any]],
+    *,
+    decoding: types.GenerateContentConfig | None = None,
+) -> LlmAgent:
+    """Build the producer from exactly its two bound source tools and preloaded procedure.
+
+    ``decoding`` is the native generation config carrying only the configured sampling
+    parameters; ``None`` leaves every one at the server default.
+    """
 
     selected_tools = list(tools)
     spec = load_agent_spec("producer")
@@ -63,6 +73,7 @@ def build_producer(model: str | BaseLlm, tools: Sequence[Callable[..., Any]]) ->
         instruction=producer_instruction(skills),
         tools=selected_tools,
         output_schema=ProducerDecision,
+        generate_content_config=decoding,
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
     )

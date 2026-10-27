@@ -56,10 +56,38 @@ def test_identity_ignores_where_a_run_connects_and_stores(update):
         {"negative_threshold": 3},
         {"max_concurrent_activities": 8},
         {"models": ModelSettings(producer="other-model")},
+        {"models": ModelSettings.model_validate({"decoding": {"temperature": 0}})},
+        {"models": ModelSettings.model_validate({"decoding": {"auditor": {"seed": 7}}})},
     ],
 )
 def test_identity_still_changes_with_behaviour(update):
     assert Settings(**update).identity != Settings().identity
+
+
+def test_decoding_is_part_of_the_identity_and_not_a_transport_field():
+    greedy = Settings.model_validate({"models": {"decoding": {"temperature": 0, "seed": 7}}})
+    seeded = Settings.model_validate({"models": {"decoding": {"temperature": 0, "seed": 8}}})
+    per_role = Settings.model_validate(
+        {"models": {"decoding": {"producer": {"temperature": 0, "seed": 7}}}}
+    )
+
+    assert "decoding" not in TRANSPORT_FIELDS and "models" not in TRANSPORT_FIELDS
+    assert len({Settings().identity, greedy.identity, seeded.identity, per_role.identity}) == 4
+    # Settings differing only in decoding: everything else, transport included, is equal.
+    assert greedy.model_dump(exclude={"models"}) == Settings().model_dump(exclude={"models"})
+
+
+@pytest.mark.parametrize("decoding", [{}, {"producer": {}, "auditor": {}}, {"seed": None}])
+def test_an_unset_decoding_block_keeps_the_identity_recorded_before_it(decoding):
+    """Configurations recorded before decoding existed keep their identity: an unset
+    block is omitted from the digest, so existing references and noise bands still match."""
+    explicit = Settings.model_validate({"models": {"decoding": decoding}})
+
+    assert explicit.identity == Settings().identity
+    # The default identity before the decoding block existed (s16).
+    assert Settings().identity == (
+        "3605f10677dc506ee1ae0eb3af7ef9a2f2fe4ec846760de0a852282657f88c55"
+    )
 
 
 def test_the_manifest_config_digest_is_the_transport_free_identity():
