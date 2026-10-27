@@ -27,6 +27,18 @@ A smoke gate (``smoke=True``, for a tier where every language already verifies, 
 track's improvement criterion is noise) still reports that criterion's reason but decides
 only on language regressions, the token ceiling, the accuracy floor and the INCOMPARABLE
 conditions; its verdict says ``smoke`` so its ACCEPTED is never read as an acceptance.
+
+A gate given a noise band (``noise``, from ``corsair gym noise``: two or more runs of one
+configuration) reads each metric's delta against it. A difference lies within noise when
+its magnitude is at most the band (max - min across those runs); a token or seconds ratio
+when it lies between 1 / max_ratio and max_ratio. An improvement criterion is then met only
+beyond the band. When every deciding reason is a regression (``language_regressed``,
+``objective_below_threshold``, ``accuracy_below_baseline``, ``tokens_above_ceiling``) whose
+metric lies within noise, the verdict is INCONCLUSIVE (with ``within_noise``) instead of
+REJECTED, and a confirmation run decides; one regression outside the band, or an unmet
+improvement criterion of the accuracy or efficiency track, still rejects. A band scored on
+another dataset, budgets or repeat count makes the gate INCOMPARABLE (``noise_mismatch``).
+Without a band every decision is as above.
 """
 
 from collections.abc import Sequence
@@ -36,6 +48,9 @@ from corsair.contracts import (
     GateReason,
     GateTrack,
     GateVerdict,
+    NoiseBand,
+    NoiseMetric,
+    NoiseSpread,
     RunIdentity,
     Scorecard,
 )
@@ -56,7 +71,20 @@ _IMPROVEMENT = frozenset(
     }
 )
 # Reasons that explain a verdict without ever causing a rejection.
-_INFORMATIONAL = frozenset({GateReason.OPERATIONALLY_CONFOUNDED, GateReason.LATENCY_NOT_COMPARABLE})
+_INFORMATIONAL = frozenset(
+    {
+        GateReason.OPERATIONALLY_CONFOUNDED,
+        GateReason.LATENCY_NOT_COMPARABLE,
+        GateReason.WITHIN_NOISE,
+    }
+)
+# The regressions a noise band can make INCONCLUSIVE, by the headline metric each is read
+# against; ``language_regressed`` is read per regressed language.
+_REGRESSION_METRIC: dict[GateReason, NoiseMetric] = {
+    GateReason.OBJECTIVE_BELOW_THRESHOLD: "objective_j",
+    GateReason.ACCURACY_BELOW_BASELINE: "macro_verified_accuracy",
+    GateReason.TOKENS_ABOVE_CEILING: "macro_effective_tokens",
+}
 
 
 def incomparable_reasons(
@@ -74,6 +102,21 @@ def incomparable_reasons(
     if baseline.macro_effective_tokens is None or candidate.macro_effective_tokens is None:
         reasons.append(GateReason.TOKENS_UNKNOWN)
     return reasons
+
+
+def noise_mismatch(noise: NoiseBand, baseline: Scorecard, candidate: Scorecard) -> bool:
+    """Whether the band scored another dataset, budgets or repeat count than either side."""
+    return any(
+        noise.dataset_digest != card.dataset_digest
+        or noise.budgets_digest != card.budgets_digest
+        or noise.repeats != card.repeats
+        for card in (baseline, candidate)
+    )
+
+
+def single_case_languages(card: Scorecard) -> list[str]:
+    """Languages with one case: one episode flips their whole verified accuracy."""
+    return sorted(language for language, summary in card.languages.items() if summary.cases == 1)
 
 
 def language_deltas(baseline: Scorecard, candidate: Scorecard) -> dict[str, float | None]:
@@ -170,6 +213,73 @@ def _within(ratio: float | None, ceiling: float) -> bool:
     return ratio is not None and ratio <= ceiling + _EPSILON
 
 
+def _inside(delta: float | None, spread: NoiseSpread | None) -> bool:
+    """A difference no larger than the largest the band's runs showed."""
+    return delta is not None and spread is not None and abs(delta) <= spread.band + _EPSILON
+
+
+def _inside_ratio(ratio: float | None, spread: NoiseSpread | None) -> bool:
+    """A ratio between the band's runs' smallest and largest ratio."""
+    if ratio is None or spread is None or spread.max_ratio is None:
+        return False
+    return 1 / spread.max_ratio - _EPSILON <= ratio <= spread.max_ratio + _EPSILON
+
+
+def _beyond(delta: float | None, noise: NoiseBand | None, spread: NoiseSpread | None) -> bool:
+    """A gain counts beyond the band; without a band every gain does."""
+    if noise is None:
+        return True
+    return delta is not None and spread is not None and delta > spread.band + _EPSILON
+
+
+def _saving_beyond(
+    ratio: float | None, noise: NoiseBand | None, spread: NoiseSpread | None
+) -> bool:
+    """A ratio saving counts below the band's smallest ratio; without a band every one does."""
+    if noise is None:
+        return True
+    if ratio is None or spread is None or spread.max_ratio is None:
+        return False
+    return ratio < 1 / spread.max_ratio - _EPSILON
+
+
+def within_noise(
+    noise: NoiseBand,
+    *,
+    deltas: dict[str, float | None],
+    delta_j: float,
+    accuracy: float,
+    tokens: float | None,
+    seconds: float | None,
+) -> tuple[list[NoiseMetric], list[str]]:
+    """The headline metrics and the languages whose delta lies inside the band."""
+    inside: dict[NoiseMetric, bool] = {
+        "objective_j": _inside(delta_j, noise.objective_j),
+        "macro_verified_accuracy": _inside(accuracy, noise.macro_verified_accuracy),
+        "macro_effective_tokens": _inside_ratio(tokens, noise.macro_effective_tokens),
+        "macro_p50_seconds": _inside_ratio(seconds, noise.macro_p50_seconds),
+    }
+    languages = [
+        language
+        for language, delta in deltas.items()
+        if _inside(delta, noise.languages.get(language))
+    ]
+    return [metric for metric, flag in inside.items() if flag], languages
+
+
+def _regression_within_noise(
+    reason: GateReason,
+    *,
+    within: list[NoiseMetric],
+    languages: list[str],
+    regressed: list[str],
+) -> bool:
+    if reason is GateReason.LANGUAGE_REGRESSED:
+        return all(language in languages for language in regressed)
+    metric = _REGRESSION_METRIC.get(reason)
+    return metric is not None and metric in within
+
+
 def _track_reasons(
     baseline: Scorecard,
     candidate: Scorecard,
@@ -181,11 +291,17 @@ def _track_reasons(
     accuracy: float,
     tokens: float | None,
     seconds: float | None,
+    noise: NoiseBand | None = None,
 ) -> list[GateReason]:
-    """The track's own reasons, after the shared language-regression check."""
+    """The track's own reasons, after the shared language-regression check.
+
+    With a band, each improvement criterion also needs its delta beyond the band.
+    """
     if track == "objective":
         reasons = []
-        if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON:
+        if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON or not _beyond(
+            delta_j, noise, None if noise is None else noise.objective_j
+        ):
             reasons.append(GateReason.OBJECTIVE_BELOW_THRESHOLD)
         if not _within(tokens, MAX_TOKEN_RATIO):
             reasons.append(GateReason.TOKENS_ABOVE_CEILING)
@@ -193,9 +309,19 @@ def _track_reasons(
     if track == "accuracy":
         reasons = []
         target = None if target_language is None else deltas.get(target_language)
-        improved = _at_least(accuracy, min_accuracy_gain(baseline)) or (
+        macro_band = None if noise is None else noise.macro_verified_accuracy
+        target_band = (
+            None
+            if noise is None or target_language is None
+            else noise.languages.get(target_language)
+        )
+        improved = (
+            _at_least(accuracy, min_accuracy_gain(baseline))
+            and _beyond(accuracy, noise, macro_band)
+        ) or (
             target_language is not None
             and _at_least(target, language_step(baseline, target_language))
+            and _beyond(target, noise, target_band)
         )
         if not improved:
             reasons.append(GateReason.ACCURACY_NOT_IMPROVED)
@@ -206,9 +332,15 @@ def _track_reasons(
     if accuracy < -_EPSILON:
         reasons.append(GateReason.ACCURACY_BELOW_BASELINE)
     comparable = latency_comparable(baseline, candidate)
+    tokens_band = None if noise is None else noise.macro_effective_tokens
+    seconds_band = None if noise is None else noise.macro_p50_seconds
     if not (
-        _within(tokens, MAX_EFFICIENT_RATIO)
-        or (comparable and _within(seconds, MAX_EFFICIENT_RATIO))
+        (_within(tokens, MAX_EFFICIENT_RATIO) and _saving_beyond(tokens, noise, tokens_band))
+        or (
+            comparable
+            and _within(seconds, MAX_EFFICIENT_RATIO)
+            and _saving_beyond(seconds, noise, seconds_band)
+        )
     ):
         reasons.append(GateReason.EFFICIENCY_NOT_IMPROVED)
     if not comparable:
@@ -234,11 +366,14 @@ def gate(
     smoke: bool = False,
     track: GateTrack = "objective",
     target_language: str | None = None,
+    noise: NoiseBand | None = None,
 ) -> GateVerdict:
     """ACCEPTED iff no language regressed and the track's criterion holds (module docstring).
 
     With ``smoke`` the track's improvement criterion is reported but does not reject.
     ``target_language`` names the accuracy track's target; it must be a baseline language.
+    ``noise`` reads every delta against a noise band; a regression inside it is
+    INCONCLUSIVE rather than REJECTED.
     """
     admit_track(baseline, track, target_language)
     deltas = language_deltas(baseline, candidate)
@@ -250,8 +385,12 @@ def gate(
         language for language, delta in deltas.items() if delta is None or delta < -_EPSILON
     ]
     reasons = incomparable_reasons(baseline, candidate, min_repeats)
+    if noise is not None and noise_mismatch(noise, baseline, candidate):
+        reasons.append(GateReason.NOISE_MISMATCH)
     decision = GateDecision.INCOMPARABLE
     confounded: list[str] = []
+    within: list[NoiseMetric] = []
+    languages_within: list[str] = []
     if not reasons:
         if regressed:
             reasons.append(GateReason.LANGUAGE_REGRESSED)
@@ -269,14 +408,36 @@ def gate(
                 accuracy=accuracy,
                 tokens=tokens,
                 seconds=seconds,
+                noise=noise,
             )
         )
+        if noise is not None:
+            within, languages_within = within_noise(
+                noise,
+                deltas=deltas,
+                delta_j=delta_j,
+                accuracy=accuracy,
+                tokens=tokens,
+                seconds=seconds,
+            )
         deciding = [
             reason
             for reason in reasons
             if reason not in _INFORMATIONAL and not (smoke and reason in _IMPROVEMENT)
         ]
         decision = GateDecision.REJECTED if deciding else GateDecision.ACCEPTED
+        if (
+            deciding
+            and noise is not None
+            and all(
+                _regression_within_noise(
+                    reason, within=within, languages=languages_within, regressed=regressed
+                )
+                for reason in deciding
+            )
+        ):
+            decision = GateDecision.INCONCLUSIVE
+            reasons.append(GateReason.WITHIN_NOISE)
     return GateVerdict(
         decision=decision,
         reasons=reasons,
@@ -293,11 +454,16 @@ def gate(
         operationally_confounded_languages=confounded,
         identity_changes=identity_changes(baseline, candidate),
         smoke=smoke,
+        single_case_languages=single_case_languages(baseline),
+        noise=noise,
+        within_noise=within,
+        languages_within_noise=languages_within,
     )
 
 
 def chain_decision(decisions: Sequence[GateDecision]) -> GateDecision:
-    """One decision over gates run in sequence: any REJECTED, else any INCOMPARABLE, else ACCEPTED.
+    """One decision over gates run in sequence: any REJECTED, else any INCOMPARABLE, else
+    any INCONCLUSIVE, else ACCEPTED.
 
     No gate at all is INCOMPARABLE: nothing was compared.
     """
@@ -305,4 +471,6 @@ def chain_decision(decisions: Sequence[GateDecision]) -> GateDecision:
         return GateDecision.REJECTED
     if not decisions or GateDecision.INCOMPARABLE in decisions:
         return GateDecision.INCOMPARABLE
+    if GateDecision.INCONCLUSIVE in decisions:
+        return GateDecision.INCONCLUSIVE
     return GateDecision.ACCEPTED

@@ -294,6 +294,14 @@ class GateDecision(StrEnum):
     ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
     INCOMPARABLE = "INCOMPARABLE"
+    # Only with a noise band: every deciding regression lies inside the band, so the
+    # gate cannot tell the candidate from run-to-run noise; a confirmation run decides.
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+    @property
+    def exit_code(self) -> int:
+        """0 accepted, 1 rejected, 2 incomparable, 3 inconclusive."""
+        return _EXIT_CODES[self]
 
 
 class GateReason(StrEnum):
@@ -320,6 +328,17 @@ class GateReason(StrEnum):
     # different or unknown concurrency, or either run had (or may have had) an
     # operational episode.
     LATENCY_NOT_COMPARABLE = "latency_not_comparable"
+    # The noise band (``--noise``) scored another dataset, budgets or repeat count than
+    # the gated scorecards: the gate is INCOMPARABLE rather than reading the wrong band.
+    NOISE_MISMATCH = "noise_mismatch"
+    # Names an INCONCLUSIVE gate, never causes one: every deciding regression lies inside
+    # the noise band, so a confirmation run decides.
+    WITHIN_NOISE = "within_noise"
+    # ``corsair gym noise`` only, never a gate reason: the runs recorded different (or
+    # unknown) configuration identities, or different repeat counts, so their spread is
+    # not one configuration's noise.
+    IDENTITY_MISMATCH = "identity_mismatch"
+    REPEATS_MISMATCH = "repeats_mismatch"
 
 
 # Which criterion a gate decides on (see ``evaluation.gym.gate.gate``): the overall
@@ -327,7 +346,94 @@ class GateReason(StrEnum):
 GateTrack = Literal["accuracy", "efficiency", "objective"]
 
 
-_EXIT_CODES = {GateDecision.ACCEPTED: 0, GateDecision.REJECTED: 1, GateDecision.INCOMPARABLE: 2}
+_EXIT_CODES = {
+    GateDecision.ACCEPTED: 0,
+    GateDecision.REJECTED: 1,
+    GateDecision.INCOMPARABLE: 2,
+    GateDecision.INCONCLUSIVE: 3,
+}
+
+# The headline metrics a noise band covers; per-language verified accuracy is keyed by
+# language beside them.
+NoiseMetric = Literal[
+    "objective_j", "macro_verified_accuracy", "macro_effective_tokens", "macro_p50_seconds"
+]
+# Floating-point slack for a recomputed spread.
+_SPREAD_TOLERANCE = 1e-9
+_MAX_NOISE_RUNS = 64
+
+
+class NoiseSpread(Contract):
+    """One metric across the runs of one configuration: pure arithmetic over scorecards.
+
+    ``values`` follow ``NoiseBand.runs``. ``half_range`` is (max - min) / 2 and ``stdev``
+    the sample standard deviation. A gate reads a difference within ``band`` (max - min,
+    the largest difference two of these runs showed) as noise, and for a positive scale
+    metric (tokens, seconds) a ratio within ``1 / max_ratio`` to ``max_ratio``.
+    """
+
+    values: list[float] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
+    mean: float
+    half_range: float = Field(ge=0)
+    stdev: float = Field(ge=0)
+    # max / min of a positive scale metric; ``None`` for a difference metric.
+    max_ratio: float | None = Field(default=None, ge=1)
+
+    @property
+    def band(self) -> float:
+        """The largest difference between two runs: twice the half-range."""
+        return 2 * self.half_range
+
+    @model_validator(mode="after")
+    def coherent_spread(self):
+        values = self.values
+        mean = sum(values) / len(values)
+        stdev = (sum((value - mean) ** 2 for value in values) / (len(values) - 1)) ** 0.5
+        expected = (mean, (max(values) - min(values)) / 2, stdev)
+        recorded = (self.mean, self.half_range, self.stdev)
+        if any(abs(a - b) > _SPREAD_TOLERANCE for a, b in zip(expected, recorded, strict=True)):
+            raise ValueError("a noise spread's mean, half-range and stdev follow its values")
+        if self.max_ratio is not None and (
+            min(values) <= 0 or abs(self.max_ratio - max(values) / min(values)) > _SPREAD_TOLERANCE
+        ):
+            raise ValueError("a noise spread's max_ratio is max / min of positive values")
+        return self
+
+
+class NoiseBand(Contract):
+    """``corsair gym noise``: the spread of two or more runs of one configuration.
+
+    Every run scored the same dataset with the same budgets, repeats and recorded
+    ``run_identity``, unsliced, with known token usage; nothing is rescored. A gate given
+    the band (``--noise``) reads a delta inside it as noise (see ``evaluation.gym.gate``).
+    ``macro_p50_seconds`` is unknown when any run's is.
+    """
+
+    schema_version: Literal["corsair.gym-noise/1"] = "corsair.gym-noise/1"
+    dataset_digest: Digest
+    budgets_digest: Digest | None = None
+    repeats: int = Field(ge=1)
+    run_identity: dict[str, list[str]] = Field(min_length=1)
+    n_runs: int = Field(ge=2, le=_MAX_NOISE_RUNS)
+    runs: list[Identifier] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
+    objective_j: NoiseSpread
+    macro_verified_accuracy: NoiseSpread
+    macro_effective_tokens: NoiseSpread
+    macro_p50_seconds: NoiseSpread | None = None
+    # Per language: majority verified accuracy.
+    languages: dict[str, NoiseSpread] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def coherent_band(self):
+        if self.n_runs != len(self.runs) or len(set(self.runs)) != len(self.runs):
+            raise ValueError("a noise band names each of its n_runs distinct runs once")
+        spreads = [self.objective_j, self.macro_verified_accuracy, self.macro_effective_tokens]
+        spreads += [*self.languages.values()]
+        if self.macro_p50_seconds is not None:
+            spreads.append(self.macro_p50_seconds)
+        if any(len(spread.values) != self.n_runs for spread in spreads):
+            raise ValueError("every noise spread has one value per run")
+        return self
 
 
 class GateVerdict(Contract):
@@ -356,11 +462,19 @@ class GateVerdict(Contract):
     # A smoke gate reports ``objective_below_threshold`` without rejecting on it, so its
     # ACCEPTED is a smoke result, never an acceptance.
     smoke: bool = False
+    # Baseline languages with one case: one episode flips their verified accuracy, and so
+    # moves J's worst-language term by its whole range. Reported only.
+    single_case_languages: list[str] = Field(default_factory=list)
+    # The noise band the gate read (``--noise``), when one was given.
+    noise: NoiseBand | None = None
+    # With a band: the headline metrics and the languages whose delta lies inside it.
+    within_noise: list[NoiseMetric] = Field(default_factory=list)
+    languages_within_noise: list[str] = Field(default_factory=list)
 
     @property
     def exit_code(self) -> int:
-        """0 accepted, 1 rejected, 2 incomparable."""
-        return _EXIT_CODES[self.decision]
+        """0 accepted, 1 rejected, 2 incomparable, 3 inconclusive."""
+        return self.decision.exit_code
 
 
 class KindBudget(Contract):
@@ -416,6 +530,8 @@ class VerifyRecord(Contract):
     reference: str | None = Field(default=None, min_length=1, max_length=300)
     invocation: list[str] | None = Field(default=None, max_length=256)
     recorded_at: datetime | None = None
+    # The noise band files given (``--noise``); each tier gate embeds the band it read.
+    noise: list[str] = Field(default_factory=list, max_length=8)
 
 
 LedgerDecision = Literal["accepted", "rejected", "inconclusive", "merged"]
@@ -456,6 +572,8 @@ class LedgerRow(Contract):
     decision: LedgerDecision | None = None
     merge_commit: str | None = Field(default=None, min_length=7, max_length=64)
     lesson: str = Field(default="", max_length=500)
+    # The noise band files the row's gates read (``--noise``, or the verify record's).
+    noise: list[str] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
     def coherent_entry(self):

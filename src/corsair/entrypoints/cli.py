@@ -27,6 +27,7 @@ if TYPE_CHECKING:
         BatchItem,
         InvestigationResult,
         LedgerRow,
+        NoiseBand,
         Oracle,
         Scorecard,
         TierGate,
@@ -139,6 +140,9 @@ class CliArguments(argparse.Namespace):
     force: bool
     no_lock: bool
     lock_timeout: float
+    noise: list[str] | None
+    noise_first: str
+    noise_rest: list[str]
 
 
 def validate_run_id(value: str) -> str:
@@ -887,8 +891,9 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
 
 
 async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
-    """Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable."""
+    """Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable, 3 inconclusive."""
     from corsair.evaluation.gym.gate import gate
+    from corsair.evaluation.gym.noise import read_noise
     from corsair.evaluation.gym.render import render_gate
     from corsair.evaluation.gym.scoring import read_scorecard
 
@@ -899,9 +904,33 @@ async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
         smoke=args.smoke,
         track=args.track,
         target_language=args.target_language,
+        noise=None if args.noise is None else read_noise(Path(args.noise[0])),
     )
     _emit_view(ui, render_gate(verdict, baseline, candidate), verdict)
     return verdict.exit_code
+
+
+async def _handle_gym_noise(args: CliArguments, ui: Terminal) -> int:
+    """Write the noise band of two or more runs of one configuration; refuse others (exit 2)."""
+    from corsair.entrypoints.gym import noise_tier, run_scorecard
+    from corsair.evaluation.gym.noise import noise_band, write_noise
+    from corsair.evaluation.gym.render import render_noise
+    from corsair.evaluation.gym.scoring import read_scorecard
+
+    paths = [Path(path) for path in (args.noise_first, *args.noise_rest)]
+    cards = [read_scorecard(run_scorecard(path)) for path in paths]
+    band = noise_band(cards)
+    if args.out:
+        out = Path(args.out)
+    else:
+        out = _gym_root(args) / "reference" / f"noise-{noise_tier(paths, cards)}.json"
+    write_noise(out, band)
+    _emit_view(
+        ui,
+        render_noise(band) + f"\n- Written to `{out}`\n",
+        {"noise": str(out), **band.model_dump(mode="json")},
+    )
+    return 0
 
 
 async def _handle_gym_replay(args: CliArguments, ui: Terminal) -> int:
@@ -959,32 +988,62 @@ async def _handle_gym_budgets(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
-def _ledger_tier_gates(
-    args: CliArguments, rows: Sequence[LedgerRow]
-) -> tuple[dict[str, TierGate | None], list[tuple[str | None, str | None]]]:
-    """Each tier's gate and the candidate identities they name, from --verdict or --tierN."""
-    from corsair.contracts import VerifyRecord
-    from corsair.evaluation.gym.ledger import gate_tier, latest_baseline
+def _ledger_references(args: CliArguments, rows: Sequence[LedgerRow]) -> dict[str, str]:
+    """Each gate's reference (a ledger row id or scorecard): ``baseline`` and each tier."""
+    from corsair.evaluation.gym.ledger import latest_baseline
 
     candidates = {"tier0": args.ledger_tier0, "tier1": args.ledger_tier1}
-    references = {"tier0": args.ledger_reference_tier0, "tier1": args.ledger_reference_tier1}
+    given = {"tier0": args.ledger_reference_tier0, "tier1": args.ledger_reference_tier1}
+    references = {} if args.ledger_baseline is None else {"baseline": args.ledger_baseline}
     if args.ledger_verdict is not None:
-        if any(candidates.values()) or any(references.values()):
-            raise ValueError("--verdict already carries the tier gates; drop --tier0/--tier1")
-        record = VerifyRecord.model_validate_json(Path(args.ledger_verdict).read_text())
-        return {"tier0": record.tier0, "tier1": record.tier1}, [(record.branch, record.commit)]
-    gates: dict[str, TierGate | None] = {}
-    identities: list[tuple[str | None, str | None]] = []
+        if any(candidates.values()) or any(given.values()) or args.noise:
+            raise ValueError(
+                "--verdict already carries the tier gates; drop --tier0/--tier1/--noise"
+            )
+        return references
     for tier, candidate in candidates.items():
-        reference = references[tier]
         if candidate is None:
-            if reference is not None:
+            if given[tier] is not None:
                 raise ValueError(f"--reference-{tier} needs --{tier}")
             continue
-        gated, run = gate_tier(rows, Path(candidate), reference or latest_baseline(rows, tier))
-        gates[tier] = gated
+        references[tier] = given[tier] or latest_baseline(rows, tier)
+    return references
+
+
+def _ledger_tier_gates(
+    args: CliArguments,
+    rows: Sequence[LedgerRow],
+    references: Mapping[str, str],
+    noise: Mapping[str, tuple[str, NoiseBand]],
+) -> tuple[dict[str, TierGate | None], list[tuple[str | None, str | None]], list[str]]:
+    """Each tier's gate, the candidate identities and noise files, from --verdict or --tierN."""
+    from corsair.contracts import VerifyRecord
+    from corsair.evaluation.gym.ledger import gate_tier
+
+    if args.ledger_verdict is not None:
+        record = VerifyRecord.model_validate_json(Path(args.ledger_verdict).read_text())
+        gates = {"tier0": record.tier0, "tier1": record.tier1}
+        return gates, [(record.branch, record.commit)], record.noise
+    candidates = {"tier0": args.ledger_tier0, "tier1": args.ledger_tier1}
+    gated_tiers: dict[str, TierGate | None] = {}
+    identities: list[tuple[str | None, str | None]] = []
+    for tier, candidate in candidates.items():
+        if candidate is None:
+            continue
+        band = noise.get(tier)
+        gated, run = gate_tier(
+            rows, Path(candidate), references[tier], None if band is None else band[1]
+        )
+        gated_tiers[tier] = gated
         identities.append((run.git_branch, run.git_commit))
-    return gates, identities
+    return gated_tiers, identities, list(args.noise or ())
+
+
+def _noise_bands(paths: Sequence[str] | None) -> dict[str, NoiseBand]:
+    """The noise band files given with ``--noise``, keyed by their path as given."""
+    from corsair.evaluation.gym.noise import read_noise
+
+    return {path: read_noise(Path(path)) for path in paths or ()}
 
 
 async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
@@ -1006,6 +1065,7 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
     from datetime import date
 
     from corsair.evaluation.gym.gate import gate
+    from corsair.evaluation.gym.noise import assign_bands
 
     rows = read_ledger(Path(args.ledger))
     if any(row.id == args.row_id for row in rows):
@@ -1015,12 +1075,23 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
     candidate = None if args.scorecard is None else read_scorecard(Path(args.scorecard))
     if args.ledger_baseline is not None and candidate is None:
         raise ValueError("--baseline gates --scorecard; pass both")
+    references = _ledger_references(args, rows)
+    cards = {key: read_scorecard(reference_scorecard(rows, ref)) for key, ref in references.items()}
+    noise = assign_bands(
+        _noise_bands(args.noise),
+        {key: card.dataset_digest for key, card in cards.items()},
+    )
+    baseline_band = noise.get("baseline")
     verdict = (
         None
-        if args.ledger_baseline is None or candidate is None
-        else gate(read_scorecard(reference_scorecard(rows, args.ledger_baseline)), candidate)
+        if candidate is None or "baseline" not in cards
+        else gate(
+            cards["baseline"],
+            candidate,
+            noise=None if baseline_band is None else baseline_band[1],
+        )
     )
-    gates, identities = _ledger_tier_gates(args, rows)
+    gates, identities, noise_files = _ledger_tier_gates(args, rows, references, noise)
     branch, commit = candidate_identity([(args.ledger_branch, args.ledger_commit), *identities])
     row = build_ledger_row(
         candidate,
@@ -1040,6 +1111,7 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
         merge_commit=args.ledger_merge_commit,
         lesson=args.lesson,
         scorecard_path=args.scorecard,
+        noise=noise_files,
     )
     append_ledger(Path(args.ledger), row)
     ui.emit(row)
@@ -1156,6 +1228,7 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         skip=("tier1",) if args.skip_tier1 else (),
         track=args.track,
         target_language=args.target_language,
+        noise=_noise_bands(args.noise),
         observe=_gym_observer(ui),
         on_gate=show,
     )
@@ -1172,7 +1245,7 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
     sys.stdout.flush()
     sys.stderr.write(verdict + "\n")
     sys.stderr.flush()
-    return {"ACCEPTED": 0, "REJECTED": 1}.get(result.decision.value, 2)
+    return result.decision.exit_code
 
 
 async def _handle_gym_images(args: CliArguments, ui: Terminal) -> int:
@@ -1188,6 +1261,7 @@ _GYM_HANDLERS: dict[str, Callable[[CliArguments, Terminal], Awaitable[int]]] = {
     "run": _handle_gym_run,
     "score": _handle_gym_score,
     "gate": _handle_gym_gate,
+    "noise": _handle_gym_noise,
     "replay": _handle_gym_replay,
     "capture": _handle_gym_capture,
     "export-grpo": _handle_gym_export,
@@ -1577,6 +1651,28 @@ def _gate_track_options(parsed: argparse.ArgumentParser) -> None:
     )
 
 
+def _noise_option(parsed: argparse.ArgumentParser, *, repeatable: bool) -> None:
+    """``--noise``: a ``corsair gym noise`` band the gate reads deltas against."""
+    rule = (
+        "a delta inside the band is noise, an improvement must exceed it, and a regression "
+        "inside it is INCONCLUSIVE (exit 3)"
+    )
+    if repeatable:
+        parsed.add_argument(
+            "--noise",
+            action="append",
+            metavar="FILE",
+            help=f"Noise band (repeatable); each applies to the gate of its dataset: {rule}",
+        )
+    else:
+        parsed.add_argument(
+            "--noise",
+            type=lambda value: [value],
+            metavar="FILE",
+            help=f"Noise band of the gated dataset: {rule}",
+        )
+
+
 def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     """``corsair gym`` subcommands; each prints code-owned text or a JSON record."""
     commands = gym.add_subparsers(dest="gym_command", required=True, title="gym commands")
@@ -1620,7 +1716,9 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     score_cmd.add_argument("--git-commit", help=f"The run's commit; {context_help}")
     score_cmd.add_argument("--git-branch", help=f"The run's branch; {context_help}")
     gate_cmd = command(
-        "gate", "Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable"
+        "gate",
+        "Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable, "
+        "3 inconclusive (with --noise)",
     )
     gate_cmd.add_argument("--baseline", required=True, metavar="SCORECARD")
     gate_cmd.add_argument("--candidate", required=True, metavar="SCORECARD")
@@ -1631,6 +1729,20 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
         "result only)",
     )
     _gate_track_options(gate_cmd)
+    _noise_option(gate_cmd, repeatable=False)
+    noise_cmd = command(
+        "noise",
+        "Write the noise band of two or more runs of one configuration and dataset (default "
+        "<gym root>/reference/noise-<tier>.json); refuse other runs with exit 2",
+    )
+    noise_cmd.add_argument("noise_first", metavar="RUN", help="Run directory or scorecard")
+    noise_cmd.add_argument("noise_rest", nargs="+", metavar="RUN", help="Further runs")
+    noise_cmd.add_argument("--out", metavar="FILE", help="Band file (default: see above)")
+    noise_cmd.add_argument(
+        "--root",
+        dest="gym_root",
+        help="Gym root holding reference/ (default <main checkout>/.runs/gym)",
+    )
     replay_cmd = command(
         "replay", "One case's round timeline, per-call usage and failure stop; no services"
     )
@@ -1669,7 +1781,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     verify = command(
         "verify",
         "The candidate protocol: tier0 run and gate, then tier1 run and gate unless tier0 was "
-        "rejected; exit 0 accepted, 1 rejected, 2 incomparable",
+        "rejected; exit 0 accepted, 1 rejected, 2 incomparable, 3 inconclusive (with --noise)",
     )
     verify.add_argument(
         "--reference",
@@ -1681,6 +1793,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
         "--skip-tier1", action="store_true", help="Stop after tier0 (a smoke result only)"
     )
     _gate_track_options(verify)
+    _noise_option(verify, repeatable=True)
     verify.add_argument(
         "--temporal-address", help="Existing server; it must already have namespace corsair-gym"
     )
@@ -1758,6 +1871,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
         choices=("accepted", "rejected", "inconclusive", "merged"),
     )
     append.add_argument("--merge-commit", dest="ledger_merge_commit", help="Required if merged")
+    _noise_option(append, repeatable=True)
     append.add_argument("--lesson", default="")
     append.add_argument("--ledger", default=GYM_LEDGER)
     render_help = "Regenerate LEDGER.md's tables from the JSONL ledger"

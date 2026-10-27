@@ -14,6 +14,7 @@ from corsair.contracts import (
     GateVerdict,
     LedgerDecision,
     LedgerRow,
+    NoiseBand,
     RunContext,
     Scorecard,
     TierGate,
@@ -59,8 +60,12 @@ def build_ledger_row(
     merge_commit: str | None = None,
     lesson: str = "",
     scorecard_path: str | None = None,
+    noise: Sequence[str] = (),
 ) -> LedgerRow:
-    """One ledger row; scorecard metrics are recorded only when a scorecard is given."""
+    """One ledger row; scorecard metrics are recorded only when a scorecard is given.
+
+    ``noise`` names the noise band files the row's gates read.
+    """
     sources: list[Identity] = [(branch, commit)]
     if scorecard is not None:
         sources.append((scorecard.run.git_branch, scorecard.run.git_commit))
@@ -101,6 +106,7 @@ def build_ledger_row(
             "decision": decision,
             "merge_commit": merge_commit,
             "lesson": lesson,
+            "noise": list(noise),
         }
     )
 
@@ -124,13 +130,16 @@ def latest_baseline(rows: Sequence[LedgerRow], tier: str) -> str:
 
 
 def gate_tier(
-    rows: Sequence[LedgerRow], candidate: Path, reference: str
+    rows: Sequence[LedgerRow], candidate: Path, reference: str, noise: NoiseBand | None = None
 ) -> tuple[TierGate, RunContext]:
-    """Gate one tier's candidate (a run directory or a scorecard file) against a reference."""
+    """Gate one tier's candidate (a run directory or a scorecard file) against a reference,
+    reading its deltas against ``noise`` when a band is given."""
     run_dir = candidate if candidate.is_dir() else None
     path = candidate / SCORECARD_FILE if run_dir is not None else candidate
     card = read_scorecard(path)
-    verdict = gate_scorecards(read_scorecard(reference_scorecard(rows, reference)), card)
+    verdict = gate_scorecards(
+        read_scorecard(reference_scorecard(rows, reference)), card, noise=noise
+    )
     gated = TierGate(
         reference=reference,
         scorecard=str(path),
@@ -178,8 +187,9 @@ def _table(header: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
 
 
 def gate_cell(verdict: GateVerdict | None) -> str:
-    """Code-owned gate result: the decision, a non-objective track, its reason codes and
-    any regressed languages. An objective gate (every gate before tracks) names no track."""
+    """Code-owned gate result: the decision, a non-objective track, its reason codes, any
+    regressed languages and, with a noise band, what lay within it. An objective gate
+    (every gate before tracks) names no track."""
     if verdict is None:
         return ABSENT
     decision = verdict.decision.value
@@ -188,6 +198,9 @@ def gate_cell(verdict: GateVerdict | None) -> str:
     details = ", ".join(reason.value for reason in verdict.reasons)
     if verdict.regressed_languages:
         details += "; regressed: " + ", ".join(verdict.regressed_languages)
+    within = [*verdict.within_noise, *verdict.languages_within_noise]
+    if within:
+        details += "; within noise: " + ", ".join(within)
     return f"{decision} ({details})" if details else decision
 
 

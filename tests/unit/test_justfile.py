@@ -42,7 +42,7 @@ def test_default_just_lists_recipes_without_running_side_effects():
     assert "Available recipes" in process.stdout
     recipes = ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up")
     gym = ("gym-run", "gym-gate", "gym-verify", "gym-runs", "gym-replay", "gym-capture")
-    gym += ("gym-ledger", "images-gym")
+    gym += ("gym-ledger", "images-gym", "gym-noise")
     for recipe in (*recipes, "live-agent", "live-chain", "dataset-families", *gym):
         assert recipe in process.stdout
 
@@ -154,11 +154,29 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
             + ["--track", "accuracy"],
         ),
+        (
+            "gym-gate",
+            ["base.json", "cand.json", "--noise", "noise $(touch SHOULD_NOT_EXIST).json"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--noise", "noise $(touch SHOULD_NOT_EXIST).json"],
+        ),
+        (
+            "gym-noise",
+            ["run a", "run $(touch SHOULD_NOT_EXIST)", "run c", "--out", "band file.json"],
+            [*GYM, "noise", "run a", "run $(touch SHOULD_NOT_EXIST)", "run c"]
+            + ["--out", "band file.json"],
+        ),
         ("gym-replay", ["run dir", "case01"], [*GYM, "replay", "run dir", "--case", "case01"]),
         (
             "gym-verify",
             ["ref dir", "--skip-tier1"],
             [*GYM, "verify", "--reference", "ref dir", "--skip-tier1"],
+        ),
+        (
+            "gym-verify",
+            ["ref dir", "--noise", "noise-tier0.json", "--noise", "noise-tier1.json"],
+            [*GYM, "verify", "--reference", "ref dir", "--noise", "noise-tier0.json"]
+            + ["--noise", "noise-tier1.json"],
         ),
         ("gym-runs", ["--tier", "tier0"], [*GYM, "runs", "--tier", "tier0"]),
         (
