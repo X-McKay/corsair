@@ -52,6 +52,12 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | s9 | dx | `gym/s9-track-gate@471a9bd` | — | — | — | — | merged `d67c83d` | Offline; h1 decisive run ACCEPTED under accuracy track (macro +0.0167, tokens 1.070, no regression), REJECTED under objective; h2 clean REJECTED under efficiency; c r0 SandboxExecutionError now operational |
 | h1-rerun | accuracy | `gym/h1-rerun@f98323c` | ACCEPTED | REJECTED (language_regressed, objective_below_threshold, tokens_above_ceiling; regressed: ruby) | +0.083 / -0.570 | 0.900 / 1.210 | rejected | Cap stops 2 to 0 and python 0.8 to 0.9 again, but tier1 tokens 1.21x (c, java, javascript up), p50 +28 s, ruby 0/3 via two target exceptions, macro verified 0.967 to 0.817; two runs of the same config disagree widely (ruby 1.0 vs 0.0, tokens 1.07x vs 1.21x): run-to-run noise exceeds the effects measured; h1 closed |
 
+### Wave 3
+
+| Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| s10 | dx | `gym/s10-freeze-overlap@be756d0` | — | — | — | — | merged `c0f7db7` | Offline; 78 intake/family tests; freeze now agrees with just dataset-families on every wave-3 draft; only the C group's ids change (ih-c-intoverflow-b) |
+
 ## Rejected ideas (do not retry without new evidence)
 
 | Idea | Wave | Why it failed |
