@@ -337,6 +337,20 @@ class GateReason(StrEnum):
     # Names an INCONCLUSIVE gate, never causes one: every deciding regression lies inside
     # the noise band, so a confirmation run decides.
     WITHIN_NOISE = "within_noise"
+    # Paired per-case outcomes: among the deciding languages more cases went from a
+    # majority pass to a majority fail than the reverse, on a gate that would otherwise
+    # accept (accuracy or objective track).
+    PAIRED_REGRESSION = "paired_regression"
+    # Slice gate only (``GateVerdict.slice``): the candidate ran cases the baseline did
+    # not score, a sliced baseline ran other cases than the candidate, or no case was
+    # scored on both sides; INCOMPARABLE.
+    SLICE_MISMATCH = "slice_mismatch"
+    # Slice gate only: a slice case went from a majority pass to a majority fail outside
+    # the noise band.
+    SLICE_REGRESSED = "slice_regressed"
+    # Slice gate only: no slice case went from a majority fail to a majority pass outside
+    # the noise band.
+    SLICE_NOT_IMPROVED = "slice_not_improved"
     # ``corsair gym noise`` only, never a gate reason: the runs recorded different (or
     # unknown) configuration identities, or different repeat counts, so their spread is
     # not one configuration's noise.
@@ -439,6 +453,54 @@ class NoiseBand(Contract):
         return self
 
 
+class DecidingMetric(Contract):
+    """One headline metric recomputed over the deciding languages only (``min_cases``)."""
+
+    baseline: float
+    candidate: float
+    delta: float
+
+
+class PairedCase(Contract):
+    """One case whose majority outcome flipped between baseline and candidate."""
+
+    case_id: Identifier
+    language: str = Field(min_length=1, max_length=64)
+    # Whether the language decides the gate (see ``GateVerdict.min_cases``).
+    deciding: bool = True
+    # With a noise band whose spread for the case's language is a whole case (±1.0): the
+    # flip is read as noise, never as a regression.
+    within_noise: bool = False
+
+
+class PairedCounts(Contract):
+    """Cases present on both sides by baseline and candidate majority outcome (verified)."""
+
+    pass_to_fail: int = Field(default=0, ge=0)
+    fail_to_pass: int = Field(default=0, ge=0)
+    stable_pass: int = Field(default=0, ge=0)
+    stable_fail: int = Field(default=0, ge=0)
+
+
+class PairedOutcomes(PairedCounts):
+    """``GateVerdict.paired``: every case scored on both sides, compared by its majority.
+
+    A case's outcome is whether the majority of its repeats verified, read from each run's
+    trajectories. The totals cover every paired case; ``languages`` splits them by
+    language; the flipped cases are listed per direction. ``deciding_pass_to_fail`` and
+    ``deciding_fail_to_pass`` count flips in deciding languages outside the noise band,
+    which ``paired_regression`` compares. Cases only one side scored are never paired.
+    """
+
+    languages: dict[str, PairedCounts] = Field(default_factory=dict)
+    pass_to_fail_cases: list[PairedCase] = Field(default_factory=list)
+    fail_to_pass_cases: list[PairedCase] = Field(default_factory=list)
+    deciding_pass_to_fail: int = Field(default=0, ge=0)
+    deciding_fail_to_pass: int = Field(default=0, ge=0)
+    baseline_only: list[Identifier] = Field(default_factory=list)
+    candidate_only: list[Identifier] = Field(default_factory=list)
+
+
 class GateVerdict(Contract):
     decision: GateDecision
     reasons: list[GateReason] = Field(default_factory=list)
@@ -473,6 +535,28 @@ class GateVerdict(Contract):
     # With a band: the headline metrics and the languages whose delta lies inside it.
     within_noise: list[NoiseMetric] = Field(default_factory=list)
     languages_within_noise: list[str] = Field(default_factory=list)
+    # Only baseline languages with at least this many cases decide ``language_regressed``,
+    # ``accuracy_not_improved`` and ``accuracy_below_baseline``; 1 (every language, and
+    # every record before ``--min-cases``) leaves the next five fields empty.
+    min_cases: int = Field(default=1, ge=1)
+    deciding_languages: list[str] = Field(default_factory=list)
+    # Shown with their deltas, never deciding: fewer than ``min_cases`` baseline cases.
+    reported_languages: list[str] = Field(default_factory=list)
+    # Macro and worst-language verified accuracy over the deciding languages, as decided on.
+    deciding_macro_verified_accuracy: DecidingMetric | None = None
+    deciding_worst_language: DecidingMetric | None = None
+    # J recomputed over the deciding languages; informational, never decided on.
+    objective_j_deciding: DecidingMetric | None = None
+    # Paired per-case majority outcomes, when both runs' trajectories were read.
+    paired: PairedOutcomes | None = None
+    # A slice screen (``gate(..., slice=True)``): decided only on the paired outcomes of
+    # ``slice_cases`` (the candidate's cases, each also scored by the baseline), run
+    # ``slice_repeats`` times each by the candidate. J, accuracy, tokens and language
+    # deltas are then over the slice and never decide; an ACCEPTED slice is a screen
+    # for a full run, never an acceptance. Records before slices decode as full gates.
+    slice: bool = False
+    slice_cases: list[Identifier] = Field(default_factory=list)
+    slice_repeats: int | None = Field(default=None, ge=0)
 
     @property
     def exit_code(self) -> int:
@@ -577,6 +661,9 @@ class LedgerRow(Contract):
     lesson: str = Field(default="", max_length=500)
     # The noise band files the row's gates read (``--noise``, or the verify record's).
     noise: list[str] = Field(default_factory=list, max_length=8)
+    # A signal-slice screen of the candidate against the tier1 reference (``--slice``):
+    # a screen before the full tier1 run, never an acceptance by itself.
+    slice: TierGate | None = None
 
     @model_validator(mode="after")
     def coherent_entry(self):
@@ -586,6 +673,15 @@ class LedgerRow(Contract):
             raise ValueError("a baseline row needs a scorecard and its tier")
         if (self.decision == "merged") != (self.merge_commit is not None):
             raise ValueError("a merged decision needs its merge commit, and only it has one")
+        if self.slice is not None and not self.slice.gate.slice:
+            raise ValueError("a slice row's gate must be a slice gate")
+        if any(gated is not None and gated.gate.slice for gated in (self.tier0, self.tier1)):
+            raise ValueError("a slice gate belongs in the row's slice, not a tier gate")
+        accepted = self.decision in ("accepted", "merged")
+        if self.slice is not None and self.tier1 is None and accepted:
+            raise ValueError(
+                "a slice screen alone is never an acceptance; gate the full tier1 run first"
+            )
         return self
 
 

@@ -1,0 +1,445 @@
+"""Gym gate: deciding languages (``min_cases``) and paired per-case outcomes."""
+
+import pytest
+
+from corsair.contracts import (
+    GateDecision,
+    GateReason,
+    GateVerdict,
+    NoiseBand,
+    PairedCase,
+    PairedCounts,
+    RunContext,
+    Scorecard,
+    Trajectory,
+)
+from corsair.evaluation.gym.gate import (
+    deciding_languages,
+    gate,
+    min_accuracy_gain,
+    paired_outcomes,
+    trajectories_reproduce,
+)
+from corsair.evaluation.gym.noise import noise_band
+from corsair.evaluation.gym.render import REASON_TEXT, render_gate
+from corsair.evaluation.gym.scoring import build_scorecard, case_outcomes, objective_terms
+
+# Python decides with three cases; java (two) and ruby (one) are reported only at 3.
+CASES = {
+    "py-a": "python.k/1",
+    "py-b": "python.k/1",
+    "py-c": "python.k/1",
+    "jv-a": "java.k/1",
+    "jv-b": "java.k/1",
+    "rb-a": "ruby.k/1",
+}
+ALL = [True, True, True]
+NONE = [False, False, False]
+BASELINE = {
+    "py-a": ALL,
+    "py-b": ALL,
+    "py-c": NONE,
+    "jv-a": ALL,
+    "jv-b": NONE,
+    "rb-a": ALL,
+}
+IDENTITY = {"config": ["c" * 64]}
+
+
+def _rows(verified: dict[str, list[bool]], run_id: str, tokens: float = 100.0) -> list[Trajectory]:
+    return [
+        Trajectory(
+            run_id=f"{run_id}-{case}-{repeat}",
+            case_id=case,
+            repeat=repeat,
+            kind=CASES[case],
+            language=CASES[case].split(".")[0],
+            status="pass" if flag else "fail",
+            passed=flag,
+            verified=flag,
+            false_label=False,
+            usage_known=True,
+            effective_tokens=tokens,
+            seconds=10.0,
+            reward_verdict=1.0 if flag else 0.0,
+            reward=1.0 if flag else 0.0,
+        )
+        for case, flags in verified.items()
+        for repeat, flag in enumerate(flags)
+    ]
+
+
+def _side(
+    verified: dict[str, list[bool]], run_id: str, tokens: float = 100.0
+) -> tuple[Scorecard, list[Trajectory]]:
+    rows = _rows(verified, run_id, tokens)
+    card = build_scorecard(
+        rows,
+        run=RunContext(run_id=run_id, concurrency=2),
+        dataset_digest="d" * 64,
+        cases=CASES,
+        sliced=False,
+    )
+    # One case missing on a side keeps the dataset whole for the gate's comparability check.
+    card = card.model_copy(update={"sliced": False, "repeats": 3, "run_identity": IDENTITY})
+    return card, rows
+
+
+def _gate(
+    baseline: dict[str, list[bool]],
+    candidate: dict[str, list[bool]],
+    tokens: float = 100.0,
+    **options,
+) -> GateVerdict:
+    before, before_rows = _side(baseline, "base")
+    after, after_rows = _side(candidate, "cand", tokens)
+    return gate(
+        before,
+        after,
+        baseline_trajectories=before_rows,
+        candidate_trajectories=after_rows,
+        **options,
+    )
+
+
+# Deciding languages
+
+
+def test_min_cases_one_leaves_every_decision_and_field_unchanged():
+    for candidate in (
+        {**BASELINE, "rb-a": NONE},
+        {**BASELINE, "py-c": ALL},
+        {**BASELINE, "jv-b": ALL, "py-a": NONE},
+        BASELINE,
+    ):
+        (before, _), (after, _) = _side(BASELINE, "base"), _side(candidate, "cand")
+        for track in ("objective", "accuracy", "efficiency"):
+            plain = gate(before, after, track=track)
+            explicit = gate(before, after, track=track, min_cases=1)
+            assert plain == explicit
+            assert plain.min_cases == 1
+            assert plain.deciding_languages == plain.reported_languages == []
+            assert plain.deciding_macro_verified_accuracy is None
+            assert plain.deciding_worst_language is None
+            assert plain.objective_j_deciding is None
+            assert plain.paired is None
+
+
+def test_a_record_written_before_min_cases_decodes_with_every_language_deciding():
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(BASELINE, "cand")
+    record = gate(before, after).model_dump(mode="json")
+    for field in (
+        "min_cases",
+        "deciding_languages",
+        "reported_languages",
+        "deciding_macro_verified_accuracy",
+        "deciding_worst_language",
+        "objective_j_deciding",
+        "paired",
+    ):
+        record.pop(field)
+    old = GateVerdict.model_validate(record)
+    assert old.min_cases == 1 and old.paired is None and old.deciding_languages == []
+    assert render_gate(old, before, after) == render_gate(gate(before, after), before, after)
+
+
+def test_only_languages_with_enough_baseline_cases_decide():
+    (card, _) = _side(BASELINE, "base")
+    assert deciding_languages(card, 1) == ["java", "python", "ruby"]
+    assert deciding_languages(card, 2) == ["java", "python"]
+    assert deciding_languages(card, 3) == ["python"]
+    verdict = _gate(BASELINE, {**BASELINE, "rb-a": NONE, "jv-a": NONE}, min_cases=3)
+    assert verdict.deciding_languages == ["python"]
+    assert verdict.reported_languages == ["java", "ruby"]
+    assert verdict.min_cases == 3
+    # Ruby and java fell but do not decide: no language regressed.
+    assert verdict.regressed_languages == []
+    assert GateReason.LANGUAGE_REGRESSED not in verdict.reasons
+    assert verdict.language_deltas["ruby"] == -1.0
+    without = _gate(BASELINE, {**BASELINE, "rb-a": NONE, "jv-a": NONE})
+    assert without.regressed_languages == ["java", "ruby"]
+    assert GateReason.LANGUAGE_REGRESSED in without.reasons
+
+
+def test_a_deciding_language_regression_still_rejects():
+    verdict = _gate(BASELINE, {**BASELINE, "py-a": NONE, "rb-a": NONE}, min_cases=3)
+    assert verdict.decision is GateDecision.REJECTED
+    assert verdict.regressed_languages == ["python"]
+    assert GateReason.LANGUAGE_REGRESSED in verdict.reasons
+
+
+def test_deciding_metrics_recompute_macro_worst_and_j_over_the_deciding_languages():
+    candidate = {**BASELINE, "py-c": ALL, "rb-a": NONE}
+    verdict = _gate(BASELINE, candidate, min_cases=2)
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(candidate, "cand")
+    expected = {
+        side: objective_terms({name: card.languages[name] for name in ("java", "python")})
+        for side, card in (("baseline", before), ("candidate", after))
+    }
+    accuracy = verdict.deciding_macro_verified_accuracy
+    worst = verdict.deciding_worst_language
+    objective = verdict.objective_j_deciding
+    assert accuracy is not None and worst is not None and objective is not None
+    assert accuracy.baseline == pytest.approx((2 / 3 + 1 / 2) / 2)
+    assert accuracy.candidate == pytest.approx((1 + 1 / 2) / 2)
+    assert accuracy.delta == pytest.approx(accuracy.candidate - accuracy.baseline)
+    assert (worst.baseline, worst.candidate) == (0.5, 0.5)
+    assert objective.baseline == pytest.approx(expected["baseline"].objective_j)
+    assert objective.candidate == pytest.approx(expected["candidate"].objective_j)
+    # J itself is not redefined: delta_j still covers every language.
+    assert verdict.delta_j == pytest.approx(after.objective_j - before.objective_j)
+
+
+def test_objective_terms_over_every_language_reproduce_the_scorecard():
+    card, _ = _side(BASELINE, "base")
+    terms = objective_terms(card.languages)
+    assert terms.objective_j == card.objective_j
+    assert terms.macro_verified_accuracy == card.macro_verified_accuracy
+    assert terms.worst_language_verified_accuracy == card.worst_language_verified_accuracy
+    assert terms.macro_reward == card.macro_reward
+    with pytest.raises(ValueError, match="at least one language"):
+        objective_terms({})
+
+
+def test_the_accuracy_track_decides_on_the_deciding_languages():
+    card, _ = _side(BASELINE, "base")
+    assert min_accuracy_gain(card) == pytest.approx(1 / 9)
+    assert min_accuracy_gain(card, ["python"]) == pytest.approx(1 / 3)
+    # A single-case gain is not an accuracy improvement once ruby only reports.
+    ruby_only = {**BASELINE, "rb-a": NONE}
+    gained = _gate(ruby_only, BASELINE, track="accuracy")
+    assert gained.decision is GateDecision.ACCEPTED
+    narrowed = _gate(ruby_only, BASELINE, track="accuracy", min_cases=3)
+    assert narrowed.decision is GateDecision.REJECTED
+    assert narrowed.reasons == [GateReason.ACCURACY_NOT_IMPROVED]
+    python = _gate(BASELINE, {**BASELINE, "py-c": ALL}, track="accuracy", min_cases=3)
+    assert python.decision is GateDecision.ACCEPTED
+    targeted = _gate(
+        BASELINE,
+        {**BASELINE, "py-c": ALL},
+        track="accuracy",
+        target_language="python",
+        min_cases=3,
+    )
+    assert targeted.decision is GateDecision.ACCEPTED
+
+
+def test_the_efficiency_floor_reads_the_deciding_languages():
+    fell = {**BASELINE, "rb-a": NONE}
+    plain = _gate(BASELINE, fell, track="efficiency")
+    assert GateReason.ACCURACY_BELOW_BASELINE in plain.reasons
+    narrowed = _gate(BASELINE, fell, track="efficiency", min_cases=3)
+    assert GateReason.ACCURACY_BELOW_BASELINE not in narrowed.reasons
+    python = _gate(BASELINE, {**BASELINE, "py-a": NONE}, track="efficiency", min_cases=3)
+    assert GateReason.ACCURACY_BELOW_BASELINE in python.reasons
+
+
+def test_min_cases_needs_a_deciding_language_and_a_deciding_target():
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(BASELINE, "cand")
+    with pytest.raises(ValueError, match="no baseline language has 4 or more cases"):
+        gate(before, after, min_cases=4)
+    with pytest.raises(ValueError, match="ruby has fewer than 3 cases"):
+        gate(before, after, track="accuracy", target_language="ruby", min_cases=3)
+    with pytest.raises(ValueError, match="at least 1"):
+        gate(before, after, min_cases=0)
+
+
+def test_a_deciding_regression_inside_the_band_is_inconclusive():
+    noisy = {**BASELINE, "py-a": NONE}
+    band = noise_band([_side(BASELINE, "ref")[0], _side(noisy, "again")[0]])
+    verdict = _gate(BASELINE, noisy, min_cases=3, noise=band)
+    assert verdict.regressed_languages == ["python"]
+    assert verdict.decision is GateDecision.INCONCLUSIVE
+    assert GateReason.WITHIN_NOISE in verdict.reasons
+    # Ruby falls outside its band (it never moved) but only reports at min_cases 3; the
+    # accuracy floor reads python's band, the per-run mean of the deciding languages.
+    cheaper = {**noisy, "rb-a": NONE}
+    plain = _gate(BASELINE, cheaper, 80.0, track="efficiency", noise=band)
+    assert plain.regressed_languages == ["python", "ruby"]
+    assert plain.decision is GateDecision.REJECTED
+    narrowed = _gate(BASELINE, cheaper, 80.0, track="efficiency", min_cases=3, noise=band)
+    assert narrowed.reasons == [
+        GateReason.LANGUAGE_REGRESSED,
+        GateReason.ACCURACY_BELOW_BASELINE,
+        GateReason.WITHIN_NOISE,
+    ]
+    assert narrowed.decision is GateDecision.INCONCLUSIVE
+
+
+# Paired outcomes
+
+
+def test_paired_outcomes_count_each_case_on_both_sides_by_its_majority():
+    candidate = {
+        **BASELINE,
+        "py-a": [True, False, False],
+        "py-c": [False, True, True],
+        "jv-b": [True, True, False],
+        "rb-a": NONE,
+    }
+    verdict = _gate(BASELINE, candidate, min_cases=3)
+    paired = verdict.paired
+    assert paired is not None
+    assert (paired.pass_to_fail, paired.fail_to_pass) == (2, 2)
+    assert (paired.stable_pass, paired.stable_fail) == (2, 0)
+    assert paired.languages == {
+        "java": PairedCounts(fail_to_pass=1, stable_pass=1),
+        "python": PairedCounts(pass_to_fail=1, fail_to_pass=1, stable_pass=1),
+        "ruby": PairedCounts(pass_to_fail=1),
+    }
+    assert paired.pass_to_fail_cases == [
+        PairedCase(case_id="py-a", language="python"),
+        PairedCase(case_id="rb-a", language="ruby", deciding=False),
+    ]
+    assert paired.fail_to_pass_cases == [
+        PairedCase(case_id="jv-b", language="java", deciding=False),
+        PairedCase(case_id="py-c", language="python"),
+    ]
+    assert (paired.deciding_pass_to_fail, paired.deciding_fail_to_pass) == (1, 1)
+    assert paired.baseline_only == paired.candidate_only == []
+
+
+def test_cases_missing_on_one_side_are_listed_and_never_paired():
+    before = _rows(BASELINE, "base")
+    after = _rows({case: flags for case, flags in BASELINE.items() if case != "py-a"}, "cand")
+    paired = paired_outcomes(before, after, deciding=["python"])
+    assert paired.baseline_only == ["py-a"]
+    assert paired.candidate_only == []
+    assert paired.pass_to_fail == 0
+    assert (
+        sum(
+            counts.pass_to_fail + counts.fail_to_pass + counts.stable_pass + counts.stable_fail
+            for counts in paired.languages.values()
+        )
+        == len(CASES) - 1
+    )
+    reverse = paired_outcomes(after, before, deciding=["python"])
+    assert reverse.candidate_only == ["py-a"] and reverse.baseline_only == []
+
+
+def test_case_outcomes_and_reproduction_check_the_per_case_record():
+    card, rows = _side(BASELINE, "base")
+    assert case_outcomes(rows)["py-c"] == ("python", False)
+    assert case_outcomes(rows)["py-a"] == ("python", True)
+    assert trajectories_reproduce(card, rows)
+    other = _rows({**BASELINE, "py-c": ALL}, "other")
+    assert not trajectories_reproduce(card, other)
+    assert not trajectories_reproduce(card, [item for item in rows if item.case_id != "rb-a"])
+
+
+def _crossed(
+    baseline: dict[str, list[bool]],
+    candidate: dict[str, list[bool]],
+    record: dict[str, list[bool]],
+    **options,
+) -> GateVerdict:
+    """A gate whose candidate trajectories (``record``) are not the candidate scorecard's:
+    the paired check reads the per-case record, not the language summaries."""
+    (before, before_rows), (after, _) = _side(baseline, "base"), _side(candidate, "cand")
+    return gate(
+        before,
+        after,
+        baseline_trajectories=before_rows,
+        candidate_trajectories=_rows(record, "cand"),
+        **options,
+    )
+
+
+def test_more_deciding_cases_falling_than_rising_rejects_an_otherwise_accepting_gate():
+    better = {**BASELINE, "py-c": ALL}
+    fallen = {**BASELINE, "py-a": NONE, "py-b": NONE, "py-c": ALL}
+    for track in ("objective", "accuracy"):
+        verdict = _crossed(BASELINE, better, fallen, track=track, min_cases=3)
+        assert verdict.paired is not None
+        assert (verdict.paired.deciding_pass_to_fail, verdict.paired.deciding_fail_to_pass) == (
+            2,
+            1,
+        )
+        assert verdict.decision is GateDecision.REJECTED
+        assert verdict.reasons[-1] is GateReason.PAIRED_REGRESSION
+    # The efficiency track decides on cost, not on a paired count.
+    efficiency = _crossed(BASELINE, better, fallen, track="efficiency", min_cases=3)
+    assert GateReason.PAIRED_REGRESSION not in efficiency.reasons
+    # A gate that already rejects gains no paired reason.
+    rejected = _crossed(BASELINE, BASELINE, fallen, min_cases=3)
+    assert rejected.reasons == [GateReason.OBJECTIVE_BELOW_THRESHOLD]
+    # Reported-only languages never count.
+    reported = _crossed(BASELINE, better, {**better, "jv-a": NONE, "rb-a": NONE}, min_cases=3)
+    assert reported.decision is GateDecision.ACCEPTED
+    assert reported.paired is not None and reported.paired.pass_to_fail == 2
+
+
+def test_a_single_case_flip_inside_a_whole_case_band_is_noise_never_a_regression():
+    flipped = {**BASELINE, "rb-a": NONE}
+    band: NoiseBand = noise_band([_side(BASELINE, "ref")[0], _side(flipped, "again")[0]])
+    assert band.languages["ruby"].band == 1.0
+    better = {**BASELINE, "py-c": ALL}
+    record = {**BASELINE, "rb-a": NONE}
+    plain = _crossed(BASELINE, better, record, track="accuracy")
+    assert GateReason.PAIRED_REGRESSION in plain.reasons
+    # Python (the target) rose beyond its band, so the gate would otherwise accept.
+    with_band = _crossed(
+        BASELINE, better, record, track="accuracy", target_language="python", noise=band
+    )
+    assert with_band.decision is GateDecision.ACCEPTED
+    assert GateReason.PAIRED_REGRESSION not in with_band.reasons
+    assert with_band.paired is not None
+    assert with_band.paired.pass_to_fail_cases == [
+        PairedCase(case_id="rb-a", language="ruby", within_noise=True)
+    ]
+    assert with_band.paired.deciding_pass_to_fail == 0
+
+
+def test_an_incomparable_gate_reads_no_paired_outcomes():
+    (before, rows), (after, after_rows) = _side(BASELINE, "base"), _side(BASELINE, "cand")
+    verdict = gate(
+        before,
+        after.model_copy(update={"dataset_digest": "e" * 64}),
+        baseline_trajectories=rows,
+        candidate_trajectories=after_rows,
+        min_cases=3,
+    )
+    assert verdict.decision is GateDecision.INCOMPARABLE
+    assert verdict.paired is None
+
+
+# The view
+
+
+def test_the_view_labels_reported_languages_and_prints_the_paired_table():
+    candidate = {**BASELINE, "py-c": ALL, "rb-a": NONE, "jv-b": ALL}
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(candidate, "cand")
+    verdict = _gate(BASELINE, candidate, min_cases=3)
+    text = render_gate(verdict, before, after)
+    assert text == render_gate(verdict, before, after)
+    assert "Deciding languages (at least 3 cases): python; reported only: java, ruby." in text
+    assert "| ruby | 1.000 | 0.000 | -1.000 | reported only (single case) |" in text
+    assert "| java | 0.500 | 1.000 | +0.500 | reported only (2 cases) |" in text
+    assert "| python | 0.667 | 1.000 | +0.333 | no |" in text
+    assert "| Deciding macro verified accuracy | 0.667 | 1.000 | +0.333 |" in text
+    assert "| Deciding worst language verified accuracy | 0.667 | 1.000 | +0.333 |" in text
+    assert "| Deciding objective J (informational) |" in text
+    header = "| Language | Pass to fail | Fail to pass | Stable pass | Stable fail | Decides |"
+    assert header in text
+    assert "| python | 0 | 1 | 2 | 0 | yes |" in text
+    assert "| ruby | 1 | 0 | 0 | 0 | reported only (single case) |" in text
+    assert "| All cases | 1 | 2 | 3 | 0 |  |" in text
+    assert "- Pass to fail: `rb-a` (ruby, reported only)" in text
+    assert "- Fail to pass: `jv-b` (java, reported only), `py-c` (python)" in text
+    assert "- Deciding flips outside noise: 0 pass to fail, 1 fail to pass" in text
+    unknown = gate(before, after, min_cases=3)
+    assert "Paired per-case outcomes: unknown (no trajectories were read)." in render_gate(
+        unknown, before, after
+    )
+    plain = render_gate(gate(before, after), before, after)
+    assert "Paired" not in plain and "Deciding" not in plain and "reported only" not in plain
+
+
+def test_the_view_names_the_paired_regression_and_the_deciding_band():
+    assert REASON_TEXT[GateReason.PAIRED_REGRESSION].startswith("More cases of the deciding")
+    noisy = {**BASELINE, "py-a": NONE}
+    band = noise_band([_side(BASELINE, "ref")[0], _side(noisy, "again")[0]])
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(noisy, "cand")
+    verdict = _gate(BASELINE, noisy, min_cases=3, noise=band)
+    text = render_gate(verdict, before, after)
+    assert "| Deciding macro verified accuracy | -0.333 | ±0.333 | yes |" in text

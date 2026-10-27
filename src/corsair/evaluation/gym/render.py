@@ -16,9 +16,11 @@ from corsair.contracts import (
     NoiseBand,
     NoiseSpread,
     OperationalEpisode,
+    PairedCase,
     Scorecard,
     TargetExceptionEpisode,
 )
+from corsair.evaluation.gym.gate import deciding_accuracy_spread, inside_band
 
 REASON_TEXT: dict[GateReason, str] = {
     GateReason.DATASET_MISMATCH: "The runs scored different frozen datasets.",
@@ -50,6 +52,20 @@ REASON_TEXT: dict[GateReason, str] = {
     GateReason.WITHIN_NOISE: (
         "Every regression lies within the measured noise band: run the candidate once more "
         "(a confirmation run) and gate that run before deciding."
+    ),
+    GateReason.PAIRED_REGRESSION: (
+        "More cases of the deciding languages went from a majority pass to a majority fail "
+        "than the reverse."
+    ),
+    GateReason.SLICE_MISMATCH: (
+        "The candidate's slice is not a set of cases the baseline scored, or the baseline "
+        "is sliced to other cases."
+    ),
+    GateReason.SLICE_REGRESSED: (
+        "A slice case went from a majority pass to a majority fail outside the noise band."
+    ),
+    GateReason.SLICE_NOT_IMPROVED: (
+        "No slice case went from a majority fail to a majority pass outside the noise band."
     ),
     GateReason.IDENTITY_MISMATCH: (
         "The runs recorded different, or unknown, configuration identities."
@@ -88,6 +104,36 @@ SINGLE_CASE_TEXT = (
 NOISE_TEXT = (
     "A delta inside the band is noise; an improvement must exceed it, and a regression "
     "inside it is inconclusive."
+)
+
+DECIDING_TEXT = (
+    "Only these languages decide language regressions, the accuracy criterion and the "
+    "accuracy floor; the others are shown with their deltas but do not decide. J, its "
+    "threshold and the token ratio are unchanged."
+)
+
+SLICE_TEXT = (
+    "Slice gate: a slice screen, not an acceptance. It decides only on the paired majority "
+    "outcomes of the slice cases: a slice case going from pass to fail outside the noise "
+    "band rejects, and at least one must go from fail to pass outside it. J, macro "
+    "accuracy, tokens and language deltas are over the slice and do not decide. A passing "
+    "screen goes on to the full tier run; it never merges anything."
+)
+
+SLICE_NOISE_TEXT = (
+    "A slice gate reads the band per case only: a flip in a language whose band is a whole "
+    "case is within noise and counts neither way."
+)
+
+SLICE_PAIRED_TEXT = (
+    "Each slice case, by whether the majority of its repeats verified. Every slice case "
+    "decides; flips within the noise band do not count."
+)
+
+PAIRED_TEXT = (
+    "Each case scored on both sides, by whether the majority of its repeats verified. "
+    "Only flips in deciding languages outside the noise band count toward a paired "
+    "regression."
 )
 
 
@@ -131,8 +177,10 @@ def _identity_line(changes: Mapping[str, bool | None]) -> str:
 
 def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard) -> str:
     """The gate decision, its fixed reasons and a side-by-side metric table."""
-    labels = (["smoke"] if verdict.smoke else []) + (
-        [] if verdict.track == "objective" else [f"{verdict.track} track"]
+    labels = (
+        (["slice"] if verdict.slice else [])
+        + (["smoke"] if verdict.smoke else [])
+        + ([] if verdict.track == "objective" else [f"{verdict.track} track"])
     )
     title = f" ({', '.join(labels)})" if labels else ""
     lines = [
@@ -140,9 +188,13 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         "",
         f"Baseline `{verdict.baseline_run_id}`, candidate `{verdict.candidate_run_id}`.",
         "",
-        TRACK_TEXT[verdict.track],
+        SLICE_TEXT if verdict.slice else TRACK_TEXT[verdict.track],
         "",
     ]
+    if verdict.slice:
+        cases = ", ".join(f"`{case}`" for case in verdict.slice_cases) or "none"
+        repeats = _count(verdict.slice_repeats)
+        lines.extend([f"Slice: {len(verdict.slice_cases)} cases × {repeats} repeats: {cases}.", ""])
     if verdict.target_language is not None:
         lines.extend([f"Target language: {verdict.target_language}.", ""])
     if verdict.smoke:
@@ -151,6 +203,16 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
     if verdict.single_case_languages:
         single = ", ".join(verdict.single_case_languages)
         lines.extend([f"Single-case languages: {single}. {SINGLE_CASE_TEXT}", ""])
+    if verdict.deciding_languages:
+        deciding = ", ".join(verdict.deciding_languages)
+        reported = ", ".join(verdict.reported_languages) or "none"
+        lines.extend(
+            [
+                f"Deciding languages (at least {verdict.min_cases} cases): {deciding}; "
+                f"reported only: {reported}. {DECIDING_TEXT}",
+                "",
+            ]
+        )
     lines.extend(f"- {REASON_TEXT[reason]}" for reason in verdict.reasons)
     if verdict.operationally_confounded_languages:
         confounded = ", ".join(verdict.operationally_confounded_languages)
@@ -187,6 +249,16 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         ]
         for name, before, after in metrics
     ]
+    deciding_metrics = [
+        ("Deciding macro verified accuracy", verdict.deciding_macro_verified_accuracy),
+        ("Deciding worst language verified accuracy", verdict.deciding_worst_language),
+        ("Deciding objective J (informational)", verdict.objective_j_deciding),
+    ]
+    rows.extend(
+        [name, _number(metric.baseline), _number(metric.candidate), _signed(metric.delta)]
+        for name, metric in deciding_metrics
+        if metric is not None
+    )
     rows.append(["Repeats", str(baseline.repeats), str(candidate.repeats), ""])
     rows.append(["Token ratio", "", _number(verdict.token_ratio), ""])
     rows.append(["p50 seconds ratio", "", _number(verdict.seconds_ratio), ""])
@@ -205,7 +277,7 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 _number(before.verified_accuracy),
                 _number(None if after is None else after.verified_accuracy),
                 _signed(delta),
-                _regressed(verdict, language),
+                _regressed(verdict, language, baseline),
                 _count(before.capped_call_episodes),
                 _count(capped_after),
                 _count_delta(before.capped_call_episodes, capped_after),
@@ -240,13 +312,94 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
             language_rows,
         )
     )
+    lines.extend(_paired_lines(verdict, baseline))
     return "\n".join(lines) + "\n"
 
 
-def _regressed(verdict: GateVerdict, language: str) -> str:
+def _reported_only(card: Scorecard, language: str) -> str:
+    cases = card.languages[language].cases
+    return "reported only (single case)" if cases == 1 else f"reported only ({cases} cases)"
+
+
+def _regressed(verdict: GateVerdict, language: str, baseline: Scorecard) -> str:
+    if verdict.slice:
+        return "not decided (slice)"
+    if language in verdict.reported_languages:
+        return _reported_only(baseline, language)
     if language not in verdict.regressed_languages:
         return "no"
     return "yes (single case)" if language in verdict.single_case_languages else "yes"
+
+
+def _flip(case: PairedCase) -> str:
+    notes = [case.language]
+    if not case.deciding:
+        notes.append("reported only")
+    if case.within_noise:
+        notes.append("within noise")
+    return f"`{case.case_id}` ({', '.join(notes)})"
+
+
+def _paired_lines(verdict: GateVerdict, baseline: Scorecard) -> list[str]:
+    """The paired per-case table, the flipped cases and what a paired regression counts."""
+    paired = verdict.paired
+    if paired is None:
+        if verdict.deciding_languages and verdict.decision is not GateDecision.INCOMPARABLE:
+            return ["", "Paired per-case outcomes: unknown (no trajectories were read)."]
+        return []
+
+    def decides(language: str) -> str:
+        if language in verdict.reported_languages and language in baseline.languages:
+            return _reported_only(baseline, language)
+        return "yes"
+
+    rows = [
+        [
+            language,
+            str(counts.pass_to_fail),
+            str(counts.fail_to_pass),
+            str(counts.stable_pass),
+            str(counts.stable_fail),
+            decides(language),
+        ]
+        for language, counts in paired.languages.items()
+    ]
+    rows.append(
+        [
+            "All cases",
+            str(paired.pass_to_fail),
+            str(paired.fail_to_pass),
+            str(paired.stable_pass),
+            str(paired.stable_fail),
+            "",
+        ]
+    )
+    text = SLICE_PAIRED_TEXT if verdict.slice else PAIRED_TEXT
+    lines = ["", f"Paired per-case outcomes. {text}", ""]
+    lines.extend(
+        _table(
+            ["Language", "Pass to fail", "Fail to pass", "Stable pass", "Stable fail", "Decides"],
+            rows,
+        )
+    )
+    lines.append("")
+    for label, cases in (
+        ("Pass to fail", paired.pass_to_fail_cases),
+        ("Fail to pass", paired.fail_to_pass_cases),
+    ):
+        flipped = ", ".join(_flip(case) for case in cases) or "none"
+        lines.append(f"- {label}: {flipped}")
+    lines.append(
+        f"- Deciding flips outside noise: {paired.deciding_pass_to_fail} pass to fail, "
+        f"{paired.deciding_fail_to_pass} fail to pass"
+    )
+    for label, cases in (
+        ("Baseline only (not paired)", paired.baseline_only),
+        ("Candidate only (not paired)", paired.candidate_only),
+    ):
+        if cases:
+            lines.append(f"- {label}: " + ", ".join(f"`{case}`" for case in cases))
+    return lines
 
 
 def _difference_band(spread: NoiseSpread | None) -> str:
@@ -265,6 +418,8 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     if noise is None:
         return []
     runs = ", ".join(f"`{run}`" for run in noise.runs)
+    if verdict.slice:
+        return [f"Noise band from {noise.n_runs} runs: {runs}. {SLICE_NOISE_TEXT}", ""]
     lines = [f"Noise band from {noise.n_runs} runs: {runs}. {NOISE_TEXT}", ""]
     if verdict.decision is GateDecision.INCOMPARABLE:
         # Nothing was compared, so no delta was read against the band.
@@ -300,6 +455,18 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
             within("macro_p50_seconds" in metrics),
         ],
     ]
+    deciding = verdict.deciding_macro_verified_accuracy
+    if verdict.deciding_languages:
+        band = deciding_accuracy_spread(noise, verdict.deciding_languages)
+        deciding_delta = None if deciding is None else deciding.delta
+        rows.append(
+            [
+                "Deciding macro verified accuracy",
+                _signed(deciding_delta),
+                _difference_band(band),
+                within(inside_band(deciding_delta, band)),
+            ]
+        )
     rows.extend(
         [
             f"{language} verified accuracy",

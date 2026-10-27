@@ -37,6 +37,9 @@ from corsair.evaluation.gym.scoring import (
     write_scorecard,
 )
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, CASES, NONE, _trajectory
+from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED_BASELINE
+from tests.unit.evaluation.test_gym_paired import _side as paired_side
+from tests.unit.evaluation.test_gym_slice import _sliced as sliced_side
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -456,3 +459,86 @@ async def test_append_refuses_incoherent_rows_and_leaves_the_ledger(tmp_path, ar
     with pytest.raises(ValueError, match=message):
         await _append(ledger, *argv)
     assert ledger.read_bytes() == before
+
+
+# Signal-slice screens
+
+FIVE, FIVE_NONE = [True] * 5, [False] * 5
+
+
+def _slice_screen(candidate: dict[str, list[bool]]) -> TierGate:
+    before, before_rows = paired_side(PAIRED_BASELINE, "ref")
+    after, after_rows = sliced_side(candidate, "slice")
+    verdict = gate(
+        before,
+        after,
+        slice=True,
+        baseline_trajectories=before_rows,
+        candidate_trajectories=after_rows,
+    )
+    return TierGate(reference="ref-w4-tier1", scorecard="slice.json", gate=verdict)
+
+
+def _slice_row(screen: TierGate, **fields) -> LedgerRow:
+    return build_ledger_row(
+        None,
+        row_id="s1",
+        recorded_on=date(2026, 10, 27),
+        wave=4,
+        entry="experiment",
+        branch="gym/h7-x",
+        commit="b" * 40,
+        track="accuracy",
+        idea="Target py-c",
+        slice=screen,
+        **fields,
+    )
+
+
+def test_a_slice_screen_renders_in_the_tier1_cell_and_the_rejected_ideas():
+    rejected = _slice_screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE_NONE})
+    row = _slice_row(rejected, decision="rejected")
+    text = render_ledger([row], "# Ledger\n")
+    assert (
+        "| s1 | accuracy | `gym/h7-x@bbbbbbb` | — "
+        "| slice: REJECTED (slice_not_improved) (3 cases × 5) | — | — | rejected |  |"
+    ) in text
+    assert "| Target py-c | 4 | slice: REJECTED (slice_not_improved) (3 cases × 5) |" in text
+
+
+def test_a_slice_screen_leads_the_full_tier1_gate_it_was_followed_by():
+    passed = _slice_screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE})
+    base = _gym_card(BASELINE, run_id="ref")
+    tier1 = gate(base, _gym_card({**BASELINE, "py-b": ALL}, run_id="t1"), track="accuracy")
+    row = _slice_row(
+        passed,
+        tier1=TierGate(reference="ref-w4-tier1", scorecard="t1.json", gate=tier1),
+        decision="accepted",
+    )
+    text = render_ledger([row], "# Ledger\n")
+    assert "| slice: ACCEPTED (3 cases × 5); ACCEPTED [accuracy] | — / +0.250 |" in text
+
+
+def test_a_slice_screen_alone_is_never_an_acceptance_and_stays_in_its_field():
+    passed = _slice_screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE})
+    with pytest.raises(ValueError, match="a slice screen alone is never an acceptance"):
+        _slice_row(passed, decision="accepted")
+    with pytest.raises(ValueError, match="a slice screen alone is never an acceptance"):
+        _slice_row(passed, decision="merged", merge_commit="c" * 40)
+    assert _slice_row(passed, decision="rejected").slice == passed
+    with pytest.raises(ValueError, match="belongs in the row's slice"):
+        _slice_row(passed, tier1=passed)
+    full = TierGate(
+        reference="ref",
+        scorecard="t1.json",
+        gate=gate(_gym_card(BASELINE, run_id="ref"), _gym_card(BASELINE, run_id="t1")),
+    )
+    with pytest.raises(ValueError, match="must be a slice gate"):
+        _slice_row(full)
+
+
+def test_a_row_recorded_before_slices_decodes_without_one():
+    row = _gated_row()
+    record = row.model_dump(mode="json")
+    record.pop("slice")
+    assert LedgerRow.model_validate(record) == row
