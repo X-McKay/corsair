@@ -148,6 +148,12 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             [*GYM, "gate", "--baseline", "base $(touch SHOULD_NOT_EXIST).json"]
             + ["--candidate", "cand.json"],
         ),
+        (
+            "gym-gate",
+            ["base.json", "cand.json", "--track", "accuracy"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--track", "accuracy"],
+        ),
         ("gym-replay", ["run dir", "case01"], [*GYM, "replay", "run dir", "--case", "case01"]),
         (
             "gym-verify",

@@ -111,8 +111,8 @@ gym-run tier *args:
     uv run --locked --extra providers corsair gym run "$@"
 
 # Gate a candidate gym scorecard against a baseline: exit 0 accepted, 1 rejected, 2 incomparable.
-gym-gate baseline candidate:
-    uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2"
+gym-gate baseline candidate *args:
+    uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2" "${@:3}"
 
 # Candidate protocol: tier0 run and gate, then tier1 unless rejected; prints VERDICT, exit 0/1/2.
 gym-verify reference *args:
