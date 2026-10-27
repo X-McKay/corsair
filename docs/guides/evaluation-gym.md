@@ -96,6 +96,28 @@ A holdout tier is filled only through reviewed intake: an agent may draft cases,
 
 Freezing changes the tier's digest, so the next gate over it needs a new reference run.
 
+#### Staged material
+
+Material staged under the private `.work/intake/` tree (a fetched dataset, agent-built chain inputs) is never source of a frozen dataset and nothing is written under `evals/` before the owner's review, so it is drafted with an explicit staging root and imported only at freeze:
+
+```bash
+corsair dataset draft .work/intake/batch/chain/case-a .work/intake/batch/chain/case-b \
+  --source-root .work/intake --recipe-template .work/intake/batch/recipe.json \
+  --split held_out --out .work/intake/batch/draft
+```
+
+Every chain directory and every source tree must lie below the staging root, with the usual admission rules applied relative to it (no `..` escape, no symbolic link on the way or inside a tree); the output may not lie under an `evals/datasets` tree. The draft records `source_root` and `staged: true`, each row names its trees below the root, and `review.md` gains two code-owned columns after the source digest: `staged tree` (the source tree, then `fixed` and the fixed tree) and `licence file` (the `LICENSE`, `LICENCE`, `COPYING`, `UNLICENSE` or `NOTICE` files found anywhere in each tree's admitted snapshot, or `none`). Rows drafted this way have provenance `unk` unless the tree sits beside the chain directory (`syn`).
+
+Freeze of a staged draft requires `--import-into`, a directory below the corpus of the manifest's evals tree:
+
+```bash
+corsair dataset freeze .work/intake/batch/draft --review .work/intake/batch/review.md \
+  --into evals/datasets/gym-tier2.json --import-into evals/datasets/corpus/DIR \
+  --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json [--allow-noassertion]
+```
+
+Before writing anything it re-admits each accepted or amended row's trees against their drafted snapshot digests and refuses (exit 2, nothing written) `import_required` (no `--import-into`), `import_not_staged` (`--import-into` for an unstaged draft), `import_outside_corpus`, `import_target_exists` (`<dir>/<case id>/` exists), `import_source_changed` (a staged tree no longer matches its digest) and `licence_missing` (a tree holds no licence file) unless `--allow-noassertion` is given. It then copies each tree's admitted files byte for byte into `<dir>/<case id>/source/` and `<dir>/<case id>/fixed/` (so every licence and notice file is retained), re-admits each copy against its digest (a mismatch removes everything copied and refuses `import_digest_mismatch`), writes `<dir>/<case id>/provenance.json` (case id, `licence` `retained` or `NOASSERTION`, and per tree its staged path, snapshot digest and licence files), and freezes the rows as above with their sources pointing at the imported trees. Rejected rows are not copied. Licences and notices are the owner's decisions: `NOASSERTION` records that none was found, not that the material may be redistributed.
+
 ## Run a tier
 
 ```bash

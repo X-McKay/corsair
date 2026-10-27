@@ -18,6 +18,12 @@ that no dataset loader accepts plus a code-owned review sheet. ``freeze_dataset`
 dataset freeze``) writes only the rows the reviewer accepted or amended into a
 ``corsair.dataset/1`` manifest, refusing incomplete reviews, invalid rows, rows whose family or
 source tree sits in another split, and manifests over 64 entries.
+
+Material staged under a private tree (fetched datasets, agent-built chain inputs) is drafted
+with an explicit staging root (``draft --source-root``) and admitted in place below it; the
+draft marks itself ``staged`` and its sheet names each tree and its licence files. Only
+``freeze --import-into``, after the reviewer's decisions, copies the accepted and amended
+rows' trees into the corpus, so no frozen request ever points into the staging root.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -463,7 +470,9 @@ REVIEW_COLUMNS = (
     "reviewer",
     "reviewed oracle digest",
 )
-_CODE_COLUMNS = len(REVIEW_COLUMNS) - 3
+# A staged draft's sheet also names each tree below the staging root and its licence files.
+STAGED_REVIEW_COLUMNS = (*REVIEW_COLUMNS[:5], "staged tree", "licence file", *REVIEW_COLUMNS[5:])
+_REVIEWER_COLUMNS = 3
 _DECISIONS = ("accept", "amend", "reject")
 # Dataset.entries bound; datasets.MAX_ENTRIES is not importable here (datasets imports intake).
 _MAX_DATASET_ENTRIES = 64
@@ -477,17 +486,35 @@ _BASIS_LABELS = {
     "truth_type": "truth type",
 }
 _STAGING = ".freeze-check.json"
+# LICENSE, LICENCE, UNLICENSE, COPYING or NOTICE, with optional suffixes (LICENSE-MIT,
+# COPYING.LESSER, NOTICE.md), but not a program file such as notice.py.
+_LICENCE_NAME = re.compile(r"(?:un)?licen[cs]e|copying|notice", re.IGNORECASE)
+_LICENCE_SUFFIX = re.compile(r"(?:[-_.][A-Za-z0-9]+)*")
+_PROGRAM_SUFFIXES = {
+    *(".c", ".cjs", ".go", ".h", ".java", ".js", ".json", ".mjs", ".pl", ".pm", ".py"),
+    *(".rb", ".rs", ".ts"),
+}
+NOASSERTION = "NOASSERTION"
 
 
 class DraftRefused(ValueError):
     """A draft input intake will not assemble; the message is code-owned."""
 
 
+class StagedTree(Contract):
+    """One source tree of a staged row: its path below the staging root and the licence or
+    notice files its admitted snapshot holds (paths within the tree, sorted)."""
+
+    path: str
+    licence_files: list[str] = Field(default_factory=list)
+
+
 class DraftEntry(DatasetEntry):
     """One drafted row: a would-be manifest entry plus what the reviewer needs to judge it.
 
     ``request`` and ``oracle`` (the proposed oracle) are relative to the draft directory.
-    ``provenance`` copies legacy labels as data; nothing maps them onto the oracle.
+    ``provenance`` copies legacy labels as data; nothing maps them onto the oracle. A staged
+    row also names its trees below the staging root.
     """
 
     kind: str
@@ -496,16 +523,52 @@ class DraftEntry(DatasetEntry):
     fixed_source_digest: Digest | None = None
     provenance: dict[str, str] = Field(default_factory=dict)
     blockers: list[str] = Field(default_factory=list)
+    staged_source: StagedTree | None = None
+    staged_fixed_source: StagedTree | None = None
 
 
 class DatasetDraft(Contract):
-    """A proposal awaiting review. No dataset loader accepts this schema."""
+    """A proposal awaiting review. No dataset loader accepts this schema.
+
+    ``staged`` drafts were read below an explicit staging root (``source_root``); freeze
+    imports their reviewed trees into the corpus before any request points at them.
+    """
 
     schema_version: Literal["corsair.dataset-draft/1"] = "corsair.dataset-draft/1"
     source_root: str
+    staged: bool = False
     recipe_template_digest: Digest
     budget_digest: Digest | None = None
     entries: list[DraftEntry] = Field(min_length=1, max_length=_MAX_DATASET_ENTRIES)
+
+    @property
+    def columns(self) -> tuple[str, ...]:
+        """The review sheet's header for this draft."""
+        return STAGED_REVIEW_COLUMNS if self.staged else REVIEW_COLUMNS
+
+    def document(self) -> dict[str, Any]:
+        """draft.json's content; an unstaged draft keeps its earlier fields only."""
+        if self.staged:
+            return self.model_dump(mode="json")
+        unstaged = {"staged_source", "staged_fixed_source"}
+        return self.model_dump(
+            mode="json", exclude={"staged": True, "entries": {"__all__": unstaged}}
+        )
+
+
+def licence_files(files: Mapping[str, bytes]) -> list[str]:
+    """The licence and notice files of an admitted snapshot, at any depth, sorted."""
+    found = []
+    for path in files:
+        name = path.rsplit("/", 1)[-1]
+        match = _LICENCE_NAME.match(name)
+        if (
+            match is not None
+            and _LICENCE_SUFFIX.fullmatch(name, match.end())
+            and Path(name).suffix.lower() not in _PROGRAM_SUFFIXES
+        ):
+            found.append(path)
+    return sorted(found)
 
 
 def propose_oracle(kind: str, *, fixed_source: bool) -> Oracle:
@@ -548,6 +611,23 @@ def _evals_root(chain_dir: Path) -> Path:
         if parent.name == "datasets":
             return parent.parent
     raise DraftRefused(f"{chain_dir}: a chain directory must lie under an evals/datasets tree")
+
+
+def _staging_root(source_root: Path, chain_dirs: Sequence[Path]) -> Path:
+    """The explicit staging root; every chain directory lies below it, with no symlink on
+    the way (sources are then admitted below it, which refuses symlinks itself)."""
+    root = Path(os.path.normpath(source_root.absolute()))
+    if root.is_symlink() or not root.is_dir():
+        raise DraftRefused(f"{root}: the staging root must be a directory, not a symbolic link")
+    for chain_dir in chain_dirs:
+        if not chain_dir.is_relative_to(root) or chain_dir == root:
+            raise DraftRefused(f"{chain_dir}: a chain directory must lie under the staging root")
+        cursor = root
+        for part in chain_dir.relative_to(root).parts:
+            cursor = cursor / part
+            if cursor.is_symlink():
+                raise DraftRefused(f"{chain_dir}: the chain path contains a symbolic link")
+    return root
 
 
 def _chain_source(chain_dir: Path, evals_root: Path, value: object) -> Path:
@@ -671,13 +751,14 @@ def _read_chain(chain_dir: Path, evals_root: Path, language: str) -> _ChainCase:
     )
 
 
-def _admitted(chain: _ChainCase, path: Path, settings: Settings) -> Source:
+def _admitted(chain: _ChainCase, path: Path, settings: Settings) -> tuple[Source, list[str]]:
+    """The admitted source and the licence files of its snapshot."""
     try:
-        source, _ = admit_source(path, settings)
+        source, files = admit_source(path, settings)
     except (OSError, ValueError) as error:
         detail = f"{chain.directory}: {path} is not admissible ({safe_text(error)})"
         raise DraftRefused(detail) from None
-    return source
+    return source, licence_files(files)
 
 
 def _validate_rows(
@@ -720,7 +801,23 @@ def _cell(text: str) -> str:
     return " ".join(text.replace("|", "/").split())[:400]
 
 
-def _code_cells(entry: DraftEntry, proposal: Oracle) -> list[str]:
+def _staged_cells(entry: DraftEntry) -> list[str]:
+    """The staged tree and licence file cells: the source tree, then ``fixed`` and its own."""
+    trees = [
+        (label, tree)
+        for label, tree in (("", entry.staged_source), ("fixed ", entry.staged_fixed_source))
+        if tree is not None
+    ]
+    return [
+        _cell("; ".join(f"{label}{tree.path}" for label, tree in trees)) or "none",
+        _cell(
+            "; ".join(f"{label}{', '.join(tree.licence_files) or 'none'}" for label, tree in trees)
+        )
+        or "none",
+    ]
+
+
+def _code_cells(entry: DraftEntry, proposal: Oracle, *, staged: bool) -> list[str]:
     """The code-owned review columns of one row; a reviewer edits only the last three."""
     verdicts = proposal.acceptable_verdicts
     fix = proposal.expected_fix
@@ -735,6 +832,7 @@ def _code_cells(entry: DraftEntry, proposal: Oracle) -> list[str]:
         entry.family,
         entry.split,
         entry.source_digest,
+        *(_staged_cells(entry) if staged else []),
         "unscored" if verdicts is None else ", ".join(verdict.value for verdict in verdicts),
         "unset (fixed_source present; reviewer sets)" if fix is None else fix.value,
         basis or "none",
@@ -762,20 +860,49 @@ def review_sheet(draft: DatasetDraft, proposals: Mapping[str, Oracle]) -> str:
         "The proposal basis column is legacy data, not a label. A row with validator blockers "
         "cannot be frozen until its draft is fixed.",
         "",
-        "| " + " | ".join(REVIEW_COLUMNS) + " |",
-        "| " + " | ".join("---" for _ in REVIEW_COLUMNS) + " |",
+    ]
+    if draft.staged:
+        lines += [
+            "Staged draft: every tree lies below the staging root named in `draft.json`. The "
+            "staged tree column is its path there and the licence file column the licence or "
+            "notice files it holds. Freeze copies accepted and amended rows' trees into the "
+            "corpus (`--import-into`) and refuses a tree without a licence file unless "
+            "`--allow-noassertion` is given.",
+            "",
+        ]
+    lines += [
+        "| " + " | ".join(draft.columns) + " |",
+        "| " + " | ".join("---" for _ in draft.columns) + " |",
     ]
     for entry in draft.entries:
-        cells = [*_code_cells(entry, proposals[entry.case_id]), "", "", ""]
-        lines.append("| " + " | ".join(cells) + " |")
+        code = _code_cells(entry, proposals[entry.case_id], staged=draft.staged)
+        lines.append("| " + " | ".join([*code, *[""] * _REVIEWER_COLUMNS]) + " |")
     return "\n".join(lines) + "\n"
 
 
-def _draft_output(out: Path, evals_root: Path) -> None:
-    if out.absolute().is_relative_to(evals_root.absolute()):
+def _draft_output(out: Path, evals_root: Path | None) -> None:
+    """Refuse an output under the evals tree (a staged draft: under any ``evals/datasets``)
+    or over an earlier draft."""
+    where = Path(os.path.normpath(out.absolute()))
+    if evals_root is None:
+        evals_root = next(
+            (
+                parent.parent
+                for parent in (where, *where.parents)
+                if parent.name == "datasets" and parent.parent.name == "evals"
+            ),
+            None,
+        )
+    if evals_root is not None and where.is_relative_to(evals_root.absolute()):
         raise DraftRefused(f"{out}: draft output must lie outside the evals tree {evals_root}")
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise DraftRefused(f"{out}: draft output directory is not empty")
+
+
+def _staged_tree(root: Path, source: Source | None, licences: list[str]) -> StagedTree | None:
+    if source is None:
+        return None
+    return StagedTree(path=Path(source.path).relative_to(root).as_posix(), licence_files=licences)
 
 
 def draft_dataset(
@@ -785,20 +912,28 @@ def draft_dataset(
     split: str,
     out: Path,
     budget: Path | None = None,
+    source_root: Path | None = None,
 ) -> dict[str, Any]:
     """Draft one review: requests, mechanical oracle proposals, draft.json and review.md.
 
-    Raises ``DraftRefused`` before writing anything when an input cannot be assembled. Rows
-    the dataset checks would reject are still written, with their blockers on the sheet.
+    Chain directories and their sources lie under one evals tree, or, with ``source_root``,
+    under that explicit staging root (a staged draft). Raises ``DraftRefused`` before
+    writing anything when an input cannot be assembled. Rows the dataset checks would reject
+    are still written, with their blockers on the sheet.
     """
     if not chain_dirs or len(chain_dirs) > _MAX_DATASET_ENTRIES:
         raise DraftRefused(f"draft between 1 and {_MAX_DATASET_ENTRIES} chain directories")
     directories = [Path(os.path.normpath(path.absolute())) for path in chain_dirs]
-    roots = {_evals_root(path) for path in directories}
-    if len(roots) != 1:
-        raise DraftRefused("every chain directory must lie under one evals tree")
-    evals_root = roots.pop()
-    _draft_output(out, evals_root)
+    staged = source_root is not None
+    if source_root is not None:
+        evals_root = _staging_root(source_root, directories)
+        _draft_output(out, None)
+    else:
+        roots = {_evals_root(path) for path in directories}
+        if len(roots) != 1:
+            raise DraftRefused("every chain directory must lie under one evals tree")
+        evals_root = roots.pop()
+        _draft_output(out, evals_root)
     try:
         template_bytes = recipe_template.read_bytes()
         template = load_recipe_template(recipe_template, bound=DRAFT_BOUND_FIELDS)
@@ -816,11 +951,15 @@ def draft_dataset(
     if len({chain.case_id for chain in chains}) != len(chains):
         raise DraftRefused("two chain directories derive the same case id")
     requests: list[tuple[_ChainCase, InvestigationRequest]] = []
+    licences: dict[str, tuple[list[str], list[str]]] = {}
     for chain in chains:
-        source = _admitted(chain, chain.source, settings)
-        fixed = (
-            None if chain.fixed_source is None else _admitted(chain, chain.fixed_source, settings)
+        source, source_licences = _admitted(chain, chain.source, settings)
+        fixed, fixed_licences = (
+            (None, [])
+            if chain.fixed_source is None
+            else _admitted(chain, chain.fixed_source, settings)
         )
+        licences[chain.case_id] = source_licences, fixed_licences
         try:
             request = request_from_template(
                 chain.finding,
@@ -865,22 +1004,32 @@ def draft_dataset(
                 if case.fixed_source is None
                 else case.fixed_source.expected_digest,
                 provenance=chain.provenance,
+                staged_source=_staged_tree(evals_root, case.source, licences[chain.case_id][0])
+                if staged
+                else None,
+                staged_fixed_source=_staged_tree(
+                    evals_root, case.fixed_source, licences[chain.case_id][1]
+                )
+                if staged
+                else None,
             )
         )
     blockers = _validate_rows(out.resolve(), entries, settings)
     draft = DatasetDraft(
         source_root=str(evals_root),
+        staged=staged,
         recipe_template_digest=digest(template_bytes),
         budget_digest=None if budget_bytes is None else digest(budget_bytes),
         entries=[
             entry.model_copy(update={"blockers": blockers[entry.case_id]}) for entry in entries
         ],
     )
-    (out / "draft.json").write_bytes(_json_bytes(draft.model_dump(mode="json")))
+    (out / "draft.json").write_bytes(_json_bytes(draft.document()))
     (out / "review.md").write_text(review_sheet(draft, proposals))
     return {
         "draft": str(out / "draft.json"),
         "review": str(out / "review.md"),
+        **({"staged": True, "source_root": draft.source_root} if staged else {}),
         "split": split,
         "entries": [
             {
@@ -908,7 +1057,7 @@ def _refusal(rule: str, detail: str) -> dict[str, str]:
     return {"rule": rule, "detail": detail}
 
 
-def _sheet_rows(text: str) -> dict[str, list[str]] | None:
+def _sheet_rows(text: str, columns: tuple[str, ...]) -> dict[str, list[str]] | None:
     """The review table's rows by case id; None when the code-owned header is absent."""
     rows: dict[str, list[str]] | None = None
     for line in text.splitlines():
@@ -917,7 +1066,7 @@ def _sheet_rows(text: str) -> dict[str, list[str]] | None:
             continue
         cells = [cell.strip() for cell in stripped[1:-1].split("|")]
         if rows is None:
-            if tuple(cells) == REVIEW_COLUMNS:
+            if tuple(cells) == columns:
                 rows = {}
             continue
         if all(set(cell) <= {"-", ":"} for cell in cells):
@@ -941,7 +1090,9 @@ def _reviewed_rows(
             proposals[entry.case_id] = Oracle.model_validate_json(content)
         except ValueError as error:
             refusals.append(_refusal("draft_changed", f"{entry.case_id}: {safe_text(error)}"))
-    rows = _sheet_rows(sheet)
+    columns = draft.columns
+    code_columns = len(columns) - _REVIEWER_COLUMNS
+    rows = _sheet_rows(sheet, columns)
     if rows is None:
         refusals.append(
             _refusal("sheet_missing_table", "no review table with the code-owned header")
@@ -956,15 +1107,16 @@ def _reviewed_rows(
         if cells is None:
             refusals.append(_refusal("sheet_row_missing", f"{entry.case_id} has no review row"))
             continue
-        if len(cells) != len(REVIEW_COLUMNS) or (
+        if len(cells) != len(columns) or (
             entry.case_id in proposals
-            and cells[:_CODE_COLUMNS] != _code_cells(entry, proposals[entry.case_id])
+            and cells[:code_columns]
+            != _code_cells(entry, proposals[entry.case_id], staged=draft.staged)
         ):
             refusals.append(
                 _refusal("sheet_mismatch", f"{entry.case_id}: a code-owned column was edited")
             )
             continue
-        decision, _, reviewed = (cell.strip() for cell in cells[_CODE_COLUMNS:])
+        decision, _, reviewed = (cell.strip() for cell in cells[code_columns:])
         decision = decision.lower()
         if not decision:
             refusals.append(_refusal("decision_missing", f"{entry.case_id} has no decision"))
@@ -1109,8 +1261,155 @@ def _reanchored(request: InvestigationRequest, directory: Path) -> Investigation
     )
 
 
+@dataclass(frozen=True)
+class _ImportTree:
+    """One admitted staged tree of an accepted row and where freeze copies it."""
+
+    name: Literal["source", "fixed"]
+    staged: Source
+    staged_tree: str
+    files: dict[str, bytes]
+    licence_files: list[str]
+
+
+@dataclass(frozen=True)
+class _Import:
+    """An accepted staged row's import: ``<import-into>/<case id>/{source,fixed}/``."""
+
+    case_id: str
+    directory: Path
+    trees: list[_ImportTree]
+
+    @property
+    def licence(self) -> str:
+        return NOASSERTION if any(not tree.licence_files for tree in self.trees) else "retained"
+
+    def provenance(self) -> dict[str, Any]:
+        """The code-owned provenance.json written beside the imported trees."""
+        return {
+            "case_id": self.case_id,
+            "licence": self.licence,
+            "trees": {
+                tree.name: {
+                    "staged_tree": tree.staged_tree,
+                    "snapshot_digest": tree.staged.expected_digest,
+                    "licence_files": tree.licence_files,
+                }
+                for tree in self.trees
+            },
+        }
+
+    def imported(self, request: InvestigationRequest) -> InvestigationRequest:
+        """The request with its sources at the imported trees, digests unchanged."""
+        sources = {
+            "source" if tree.name == "source" else "fixed_source": tree.staged.model_copy(
+                update={"path": str(self.directory / tree.name)}
+            )
+            for tree in self.trees
+        }
+        return request.model_copy(update={"case": request.case.model_copy(update=sources)})
+
+
+def _import_plan(
+    rows: Sequence[_Reviewed],
+    requests: Mapping[str, InvestigationRequest],
+    *,
+    draft: DatasetDraft,
+    import_into: Path,
+    corpus: Path,
+    allow_noassertion: bool,
+    refusals: list[dict[str, str]],
+) -> dict[str, _Import]:
+    """Check every accepted row's import without writing: the target lies below the corpus
+    and does not exist, each staged tree still has its drafted snapshot digest, and each tree
+    holds a licence file unless NOASSERTION is allowed."""
+    target = import_into.resolve()
+    if not target.is_relative_to(corpus.resolve()) or target == corpus.resolve():
+        refusals.append(
+            _refusal("import_outside_corpus", f"{import_into} must lie below {corpus}/")
+        )
+        return {}
+    root = Path(draft.source_root)
+    settings = Settings(source_root=draft.source_root)
+    plan: dict[str, _Import] = {}
+    for row in rows:
+        case_id = row.entry.case_id
+        directory = target / case_id
+        if directory.exists() or directory.is_symlink():
+            refusals.append(_refusal("import_target_exists", f"{directory} exists"))
+        case = requests[case_id].case
+        trees = []
+        for name, source in (("source", case.source), ("fixed", case.fixed_source)):
+            if source is None:
+                continue
+            staged_tree = Path(source.path).relative_to(root).as_posix()
+            try:
+                _, files = admit_source(Path(source.path), settings, source.expected_digest)
+            except (OSError, ValueError) as error:
+                refusals.append(
+                    _refusal(
+                        "import_source_changed", f"{case_id}: {staged_tree}: {safe_text(error)}"
+                    )
+                )
+                continue
+            licences = licence_files(files)
+            if not licences and not allow_noassertion:
+                refusals.append(
+                    _refusal(
+                        "licence_missing",
+                        f"{case_id}: {name} tree {staged_tree} holds no LICENSE, COPYING or "
+                        f"NOTICE file; --allow-noassertion records licence {NOASSERTION}",
+                    )
+                )
+            trees.append(_ImportTree(name, source, staged_tree, files, licences))
+        plan[case_id] = _Import(case_id, directory, trees)
+    return plan
+
+
+def _write_tree(target: Path, files: Mapping[str, bytes]) -> None:
+    """Write an admitted snapshot's files under a new ``target``, never over a file."""
+    for relative, content in files.items():
+        path = target / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as stream:
+            stream.write(content)
+
+
+def _write_imports(plan: Mapping[str, _Import], corpus_settings: Settings) -> str | None:
+    """Copy every planned tree, then re-admit each copy against its drafted digest. On any
+    failure remove everything written (the targets did not exist) and return the detail."""
+    created = [
+        path
+        for directory in {item.directory.parent for item in plan.values()}
+        for path in (directory, *directory.parents)
+        if not path.exists()
+    ]
+    written: list[Path] = []
+    try:
+        for item in plan.values():
+            written.append(item.directory)
+            for tree in item.trees:
+                _write_tree(item.directory / tree.name, tree.files)
+                admit_source(
+                    item.directory / tree.name, corpus_settings, tree.staged.expected_digest
+                )
+            (item.directory / "provenance.json").write_bytes(_json_bytes(item.provenance()))
+    except (OSError, ValueError) as error:
+        for directory in written:
+            shutil.rmtree(directory, ignore_errors=True)
+        for path in sorted(set(created), key=lambda value: len(value.parts), reverse=True):
+            if path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
+        return safe_text(error)
+    return None
+
+
 def _freeze_result(
-    draft_dir: Path, review: Path, into: Path, against: Sequence[Path]
+    draft_dir: Path,
+    review: Path,
+    into: Path,
+    against: Sequence[Path],
+    import_into: Path | None,
 ) -> dict[str, Any]:
     return {
         "freeze": {
@@ -1118,27 +1417,37 @@ def _freeze_result(
             "review": str(review),
             "into": str(into),
             "against": [str(path) for path in against],
+            "import_into": None if import_into is None else str(import_into),
         },
         "written": False,
         "refusals": [],
         "identity": None,
         "frozen": [],
         "rejected": [],
+        "imported": [],
         "absolute_sources": False,
         "validation": None,
     }
 
 
 def freeze_dataset(
-    draft_dir: Path, *, review: Path, into: Path, against: Sequence[Path]
+    draft_dir: Path,
+    *,
+    review: Path,
+    into: Path,
+    against: Sequence[Path],
+    import_into: Path | None = None,
+    allow_noassertion: bool = False,
 ) -> dict[str, Any]:
     """Freeze a reviewed draft's accepted and amended rows into a ``corsair.dataset/1`` manifest.
 
     Nothing is written while any refusal stands. A write appends the rows to ``into`` (kept
-    entries are unchanged), copies each row's request and reviewed oracle under
-    ``<into stem>/<case id>/`` and reports the old and new dataset identities.
+    entries are unchanged), copies each row's request and reviewed oracle beside the corpus
+    and reports the old and new dataset identities. A staged draft needs ``import_into``
+    (below the corpus of ``into``'s evals tree): each accepted row's trees are first copied
+    there byte for byte, with their licence files, and their digests re-checked.
     """
-    result = _freeze_result(draft_dir, review, into, against)
+    result = _freeze_result(draft_dir, review, into, against, import_into)
     refusals: list[dict[str, str]] = result["refusals"]
     base = draft_dir.resolve()
     try:
@@ -1146,6 +1455,14 @@ def freeze_dataset(
         sheet = review.read_text()
     except (OSError, ValueError) as error:
         refusals.append(_refusal("draft_unreadable", safe_error_detail(error)))
+        return result
+    if draft.staged and import_into is None:
+        detail = "a staged draft is frozen only with --import-into evals/datasets/corpus/<dir>"
+        refusals.append(_refusal("import_required", detail))
+        return result
+    if not draft.staged and import_into is not None:
+        detail = "--import-into copies a staged draft's trees; this draft is not staged"
+        refusals.append(_refusal("import_not_staged", detail))
         return result
     rows, result["rejected"] = _reviewed_rows(base, draft, sheet, refusals)
     if refusals or not rows:
@@ -1186,10 +1503,29 @@ def freeze_dataset(
         )
         for row in rows
     }
+    # A staged draft's rows are frozen over their imported trees, in the evals tree of into.
+    frozen_root = Path(draft.source_root)
+    frozen_requests = dict(requests)
+    plan: dict[str, _Import] = {}
+    if import_into is not None:
+        frozen_root = datasets.dataset_root(into)
+        plan = _import_plan(
+            rows,
+            requests,
+            draft=draft,
+            import_into=import_into,
+            corpus=frozen_root / "datasets/corpus",
+            allow_noassertion=allow_noassertion,
+            refusals=refusals,
+        )
+        if not plan:  # the target lies outside the corpus: no frozen layout to check
+            return result
+        for case_id, item in plan.items():
+            frozen_requests[case_id] = item.imported(requests[case_id])
     layout: dict[str, tuple[Path, bool]] = {}
     for row in rows:
         directory, absolute = _frozen_directory(
-            into, Path(draft.source_root), requests[row.entry.case_id]
+            into, frozen_root, frozen_requests[row.entry.case_id]
         )
         if directory is None:
             refusals.append(
@@ -1210,11 +1546,26 @@ def freeze_dataset(
     if refusals:
         return result
 
+    corpus_settings = Settings(source_root=str(frozen_root))
+    if plan:
+        failure = _write_imports(plan, corpus_settings)
+        if failure is not None:
+            refusals.append(_refusal("import_digest_mismatch", failure))
+            return result
+        result["imported"] = [
+            {
+                "case_id": item.case_id,
+                "directory": str(item.directory),
+                "licence": item.licence,
+                "licence_files": {tree.name: tree.licence_files for tree in item.trees},
+            }
+            for item in plan.values()
+        ]
     root = datasets.dataset_root(into)
     added = []
     for row in rows:
         directory, absolute = layout[row.entry.case_id]
-        request = requests[row.entry.case_id]
+        request = frozen_requests[row.entry.case_id]
         frozen = request if absolute else _reanchored(request, directory)
         request_bytes = _json_bytes(frozen.model_dump(mode="json", exclude_none=True))
         paths = {
@@ -1239,7 +1590,7 @@ def freeze_dataset(
     temporary = into.with_name(f".{into.name}.tmp")
     temporary.write_bytes(_json_bytes(manifest.model_dump(mode="json")))
     os.replace(temporary, into)
-    report = datasets.validate_dataset(into, settings)
+    report = datasets.validate_dataset(into, corpus_settings)
     result["written"] = True
     result["identity"] = {
         "old": None if existing is None else digest(existing),

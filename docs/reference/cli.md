@@ -412,20 +412,25 @@ corsair inspect "$RUN_ID" --settings .state/settings.json
 ```bash
 corsair dataset draft evals/datasets/chain/python/xxe-a evals/datasets/chain/python/xxe-b \
   --recipe-template .work/intake/wave1/recipe-python-xxe.json --split held_out \
-  --out .work/intake/wave1/draft [--budget budget.json]
+  --out .work/intake/wave1/draft [--budget budget.json] [--source-root DIR]
 ```
 
 Drafts reviewed intake for up to 64 chain directories, offline. For each directory it assembles `<case id>/request.json` from `case.json` and `input.json` and the operator's recipe template (an admitted `Recipe` member without `module_file` or the callable field; title, file, line and callable come from `input.json` only, `claim_scope` is `component`, and `source`/`fixed_source` are admitted in place, with the legacy `../../../../../benchmarks/corpus/` prefix mapped to `evals/datasets/corpus/`), a mechanical `<case id>/oracle.proposed.json`, `draft.json` (`corsair.dataset-draft/1`, refused by every dataset loader) and the code-owned `review.md` (case id, kind, family, split, source digest, proposed acceptable verdicts, proposed `expected_fix`, proposal basis, validator blockers, and empty decision, reviewer and reviewed oracle digest columns). It never reads a directory's `README.md`, `manifest.json`, `submission.json`, `verification/` or legacy narrative, and never writes under the evals tree. See [intake](../guides/evaluation-gym.md#intake-drafting-and-freezing-reviewed-cases) for ids, provenance and the proposal rules. It exits `0` when every row passes the `dataset validate` checks, `1` when a drafted row has blockers, and `2` (nothing written) when an input is refused: an unknown recipe kind, a template that sets a bound field or does not bind, an unreadable or inadmissible directory or source, or a non-empty `--out`.
+
+With `--source-root DIR` (a staging root such as `.work/intake`) the chain directories and their source trees must instead lie below `DIR` and are admitted relative to it (a directory or tree outside it, or a symbolic link on the chain path or in a tree, is refused with exit `2`); `--out` may not lie under an `evals/datasets` tree. `draft.json` records `source_root` and `staged: true` and each row's `staged_source`/`staged_fixed_source` (path below `DIR` and licence files), and `review.md` adds the code-owned `staged tree` and `licence file` columns after the source digest. Such a draft is frozen only with `--import-into`. See [staged material](../guides/evaluation-gym.md#staged-material).
 
 ### `dataset freeze DRAFT_DIR --review REVIEW.md --into MANIFEST --against MANIFEST...`
 
 ```bash
 corsair dataset freeze .work/intake/wave1/draft --review .work/intake/wave1/review.md \
   --into evals/datasets/gym-tier2.json \
-  --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json
+  --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json \
+  [--import-into evals/datasets/corpus/DIR [--allow-noassertion]]
 ```
 
 Freezes the rows of a reviewed draft whose decision is `accept` (the proposed oracle) or `amend` (the `oracle.json` the reviewer wrote in the row's draft directory) into a `corsair.dataset/1` manifest with frozen digests, appending to an existing manifest. It refuses with exit `2` and writes nothing when any row lacks a decision or has an invalid one, a code-owned cell was edited, a draft file changed, a filled reviewed oracle digest does not match, an accepted row fails the `dataset validate` checks, a family, case, chain pair or source tree (variant stem or snapshot digest) sits in a different split in an `--against` manifest or the existing `--into` manifest, a case is already frozen there, or the result would exceed 64 entries; each refusal names its rule. After writing it logs `dataset.frozen` with the old (`none`) and new dataset digests, re-validates the manifest, and exits `1`: a new cohort identity to review and commit. It exits `0` without writing when every row was rejected.
+
+A staged draft (`dataset draft --source-root`) requires `--import-into`, a directory below `<evals tree of --into>/datasets/corpus/`; `--import-into` for an unstaged draft is refused. Before writing, freeze also refuses (exit `2`) a target outside the corpus (`import_outside_corpus`), an existing `<DIR>/<case id>/` (`import_target_exists`), a staged tree whose snapshot digest changed since the draft (`import_source_changed`), and a tree without a `LICENSE`/`LICENCE`/`COPYING`/`UNLICENSE`/`NOTICE` file unless `--allow-noassertion` is given (`licence_missing`). For accepted and amended rows only it copies each admitted tree byte for byte into `<DIR>/<case id>/source/` and `fixed/`, re-admits each copy against its digest (on a mismatch it removes the copies and refuses `import_digest_mismatch`), writes `<DIR>/<case id>/provenance.json` (`licence` `retained` or `NOASSERTION`, staged paths, snapshot digests and licence files per tree), and then writes the requests, oracles and manifest as above with sources pointing at the imported trees; the output's `imported` list names each copied row and its licence.
 
 Do not delete an intent to obtain a pass, reuse a run ID with a different request, or blindly rerun an uncertain operation. Preserve the run ID, inspect owned resource identifiers, and record uncertainty. Temporal history alone cannot restore a separate local artifact filesystem after host loss.
 
