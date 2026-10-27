@@ -449,3 +449,5 @@ content-addressed tags and cannot contaminate parallel runs.
   (target_exception / harness / sandbox); no driver, image or identity change; re-validation unchanged for old results
   (ERROR roles were never admissible); 425 stored rounds show 0 verdict differences. Gates on `gym/loop` at 4593c936:
   see the next bullet.
+- 2026-10-27 Gates on `gym/loop` at 4593c936 (after s8 and w2): `just check` exit 0; `just -- test -q -W error`
+  1387 passed, 113 deselected, 0 warnings. Docker suite deferred until the h1 re-measurement's live run ends.
