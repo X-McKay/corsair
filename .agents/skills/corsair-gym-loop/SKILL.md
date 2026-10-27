@@ -26,7 +26,7 @@ One wave, driven by CLI exit codes so no harness reproduces a judgment. Design a
 ## Invariants
 
 - Same dataset digest, budgets digest and repeats on both sides of a gate; anything else is INCOMPARABLE, never a win or a regression.
-- Any prompt, schema, budget, driver, image or model change is a new configuration identity; say so in the ledger row.
+- Any prompt, packet-builder or tool-declaration, schema, budget, driver, image or model change is a new configuration identity (a packet-builder change shows as `producer_packet`/`auditor_packet` in the gate's `Identity changes:` line); say so in the ledger row.
 - Missing usage stays unknown; ERROR, UNABLE_TO_RUN and INCONCLUSIVE are never negatives; a failed reproduction never yields EXPLOIT_NOT_DEMONSTRATED.
 - No second agent loop, scheduler, tracing stack or replay engine; no model-authored execution; no oracle or outcome in agent, tool or workflow inputs.
 - One shared model endpoint: compare latency at equal concurrency; `cpu_seconds` is the contention-resistant figure.

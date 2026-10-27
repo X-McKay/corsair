@@ -4,6 +4,7 @@ import json
 from importlib.resources import files
 
 from corsair import __version__
+from corsair.adapters.inference.adk import probe_packet_digest
 from corsair.agents.resources import runtime_skill_digest
 from corsair.contracts import (
     AuditResult,
@@ -40,6 +41,8 @@ def build_manifest(request: InvestigationRequest, settings: Settings, image_id: 
         config_digest=settings.identity,
         producer_prompt_digest=prompts["producer"],
         auditor_prompt_digest=prompts["auditor"],
+        producer_packet_digest=probe_packet_digest("producer"),
+        auditor_packet_digest=probe_packet_digest("auditor"),
         image_id=image_id,
         models={"producer": settings.models.producer, "auditor": settings.models.auditor},
         capabilities=capabilities,

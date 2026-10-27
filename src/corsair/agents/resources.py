@@ -175,6 +175,21 @@ def prompt_text(role: str) -> str:
     )
 
 
+def packet_probe_text(role: str) -> str:
+    """Return the role's frozen packet probe request, read from the built package.
+
+    The probe is the role's input contract (``ProducerInput`` or ``AuditInput``) as JSON
+    with fixed placeholder values: no timestamp, run id, checkout path or settings value.
+    Rendering it through the live packet builders gives the manifest's packet digest.
+    """
+
+    return (
+        resources.files(_resource_package(role))
+        .joinpath("packet-probe.json")
+        .read_text(encoding="utf-8")
+    )
+
+
 def _read_utf8(path: Path, *, byte_limit: int) -> bytes:
     """Read one admitted resource after strict text and executable-file checks."""
 

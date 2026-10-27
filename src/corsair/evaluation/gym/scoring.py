@@ -516,6 +516,8 @@ def run_identity(manifest: RunManifest | None) -> RunIdentity | None:
         config=manifest.config_digest,
         producer_prompt=manifest.producer_prompt_digest,
         auditor_prompt=manifest.auditor_prompt_digest,
+        producer_packet=manifest.producer_packet_digest,
+        auditor_packet=manifest.auditor_packet_digest,
         producer_spec=_capability(manifest, "producer", "spec_digest"),
         auditor_spec=_capability(manifest, "auditor", "spec_digest"),
         producer_output_schema=_capability(manifest, "producer", "output_schema_digest"),

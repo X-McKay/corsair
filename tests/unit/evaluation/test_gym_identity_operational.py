@@ -1,6 +1,7 @@
 """Gym run identity and operational-stop visibility: observations, never a decision input."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -539,3 +540,55 @@ async def test_the_gate_command_takes_smoke(tmp_path, capsys):
     verdict = json.loads(capsys.readouterr().out)
     assert (verdict["decision"], verdict["smoke"]) == ("ACCEPTED", True)
     assert verdict["reasons"] == ["objective_below_threshold"]
+
+
+# Packet digests: identity components a manifest records from the packet builders
+
+# A scorecard the scoring code wrote before the packet digests existed, from the
+# stored manifest of tests/replay/kernel/case02.*.json; read-only.
+STORED_CARD = Path(__file__).with_name("scorecard-before-packet-digests.json")
+
+
+def test_scoring_lists_each_roles_packet_digest_in_the_run_identity():
+    built = _manifest(producer_packet_digest="5" * 64, auditor_packet_digest="6" * 64)
+    scored = trajectory(_failed(HEARTBEAT), 0, KIND, ORACLE, _result(built), None)
+    assert scored.run_identity is not None
+    assert (scored.run_identity.producer_packet, scored.run_identity.auditor_packet) == (
+        "5" * 64,
+        "6" * 64,
+    )
+    older = trajectory(_failed(HEARTBEAT), 0, KIND, ORACLE, _result(_manifest()), None)
+    assert older.run_identity is not None
+    assert (older.run_identity.producer_packet, older.run_identity.auditor_packet) == (None, None)
+    card = _card(BASELINE, "p", identity=lambda case: _identity(producer_packet=NEW))
+    assert card.run_identity["producer_packet"] == [NEW]
+    assert card.run_identity["auditor_packet"] == [SAME]
+    before = _card(BASELINE, "base", identity=lambda case: _identity())
+    after = _card(BASELINE, "cand", identity=lambda case: _identity(auditor_packet=NEW))
+    verdict = gate(before, after)
+    assert verdict.identity_changes["auditor_packet"] is True
+    assert verdict.identity_changes["producer_packet"] is False
+    assert "Identity changes: auditor_packet." in render_gate(verdict, before, after)
+
+
+def test_a_scorecard_stored_before_the_packet_digests_reads_them_as_unknown():
+    raw = json.loads(STORED_CARD.read_bytes())
+    assert not {"producer_packet", "auditor_packet"} & set(raw["run_identity"])
+    stored = Scorecard.model_validate(raw)
+    assert stored.run_identity["producer_prompt"] == raw["run_identity"]["producer_prompt"]
+    assert "producer_packet" not in stored.run_identity
+    candidate = stored.model_copy(
+        update={
+            "run": RunContext(run_id="cand"),
+            "run_identity": {
+                **stored.run_identity,
+                "producer_packet": [NEW],
+                "auditor_packet": [NEW],
+            },
+        }
+    )
+    changes = identity_changes(stored, candidate)
+    assert (changes["producer_packet"], changes["auditor_packet"]) == (None, None)
+    assert changes["producer_prompt"] is False
+    text = render_gate(gate(stored, candidate), stored, candidate)
+    assert "Identity changes: none; unknown: producer_packet, auditor_packet." in text

@@ -70,8 +70,9 @@ class RunIdentity(Contract):
     """The full configuration identity one stored result's ``RunManifest`` records.
 
     Read from the result, never from the checkout: the package version, the settings
-    identity (``config``), each role's instruction, agent spec, output schema and runtime
-    skills digests from the manifest's ``capabilities``, the risk-assessment and
+    identity (``config``), each role's instruction and packet digests, its agent spec,
+    output schema and runtime skills digests from the manifest's ``capabilities``, the
+    risk-assessment and
     budget-policy digests, the trusted image and each role's model. A value an older
     manifest did not record stays ``None``. The per-case ``request_digest`` stays in
     ``Trajectory.identity``; ``image`` varies per language and ``budget_policy`` per
@@ -82,6 +83,8 @@ class RunIdentity(Contract):
     config: Digest | None = None
     producer_prompt: Digest | None = None
     auditor_prompt: Digest | None = None
+    producer_packet: Digest | None = None
+    auditor_packet: Digest | None = None
     producer_spec: str | None = Field(default=None, max_length=128)
     auditor_spec: str | None = Field(default=None, max_length=128)
     producer_output_schema: str | None = Field(default=None, max_length=128)
