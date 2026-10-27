@@ -106,6 +106,12 @@ def chain_pair(path: str) -> str | None:
     return None if stem is None else str(stem)
 
 
+def kind_language(kind: str) -> str:
+    """The language a recipe kind names: ``c.integer_overflow/1`` is ``c``."""
+    prefix = kind.split(".", 1)[0]
+    return _LANGUAGES.get(prefix, prefix)
+
+
 def family_stem(family: str, kind: str | None) -> str:
     """A family's language and class, ``<language>/<class>``, so spellings compare equal.
 
@@ -120,7 +126,7 @@ def family_stem(family: str, kind: str | None) -> str:
     elif tokens[0] in _LANGUAGES and len(tokens) > 1:
         language, tokens = _LANGUAGES[tokens[0]], tokens[1:]
     elif kind is not None:
-        language = _LANGUAGES.get(kind.split(".", 1)[0], kind.split(".", 1)[0])
+        language = kind_language(kind)
     name = "".join(tokens).replace("_", "")
     return f"{language}/{name}" if language else name
 
@@ -146,6 +152,22 @@ def _source_trees(
     return tuple(trees.items())
 
 
+def request_member(
+    source: str,
+    entry: DatasetEntry,
+    pair: str | None,
+    request: InvestigationRequest,
+    request_path: Path,
+    root: Path,
+) -> Member:
+    """A labelled entry's membership given its read request: the family stem from the
+    request's recipe kind and its source trees (relative paths anchor at ``request_path``,
+    displays at ``root``). Frozen entries and ``dataset freeze``'s drafted rows share it."""
+    stem = family_stem(entry.family, request.case.recipe.kind)
+    trees = _source_trees(request, request_path, root.resolve())
+    return Member(source, entry.case_id, entry.family, entry.split, pair, stem, trees)
+
+
 def _case_member(source: str, root: Path, entry: DatasetEntry) -> Member:
     """A labelled entry's membership, with its family stem and source trees from its request."""
     pair = chain_pair(entry.request)
@@ -155,9 +177,7 @@ def _case_member(source: str, root: Path, entry: DatasetEntry) -> Member:
     except (OSError, ValueError) as error:
         problem = safe_error_detail(error)
         return Member(source, entry.case_id, entry.family, entry.split, pair, problem=problem)
-    stem = family_stem(entry.family, request.case.recipe.kind)
-    trees = _source_trees(request, request_path, root.resolve())
-    return Member(source, entry.case_id, entry.family, entry.split, pair, stem, trees)
+    return request_member(source, entry, pair, request, request_path, root)
 
 
 def dataset_members(path: Path) -> list[Member]:

@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from corsair.contracts import (
     Dataset,
     FixStatus,
+    InvestigationRequest,
     Oracle,
     PythonCommandSentinel,
     PythonRecipe,
@@ -34,6 +35,7 @@ from corsair.evaluation import datasets, families
 from corsair.evaluation.intake import (
     DRAFT_SCHEMA,
     REVIEW_COLUMNS,
+    DraftEntry,
     DraftRefused,
     draft_dataset,
     freeze_dataset,
@@ -118,6 +120,22 @@ def _chain_pair(evals: Path, stem: str, *, label: str = "EXPLOIT_DEMONSTRATED") 
         _write_json(chain / "verification/result.json", {"note": NARRATIVE})
         directories.append(chain)
     return directories
+
+
+def _syn_chain(evals: Path, directory: str, *, parent: str = "python", family: str) -> Path:
+    """A chain directory with its own ``tree/`` beside it (provenance ``syn``)."""
+    chain = evals / f"datasets/chain/{parent}/{directory}"
+    (chain / "tree").mkdir(parents=True)
+    (chain / "tree/app.py").write_text(MODULE)
+    _write_json(chain / "case.json", {"family": family, "kind": "positive"})
+    _write_json(
+        chain / "input.json",
+        {
+            "finding": {"title": "t", "file_path": "app.py", "start_line": 3, "symbol": "lookup"},
+            "source": "tree",
+        },
+    )
+    return chain
 
 
 @pytest.fixture
@@ -377,6 +395,16 @@ def test_provenance_is_unknown_without_a_recognised_corpus(tmp_path):
     assert entry["provenance"] == {"truth_type": "positive"}
 
 
+def test_draft_takes_the_language_from_the_recipe_kind_not_the_directory(tmp_path):
+    # Rows filed outside a language directory (the C rows under chain/common/) repeat the
+    # language as a prefix; the kind names it, and ids name it once.
+    chain = _syn_chain(tmp_path / "evals", "python-local-b", parent="common", family="python-local")
+    out = tmp_path / "draft"
+    draft_dataset([chain], recipe_template=_template(tmp_path), split="held_out", out=out)
+    [entry] = json.loads((out / "draft.json").read_text())["entries"]
+    assert (entry["case_id"], entry["family"]) == ("syn-python-local-b", "syn-python-local")
+
+
 # dataset freeze
 
 
@@ -498,6 +526,116 @@ def test_freeze_refuses_a_family_or_source_tree_in_another_split(tmp_path, evals
     assert "family_crosses_splits" not in _rules(result)
 
 
+def test_freeze_refuses_a_held_out_draft_whose_family_stem_a_tier_row_has(tmp_path, evals):
+    # A tier row with another family id, tree and pair, but the drafted rows' stem python/demo.
+    _chain_pair(evals, "elsewhere")
+    for tree in (evals / "datasets/corpus/infosec-harness/python/elsewhere").iterdir():
+        (tree / "app.py").write_text((tree / "app.py").read_text() + "# elsewhere\n")
+    chain = _draft(tmp_path, evals, stem="elsewhere", split="chain", out="chain-draft")
+    tier1 = evals / "datasets/tier1.json"
+    review = _accept_all(chain, "ih-python-elsewhere-a", "ih-python-elsewhere-b")
+    assert freeze_dataset(chain, review=review, into=tier1, against=[])["written"]
+    document = json.loads(tier1.read_text())
+    for item in document["entries"]:
+        item["family"] = "demo"
+    tier1.write_text(json.dumps(document))
+    holdout = _draft(tmp_path, evals)
+    into = evals / "datasets/gym-tier2.json"
+
+    result = freeze_dataset(
+        holdout,
+        review=_accept_all(holdout, "ih-python-demo-a", "ih-python-demo-b"),
+        into=into,
+        against=[tier1],
+    )
+
+    assert _rules(result) == {"family_stem_crosses_splits"}
+    assert not result["written"] and not into.exists()
+    [refusal] = result["refusals"]
+    assert refusal["detail"] == (
+        "python/demo is placed in chain: tier1.json:ih-python-elsewhere-a, "
+        "tier1.json:ih-python-elsewhere-b; held_out: draft:ih-python-demo-a, draft:ih-python-demo-b"
+    )
+
+
+def test_freeze_sees_a_source_tree_shared_with_a_v3_layout_row(tmp_path):
+    evals = tmp_path / "evals"
+    drafted = _syn_chain(evals, "local-a", family="local")
+    out = tmp_path / "draft"
+    draft_dataset([drafted], recipe_template=_template(tmp_path), split="held_out", out=out)
+    # The other variant's row is frozen in the v3 request layout over its own copy of a tree.
+    v3 = evals / "datasets/chain/python/local-b/v3"
+    (v3 / "source").mkdir(parents=True)
+    (v3 / "source/app.py").write_text(MODULE + "# variant b\n")
+    request = json.loads((out / "syn-python-local-a/request.json").read_text())
+    request["case"]["case_id"] = "local-b"
+    request["case"]["source"] = {"path": "source"}
+    body = _write_json(v3 / "request.json", request)
+    row = {
+        "case_id": "local-b",
+        "family": "unrelated",
+        "split": "chain",
+        "request": "datasets/chain/python/local-b/v3/request.json",
+        "oracle": "datasets/chain/python/local-b/v3/oracle.json",
+        "request_digest": digest(body.read_bytes()),
+        "oracle_digest": "0" * 64,
+    }
+    tier1 = _write_json(
+        evals / "datasets/tier1.json", {"schema_version": "corsair.dataset/1", "entries": [row]}
+    )
+    into = evals / "datasets/gym-tier2.json"
+
+    result = freeze_dataset(
+        out, review=_accept_all(out, "syn-python-local-a"), into=into, against=[tier1]
+    )
+
+    assert {"pair_crosses_splits", "source_tree_crosses_splits"} <= _rules(result)
+    trees = [item for item in result["refusals"] if item["rule"] == "source_tree_crosses_splits"]
+    assert [item["detail"] for item in trees] == [
+        "datasets/chain/python/local is placed in chain: tier1.json:local-b; "
+        "held_out: draft:syn-python-local-a"
+    ]
+    assert not into.exists()
+
+
+def test_a_drafted_member_matches_the_family_check_of_its_frozen_entry(tmp_path, evals):
+    draft = _draft(tmp_path, evals)
+    into = evals / "datasets/gym-tier2.json"
+    review = _accept_all(draft, "ih-python-demo-a", "ih-python-demo-b")
+    assert freeze_dataset(draft, review=review, into=into, against=[])["written"]
+    drafted = json.loads((draft / "draft.json").read_text())
+
+    frozen = {member.case_id: member for member in families.dataset_members(into)}
+    for item in drafted["entries"]:
+        entry = DraftEntry.model_validate(item)
+        request = InvestigationRequest.model_validate_json((draft / entry.request).read_bytes())
+        member = families.request_member(
+            "draft", entry, None, request, draft / entry.request, evals
+        )
+        assert member.stem == frozen[entry.case_id].stem == "python/demo"
+        assert dict(member.trees).keys() == dict(frozen[entry.case_id].trees).keys()
+
+
+def test_freeze_refuses_an_other_split_entry_whose_request_is_unreadable(tmp_path, evals):
+    draft = _draft(tmp_path, evals)
+    row = {
+        "case_id": "gone",
+        "family": "gone",
+        "split": "chain",
+        "request": "datasets/gone/request.json",
+        "oracle": "datasets/gone/oracle.json",
+        "request_digest": "0" * 64,
+        "oracle_digest": "0" * 64,
+    }
+    tier1 = _write_json(
+        evals / "datasets/tier1.json", {"schema_version": "corsair.dataset/1", "entries": [row]}
+    )
+    into = evals / "datasets/gym-tier2.json"
+    review = _accept_all(draft, "ih-python-demo-a", "ih-python-demo-b")
+    result = freeze_dataset(draft, review=review, into=into, against=[tier1])
+    assert _rules(result) == {"against_unreadable"} and not into.exists()
+
+
 def test_freeze_refuses_more_than_sixty_four_entries_and_a_case_frozen_twice(tmp_path, evals):
     draft = _draft(tmp_path, evals)
     review = _accept_all(draft, "ih-python-demo-a", "ih-python-demo-b")
@@ -617,3 +755,25 @@ def test_the_python_xxe_pair_drafts_without_blockers(tmp_path):
     request = json.loads((out / "ih-python-xxe-b/request.json").read_text())
     assert request["case"]["recipe"]["function"] == "parse_note"
     assert PythonRecipe.model_validate(request["case"]["recipe"]).payload_parameter == "document"
+
+
+def test_the_c_row_filed_under_common_drafts_with_language_c(tmp_path):
+    template = _write_json(
+        tmp_path / "t.json",
+        {
+            "kind": "c.integer_overflow/1",
+            "length_parameter": "n",
+            "fill_byte": 65,
+            "expected_control_length": 5,
+            "sanitizer_class": "heap-buffer-overflow",
+        },
+    )
+    result = draft_dataset(
+        [ROOT / "evals/datasets/chain/common/c-intoverflow-b"],
+        recipe_template=template,
+        split="chain",
+        out=tmp_path / "c",
+    )
+    [entry] = result["entries"]
+    assert (entry["case_id"], entry["family"]) == ("ih-c-intoverflow-b", "ih-c-intoverflow")
+    assert families.family_stem(entry["family"], entry["kind"]) == "c/intoverflow"

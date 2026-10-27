@@ -610,8 +610,18 @@ class _ChainCase:
     provenance: dict[str, str]
 
 
-def _read_chain(chain_dir: Path, evals_root: Path) -> _ChainCase:
-    """Read case.json and input.json only; never README, submission, manifest or narrative."""
+def _unprefixed(text: str, language: str) -> str:
+    """``text`` without a leading ``<language>-`` token, so an id names its language once."""
+    rest = text.removeprefix(f"{language}-")
+    return rest or text
+
+
+def _read_chain(chain_dir: Path, evals_root: Path, language: str) -> _ChainCase:
+    """Read case.json and input.json only; never README, submission, manifest or narrative.
+
+    ``language`` is the recipe template kind's, not the parent directory's: the C rows are
+    filed under ``chain/common/`` as ``c-<class>-<variant>``, and drop that repeated prefix.
+    """
     case = _json_object(chain_dir / "case.json")
     record = _json_object(chain_dir / "input.json")
     raw = record.get("finding")
@@ -624,12 +634,12 @@ def _read_chain(chain_dir: Path, evals_root: Path) -> _ChainCase:
         raise DraftRefused(f"{chain_dir}: input.json finding needs title, file_path and symbol")
     if line is not None and (not isinstance(line, int) or isinstance(line, bool)):
         raise DraftRefused(f"{chain_dir}: input.json start_line must be an integer")
-    language, name = chain_dir.parent.name, chain_dir.name
-    if not (_SLUG.fullmatch(language) and _SLUG.fullmatch(name)):
-        raise DraftRefused(f"{chain_dir}: language and directory names must be lowercase slugs")
+    if not _SLUG.fullmatch(chain_dir.name):
+        raise DraftRefused(f"{chain_dir}: the directory name must be a lowercase slug")
+    name = _unprefixed(chain_dir.name, language)
     declared = case.get("family")
     if isinstance(declared, str) and _SLUG.fullmatch(declared):
-        vulnerability = declared
+        vulnerability = _unprefixed(declared, language)
     else:
         variant = _VARIANT.match(name)
         vulnerability = variant["stem"] if variant else name
@@ -797,8 +807,12 @@ def draft_dataset(
     except (OSError, ValueError) as error:
         detail = f"recipe template or budget refused: {safe_error_detail(error)}"
         raise DraftRefused(detail) from None
+    # families imports this module's intake schema, so it is imported where it is used.
+    from corsair.evaluation.families import kind_language
+
     settings = Settings(source_root=str(evals_root))
-    chains = [_read_chain(path, evals_root) for path in directories]
+    language = kind_language(str(template["kind"]))
+    chains = [_read_chain(path, evals_root, language) for path in directories]
     if len({chain.case_id for chain in chains}) != len(chains):
         raise DraftRefused("two chain directories derive the same case id")
     requests: list[tuple[_ChainCase, InvestigationRequest]] = []
@@ -985,96 +999,55 @@ def _reviewed_rows(
     return selected, rejected
 
 
-def _tree_keys(source: Source | None) -> set[str]:
-    """The source-tree stem (the parent of an ``a``/``b`` or ``-a``/``-b`` variant) and digest."""
-    if source is None:
-        return set()
-    path = Path(os.path.normpath(source.path))
-    if path.name in {"source", "tree"}:
-        path = path.parent
-    variant = _VARIANT.match(path.name)
-    stem = (
-        path.parent
-        if path.name in {"a", "b"}
-        else path.parent / variant["stem"]
-        if variant
-        else path
-    )
-    keys = {f"tree {stem}"}
-    if source.expected_digest is not None:
-        keys.add(f"snapshot {source.expected_digest}")
-    return keys
-
-
-def _request_keys(request: InvestigationRequest) -> set[str]:
-    return _tree_keys(request.case.source) | _tree_keys(request.case.fixed_source)
-
-
-def _manifest_members(
-    path: Path, split: str, refusals: list[dict[str, str]]
-) -> tuple[list[Member], list[tuple[str, str, set[str]]]]:
-    """One manifest's members (pairs anchored at its root) and other-split source trees."""
+def _manifest_members(path: Path, split: str, refusals: list[dict[str, str]]) -> list[Member]:
+    """One manifest's members, pairs anchored at its root; an other-split entry whose request
+    is unreadable is refused, since its family stem and trees are unknown."""
     from corsair.evaluation import families
 
     try:
         members = families.dataset_members(path)
-        document = json.loads(path.read_bytes())
     except (OSError, ValueError) as error:
         refusals.append(_refusal("against_unreadable", f"{path}: {safe_text(error)}"))
-        return [], []
+        return []
+    for member in members:
+        if member.problem is not None and member.split != split:
+            detail = f"{path.name}:{member.case_id}: {member.problem}"
+            refusals.append(_refusal("against_unreadable", detail))
     root = datasets.dataset_root(path)
-    anchored = [
+    return [
         replace(member, pair=None if member.pair is None else str(root / member.pair))
         for member in members
     ]
-    trees: list[tuple[str, str, set[str]]] = []
-    if document.get("schema_version") == datasets.CASE_SCHEMA:
-        for entry in Dataset.model_validate(document).entries:
-            if entry.split == split:
-                continue
-            try:
-                request_path = datasets.resolve_frozen(root, entry.request)
-                request = InvestigationRequest.model_validate_json(request_path.read_bytes())
-            except (OSError, ValueError) as error:
-                refusals.append(
-                    _refusal(
-                        "against_unreadable", f"{path.name}:{entry.case_id}: {safe_text(error)}"
-                    )
-                )
-                continue
-            label = f"{path.name}:{entry.case_id} (split {entry.split})"
-            keys = _request_keys(normalize_request_sources(request, request_path))
-            trees.append((label, entry.split, keys))
-    return anchored, trees
 
 
 def _split_refusals(
+    draft_dir: Path,
     draft: DatasetDraft,
     rows: Sequence[_Reviewed],
     requests: Mapping[str, InvestigationRequest],
     manifests: Sequence[Path],
 ) -> list[dict[str, str]]:
-    """Refuse a row whose family, case, chain pair or source tree sits in another split."""
+    """Refuse a row whose family, family stem, case, chain pair or source tree sits in another
+    split. Each drafted row is a member built as ``dataset_members`` builds a frozen entry, so
+    freeze refuses what ``just dataset-families`` would report."""
     from corsair.evaluation import families
 
     refusals: list[dict[str, str]] = []
     split = rows[0].entry.split
     root = Path(draft.source_root)
-    drafted = [
-        families.Member(
+    members = [
+        families.request_member(
             "draft",
-            row.entry.case_id,
-            row.entry.family,
-            row.entry.split,
+            row.entry,
             families.chain_pair(str(root / row.entry.origin / "request.json")),
+            requests[row.entry.case_id],
+            draft_dir / row.entry.request,
+            root,
         )
         for row in rows
     ]
-    members, trees = list(drafted), []
     for path in manifests:
-        found, other = _manifest_members(path, split, refusals)
-        members += found
-        trees += other
+        members += _manifest_members(path, split, refusals)
     for violation in families.split_violations(members):
         if not violation["rule"].endswith("_splits"):
             continue
@@ -1082,18 +1055,9 @@ def _split_refusals(
         if not any(name.startswith("draft:") for names in placements.values() for name in names):
             continue
         key = next(value for name, value in violation.items() if name not in {"rule", "splits"})
+        shown = ", ".join(key) if isinstance(key, list) else key
         where = "; ".join(f"{name}: {', '.join(found)}" for name, found in placements.items())
-        refusals.append(_refusal(violation["rule"], f"{key} is placed in {where}"))
-    for row in rows:
-        keys = _request_keys(requests[row.entry.case_id])
-        for label, _, other in trees:
-            for shared in sorted(keys & other):
-                refusals.append(
-                    _refusal(
-                        "source_tree_crosses_splits",
-                        f"{row.entry.case_id} shares {shared} with {label}",
-                    )
-                )
+        refusals.append(_refusal(violation["rule"], f"{shown} is placed in {where}"))
     return refusals
 
 
@@ -1242,7 +1206,7 @@ def freeze_dataset(
             if target.exists():
                 refusals.append(_refusal("case_file_exists", f"{target} exists"))
     manifests = [*against, *([into] if existing is not None else [])]
-    refusals += _split_refusals(draft, rows, requests, manifests)
+    refusals += _split_refusals(base, draft, rows, requests, manifests)
     if refusals:
         return result
 
