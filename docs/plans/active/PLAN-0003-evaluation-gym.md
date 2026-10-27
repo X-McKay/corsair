@@ -702,4 +702,12 @@ content-addressed tags and cannot contaminate parallel runs.
   (the control-coverage miss the auditor found), python and ruby 7 are `target_exception_adversarial`, c 1 is
   `execution_error_both`. Failure-stop names change once; scorecards scored before 88a4a7b6 keep the plain label.
   Check exit 0, 1655 passed.
+- 2026-10-27 greedy pair done (8df25d, 88e6ce at b261324f, config 83017e1a…; ledger `g1`, rejected): J 1.034 /
+  0.906 against the sampled pair's 1.074 / 1.124, macro 0.897 / 0.854, capped-call episodes 15 / 21 against 7 and
+  7, macro reward 0.76 / 0.68 against 0.85 / 0.81. The greedy band (`reference/noise-tier1-greedy.json`) is wider
+  than the sampled one (J half-range 0.064 against 0.025) and its own classification differs (case02 stable fail,
+  safe-flat unstable). Gated against the sampled reference with the band: run 1 INCONCLUSIVE (only flip case03,
+  within noise), run 2 REJECTED (`sbj-javascript-safe-flat` pass to fail, a stable-pass case, J −0.17). Data for
+  owner decision 3: on this route temperature 0 with a seed neither repeats episodes nor improves them; the gym
+  keeps server-default sampling. Lock queue now: tier2 holdout baseline (8c7740, running), then h8's slice screen.
 
