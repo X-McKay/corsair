@@ -58,6 +58,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | s10 | dx | `gym/s10-freeze-overlap@be756d0` | — | — | — | — | merged `c0f7db7` | Offline; 78 intake/family tests; freeze now agrees with just dataset-families on every wave-3 draft; only the C group's ids change (ih-c-intoverflow-b) |
 | s11 | dx | `gym/s11-draft-source-root@676cb8b` | — | — | — | — | merged `ca5f614` | Offline; 22 tests; 18 JavaScript rows drafted from .work/intake (1 blocked: json-ptr fixed tree lacks index.js); freeze refuses unreviewed sheets; nothing under evals/ written |
+| w3 | accuracy | `gym/w3-js-driver-default-export@c931d25` | — | — | — | — | merged `9847fa7` | Trusted driver change; JavaScript image 2c776a9 to 9ca2c53 (new identity); Docker 64 passed; covers 7 more of the 18 staged rows; 7 remain unbindable (not exported by name, UMD factories) |
 
 ## Rejected ideas (do not retry without new evidence)
 

@@ -556,3 +556,11 @@ content-addressed tags and cannot contaminate parallel runs.
   18 JavaScript rows at `.work/intake/wave3-js/holdout-javascript/review.md` (all with licence files in both trees;
   `unk-javascript-json-ptr` blocked: fixed tree lacks index.js; case ids carry provenance `unk` until a code for
   SecBench.js material is decided); freeze on the unreviewed sheet: exit 2, 18 × `decision_missing`, nothing written.
+- 2026-10-27 w3 merged (9847fa7c, c931d25c): `driver.mjs` binds `module.exports` itself when the recipe's `function`
+  is the literal marker `module.exports` (validator admits that exact string; no name matching); `default` binds the
+  `.default` property (already worked, now documented and tested); anything else keeps the existing not-callable
+  path. JavaScript image 2c776a9 → 9ca2c53 (`:0.1` untouched); JavaScript runs after this carry a new identity.
+  Gates on `gym/loop` at 9847fa7c: `just check` exit 0; `just -- test -q -W error` 1464 passed, 116 deselected;
+  `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` 64 passed, 1 skipped (long probe). Of the 18 staged
+  JavaScript rows: 4 bind by name, 7 now bind with the marker (recipe authoring decides the marker per row), 7 remain
+  unbindable (5 not exported by name, 2 UMD factories). Sourcing wave closed pending owner review of both sheets.
