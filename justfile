@@ -114,6 +114,14 @@ gym-run tier *args:
 gym-gate baseline candidate:
     uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2"
 
+# Candidate protocol: tier0 run and gate, then tier1 unless rejected; prints VERDICT, exit 0/1/2.
+gym-verify reference *args:
+    uv run --locked --extra providers corsair gym verify --reference "$1" "${@:2}"
+
+# List stored gym runs (shared by every worktree), newest first; --tier, --limit, --root.
+gym-runs *args:
+    uv run --locked --extra providers corsair gym runs "$@"
+
 # Show one case's rounds, per-call usage and failure stop from a gym run directory.
 gym-replay run case:
     uv run --locked --extra providers corsair gym replay "$1" --case "$2"

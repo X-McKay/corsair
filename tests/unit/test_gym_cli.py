@@ -264,7 +264,11 @@ async def test_replay_shows_rounds_calls_and_statements_never_payload_text(tmp_p
     for model_text in ("../private/secret.txt", "hello.txt", "reviewed", "hypothesis"):
         assert model_text not in text
     with pytest.raises(ValueError, match="no trajectory"):
-        await _run(_arguments("gym", "replay", str(run_dir), "--case", "absent"))
+        await _run(
+            _arguments(
+                "gym", "replay", str(run_dir), "--case", "absent", "--settings", str(settings)
+            )
+        )
 
 
 @pytest.mark.asyncio
@@ -303,3 +307,157 @@ def test_a_report_without_a_matching_manifest_needs_an_explicit_dataset(tmp_path
         )
     )
     assert gym.dataset_for_report(report, ROOT) == ROOT / "evals/datasets/gym-tier0.json"
+
+
+# runs
+
+
+def _stored_run(
+    gym_root: Path, run_id: str, verified: dict[str, list[bool]], record: dict | None = None
+) -> Path:
+    run_dir = gym_root / "runs" / run_id
+    _card(run_dir / SCORECARD_FILE, verified, run_id=run_id)
+    if record is not None:
+        (run_dir / gym.RUN_FILE).write_text(json.dumps(record))
+    return run_dir
+
+
+@pytest.mark.asyncio
+async def test_runs_lists_stored_runs_newest_first_with_their_headline_figures(tmp_path, capsys):
+    root = tmp_path / "gym"
+    _stored_run(root, "gym-tier0-20261027t010807-479fc5", BASELINE)
+    _stored_run(
+        root,
+        "custom",
+        {**BASELINE, "py-b": ALL},
+        {"tier": "tier1", "started_at": "2026-10-28T00:00:00+00:00", "git": {"dirty": True}},
+    )
+    older_layout = root / "gym-tier1-20261026t000000-abcdef"
+    _card(older_layout / SCORECARD_FILE, BASELINE, run_id="gym-tier1-20261026t000000-abcdef")
+    args = ["gym", "runs", "--root", str(root)]
+
+    assert await _run(_arguments(*args)) == 0
+    rows = json.loads(capsys.readouterr().out)
+    assert [(row["run_id"], row["tier"]) for row in rows] == [
+        ("custom", "tier1"),
+        ("gym-tier0-20261027t010807-479fc5", "tier0"),
+        ("gym-tier1-20261026t000000-abcdef", "tier1"),
+    ]
+    assert rows[0]["worst_language"] == "ruby"
+    assert rows[0]["git_dirty"] is True and rows[1]["git_dirty"] is None
+    assert rows[1]["started_at"] == "2026-10-27T01:08:07+00:00"
+
+    assert await _run(_arguments(*args, "--tier", "tier1", "--limit", "1")) == 0
+    assert [row["run_id"] for row in json.loads(capsys.readouterr().out)] == ["custom"]
+
+    assert await _run(_arguments(*args, format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert "| Run | Commit | Tier | Repeats | Sliced | J |" in text
+    assert "| `custom` | aaaaaaa+dirty | tier1 | 3 | no |" in text
+
+    assert await _run(_arguments("gym", "runs", "--root", str(tmp_path / "empty"))) == 0
+    assert json.loads(capsys.readouterr().out) == []
+
+
+# verify
+
+
+def _fake_runs(monkeypatch, tmp_path: Path, cards: dict[str, dict[str, list[bool]]]) -> list[str]:
+    """Replace the runner: each tier returns a stored scorecard; the tiers run are recorded."""
+    ran: list[str] = []
+
+    async def run_gym(options, *, root, compose_activities, observe):
+        del root, compose_activities, observe
+        tier = gym.tier_name(options.dataset)
+        ran.append(tier)
+        run_dir = tmp_path / "runs" / tier
+        card = read_scorecard(_card(run_dir / SCORECARD_FILE, cards[tier], run_id=f"cand-{tier}"))
+        return gym.GymRun(run_dir, card, [], "127.0.0.1:1", True, 1.0)
+
+    monkeypatch.setattr(gym, "run_gym", run_gym)
+    return ran
+
+
+def _reference(tmp_path: Path) -> Path:
+    reference = tmp_path / "reference"
+    for tier in ("tier0", "tier1"):
+        _card(reference / f"{tier}.json", BASELINE, run_id=f"ref-{tier}")
+    return reference
+
+
+@pytest.mark.asyncio
+async def test_verify_stops_at_a_tier0_rejection_without_running_tier1(
+    tmp_path, capsys, monkeypatch
+):
+    ran = _fake_runs(monkeypatch, tmp_path, {"tier0": {**BASELINE, "rb-a": NONE}})
+    args = ["gym", "verify", "--reference", str(_reference(tmp_path))]
+    args += ["--settings", str(_settings_file(tmp_path))]
+
+    assert await _run(_arguments(*args, format="markdown")) == 1
+    assert ran == ["tier0"]
+    text = capsys.readouterr().out
+    assert text.startswith("### tier0")
+    assert "## Gate: REJECTED" in text
+    assert "- tier1 was not run because tier0 was REJECTED." in text
+    assert text.rstrip().splitlines()[-1] == "VERDICT: REJECTED"
+    (verdict_path,) = (tmp_path / "artifacts/gym/verify").glob("*/verdict.json")
+    record = json.loads(verdict_path.read_text())
+    assert record["decision"] == "REJECTED" and record["complete"] is False
+    assert record["skipped"] == {"tier1": "rejected_at_tier0"}
+    (tier0,) = record["tiers"]
+    assert tier0["candidate_scorecard"] == str(tmp_path / "runs/tier0" / SCORECARD_FILE)
+    assert tier0["reference_scorecard"] == str(tmp_path / "reference/tier0.json")
+    assert tier0["gate"]["language_deltas"] == {"python": 0.0, "ruby": -0.5}
+    assert record["invocation"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tier0", "tier1", "code", "decision"),
+    [
+        ({**BASELINE, "py-b": ALL}, {**BASELINE, "py-b": ALL}, 0, "ACCEPTED"),
+        ({**BASELINE, "py-b": ALL}, {**BASELINE, "rb-a": NONE}, 1, "REJECTED"),
+        (BASELINE, {**BASELINE, "py-b": ALL}, 1, "REJECTED"),
+    ],
+)
+async def test_verify_runs_tier1_after_tier0_and_decides_over_both_gates(
+    tmp_path, capsys, monkeypatch, tier0, tier1, code, decision
+):
+    ran = _fake_runs(monkeypatch, tmp_path, {"tier0": tier0, "tier1": tier1})
+    args = ["gym", "verify", "--reference", str(_reference(tmp_path))]
+    args += ["--settings", str(_settings_file(tmp_path))]
+
+    assert await _run(_arguments(*args)) == code
+    record = json.loads(capsys.readouterr().out)
+    assert ran == (["tier0"] if tier0 == BASELINE else ["tier0", "tier1"])
+    assert record["decision"] == decision
+    assert Path(record["verdict"]).is_file()
+
+
+@pytest.mark.asyncio
+async def test_verify_with_skip_tier1_or_a_mismatched_reference(tmp_path, capsys, monkeypatch):
+    ran = _fake_runs(monkeypatch, tmp_path, {"tier0": {**BASELINE, "py-b": ALL}})
+    reference = _reference(tmp_path)
+    (reference / "tier1.json").unlink()
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    args = ["gym", "verify", "--reference", str(reference), *settings]
+
+    with pytest.raises(ValueError, match="no reference scorecard"):
+        await _run(_arguments(*args))
+    assert ran == []
+    assert await _run(_arguments(*args, "--skip-tier1", format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert "- tier1 was skipped on request (--skip-tier1); this is not an acceptance." in text
+    assert text.rstrip().endswith("VERDICT: ACCEPTED")
+
+    sliced = reference / "tier0.json"
+    _card(sliced, BASELINE, run_id="ref-tier0", sliced=True)
+    assert await _run(_arguments(*args, "--skip-tier1")) == 2
+    assert json.loads(capsys.readouterr().out)["decision"] == "INCOMPARABLE"
+    with pytest.raises(ValueError, match="no reference directory"):
+        await _run(_arguments("gym", "verify", "--reference", str(tmp_path / "x"), *settings))
+
+
+def test_verify_defaults_to_the_standard_protocol():
+    args = _arguments("gym", "verify")
+    assert (args.reference, args.repeats, args.concurrency, args.skip_tier1) == (None, 3, 2, False)

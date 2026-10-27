@@ -3,7 +3,7 @@
 import pytest
 
 from corsair.contracts import GateDecision, GateReason, RunContext, Scorecard, Trajectory
-from corsair.evaluation.gym.gate import gate
+from corsair.evaluation.gym.gate import chain_decision, gate
 from corsair.evaluation.gym.scoring import build_scorecard
 
 CASES = {"py-a": "python.k/1", "py-b": "python.k/1", "rb-a": "ruby.k/1", "rb-b": "ruby.k/1"}
@@ -114,3 +114,21 @@ def test_fewer_repeats_than_the_minimum_are_incomparable():
     assert gate(_card(BASELINE), _card(short, run_id="cand"), min_repeats=2).decision is (
         GateDecision.REJECTED
     )
+
+
+@pytest.mark.parametrize(
+    ("decisions", "expected"),
+    [
+        (["ACCEPTED", "ACCEPTED"], "ACCEPTED"),
+        (["ACCEPTED"], "ACCEPTED"),
+        (["REJECTED"], "REJECTED"),
+        (["INCOMPARABLE", "REJECTED"], "REJECTED"),
+        (["ACCEPTED", "INCOMPARABLE"], "INCOMPARABLE"),
+        (["INCOMPARABLE", "ACCEPTED"], "INCOMPARABLE"),
+        ([], "INCOMPARABLE"),
+    ],
+)
+def test_a_chain_of_gates_rejects_on_any_rejection_and_accepts_only_when_all_accept(
+    decisions, expected
+):
+    assert chain_decision([GateDecision(item) for item in decisions]) is GateDecision(expected)

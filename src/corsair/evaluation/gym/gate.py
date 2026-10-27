@@ -4,6 +4,8 @@ INCOMPARABLE is never a regression verdict: different datasets or budgets, a sli
 too few repeats or unknown token usage mean the two scorecards answer different questions.
 """
 
+from collections.abc import Sequence
+
 from corsair.contracts import GateDecision, GateReason, GateVerdict, Scorecard
 
 MIN_REPEATS = 3
@@ -79,3 +81,15 @@ def gate(
         language_deltas=deltas,
         regressed_languages=regressed,
     )
+
+
+def chain_decision(decisions: Sequence[GateDecision]) -> GateDecision:
+    """One decision over gates run in sequence: any REJECTED, else any INCOMPARABLE, else ACCEPTED.
+
+    No gate at all is INCOMPARABLE: nothing was compared.
+    """
+    if GateDecision.REJECTED in decisions:
+        return GateDecision.REJECTED
+    if not decisions or GateDecision.INCOMPARABLE in decisions:
+        return GateDecision.INCOMPARABLE
+    return GateDecision.ACCEPTED

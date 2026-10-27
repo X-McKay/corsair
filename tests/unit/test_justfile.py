@@ -41,7 +41,8 @@ def test_default_just_lists_recipes_without_running_side_effects():
     assert process.returncode == 0, process.stderr
     assert "Available recipes" in process.stdout
     recipes = ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up")
-    gym = ("gym-run", "gym-gate", "gym-replay", "gym-capture", "gym-ledger", "images-gym")
+    gym = ("gym-run", "gym-gate", "gym-verify", "gym-runs", "gym-replay", "gym-capture")
+    gym += ("gym-ledger", "images-gym")
     for recipe in (*recipes, "live-agent", "live-chain", "dataset-families", *gym):
         assert recipe in process.stdout
 
@@ -148,6 +149,12 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             + ["--candidate", "cand.json"],
         ),
         ("gym-replay", ["run dir", "case01"], [*GYM, "replay", "run dir", "--case", "case01"]),
+        (
+            "gym-verify",
+            ["ref dir", "--skip-tier1"],
+            [*GYM, "verify", "--reference", "ref dir", "--skip-tier1"],
+        ),
+        ("gym-runs", ["--tier", "tier0"], [*GYM, "runs", "--tier", "tier0"]),
         (
             "gym-capture",
             ["run dir", "case01", "--reference", "other run"],

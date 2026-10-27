@@ -299,3 +299,44 @@ def test_score_report_reads_the_frozen_manifest_and_refuses_another_dataset(tmp_
     write_trajectories(path, trajectories)
     assert read_trajectories(path) == trajectories
     assert all(json.loads(line)["case_id"] for line in path.read_text().splitlines())
+
+
+# The batch row scorer shared by ``corsair eval`` and ``corsair gym run``
+
+
+def test_score_batch_scores_receipts_and_keeps_every_unavailable_row_explicit(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import AuditDecision, BatchItem
+    from corsair.evaluation.scoring import score, score_batch
+    from tests.unit.evaluation.test_gym_capture import CASE, _evals_root, _oracle, _result
+
+    root, _, _ = _evals_root(tmp_path)
+    store = ArtifactStore(tmp_path / "artifacts")
+    oracle = _oracle(root)
+    result = _result(store, "gym-accepted", AuditDecision.ACCEPT)
+    ref = store.reconcile("result.gym-accepted")
+    items = [
+        BatchItem(case_id=CASE, run_id="gym-accepted", artifact=ref),
+        BatchItem(case_id=CASE, run_id="gym-lost", error="worker lost"),
+        BatchItem(case_id=CASE, run_id="gym-other", artifact=ref),
+        BatchItem(case_id="absent", run_id="gym-accepted", artifact=ref),
+    ]
+
+    rows = score_batch(items, store, {CASE: oracle})
+
+    assert rows[0] == score(result, oracle, store)
+    assert rows[1:] == [
+        {"case_id": CASE, "run_id": "gym-lost", "status": "unavailable", "reason": "worker lost"},
+        {
+            "case_id": CASE,
+            "run_id": "gym-other",
+            "status": "unavailable",
+            "reason": "Child result identity differs from its batch receipt",
+        },
+        {
+            "case_id": "absent",
+            "run_id": "gym-accepted",
+            "status": "unavailable",
+            "reason": "Child result identity differs from its batch receipt",
+        },
+    ]

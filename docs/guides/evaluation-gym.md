@@ -17,6 +17,34 @@ Tiers are frozen `corsair.dataset/1` manifests whose entries are copied verbatim
 
 Holdout hygiene: a holdout tier is only held out if no family, family stem, chain pair or source tree it uses appears in another split. `just dataset-families evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json` (adding `gym-tier2.json` once it exists) checks the tiers together and exits `1` on a family id or its `<language>/<class>` stem (so bare `xxe` under a Java recipe and `ih-java-xxe` collide), a case, a chain pair in any request layout (`<class>-a`/`<class>-b`, `…/v3/`, `…-v3`) or a source tree (same resolved path, same pair stem directory or same declared digest) that crosses splits; the rules are listed in the [baseline policy](../../evals/baselines/README.md#checking-the-family-grouped-split). A row that shares any of these with tier0 or tier1 belongs in tier1, not the holdout.
 
+## Verify a candidate
+
+The standard candidate protocol is one command:
+
+```bash
+just -- gym-verify "<main checkout>/.runs/gym/reference"
+corsair gym verify                     # the same, with the default reference
+```
+
+`corsair gym verify [--reference DIR] [--repeats 3] [--concurrency 2] [--skip-tier1] [--budgets FILE] [--temporal-address A]` runs tier0, gates it against `DIR/tier0.json`, and unless that gate is REJECTED runs tier1 and gates it against `DIR/tier1.json`. It prints both gate tables and ends with one line, `VERDICT: ACCEPTED`, `VERDICT: REJECTED` or `VERDICT: INCOMPARABLE`, exiting 0, 1 or 2. The final decision is REJECTED when either gate rejected, else INCOMPARABLE when either gate was incomparable, else ACCEPTED. `verdict.json` under `<gym root>/verify/<verify-id>/` records the reference, both candidate and reference scorecard paths, both gate verdicts (reasons, delta J, token ratio and per-language deltas) and any tier that was not run with its reason. `--reference` defaults to `<gym root>/reference` when it exists. `--skip-tier1` stops after tier0; its ACCEPTED is a smoke result, not an acceptance, and `verdict.json` says so (`complete: false`).
+
+## The shared run store
+
+Gym runs persist in one directory shared by every worktree of the repository, so a run outlives the worktree that produced it and `replay`, `capture` and `runs` see runs from any worktree. The gym root is `<main checkout>/.runs/gym/`, where the main checkout is the parent of `git rev-parse --git-common-dir` (in the main checkout itself this is its own `.runs/gym/`):
+
+| Path | Holds |
+| --- | --- |
+| `store/` | The content-addressed artifact store of every gym run (`blobs/`, `operations/`) |
+| `runs/<run-id>/` | One run directory each (below) |
+| `reference/` | The current reference scorecards `tier0.json` and `tier1.json` read by `verify` |
+| `verify/<verify-id>/verdict.json` | One record per `verify` |
+
+Settings whose `artifact_root` is not the default `.runs` keep that directory as the store and use `<artifact_root>/gym/` as the gym root; `--out DIR` still places a single run's directory anywhere. Concurrent runs from different worktrees cannot corrupt the store: every blob and operation record is written to a temporary file in its directory, fsynced and published with an atomic `link`, which fails rather than replaces when the name exists; an existing blob has the same content by construction (its name is its sha256), and an existing operation record with different content raises an identity conflict instead of being overwritten. Operation ids are derived from run ids, which carry a time stamp and a random suffix.
+
+`corsair gym runs [--root DIR] [--tier T] [--limit N]` (`just -- gym-runs …`) lists stored runs newest first: run id, commit (`+dirty` when the working tree was), tier, repeats, sliced, J, macro verified accuracy, worst language, macro effective tokens, p50 seconds, capped-call episodes and run directory; `--format json` prints the same rows. It also lists run directories placed directly under the root, the layout before the shared store.
+
+To bring runs made before the shared store into it, copy their run directories and their worktree's store without overwriting anything: `cp -a <worktree>/.runs/gym/<run-id> <gym root>/runs/`, `cp -an <worktree>/.runs/blobs/. <gym root>/store/blobs/`, `cp -an <worktree>/.runs/operations/. <gym root>/store/operations/` (and `cp -a <worktree>/.runs/gym/reference <gym root>/`). Names are content or operation digests, so a name that already exists holds the same record.
+
 ## Run a tier
 
 ```bash
@@ -25,7 +53,7 @@ just -- gym-run tier0 --repeats 3
 just -- gym-run tier1 --repeats 3 --concurrency 2
 ```
 
-`TIER` is a tier name (`tier0` resolves to `evals/datasets/gym-tier0.json`) or a manifest path. Settings default to the checkout's `.state/settings.json` (the live model route) when it exists; pass `--settings FILE` otherwise. Other switches: `--concurrency C` (at most the settings' `max_concurrent_activities`, so no work waits for a slot and skews timing), `--case ID` (repeatable) and `--lang python,c` (sliced runs, see below), `--budgets FILE` (default `evals/experiments/budgets.json` when present), `--out DIR` and `--run-id ID`.
+`TIER` is a tier name (`tier0` resolves to `evals/datasets/gym-tier0.json`) or a manifest path. Settings default to the checkout's `.state/settings.json` (the live model route) when it exists; pass `--settings FILE` otherwise. Other switches: `--concurrency C` (at most the settings' `max_concurrent_activities`, so no work waits for a slot and skews timing), `--case ID` (repeatable) and `--lang python,c` (sliced runs, see below), `--budgets FILE` (default `evals/experiments/budgets.json` when present), `--out DIR` (default `<gym root>/runs/<run-id>/`) and `--run-id ID`.
 
 What the runner does, in order:
 
@@ -33,8 +61,8 @@ What the runner does, in order:
 2. Tags each language's trusted image by content and builds any missing tag (see [images](#content-addressed-images)).
 3. Starts an ephemeral, headless, in-memory `temporal server start-dev` on a free loopback port with the namespace `corsair-gym` pre-created, and waits until it answers. With `--temporal-address A` it instead connects to that server and refuses to run unless the namespace `corsair-gym` already exists there; it never falls back to `default`.
 4. Derives an in-memory copy of the settings with namespace `corsair-gym`, task queue `gym-<branch-slug>-<sha7>` (the checkout's branch and commit) and the content-tagged images, composes the production worker in-process with `compose_worker` on that queue, and submits the existing `EvaluationWorkflow` through the typed API. There is no second scheduler or loop.
-5. Scores each returned result exactly as `corsair eval` does and writes three files under `<artifact_root>/gym/<run-id>/` (default `.runs/gym/<run-id>/`): `report.json` (the `corsair eval` report shape), `trajectories.jsonl` (one scored episode per case and repeat) and `scorecard.json`. The ephemeral server's output goes to `temporal.log` beside them.
-6. Stops the ephemeral server, also when the run fails, and prints the scorecard, the run directory, the transport and the image ids.
+5. Scores each returned result with the same row scorer as `corsair eval` (`evaluation.scoring.score_batch`) and writes three files in the run directory `<gym root>/runs/<run-id>/`: `report.json` (the `corsair eval` report shape), `trajectories.jsonl` (one scored episode per case and repeat) and `scorecard.json`. Beside them are `run.json`, written when the run starts and completed when it ends (the sanitized command line, git branch, commit and dirty flag, the store and gym root, tier, repeats, concurrency, selection, budgets source and digest, start and completion times, wall seconds and episode count; no settings values or credentials), `budgets.json` (the exact bytes of the budgets file used, when one was) and the ephemeral server's `temporal.log`.
+6. Stops the ephemeral server, also when the run fails, and prints the scorecard, the run directory, the store, the transport and the image ids.
 
 The command exits 0 when every row has a stored result and 1 when any row is unavailable (an operational loss, not a measurement). A run that the gym refuses, or that fails before scoring, exits 2 like any other failed command.
 
@@ -65,7 +93,7 @@ Each trajectory also records where the output budget went, as observations that 
 ## Gate a candidate
 
 ```bash
-just -- gym-gate .runs/gym/REF/scorecard.json .runs/gym/CAND/scorecard.json
+just -- gym-gate "<gym root>/reference/tier0.json" "<gym root>/runs/CAND/scorecard.json"
 ```
 
 `corsair gym gate --baseline SCORECARD --candidate SCORECARD` prints the decision, its fixed reasons and a metric table, and exits 0 for ACCEPTED, 1 for REJECTED and 2 for INCOMPARABLE. ACCEPTED requires that no language's verified accuracy fell, that `objective_j` gained at least 0.01 and that macro effective tokens stayed within 1.10 × the baseline.
@@ -73,6 +101,8 @@ just -- gym-gate .runs/gym/REF/scorecard.json .runs/gym/CAND/scorecard.json
 INCOMPARABLE means the two scorecards answer different questions, so neither a win nor a regression can be read from them: different dataset digests, different budgets digests, a sliced run on either side, fewer than three repeats per case, or unknown token usage. Re-run both sides on the same tier, budgets and repeat count instead of reading the deltas.
 
 ## Replay, capture and export
+
+`replay`, `capture` and `score` read results from the store the run directory's `run.json` names, else from the configured or shared store.
 
 - `just -- gym-replay RUN-DIR CASE` (`corsair gym replay RUN-DIR --case ID`) prints each repeat's round timeline (stop, payload digest, abstention, audit decision and rule, role outcomes, sandbox seconds), the per-call tokens, tool result sizes and seconds from the stored usage, and the code-owned explanation of the verdict. It never prints payloads, hypotheses or model reasons; JSON output carries the same fields.
 - `just -- gym-capture RUN-DIR CASE [--reference RUN-DIR …]` freezes every failed repeat of a case as agent fixtures and datasets under `evals/` and kernel replay cases under `tests/replay/kernel/`. The manifest is found by the report's dataset digest (or `--dataset`). A reference run over the same dataset may supply the demonstrated payloads for a case that flipped to failing.
@@ -91,4 +121,4 @@ INCOMPARABLE means the two scorecards answer different questions, so neither a w
 
 ## Limits
 
-A runner test with scripted inference under real Docker and a real ephemeral Temporal server proves the lifecycle and the records, not model accuracy. A live tier run is a small-n diagnostic on one shared model endpoint: compare latency only at equal concurrency. Scorecards and run directories under `.runs/` are private evidence; reference scorecards are copied under `evals/baselines/candidates/` only by the orchestrator, and nothing is promoted.
+A runner test with scripted inference under real Docker and a real ephemeral Temporal server proves the lifecycle and the records, not model accuracy. A live tier run is a small-n diagnostic on one shared model endpoint: compare latency only at equal concurrency. Scorecards, run directories and the shared store under `.runs/` are private evidence; reference scorecards are copied under `evals/baselines/candidates/` only by the orchestrator, and nothing is promoted.
