@@ -247,6 +247,14 @@ def test_family_stem_is_language_and_class(family, kind, stem):
     assert family_stem(family, kind) == stem
 
 
+@pytest.mark.parametrize(
+    ("kind", "language"),
+    [("c.integer_overflow/1", "c"), ("javascript.prototype_pollution/1", "javascript")],
+)
+def test_kind_language_is_the_recipe_kind_prefix(kind, language):
+    assert families.kind_language(kind) == language
+
+
 def test_a_bare_family_and_its_prefixed_id_in_two_splits_fail_by_stem(tmp_path):
     tier0 = manifest(
         tmp_path / "tier0.json",
