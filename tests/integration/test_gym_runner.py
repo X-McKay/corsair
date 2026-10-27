@@ -3,10 +3,13 @@
 This is not a live-model result: the scripted ADK model supplies a frozen proposal while
 the production worker composition, workflows, source admission, content-tagged image and
 sandbox execute. It proves the runner's lifecycle and records, the shared run store and the
-verify chain, not model accuracy.
+verify chain, not model accuracy. The run-lock tests need no Docker: a stub sandbox reports
+itself unavailable, so the episodes end in an error while the lock serialises real runs.
 """
 
+import asyncio
 import json
+import logging
 import os
 import socket
 from pathlib import Path
@@ -41,6 +44,7 @@ from corsair.evaluation.gym.scoring import (
     read_scorecard,
     read_trajectories,
 )
+from corsair.ports.sandboxing import SandboxUnavailable
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from tests.integration.test_chain import ReferenceModel
@@ -329,3 +333,165 @@ async def test_verify_runs_tier1_when_tier0_is_not_rejected(tmp_path, monkeypatc
     assert [item and item.run_dir for item in (verdict.tier0, verdict.tier1)] == [
         str(run.run_dir) for run in result.runs.values()
     ]
+
+
+# The run lock: real ephemeral Temporal servers, scripted inference, no Docker
+
+
+def _require_temporal() -> None:
+    if os.environ.get("CORSAIR_TEST_TEMPORAL") != "1":
+        pytest.skip("set CORSAIR_TEST_TEMPORAL=1 to start a Temporal dev server")
+
+
+class _UnavailableSandbox:
+    """Image checks pass; every role reports the sandbox unavailable (no Docker here)."""
+
+    @property
+    def image_id(self) -> str:
+        return "sha256:" + "b" * 64
+
+    def image_id_for(self, kind: str) -> str:
+        del kind
+        return self.image_id
+
+    def has_unknown_operation(self, operation_id: str) -> bool:
+        del operation_id
+        return False
+
+    def execute_role(self, *args, **kwargs):
+        del args, kwargs
+        raise SandboxUnavailable("no Docker in the run-lock test")
+
+
+def _composer_without_docker(settings: Settings) -> Activities:
+    store = ArtifactStore(settings.artifact_root)
+    return Activities(
+        settings,
+        store=store,
+        inference=AdkInference(settings, store, ReferenceModel(model="scripted-gym")),
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=_UnavailableSandbox(),
+    )
+
+
+def _lock_case(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Settings]:
+    dataset, shared, settings = _shared_case(tmp_path, monkeypatch)
+    image = "sha256:" + "b" * 64
+    monkeypatch.setattr(
+        gym, "ensure_images", lambda root, refs: dict.fromkeys(refs.values(), image)
+    )
+    monkeypatch.setattr(gym, "LOCK_POLL_SECONDS", 0.1)
+    return dataset, shared, settings
+
+
+def _record(run: gym.GymRun) -> dict:
+    return json.loads((run.run_dir / gym.RUN_FILE).read_text())
+
+
+@pytest.mark.temporal
+@pytest.mark.asyncio
+async def test_a_second_gym_run_waits_for_the_first_and_then_proceeds(
+    tmp_path, monkeypatch, caplog
+):
+    _require_temporal()
+    caplog.set_level(logging.INFO, logger="corsair")
+    dataset, shared, settings = _lock_case(tmp_path, monkeypatch)
+    first_id, second_id = "gym-lock-first-20261027t010000-aaaaaa", "gym-lock-second-bbbbbb"
+    first_running, finish_first = asyncio.Event(), asyncio.Event()
+    second_holder: list[gym.LockHolder | None] = []
+
+    async def hold_first(handle):
+        first_running.set()
+        await finish_first.wait()
+        return await wait_for_result(handle)
+
+    async def observe_second(handle):
+        second_holder.append(gym.read_lock(shared))
+        return await wait_for_result(handle)
+
+    def start(run_id: str, observe) -> asyncio.Task[gym.GymRun]:
+        options = gym.GymOptions(dataset=dataset, settings=settings, run_id=run_id, concurrency=1)
+        return asyncio.create_task(
+            gym.run_gym(
+                options, root=ROOT, compose_activities=_composer_without_docker, observe=observe
+            )
+        )
+
+    first = start(first_id, hold_first)
+    await asyncio.wait_for(first_running.wait(), 120)
+    second = start(second_id, observe_second)
+    await asyncio.sleep(1.5)
+
+    # The second run waits before writing anything or starting its Temporal server.
+    assert not second.done() and second_holder == []
+    assert not (shared / "runs" / second_id).exists()
+    holder = gym.read_lock(shared)
+    assert holder is not None and holder.run_id == first_id
+    waiting = [r for r in caplog.records if r.getMessage() == "gym.lock_waiting"]
+    assert waiting and {r.fields["run_id"] for r in waiting} == {first_id}
+
+    finish_first.set()
+    first_run = await asyncio.wait_for(first, 180)
+    second_run = await asyncio.wait_for(second, 180)
+
+    assert [item and item.run_id for item in second_holder] == [second_id]
+    assert gym.read_lock(shared) is None, "both runs released the lock"
+    first_record, second_record = _record(first_run), _record(second_run)
+    assert first_record["lock"]["waited"] is False
+    assert first_record["lock"]["holder_run_id"] == first_id
+    lock = second_record["lock"]
+    assert (lock["used"], lock["waited"], lock["holder_run_id"]) == (True, True, second_id)
+    assert [item["run_id"] for item in lock["waited_for"]] == [first_id]
+    assert lock["waited_for"][0]["tier"] == "capture" and lock["wait_seconds"] >= 1.5
+    assert second_record["started_at"] >= first_record["completed_at"]
+    assert [row["run_id"] for row in gym.list_runs(shared)] == [second_id, first_id]
+
+
+@pytest.mark.temporal
+@pytest.mark.asyncio
+async def test_verify_holds_the_lock_across_both_tiers(tmp_path, monkeypatch):
+    _require_temporal()
+    dataset, shared, settings = _lock_case(tmp_path, monkeypatch)
+    for tier in gym.VERIFY_TIERS:
+        _reference(shared / "reference" / f"{tier}.json", dataset, objective_j=0.0, tokens=1.0)
+    other_id = "gym-lock-other-cccccc"
+    holders: dict[str, str | None] = {}
+    other: list[asyncio.Task[gym.GymRun]] = []
+
+    def on_gate(tier, gated, baseline, run) -> None:
+        del gated, baseline, run
+        holder = gym.read_lock(shared)
+        holders[tier] = None if holder is None else holder.run_id
+        if tier == "tier0":  # Another experimenter starts a run between the two tiers.
+            options = gym.GymOptions(dataset=dataset, settings=settings, run_id=other_id)
+            other.append(
+                asyncio.create_task(
+                    gym.run_gym(options, root=ROOT, compose_activities=_composer_without_docker)
+                )
+            )
+        else:
+            assert not other[0].done(), "the other run must not run between verify's tiers"
+
+    result = await gym.verify_candidate(
+        gym.GymOptions(dataset=dataset, settings=settings, repeats=1, concurrency=1),
+        shared / "reference",
+        root=ROOT,
+        tiers={"tier0": dataset, "tier1": dataset},
+        compose_activities=_composer_without_docker,
+        on_gate=on_gate,
+    )
+    verify_id = result.verdict_path.parent.name
+    other_run = await asyncio.wait_for(other[0], 180)
+
+    assert set(result.runs) == {"tier0", "tier1"}
+    assert holders == {"tier0": verify_id, "tier1": verify_id}
+    tier0, tier1 = (_record(run) for run in result.runs.values())
+    assert tier0["lock"]["holder_run_id"] == tier1["lock"]["holder_run_id"] == verify_id
+    assert tier1["lock"]["waited"] is False and tier1["lock"]["wait_seconds"] == 0.0
+    waited = _record(other_run)["lock"]
+    assert waited["waited"] is True
+    assert [(item["run_id"], item["tier"]) for item in waited["waited_for"]] == [
+        (verify_id, "tier0+tier1")
+    ]
+    assert _record(other_run)["started_at"] >= tier1["completed_at"]
+    assert gym.read_lock(shared) is None

@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 import sys
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import timedelta
@@ -126,6 +127,10 @@ class CliArguments(argparse.Namespace):
     runs_tier: str | None
     reference: str | None
     skip_tier1: bool
+    lock_command: Literal["status", "release"]
+    force: bool
+    no_lock: bool
+    lock_timeout: float
 
 
 def validate_run_id(value: str) -> str:
@@ -739,6 +744,8 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         out=Path(args.out) if args.out else None,
         run_id=validate_run_id(args.run_id) if args.run_id else None,
         invocation=safe_invocation(sys.argv),
+        lock=not args.no_lock,
+        lock_timeout=args.lock_timeout,
     )
     run = await run_gym(options, root=root, observe=_gym_observer(ui))
     _emit_view(ui, "\n".join(_gym_run_lines(run)), _gym_run_record(run))
@@ -984,14 +991,57 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+def _gym_root(args: CliArguments) -> Path:
+    """``--root``, else the configured or shared gym root."""
+    from corsair.entrypoints.gym import gym_paths
+
+    return Path(args.gym_root) if args.gym_root else gym_paths(None, _gym_settings(args)).root
+
+
 async def _handle_gym_runs(args: CliArguments, ui: Terminal) -> int:
     """List stored runs, newest first, from the shared gym root (or ``--root``)."""
-    from corsair.entrypoints.gym import gym_paths, list_runs
+    from corsair.entrypoints.gym import list_runs, lock_line, lock_status
     from corsair.evaluation.gym.render import render_runs
 
-    root = Path(args.gym_root) if args.gym_root else gym_paths(None, _gym_settings(args)).root
+    root = _gym_root(args)
     rows = list_runs(root, tier=args.runs_tier, limit=args.limit)
-    _emit_view(ui, f"## Gym runs under `{root}`\n\n" + render_runs(rows), rows)
+    status = lock_status(root)
+    held = "" if status is None else lock_line(status) + "\n\n"
+    _emit_view(ui, held + f"## Gym runs under `{root}`\n\n" + render_runs(rows), rows)
+    return 0
+
+
+async def _handle_gym_lock(args: CliArguments, ui: Terminal) -> int:
+    """Show the gym root's run lock, or release it with ``--force``; printing the holder."""
+    from corsair.entrypoints.gym import (
+        LOCK_DIR,
+        GymRefused,
+        force_release,
+        lock_line,
+        lock_status,
+    )
+
+    root = _gym_root(args)
+    status = lock_status(root)
+    if args.lock_command == "status":
+        text = (
+            f"Gym lock under `{root / LOCK_DIR}` is free." if status is None else lock_line(status)
+        )
+        _emit_view(ui, text + "\n", {"held": status is not None, "holder": status})
+        return 0
+    if status is not None and not args.force:
+        raise GymRefused(
+            f"{lock_line(status)} Release it only when that run is gone: pass --force."
+        )
+    released = force_release(root) if args.force else None
+    if released is None:
+        text = f"Gym lock under `{root / LOCK_DIR}` was free; nothing was released."
+    else:
+        text = f"Released the gym lock held by `{released.run_id}` ({released.tier}, " + (
+            f"{released.branch}@{released.commit[:7]}, pid {released.pid} on {released.host})."
+        )
+    held = None if released is None else released.record()
+    _emit_view(ui, text + "\n", {"released": held is not None, "holder": held})
     return 0
 
 
@@ -1028,6 +1078,8 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         temporal_address=args.temporal_address,
         budgets=Path(args.budgets) if args.budgets else None,
         invocation=safe_invocation(sys.argv),
+        lock=not args.no_lock,
+        lock_timeout=args.lock_timeout,
     )
     human = ui.human or ui.markdown
 
@@ -1085,6 +1137,7 @@ _GYM_HANDLERS: dict[str, Callable[[CliArguments, Terminal], Awaitable[int]]] = {
     "images": _handle_gym_images,
     "runs": _handle_gym_runs,
     "verify": _handle_gym_verify,
+    "lock": _handle_gym_lock,
 }
 
 
@@ -1135,6 +1188,18 @@ def positive_limit(value: str) -> int:
     if limit < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return limit
+
+
+_DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+_DURATION_SECONDS = {"": 1.0, "s": 1.0, "m": 60.0, "h": 3600.0}
+
+
+def lock_duration(value: str) -> float:
+    """Admit a ``--lock-timeout`` such as ``2h``, ``30m``, ``90s`` or ``600`` (seconds)."""
+    matched = _DURATION.fullmatch(value.strip().lower())
+    if matched is None:
+        raise argparse.ArgumentTypeError("expected seconds or a duration such as 30m or 2h")
+    return float(matched.group(1)) * _DURATION_SECONDS[matched.group(2)]
 
 
 def positive_round(value: str) -> int:
@@ -1400,6 +1465,24 @@ def parser() -> argparse.ArgumentParser:
     return root
 
 
+def _lock_options(command: argparse.ArgumentParser) -> None:
+    """The run lock switches shared by ``gym run`` and ``gym verify``."""
+    command.add_argument(
+        "--lock-timeout",
+        type=lock_duration,
+        default=7200.0,
+        metavar="DURATION",
+        help="Wait at most this long (e.g. 30m, 2h; default 2h) for another run to release "
+        "the gym root's run lock, then exit 2",
+    )
+    command.add_argument(
+        "--no-lock",
+        action="store_true",
+        help="Scripted tests only: skip the shared-root run lock, so the run is not "
+        "serialised with other live runs and its timing is not comparable",
+    )
+
+
 def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     """``corsair gym`` subcommands; each prints code-owned text or a JSON record."""
     commands = gym.add_subparsers(dest="gym_command", required=True, title="gym commands")
@@ -1432,6 +1515,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     )
     run.add_argument("--out", help="Run directory (default <shared gym root>/runs/<run-id>)")
     run.add_argument("--run-id", help="Batch identity (default gym-<tier>-<time>-<hex>)")
+    _lock_options(run)
     score_cmd = command("score", "Score a saved report into trajectories and a scorecard")
     score_cmd.add_argument("report", help="Composed evaluation report JSON")
     score_cmd.add_argument("--dataset", required=True, help="The manifest it was scored against")
@@ -1497,6 +1581,26 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     verify.add_argument(
         "--budgets", help="Budgets file (default evals/experiments/budgets.json when present)"
     )
+    _lock_options(verify)
+    lock = command("lock", "Show or release the gym root's run lock (<gym root>/lock/)")
+    lock_commands = lock.add_subparsers(dest="lock_command", required=True, title="lock commands")
+    for name, description in (
+        ("status", "Show the lock's holder (run id, tier, commit, pid, host) and how long"),
+        ("release", "Remove the lock whoever holds it; refused without --force"),
+    ):
+        lock_command = lock_commands.add_parser(name, help=description, description=description)
+        _presentation_options(lock_command)
+        lock_command.add_argument(
+            "--root",
+            dest="gym_root",
+            help="Gym root holding lock/ (default <main checkout>/.runs/gym, shared by worktrees)",
+        )
+        if name == "release":
+            lock_command.add_argument(
+                "--force",
+                action="store_true",
+                help="Release it even though a run may still hold it; prints that holder",
+            )
     ledger = command("ledger", "Append to or render the experiment ledger")
     ledger_commands = ledger.add_subparsers(
         dest="ledger_command", required=True, title="ledger commands"
