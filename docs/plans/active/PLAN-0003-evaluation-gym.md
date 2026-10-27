@@ -719,4 +719,11 @@ content-addressed tags and cannot contaminate parallel runs.
   reference runs. The binding failures on JavaScript are now the producer output cap (`provider_max_tokens`, an
   operational stop that ends the episode) and the aurelia exploit shape (`constructor[prototype]` forms that held;
   owner decision 4's prototype-pollution rubric). Identity: `producer_packet` only, plus the s19 skills digests.
+- 2026-10-27 tier2 holdout baseline (run 35e3a4 at 494f2523, 3 repeats; ledger `ref-w5-tier2`; installed as
+  `reference/tier2.json`): macro verified accuracy 0.5, J 0.540, macro effective tokens 139k, p50 214 s, no
+  operational episodes. Orchestrator-only: no experimenter gates against it and per-case detail stays in the run
+  directory. The stop shapes match tier1 JavaScript (unverified control coverage, a cap-out, an abstain). Launched
+  h9 (a producer output-cap stop is carried to the next round while rounds remain; python slice adversarial01,
+  adversarial02, case02 with sentinels case01 and chain-python-codeinjection-b), and queued a third same-identity
+  tier1 reference run from `ref-494f2523` behind h9's slice so the band moves to n=3.
 
