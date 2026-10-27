@@ -23,6 +23,7 @@ from corsair.observability.logging import configure_logging, event, safe_text
 if TYPE_CHECKING:
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import BatchItem, InvestigationResult, Oracle
+    from corsair.entrypoints.gym import GymRun
     from corsair.entrypoints.terminal import Terminal
     from corsair.settings import Settings
 
@@ -97,6 +98,10 @@ class CliArguments(argparse.Namespace):
     ledger_markdown: str
     ledger_baseline: str | None
     gym_dataset: str | None
+    gym_root: str | None
+    runs_tier: str | None
+    reference: str | None
+    skip_tier1: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -407,10 +412,10 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     """Run a frozen batch, score returned native receipts, and save its report."""
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.adapters.temporal.client import connect, wait_for_result
-    from corsair.contracts import BatchRequest, InvestigationResult, digest
+    from corsair.contracts import BatchRequest, digest
     from corsair.evaluation.datasets import load_dataset
     from corsair.evaluation.families import label_rows
-    from corsair.evaluation.scoring import save_report, score
+    from corsair.evaluation.scoring import save_report, score_batch
     from corsair.workflows.evaluation import EvaluationWorkflow
 
     settings = _settings(args)
@@ -433,24 +438,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
         f"Evaluation {handle.id}",
         query=lambda: handle.query(EvaluationWorkflow.status),
     )
-    rows: list[dict[str, object]] = []
-    for item in items:
-        try:
-            if item.artifact is None:
-                raise ValueError(item.error or "Result artifact unavailable")
-            result = InvestigationResult.model_validate(store.get_json(item.artifact))
-            if result.case_id != item.case_id or result.run_id != item.run_id:
-                raise ValueError("Child result identity differs from its batch receipt")
-            rows.append(score(result, oracles[item.case_id], store))
-        except (OSError, ValueError, KeyError) as error:
-            rows.append(
-                {
-                    "case_id": item.case_id,
-                    "run_id": item.run_id,
-                    "status": "unavailable",
-                    "reason": safe_text(error),
-                }
-            )
+    rows = score_batch(items, store, oracles)
     output = Path(args.output or f".runs/evaluations/{identity}.json")
     report = save_report(output, label_rows(rows, dataset), dataset_digest=digest(dataset))
     ui.emit({"report": str(output), "summary": report["summary"]})
@@ -621,6 +609,14 @@ def _gym_settings(args: CliArguments) -> Settings:
     return load_settings(args.settings or default_settings_path(checkout_root()))
 
 
+def _gym_store(args: CliArguments, run_dir: Path) -> ArtifactStore:
+    """The store a gym run wrote to (its run.json), else the configured or shared store."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.entrypoints.gym import run_store
+
+    return ArtifactStore(run_store(run_dir, None, _gym_settings(args)))
+
+
 def _emit_view(ui: Terminal, text: str, value: object) -> None:
     """Human and Markdown output print the code-owned Markdown view; JSON gets the record."""
     if ui.human or ui.markdown:
@@ -631,9 +627,13 @@ def _emit_view(ui: Terminal, text: str, value: object) -> None:
 
 async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
     """Run one tier on an in-process worker in the gym namespace; write and show its scorecard."""
-    from corsair.entrypoints.gym import GymOptions, checkout_root, resolve_tier, run_gym
-    from corsair.evaluation.gym.render import render_scorecard
-    from corsair.workflows.evaluation import EvaluationWorkflow
+    from corsair.entrypoints.gym import (
+        GymOptions,
+        checkout_root,
+        resolve_tier,
+        run_gym,
+        safe_invocation,
+    )
 
     root = checkout_root()
     options = GymOptions(
@@ -652,10 +652,20 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         budgets=Path(args.budgets) if args.budgets else None,
         out=Path(args.out) if args.out else None,
         run_id=validate_run_id(args.run_id) if args.run_id else None,
+        invocation=safe_invocation(sys.argv),
     )
+    run = await run_gym(options, root=root, observe=_gym_observer(ui))
+    _emit_view(ui, "\n".join(_gym_run_lines(run)), _gym_run_record(run))
+    unavailable = sum(item.status == "unavailable" for item in run.trajectories)
+    return 1 if unavailable else 0
+
+
+def _gym_observer(ui: Terminal) -> Callable[[Any], Awaitable[list[BatchItem]]]:
+    """Wait for the batch with the terminal's progress view of the workflow status."""
 
     async def observe(handle: Any) -> list[BatchItem]:
         from corsair.adapters.temporal.client import wait_for_result
+        from corsair.workflows.evaluation import EvaluationWorkflow
 
         return await ui.wait(
             wait_for_result(handle),
@@ -663,11 +673,18 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
             query=lambda: handle.query(EvaluationWorkflow.status),
         )
 
-    run = await run_gym(options, root=root, observe=observe)
+    return observe
+
+
+def _gym_run_lines(run: GymRun) -> list[str]:
+    from corsair.entrypoints.gym import read_run_record
+    from corsair.evaluation.gym.render import render_scorecard
+
     card = run.scorecard
-    lines = [
+    return [
         render_scorecard(card),
         f"- Run directory: `{run.run_dir}`",
+        f"- Store: `{read_run_record(run.run_dir).get('store', 'unknown')}`",
         f"- Temporal: {'ephemeral' if run.ephemeral else 'existing'} `{run.temporal_address}`, "
         f"namespace `{card.run.temporal_namespace}`, task queue `{card.run.task_queue}`",
         f"- Commit: `{card.run.git_branch}` `{card.run.git_commit}`",
@@ -675,24 +692,20 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         f"- Wall seconds: {run.wall_seconds:.1f}",
         "",
     ]
-    _emit_view(
-        ui,
-        "\n".join(lines),
-        {
-            "run_dir": str(run.run_dir),
-            "temporal_address": run.temporal_address,
-            "ephemeral": run.ephemeral,
-            "wall_seconds": run.wall_seconds,
-            "scorecard": card,
-        },
-    )
-    unavailable = sum(item.status == "unavailable" for item in run.trajectories)
-    return 1 if unavailable else 0
+
+
+def _gym_run_record(run: GymRun) -> dict[str, object]:
+    return {
+        "run_dir": str(run.run_dir),
+        "temporal_address": run.temporal_address,
+        "ephemeral": run.ephemeral,
+        "wall_seconds": run.wall_seconds,
+        "scorecard": run.scorecard,
+    }
 
 
 async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
     """Score a saved report into trajectories and a scorecard; no services."""
-    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import RunContext
     from corsair.evaluation.comparison import read_report
     from corsair.evaluation.gym.budgets import load_budgets
@@ -716,7 +729,7 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
         if previous.exists()
         else RunContext(run_id=validate_run_id(report_path.stem))
     )
-    store = ArtifactStore(_gym_settings(args).artifact_root)
+    store = _gym_store(args, report_path.parent)
     run_ids = [str(row.get("run_id")) for row in report.get("rows", [])]
     trajectories, card = score_report(
         report,
@@ -745,18 +758,16 @@ async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_gym_replay(args: CliArguments, ui: Terminal) -> int:
     """Show one case's rounds, per-call usage and failure stop from a gym run; no services."""
-    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.entrypoints.gym import render_replay, replay_case
 
-    store = ArtifactStore(_gym_settings(args).artifact_root)
-    view = replay_case(Path(args.run_dir), args.case or "", store)
+    run_dir = Path(args.run_dir)
+    view = replay_case(run_dir, args.case or "", _gym_store(args, run_dir))
     _emit_view(ui, render_replay(view), view)
     return 0
 
 
 async def _handle_gym_capture(args: CliArguments, ui: Terminal) -> int:
     """Freeze a case's failed repeats as agent fixtures and kernel replay cases."""
-    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.entrypoints.gym import checkout_root, dataset_for_report
     from corsair.evaluation.gym.capture import capture
     from corsair.evaluation.gym.scoring import REPORT_FILE
@@ -772,7 +783,7 @@ async def _handle_gym_capture(args: CliArguments, ui: Terminal) -> int:
         run_dir,
         args.case or "",
         dataset_path=dataset,
-        store=ArtifactStore(_gym_settings(args).artifact_root),
+        store=_gym_store(args, run_dir),
         out_root=root / "evals",
         kernel_dir=root / "tests/replay/kernel",
         references=[Path(path) for path in args.references or ()],
@@ -837,6 +848,90 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+async def _handle_gym_runs(args: CliArguments, ui: Terminal) -> int:
+    """List stored runs, newest first, from the shared gym root (or ``--root``)."""
+    from corsair.entrypoints.gym import gym_paths, list_runs
+    from corsair.evaluation.gym.render import render_runs
+
+    root = Path(args.gym_root) if args.gym_root else gym_paths(None, _gym_settings(args)).root
+    rows = list_runs(root, tier=args.runs_tier, limit=args.limit)
+    _emit_view(ui, f"## Gym runs under `{root}`\n\n" + render_runs(rows), rows)
+    return 0
+
+
+_SKIPPED_TEXT = {
+    "skipped_by_request": "was skipped on request (--skip-tier1); this is not an acceptance.",
+    "rejected_at_tier0": "was not run because tier0 was REJECTED.",
+}
+
+
+async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
+    """tier0 run and gate, then tier1 run and gate unless rejected; exit 0, 1 or 2."""
+    from corsair.entrypoints.gym import (
+        VERIFY_TIERS,
+        GymOptions,
+        TierGate,
+        checkout_root,
+        gym_paths,
+        resolve_tier,
+        safe_invocation,
+        verify_candidate,
+    )
+    from corsair.evaluation.gym.render import render_gate
+
+    root = checkout_root()
+    settings = _gym_settings(args)
+    reference = Path(args.reference) if args.reference else gym_paths(root, settings).reference
+    if not reference.is_dir():
+        raise ValueError(f"no reference directory {reference}; pass --reference DIR")
+    tiers = {name: resolve_tier(name, root) for name in VERIFY_TIERS}
+    options = GymOptions(
+        dataset=tiers["tier0"],
+        settings=settings,
+        repeats=args.repeats,
+        concurrency=args.concurrency,
+        temporal_address=args.temporal_address,
+        budgets=Path(args.budgets) if args.budgets else None,
+        invocation=safe_invocation(sys.argv),
+    )
+    human = ui.human or ui.markdown
+
+    def show(item: TierGate) -> None:
+        if human:
+            sys.stdout.write(
+                f"### {item.tier}\n\n- Run directory: `{item.run.run_dir}`\n"
+                f"- Reference: `{item.reference}`\n\n"
+                + render_gate(item.verdict, item.baseline, item.run.scorecard)
+                + "\n"
+            )
+            sys.stdout.flush()
+
+    result = await verify_candidate(
+        options,
+        reference,
+        root=root,
+        tiers=tiers,
+        skip=("tier1",) if args.skip_tier1 else (),
+        observe=_gym_observer(ui),
+        on_gate=show,
+    )
+    if human:
+        lines = [f"- {tier} {_SKIPPED_TEXT[reason]}" for tier, reason in result.skipped.items()]
+        lines += [
+            f"- Verdict record: `{result.verdict_path}`",
+            "",
+            f"VERDICT: {result.decision.value}",
+        ]
+        sys.stdout.write("\n".join(lines) + "\n")
+    else:
+        ui.emit({"verdict": str(result.verdict_path), **_read_json(result.verdict_path)})
+    return {"ACCEPTED": 0, "REJECTED": 1}.get(result.decision.value, 2)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text())
+
+
 async def _handle_gym_images(args: CliArguments, ui: Terminal) -> int:
     """Build the content-addressed trusted images of this checkout; print tags and ids."""
     from corsair.entrypoints.gym import build_gym_images, checkout_root
@@ -856,6 +951,8 @@ _GYM_HANDLERS: dict[str, Callable[[CliArguments, Terminal], Awaitable[int]]] = {
     "budgets": _handle_gym_budgets,
     "ledger": _handle_gym_ledger,
     "images": _handle_gym_images,
+    "runs": _handle_gym_runs,
+    "verify": _handle_gym_verify,
 }
 
 
@@ -1170,7 +1267,7 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     run.add_argument(
         "--budgets", help="Budgets file (default evals/experiments/budgets.json when present)"
     )
-    run.add_argument("--out", help="Run directory (default <artifact_root>/gym/<run-id>)")
+    run.add_argument("--out", help="Run directory (default <shared gym root>/runs/<run-id>)")
     run.add_argument("--run-id", help="Batch identity (default gym-<tier>-<time>-<hex>)")
     score_cmd = command("score", "Score a saved report into trajectories and a scorecard")
     score_cmd.add_argument("report", help="Composed evaluation report JSON")
@@ -1209,6 +1306,34 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     budgets.add_argument("--from", dest="source", required=True, metavar="SCORECARD")
     budgets.add_argument("--out", required=True, metavar="FILE")
     command("images", "Build this checkout's content-addressed images; print tags and ids")
+    runs_cmd = command("runs", "List stored gym runs, newest first, with their headline figures")
+    runs_cmd.add_argument(
+        "--root",
+        dest="gym_root",
+        help="Gym root holding runs/ (default <main checkout>/.runs/gym, shared by worktrees)",
+    )
+    runs_cmd.add_argument("--tier", dest="runs_tier", help="Only runs of this tier")
+    runs_cmd.add_argument("--limit", type=positive_limit, help="At most this many runs")
+    verify = command(
+        "verify",
+        "The candidate protocol: tier0 run and gate, then tier1 run and gate unless tier0 was "
+        "rejected; exit 0 accepted, 1 rejected, 2 incomparable",
+    )
+    verify.add_argument(
+        "--reference",
+        help="Directory with tier0.json and tier1.json (default <shared gym root>/reference)",
+    )
+    verify.add_argument("--repeats", type=int, choices=range(1, 9), default=3)
+    verify.add_argument("--concurrency", type=int, choices=range(1, 9), default=2)
+    verify.add_argument(
+        "--skip-tier1", action="store_true", help="Stop after tier0 (a smoke result only)"
+    )
+    verify.add_argument(
+        "--temporal-address", help="Existing server; it must already have namespace corsair-gym"
+    )
+    verify.add_argument(
+        "--budgets", help="Budgets file (default evals/experiments/budgets.json when present)"
+    )
     ledger = command("ledger", "Append to or render the experiment ledger")
     ledger_commands = ledger.add_subparsers(
         dest="ledger_command", required=True, title="ledger commands"

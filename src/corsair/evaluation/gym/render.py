@@ -5,6 +5,7 @@ and the fixed reason sentences below are printed; no model-authored text reaches
 """
 
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from corsair.contracts import GateReason, GateVerdict, GroupSummary, Scorecard
 
@@ -191,3 +192,52 @@ def render_scorecard(scorecard: Scorecard) -> str:
     lines.append("")
     lines.extend(_table(["Kind", *_GROUP_HEADER], _group_rows(scorecard.kinds)))
     return "\n".join(lines) + "\n"
+
+
+_RUNS_HEADER = [
+    "Run",
+    "Commit",
+    "Tier",
+    "Repeats",
+    "Sliced",
+    "J",
+    "Verified acc",
+    "Worst language",
+    "Eff. tokens",
+    "p50 s",
+    "Capped eps",
+    "Run directory",
+]
+
+
+def _commit(row: Mapping[str, Any]) -> str:
+    commit = row.get("git_commit")
+    if not commit:
+        return "unknown"
+    return commit[:7] + ("+dirty" if row.get("git_dirty") else "")
+
+
+def render_runs(rows: Sequence[Mapping[str, Any]]) -> str:
+    """Stored runs, newest first, as ``corsair gym runs`` lists them."""
+    if not rows:
+        return "No stored gym runs.\n"
+    table = [
+        [
+            f"`{row['run_id']}`",
+            _commit(row),
+            row.get("tier") or "unknown",
+            str(row["repeats"]),
+            "yes" if row["sliced"] else "no",
+            _number(row["objective_j"]),
+            _number(row["macro_verified_accuracy"]),
+            "unknown"
+            if row["worst_language"] is None
+            else f"{row['worst_language']} {_number(row['worst_language_verified_accuracy'])}",
+            _number(row["macro_effective_tokens"], 0),
+            _number(row["macro_p50_seconds"], 1),
+            _count(row["capped_call_episodes"]),
+            f"`{row['run_dir']}`",
+        ]
+        for row in rows
+    ]
+    return "\n".join(_table(_RUNS_HEADER, table)) + "\n"

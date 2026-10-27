@@ -1,4 +1,5 @@
-"""Gym runner pure parts: identity, tiers, task queues, content-addressed images, selection.
+"""Gym runner pure parts: identity, tiers, task queues, content-addressed images, selection,
+the shared run store and run metadata.
 
 No Docker, Temporal or model is involved; the runner's service path is covered by
 tests/integration/test_gym_runner.py.
@@ -6,10 +7,13 @@ tests/integration/test_gym_runner.py.
 
 import json
 import re
+import subprocess
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pytest
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import validate_root_identity
 from corsair.entrypoints import gym
 from corsair.entrypoints.requests import load_investigation_request
@@ -251,3 +255,102 @@ def test_more_concurrency_than_worker_activity_slots_is_refused():
     with pytest.raises(ValueError, match="max_concurrent_activities"):
         gym.check_concurrency(Settings(max_concurrent_activities=2), 3)
     gym.check_concurrency(Settings(max_concurrent_activities=4), 4)
+
+
+# The shared run store
+
+
+def _git(cwd: Path, *arguments: str) -> None:
+    subprocess.run(["git", "-C", str(cwd), *arguments], check=True, capture_output=True)
+
+
+def _repository_with_worktree(tmp_path: Path) -> tuple[Path, Path]:
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q", "-b", "main")
+    (main / "README").write_text("x\n")
+    _git(main, "add", "README")
+    _git(main, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "x")
+    worktree = main / ".worktrees/gym/exp"
+    _git(main, "worktree", "add", "-q", "-b", "gym/exp", str(worktree))
+    return main, worktree
+
+
+def test_every_worktree_resolves_the_main_checkouts_gym_root(tmp_path):
+    main, worktree = _repository_with_worktree(tmp_path)
+    expected = main.resolve() / ".runs/gym"
+
+    assert gym.shared_gym_root(main) == gym.shared_gym_root(worktree) == expected
+    paths = gym.gym_paths(worktree, Settings())
+    assert paths == gym.gym_paths(main, Settings())
+    assert (paths.store, paths.runs, paths.reference) == (
+        expected / "store",
+        expected / "runs",
+        expected / "reference",
+    )
+
+
+def test_settings_naming_an_artifact_root_keep_it_as_the_store(tmp_path):
+    paths = gym.gym_paths(tmp_path / "not-a-checkout", Settings(artifact_root=str(tmp_path / "a")))
+    assert paths.store == tmp_path / "a"
+    assert paths.runs == tmp_path / "a/gym/runs"
+
+
+def test_a_run_reads_back_from_its_recorded_store(tmp_path):
+    run_dir, store = tmp_path / "run", tmp_path / "elsewhere"
+    explicit = Settings(artifact_root=str(tmp_path / "configured"))
+    assert gym.run_store(run_dir, tmp_path, explicit) == tmp_path / "configured"
+    store.mkdir()
+    run_dir.mkdir()
+    (run_dir / gym.RUN_FILE).write_text(json.dumps({"store": str(store)}))
+    assert gym.run_store(run_dir, tmp_path, explicit) == store
+
+
+def _publish(root: str, worker: int) -> int:
+    """One process's writes: shared blobs and a shared operation, plus its own operations."""
+    store = ArtifactStore(root)
+    for index in range(200):
+        ref = store.put(f"shared blob {index}".encode())
+        store.commit(f"shared.{index}", ref)
+        store.commit(f"own.{worker}.{index}", store.put(f"own {worker} {index}".encode()))
+    return worker
+
+
+def test_concurrent_runs_from_two_processes_share_one_store_safely(tmp_path):
+    root = tmp_path / "store"
+    with ProcessPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(_publish, [str(root)] * 2, [1, 2])) == [1, 2]
+
+    store = ArtifactStore(root)
+    assert len(list(store.blobs.iterdir())) == 600
+    assert len(list(store.operations.iterdir())) == 600
+    expected = {f"shared.{index}": f"shared blob {index}" for index in range(200)}
+    for worker in (1, 2):
+        expected |= {f"own.{worker}.{index}": f"own {worker} {index}" for index in range(200)}
+    for operation, content in expected.items():
+        ref = store.reconcile(operation)
+        assert ref is not None and store.get(ref) == content.encode()
+    assert not list(store.blobs.glob(".write-*")) and not list(store.operations.glob(".write-*"))
+    with pytest.raises(ValueError, match="identity conflict"):
+        store.commit("shared.0", store.put(b"a different result"))
+
+
+# Run metadata
+
+
+def test_the_invocation_keeps_arguments_but_not_endpoints_or_the_program_path():
+    argv = ["/x/.venv/bin/corsair", "gym", "run", "tier0", "--temporal-address", "https://h:1/x"]
+    assert gym.safe_invocation(argv) == (
+        "corsair",
+        "gym",
+        "run",
+        "tier0",
+        "--temporal-address",
+        "[endpoint]",
+    )
+    assert gym.safe_invocation([]) == ()
+
+
+def test_the_tier_name_is_the_manifest_stem_without_its_prefix():
+    assert gym.tier_name(DATASETS / "gym-tier1.json") == "tier1"
+    assert gym.tier_name(Path("custom.json")) == "custom"

@@ -1,12 +1,13 @@
 """External evaluator: oracle files are never passed to agents, tools or workflows."""
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    BatchItem,
     Digest,
     Disposition,
     ExecutionStatus,
@@ -18,6 +19,7 @@ from corsair.contracts import (
     Verdict,
 )
 from corsair.evaluation.ledger import gate_ledger, ledger_counts, row_ledger, verified_rounds
+from corsair.observability.logging import safe_text
 from corsair.policies.operations import round_operation_id
 from corsair.policies.verdicts import (
     decide,
@@ -196,6 +198,31 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         "reason": result.reason,
         "gate_ledger": gate_ledger(result, verified_rounds(result, store)),
     }
+
+
+def score_batch(
+    items: Iterable[BatchItem], store: ArtifactStore, oracles: Mapping[str, Oracle]
+) -> list[dict]:
+    """Score each batch receipt's stored result; an unavailable result stays an explicit row."""
+    rows: list[dict] = []
+    for item in items:
+        try:
+            if item.artifact is None:
+                raise ValueError(item.error or "Result artifact unavailable")
+            result = InvestigationResult.model_validate(store.get_json(item.artifact))
+            if result.case_id != item.case_id or result.run_id != item.run_id:
+                raise ValueError("Child result identity differs from its batch receipt")
+            rows.append(score(result, oracles[item.case_id], store))
+        except (OSError, ValueError, KeyError) as error:
+            rows.append(
+                {
+                    "case_id": item.case_id,
+                    "run_id": item.run_id,
+                    "status": "unavailable",
+                    "reason": safe_text(error),
+                }
+            )
+    return rows
 
 
 def usage_metrics(result: InvestigationResult) -> dict:
