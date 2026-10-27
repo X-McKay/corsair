@@ -11,11 +11,12 @@ from pathlib import Path
 import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import GateDecision, RunContext, Scorecard, VerifyRecord
+from corsair.contracts import GateDecision, NoiseBand, RunContext, Scorecard, VerifyRecord
 from corsair.entrypoints import cli, gym
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.gym.budgets import load_budgets
 from corsair.evaluation.gym.ledger import read_ledger
+from corsair.evaluation.gym.noise import noise_band, read_noise, write_noise
 from corsair.evaluation.gym.scoring import (
     SCORECARD_FILE,
     TRAJECTORIES_FILE,
@@ -731,3 +732,160 @@ async def test_runs_shows_a_held_lock_above_the_table(tmp_path, capsys):
     assert [row["run_id"] for row in json.loads(capsys.readouterr().out)] == [
         "gym-tier0-20261027t010807-479fc5"
     ]
+
+
+# The noise band
+
+NOISE_IDENTITY = {"config": ["c" * 64]}
+NOISY = {**BASELINE, "rb-a": NONE}
+
+
+def _identified(
+    path: Path, verified: dict[str, list[bool]], *, run_id: str, tokens: float = 100.0
+) -> Path:
+    """A scorecard of the noise configuration: one recorded identity, one dataset."""
+    rows = [
+        _trajectory(case, repeat, flag, tokens)
+        for case, flags in verified.items()
+        for repeat, flag in enumerate(flags)
+    ]
+    run = RunContext(run_id=run_id, git_branch="gym/loop", git_commit="a" * 40)
+    card = build_scorecard(rows, run=run, dataset_digest="d" * 64, cases=CASES)
+    write_scorecard(path, card.model_copy(update={"run_identity": NOISE_IDENTITY}))
+    return path
+
+
+def _noise_runs(root: Path) -> list[Path]:
+    """Two stored tier1 runs of one configuration: ruby flips once, tokens differ 1.2x."""
+    first = root / "runs/gym-tier1-20261027t012146-ade22e"
+    second = root / "runs/gym-tier1-20261027t111450-29968e"
+    _identified(first / SCORECARD_FILE, BASELINE, run_id=first.name)
+    _identified(second / SCORECARD_FILE, NOISY, run_id=second.name, tokens=120.0)
+    return [first, second]
+
+
+@pytest.mark.asyncio
+async def test_noise_writes_the_band_of_two_runs_under_the_reference_directory(tmp_path, capsys):
+    root = tmp_path / "gym"
+    first, second = _noise_runs(root)
+    args = ["gym", "noise", str(first), str(second / SCORECARD_FILE), "--root", str(root)]
+
+    assert await _run(_arguments(*args)) == 0
+    record = json.loads(capsys.readouterr().out)
+    out = root / "reference/noise-tier1.json"
+    assert record["noise"] == str(out)
+    band = NoiseBand.model_validate_json(out.read_text())
+    assert band.runs == [first.name, second.name]
+    assert band.languages["ruby"].band == 0.5
+    assert record["n_runs"] == 2 and record["schema_version"] == "corsair.gym-noise/1"
+    # The same band again is a no-op; a different band never replaces a reference.
+    assert await _run(_arguments(*args, format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert text.startswith("## Noise band: 2 runs\n")
+    assert f"- Written to `{out}`" in text
+    with pytest.raises(ValueError, match="already holds a different noise band"):
+        await _run(_arguments("gym", "noise", str(second), str(first), "--root", str(root)))
+
+
+@pytest.mark.asyncio
+async def test_noise_refuses_runs_of_another_configuration_and_needs_a_tier_or_out(tmp_path):
+    root = tmp_path / "gym"
+    first, _ = _noise_runs(root)
+    other = _card(tmp_path / "other.json", NOISY, run_id="other")  # no recorded identity
+    with pytest.raises(ValueError, match="identity_mismatch"):
+        await _run(_arguments("gym", "noise", str(first), str(other), "--out", str(tmp_path / "n")))
+    custom = _identified(tmp_path / "custom.json", NOISY, run_id="custom")
+    with pytest.raises(ValueError, match="pass --out"):
+        await _run(_arguments("gym", "noise", str(first), str(custom), "--root", str(root)))
+    out = tmp_path / "band.json"
+    assert await _run(_arguments("gym", "noise", str(first), str(custom), "--out", str(out))) == 0
+    assert out.is_file()
+    with pytest.raises(SystemExit):
+        _arguments("gym", "noise", str(first))
+
+
+def _band(tmp_path: Path) -> Path:
+    first, second = _noise_runs(tmp_path / "gym")
+    out = tmp_path / "noise-tier1.json"
+    write_noise(
+        out, noise_band([read_scorecard(path / SCORECARD_FILE) for path in (first, second)])
+    )
+    return out
+
+
+@pytest.mark.asyncio
+async def test_gate_with_a_noise_band_exits_3_on_a_regression_inside_it(tmp_path, capsys):
+    noise = _band(tmp_path)
+    baseline = _card(tmp_path / "base.json", BASELINE, run_id="base")
+    noisy = _identified(tmp_path / "cand.json", NOISY, run_id="cand", tokens=120.0)
+    args = ["gym", "gate", "--baseline", str(baseline), "--candidate", str(noisy)]
+
+    assert await _run(_arguments(*args)) == 1
+    assert json.loads(capsys.readouterr().out)["decision"] == "REJECTED"
+    assert await _run(_arguments(*args, "--noise", str(noise))) == 3
+    verdict = json.loads(capsys.readouterr().out)
+    assert verdict["decision"] == "INCONCLUSIVE"
+    assert verdict["reasons"][-1] == "within_noise"
+    assert verdict["noise"]["runs"] == [
+        "gym-tier1-20261027t012146-ade22e",
+        "gym-tier1-20261027t111450-29968e",
+    ]
+    assert await _run(_arguments(*args, "--noise", str(noise), format="markdown")) == 3
+    text = capsys.readouterr().out
+    assert text.startswith("## Gate: INCONCLUSIVE\n")
+    assert "Noise band from 2 runs" in text
+
+
+@pytest.mark.asyncio
+async def test_verify_reads_each_tiers_noise_band_and_exits_3_when_inconclusive(
+    tmp_path, capsys, monkeypatch
+):
+    noise = _band(tmp_path)
+    ran = _fake_runs(monkeypatch, tmp_path, {"tier0": BASELINE, "tier1": NOISY})
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    verify = ["gym", "verify", "--reference", str(_reference(tmp_path)), *settings]
+
+    assert await _run(_arguments(*verify)) == 1
+    capsys.readouterr()
+    assert await _run(_arguments(*verify, "--noise", str(noise))) == 3
+    captured = capsys.readouterr()
+    assert captured.err.rstrip().splitlines()[-1] == "VERDICT: INCONCLUSIVE"
+    record = VerifyRecord.model_validate_json(Path(json.loads(captured.out)["verdict"]).read_text())
+    assert record.decision is GateDecision.INCONCLUSIVE
+    assert record.noise == [str(noise)]
+    assert record.tier1 is not None and record.tier1.gate.noise is not None
+    assert record.tier1.gate.decision is GateDecision.INCONCLUSIVE
+    assert ran == ["tier0", "tier1", "tier0", "tier1"]
+
+    ran.clear()
+    elsewhere = tmp_path / "elsewhere.json"
+    elsewhere.write_text(
+        read_noise(noise).model_copy(update={"dataset_digest": "e" * 64}).model_dump_json()
+    )
+    with pytest.raises(ValueError, match="matches no gated tier"):
+        await _run(_arguments(*verify, "--noise", str(elsewhere)))
+    assert ran == []
+
+
+@pytest.mark.asyncio
+async def test_ledger_append_records_the_noise_band_and_an_inconclusive_gate(tmp_path, capsys):
+    noise = _band(tmp_path)
+    ledger, markdown = tmp_path / "ledger.jsonl", tmp_path / "LEDGER.md"
+    shutil.copy(ROOT / "evals/experiments/LEDGER.md", markdown)
+    reference = _card(tmp_path / "ref.json", BASELINE, run_id="ref")
+    candidate = _identified(tmp_path / "cand.json", NOISY, run_id="cand", tokens=120.0)
+    append = ["gym", "ledger", "append", "--ledger", str(ledger), "--entry", "experiment"]
+    append += ["--wave", "4", "--tier1", str(candidate), "--reference-tier1", str(reference)]
+
+    assert await _run(_arguments(*append, "--id", "n1", "--noise", str(noise))) == 0
+    (row,) = read_ledger(ledger)
+    assert row.noise == [str(noise)]
+    assert row.tier1 is not None and row.tier1.gate.decision is GateDecision.INCONCLUSIVE
+    render = ["gym", "ledger", "render", "--ledger", str(ledger), "--markdown", str(markdown)]
+    assert await _run(_arguments(*render)) == 0
+    text = markdown.read_text()
+    assert "| n1 |  | `gym/loop@aaaaaaa` | — | INCONCLUSIVE (" in text
+    assert "within_noise; regressed: ruby; within noise: objective_j" in text
+    capsys.readouterr()
+    with pytest.raises(ValueError, match="matches no gated tier"):
+        await _run(_arguments(*append[:-4], "--id", "n2", "--noise", str(noise), "--branch", "b"))

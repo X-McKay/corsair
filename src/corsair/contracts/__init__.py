@@ -49,6 +49,9 @@ from .gym import KernelCase as KernelCase
 from .gym import KindBudget as KindBudget
 from .gym import LedgerDecision as LedgerDecision
 from .gym import LedgerRow as LedgerRow
+from .gym import NoiseBand as NoiseBand
+from .gym import NoiseMetric as NoiseMetric
+from .gym import NoiseSpread as NoiseSpread
 from .gym import OperationalEpisode as OperationalEpisode
 from .gym import OperationalReason as OperationalReason
 from .gym import RoundSummary as RoundSummary

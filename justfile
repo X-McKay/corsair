@@ -110,11 +110,15 @@ eval dataset *args:
 gym-run tier *args:
     uv run --locked --extra providers corsair gym run "$@"
 
-# Gate a candidate gym scorecard against a baseline: exit 0 accepted, 1 rejected, 2 incomparable.
+# Gate a candidate gym scorecard against a baseline: exit 0 accepted, 1 rejected, 2 incomparable, 3 inconclusive (--noise).
 gym-gate baseline candidate *args:
     uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2" "${@:3}"
 
-# Candidate protocol: tier0 run and gate, then tier1 unless rejected; prints VERDICT, exit 0/1/2.
+# Write the noise band of two or more runs of one configuration (default <gym root>/reference/noise-<tier>.json).
+gym-noise first second *args:
+    uv run --locked --extra providers corsair gym noise "$@"
+
+# Candidate protocol: tier0 run and gate, then tier1 unless rejected; prints VERDICT, exit 0/1/2/3.
 gym-verify reference *args:
     uv run --locked --extra providers corsair gym verify --reference "$1" "${@:2}"
 

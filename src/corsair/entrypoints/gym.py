@@ -60,6 +60,7 @@ from corsair.contracts import (
     GateTrack,
     InvestigationRequest,
     InvestigationResult,
+    NoiseBand,
     RunContext,
     Scorecard,
     SkipReason,
@@ -75,6 +76,7 @@ from corsair.evaluation.families import label_rows
 from corsair.evaluation.gym.budgets import budgets_digest, load_budgets
 from corsair.evaluation.gym.gate import admit_track, chain_decision, gate
 from corsair.evaluation.gym.ledger import candidate_identity
+from corsair.evaluation.gym.noise import assign_bands
 from corsair.evaluation.gym.scoring import (
     REPORT_FILE,
     SCORECARD_FILE,
@@ -1147,6 +1149,7 @@ def verify_record(
     reference: Path,
     invocation: Sequence[str],
     track: GateTrack = "objective",
+    noise: Sequence[str] = (),
 ) -> VerifyRecord:
     """``verdict.json``: the candidate's identity, the chain decision and each tier's gate.
 
@@ -1168,6 +1171,7 @@ def verify_record(
         reference=str(reference),
         invocation=list(invocation) or None,
         recorded_at=datetime.now(UTC),
+        noise=list(noise),
     )
 
 
@@ -1183,14 +1187,16 @@ async def verify_candidate(
     on_gate: GateObserver | None = None,
     track: GateTrack = "objective",
     target_language: str | None = None,
+    noise: Mapping[str, NoiseBand] | None = None,
 ) -> Verification:
     """Run and gate tier0, then tier1 unless tier0 was rejected.
 
     Each tier is gated against ``<reference>/<tier>.json`` on ``track`` (tier0 as a smoke
     gate); ``tiers`` maps ``tier0`` and ``tier1``, in that order, to their manifests. A
-    ``target_language`` is checked against every reference before any tier runs. The gym
-    root's run lock is held once across every tier. The canonical ``VerifyRecord`` is
-    written to ``verdict.json`` under the gym root.
+    ``target_language`` is checked against every reference before any tier runs, and so is
+    each ``noise`` band (keyed by its file): it applies to the tier whose reference scored
+    its dataset. The gym root's run lock is held once across every tier. The canonical
+    ``VerifyRecord`` is written to ``verdict.json`` under the gym root.
     """
     if tuple(tiers) != VERIFY_TIERS:
         raise ValueError(f"verify runs exactly {', '.join(VERIFY_TIERS)}, in that order")
@@ -1203,6 +1209,9 @@ async def verify_candidate(
     for baseline in baselines.values():
         # Refuse a target language a reference lacks now, not after an hour of runs.
         admit_track(baseline, track, target_language)
+    bands = assign_bands(
+        noise or {}, {name: card.dataset_digest for name, card in baselines.items()}
+    )
     gates: dict[str, TierGate] = {}
     runs: dict[str, GymRun] = {}
     skipped: dict[str, SkipReason] = {name: "skipped_by_request" for name in tiers if name in skip}
@@ -1239,11 +1248,13 @@ async def verify_candidate(
                     smoke=(name == "tier0"),
                     track=track,
                     target_language=target_language,
+                    noise=bands[name][1] if name in bands else None,
                 ),
             )
             if on_gate is not None:
                 on_gate(name, gates[name], baselines[name], run)
-    # REJECTED when any gate rejected, else INCOMPARABLE when any was, else ACCEPTED.
+    # REJECTED when any gate rejected, else INCOMPARABLE when any was, else INCONCLUSIVE
+    # when any was, else ACCEPTED.
     decision = chain_decision([item.gate.decision for item in gates.values()])
     record = verify_record(
         gates,
@@ -1253,6 +1264,7 @@ async def verify_candidate(
         reference=reference,
         invocation=options.invocation,
         track=track,
+        noise=list(noise or ()),
     )
     verdict_path = gym_root / "verify" / verify_id / VERDICT_FILE
     _write_json(verdict_path, record.model_dump(mode="json"))
@@ -1282,6 +1294,23 @@ def _run_tier(record: Mapping[str, Any], run_id: str) -> str | None:
     if stamp is None or not run_id.startswith("gym-"):
         return None
     return run_id[len("gym-") : stamp.start()]
+
+
+def run_scorecard(path: Path) -> Path:
+    """A run directory's scorecard, or the scorecard file given."""
+    return path / SCORECARD_FILE if path.is_dir() else path
+
+
+def noise_tier(paths: Sequence[Path], cards: Sequence[Scorecard]) -> str:
+    """The one tier every run names (its ``run.json``, else its run id); refused otherwise."""
+    tiers = {
+        _run_tier(read_run_record(path) if path.is_dir() else {}, card.run.run_id)
+        for path, card in zip(paths, cards, strict=True)
+    }
+    tier = tiers.pop() if len(tiers) == 1 else None
+    if tier is None:
+        raise ValueError("the runs do not name one tier; pass --out")
+    return tier
 
 
 def run_summary(run_dir: Path) -> dict[str, Any]:

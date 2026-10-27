@@ -448,7 +448,8 @@ def test_a_regression_made_only_of_operational_stops_is_rejected_as_confounded()
     assert "Operationally confounded: java, perl" in text
     assert "| Baseline operational eps | Candidate operational eps | Operational delta |" in text
     assert (
-        "| java | 1.000 | 0.000 | -1.000 | yes | unknown | unknown | unknown | 0 | 3 | +3 "
+        "| java | 1.000 | 0.000 | -1.000 | yes (single case) | unknown | unknown | unknown "
+        "| 0 | 3 | +3 "
         "| 0 | 0 | +0 | yes |" in (text)
     )
 
