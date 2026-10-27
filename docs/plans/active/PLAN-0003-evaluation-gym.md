@@ -430,3 +430,10 @@ content-addressed tags and cannot contaminate parallel runs.
   instruction (2,131 B) and the gym modules from the wheel; the wheel contains no `.runs`, `.state`, `.work` or
   ledger content. 54 commits ahead of `main`, nothing pushed. Blocked on the owner's rulings (target-side
   exception policy; coverage discard on ERROR observations; publication of `gym/loop`; xxe oracle review).
+- 2026-10-27 Owner rulings ("Go" on the orchestrator's recommendations 1 and 2): (1) the kernel keeps a target-side
+  exception explicit as ERROR; the gym scores such an episode 0 under a new `target_exception` gate reason instead
+  of −0.5, derived from the raw receipt (s8); a blind-retry workflow policy after a target-side exception is deferred
+  to a reviewed spec of its own. (2) ERROR observations keep receipt coverage and carry an explicit error kind (w2),
+  verdict-neutral, with re-validation tolerant of results stored before the change. Publication of `gym/loop` and
+  the xxe oracle freeze remain pending explicit instruction. Next: re-score the reference under the new reward (same
+  runs), then re-measure h1 at budget 4096 against it.
