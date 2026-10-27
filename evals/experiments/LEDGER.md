@@ -48,6 +48,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | s7 | dx | `gym/s7-verify-score-nits@890616e` | — | — | — | — | merged `6c4228b` | Offline; 9 tests; gates on gym/loop after merge: check clean, 1345 tests, Docker 61 passed |
 | s8 | dx | `gym/s8-target-exception-reward@b97a592` | — | — | — | — | merged `7ab7235` | Offline; 27 tests; reference re-scored in place; h1 still REJECTED on the J margin alone (single-case languages make one ERROR cost ~0.085 J), so track-specific gate criteria follow (s9) |
 | w2 | dx | `gym/w2-error-observation-coverage@008fdc0` | — | — | — | — | merged `4593c93` | Verdict-neutral: 425 stored rounds under old and new code, 0 differences in validate_saved, decide, session_verdict; 32 of 38 stored ERROR roles are target_exception with the bound line covered; Docker 61 passed, Temporal 57 passed in the worktree |
+| s9 | dx | `gym/s9-track-gate@471a9bd` | — | — | — | — | merged `d67c83d` | Offline; h1 decisive run ACCEPTED under accuracy track (macro +0.0167, tokens 1.070, no regression), REJECTED under objective; h2 clean REJECTED under efficiency; c r0 SandboxExecutionError now operational |
 
 ## Rejected ideas (do not retry without new evidence)
 
