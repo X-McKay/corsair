@@ -33,6 +33,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | s4 | dx | `gym/s4-dataset-intake-draft@875db9d` | — | — | — | — | merged `c88ec3f` | Offline; 25 tests; xxe pair drafted in scratch only; proposed oracles are wide by design and need owner review before any tier |
 | h2 | efficiency | `gym/h2-producer-decisiveness@a41fed0` | ACCEPTED | REJECTED (language_regressed, objective_below_threshold; regressed: java, perl, python) | +0.097 / -1.039 | 0.640 / 0.785 | inconclusive | tier0 ACCEPTED (-36% tokens, J +0.097); tier1 REJECTED but java 3/3 and perl 1/3 failed on activity heartbeat timeouts while h1 overlapped (sliced re-run 6/6); python provider_max_tokens rose 2 to 6; clean tier1 re-run pending; the decision-shape sentence alone removed 16 of 17 validation retries on tier0 |
 | s6 | dx | `gym/s6-scorecard-identity-operational@8824521` | — | — | — | — | merged `a4ac5cc` | Offline; 39 tests; re-scoring reference and h2 tier1 identical; h2 java/perl confounded by heartbeat timeouts, python regression real; identity line shows producer_prompt and producer_skills changed |
+| s5 | dx | `gym/s5-run-lock@885d0a7` | — | — | — | — | merged `2ecb728` | Scripted Temporal integration proof that a second run waits; Docker suite deferred until the live runs end |
 
 ## Rejected ideas (do not retry without new evidence)
 
