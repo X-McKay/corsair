@@ -161,6 +161,18 @@ def test_a_licence_less_staged_tree_shows_none_on_the_sheet(tmp_path, stage):
     assert row["licence file"] == "none; fixed LICENSE, lib/NOTICE.md"
 
 
+def test_a_staged_row_declaring_secbenchjs_material_has_provenance_sbj(tmp_path, stage):
+    """SecBench.js pointer rows are staged with npm trees under ``external/secbenchjs/``;
+    their case.json provenance path names that corpus, so ids read ``sbj-``, not ``unk-``."""
+    chain = _staged_case(stage, "deep-b")
+    case = json.loads((chain / "case.json").read_text())
+    case["provenance"] = {"path": "external/secbenchjs/pkgs/deep/1.0.0", "license": "MIT"}
+    _write_json(chain / "case.json", case)
+    draft = _staged_draft(tmp_path, stage, "deep-b")
+    [entry] = json.loads((draft / "draft.json").read_text())["entries"]
+    assert (entry["case_id"], entry["family"]) == ("sbj-python-deep-b", "sbj-python-deep")
+
+
 def test_an_unstaged_draft_keeps_its_schema_and_sheet(tmp_path):
     from tests.unit.test_dataset_intake_draft import _chain_pair, _draft
 

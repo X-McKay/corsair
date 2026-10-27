@@ -28,9 +28,10 @@ from corsair.observability.logging import safe_error_detail
 
 _VARIANT_DIRECTORY = re.compile(r"^(?:(?P<stem>.+)-)?[ab](?:-v\d+)?$")
 _LAYOUT_DIRECTORY = re.compile(r"^v\d+$")
-# Family ids written ``ih-<language>-<class>`` or ``chain-<language>-<class>`` always name
-# the language; an unprefixed id names one only through a known language token.
-_LANGUAGE_PREFIXES = frozenset({"ih", "chain"})
+# Family ids written ``ih-<language>-<class>``, ``sbj-<language>-<class>`` or
+# ``chain-<language>-<class>`` always name the language; an unprefixed id names one only
+# through a known language token.
+_LANGUAGE_PREFIXES = frozenset({"ih", "sbj", "chain"})
 _LANGUAGES = {
     "c": "c",
     "java": "java",
@@ -115,7 +116,7 @@ def kind_language(kind: str) -> str:
 def family_stem(family: str, kind: str | None) -> str:
     """A family's language and class, ``<language>/<class>``, so spellings compare equal.
 
-    The language comes from an ``ih-``/``chain-`` prefix, a leading language token, or else
+    The language comes from an ``ih-``/``sbj-``/``chain-`` prefix, a leading language token, or else
     the request's recipe kind (``java.secret_disclosure/1`` is java); the class drops
     ``-``/``_`` separators. ``xxe`` under a java kind and ``ih-java-xxe`` are both ``java/xxe``;
     without any language the stem is the class alone."""

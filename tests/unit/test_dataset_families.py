@@ -239,6 +239,7 @@ def test_chain_pair_is_read_from_the_variant_directory(path, pair):
         ("xxe", "java.secret_disclosure/1", "java/xxe"),
         ("pathtraversal", "ruby.secret_disclosure/1", "ruby/pathtraversal"),
         ("ih-ruby-path-traversal", None, "ruby/pathtraversal"),
+        ("sbj-javascript-deep-extend", None, "javascript/deepextend"),
         ("family01", "python.secret_disclosure/1", "python/family01"),
         ("xxe", None, "xxe"),
     ],
