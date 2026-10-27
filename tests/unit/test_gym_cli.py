@@ -29,6 +29,8 @@ from corsair.evaluation.gym.scoring import (
 from corsair.settings import Settings
 from tests.unit.evaluation.test_gym_capture import CASE, _evals_root, _gym_run
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, CASES, NONE, _trajectory
+from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED_BASELINE
+from tests.unit.evaluation.test_gym_paired import _side as paired_side
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -889,3 +891,139 @@ async def test_ledger_append_records_the_noise_band_and_an_inconclusive_gate(tmp
     capsys.readouterr()
     with pytest.raises(ValueError, match="matches no gated tier"):
         await _run(_arguments(*append[:-4], "--id", "n2", "--noise", str(noise), "--branch", "b"))
+
+
+# Deciding languages and paired outcomes (--min-cases)
+
+
+def _paired_run(directory: Path, verified: dict[str, list[bool]], run_id: str) -> Path:
+    """A run directory with a scorecard and its trajectories (python has three cases)."""
+    card, rows = paired_side(verified, run_id)
+    write_scorecard(directory / SCORECARD_FILE, card)
+    write_trajectories(directory / TRAJECTORIES_FILE, rows)
+    return directory / SCORECARD_FILE
+
+
+# Python gains a case while single-case ruby flips: python decides at --min-cases 3.
+PAIRED_CANDIDATE = {**PAIRED_BASELINE, "py-c": ALL, "rb-a": NONE}
+
+
+@pytest.mark.asyncio
+async def test_gate_min_cases_decides_on_deciding_languages_with_paired_outcomes(tmp_path, capsys):
+    root = tmp_path / "gym"
+    base = _paired_run(root / "runs/base", PAIRED_BASELINE, "base")
+    reference = root / "reference/tier1.json"
+    reference.parent.mkdir(parents=True)
+    shutil.copy(base, reference)
+    cand = _paired_run(root / "runs/cand", PAIRED_CANDIDATE, "cand")
+    pair = ["gym", "gate", "--baseline", str(reference), "--candidate", str(cand)]
+    pair += ["--track", "accuracy"]
+
+    assert await _run(_arguments(*pair)) == 1
+    captured = capsys.readouterr()
+    plain = json.loads(captured.out)
+    assert plain["regressed_languages"] == ["ruby"]
+    assert (plain["min_cases"], plain["paired"], plain["deciding_languages"]) == (1, None, [])
+    assert captured.err == ""
+
+    narrowed = [*pair, "--min-cases", "3", "--root", str(root)]
+    assert await _run(_arguments(*narrowed)) == 0
+    verdict = json.loads(capsys.readouterr().out)
+    assert verdict["decision"] == "ACCEPTED"
+    assert (verdict["deciding_languages"], verdict["reported_languages"]) == (
+        ["python"],
+        ["java", "ruby"],
+    )
+    paired = verdict["paired"]
+    # The reference copy's trajectories come from <root>/runs/<its run id>/.
+    assert (paired["pass_to_fail"], paired["fail_to_pass"]) == (1, 1)
+    assert paired["pass_to_fail_cases"] == [
+        {"case_id": "rb-a", "language": "ruby", "deciding": False, "within_noise": False}
+    ]
+    assert (paired["deciding_pass_to_fail"], paired["deciding_fail_to_pass"]) == (0, 1)
+    assert await _run(_arguments(*narrowed, format="markdown")) == 0
+    text = capsys.readouterr().out
+    assert "| ruby | 1.000 | 0.000 | -1.000 | reported only (single case) |" in text
+    assert "| python | 0 | 1 | 2 | 0 | yes |" in text
+
+    (root / "runs/base" / TRAJECTORIES_FILE).unlink()
+    assert await _run(_arguments(*narrowed)) == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["paired"] is None
+    assert "Warning: paired per-case outcomes are unknown" in captured.err
+    assert str(root / "runs/base" / TRAJECTORIES_FILE) in captured.err
+    with pytest.raises(ValueError, match="no baseline language has 4 or more cases"):
+        await _run(_arguments(*pair, "--min-cases", "4", "--root", str(root)))
+    with pytest.raises(SystemExit):
+        _arguments(*pair, "--min-cases", "0")
+
+
+@pytest.mark.asyncio
+async def test_gate_min_cases_ignores_trajectories_of_another_scorecard(tmp_path, capsys):
+    root = tmp_path / "gym"
+    base = _paired_run(root / "runs/base", PAIRED_BASELINE, "base")
+    cand = _paired_run(root / "runs/cand", PAIRED_CANDIDATE, "cand")
+    # Overwrite the candidate's trajectories with another run's: they do not reproduce it.
+    write_trajectories(root / "runs/cand" / TRAJECTORIES_FILE, paired_side(PAIRED_BASELINE, "x")[1])
+    args = ["gym", "gate", "--baseline", str(base), "--candidate", str(cand)]
+    args += ["--track", "accuracy", "--min-cases", "3", "--root", str(root)]
+
+    assert await _run(_arguments(*args)) == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["paired"] is None
+    assert f"no trajectories reproducing `{cand}`" in captured.err
+
+
+def _fake_paired_runs(monkeypatch, tmp_path: Path, cards: dict[str, dict[str, list[bool]]]):
+    ran: list[str] = []
+
+    async def run_gym(options, *, root, compose_activities, observe, held=None, pinned=None):
+        del root, compose_activities, observe, held, pinned
+        tier = gym.tier_name(options.dataset)
+        ran.append(tier)
+        run_dir = tmp_path / "runs" / tier
+        _paired_run(run_dir, cards[tier], f"cand-{tier}")
+        card = read_scorecard(run_dir / SCORECARD_FILE)
+        rows = read_trajectories(run_dir / TRAJECTORIES_FILE)
+        return gym.GymRun(run_dir, card, rows, "127.0.0.1:1", True, 1.0)
+
+    monkeypatch.setattr(gym, "run_gym", run_gym)
+    return ran
+
+
+@pytest.mark.asyncio
+async def test_verify_min_cases_narrows_the_tier1_gate_only(tmp_path, capsys, monkeypatch):
+    reference = tmp_path / "reference"
+    gym_root = tmp_path / "artifacts/gym"
+    for tier in ("tier0", "tier1"):
+        _paired_run(gym_root / "runs" / f"ref-{tier}", PAIRED_BASELINE, f"ref-{tier}")
+        reference.mkdir(exist_ok=True)
+        shutil.copy(gym_root / "runs" / f"ref-{tier}" / SCORECARD_FILE, reference / f"{tier}.json")
+    ran = _fake_paired_runs(
+        monkeypatch, tmp_path, {"tier0": PAIRED_BASELINE, "tier1": PAIRED_CANDIDATE}
+    )
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    verify = ["gym", "verify", "--reference", str(reference), "--track", "accuracy", *settings]
+
+    assert await _run(_arguments(*verify)) == 1
+    record = VerifyRecord.model_validate_json(
+        Path(json.loads(capsys.readouterr().out)["verdict"]).read_text()
+    )
+    assert record.tier1 is not None and record.tier1.gate.regressed_languages == ["ruby"]
+
+    assert await _run(_arguments(*verify, "--min-cases", "3")) == 0
+    record = VerifyRecord.model_validate_json(
+        Path(json.loads(capsys.readouterr().out)["verdict"]).read_text()
+    )
+    assert record.tier0 is not None and record.tier1 is not None
+    assert (record.tier0.gate.min_cases, record.tier0.gate.paired) == (1, None)
+    tier1 = record.tier1.gate
+    assert (tier1.min_cases, tier1.deciding_languages) == (3, ["python"])
+    assert tier1.paired is not None and tier1.paired.deciding_fail_to_pass == 1
+    assert tier1.decision is GateDecision.ACCEPTED
+    assert ran == ["tier0", "tier1", "tier0", "tier1"]
+
+    ran.clear()
+    with pytest.raises(ValueError, match="no baseline language has 4 or more cases"):
+        await _run(_arguments(*verify, "--min-cases", "4"))
+    assert ran == []

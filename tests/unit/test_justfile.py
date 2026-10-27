@@ -169,6 +169,12 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             + ["--noise", "noise $(touch SHOULD_NOT_EXIST).json"],
         ),
         (
+            "gym-gate",
+            ["base.json", "cand.json", "--min-cases", "3", "--root", "gym root"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--min-cases", "3", "--root", "gym root"],
+        ),
+        (
             "gym-noise",
             ["run a", "run $(touch SHOULD_NOT_EXIST)", "run c", "--out", "band file.json"],
             [*GYM, "noise", "run a", "run $(touch SHOULD_NOT_EXIST)", "run c"]
@@ -184,6 +190,12 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
             "gym-verify",
             ["ref dir", "--noise", "noise-tier0.json", "--noise", "noise-tier1.json"],
             [*GYM, "verify", "--reference", "ref dir", "--noise", "noise-tier0.json"]
+            + ["--noise", "noise-tier1.json"],
+        ),
+        (
+            "gym-verify",
+            ["ref dir", "--min-cases", "3", "--noise", "noise-tier1.json"],
+            [*GYM, "verify", "--reference", "ref dir", "--min-cases", "3"]
             + ["--noise", "noise-tier1.json"],
         ),
         ("gym-runs", ["--tier", "tier0"], [*GYM, "runs", "--tier", "tier0"]),
