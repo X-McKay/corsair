@@ -572,9 +572,9 @@ content-addressed tags and cannot contaminate parallel runs.
   imported licensed trees and a provenance code), s12 (noise band record and an INCONCLUSIVE gate verdict for deltas
   inside the band), and an auditor pass over the stored tier1 runs to rank the next behavioural hypotheses. The
   live route is idle until tier1 changes: the next reference is taken on the enlarged tier1, twice, to seed the band.
-- 2026-10-27 c1 merged (e0fea284, 97a381b3 cherry-picked): of the 11 local sibling rows, one was frozen
+- 2026-10-27 c1 merged (e0fea284, 97a381b3 cherry-picked): of the 10 local sibling rows, one was frozen
   (`ih-python-codeinjection-a`, amended to the chain-python-cmdi-a negative convention; tier1 15 → 16 rows, digest
-  ec8cd985… → 93b3a0e9…, accuracy step 1/66); ten rejected: clean negatives for unqualified kinds (java, javascript,
+  ec8cd985… → 93b3a0e9…, accuracy step 1/66); nine rejected: clean negatives for unqualified kinds (java, javascript,
   perl, ruby), duplicate trees of existing tier rows (javascript -a and finding-text-injection, perl -b), the C
   fixed-comparison tree with an unsupported truth type, and the python ineffective-fix row (no frozen convention).
   Decisions carry reviewer `orchestrator-wave4 (pending owner audit)`. Gates in the agent worktree: check exit 0,
