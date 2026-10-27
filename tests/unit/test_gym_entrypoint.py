@@ -123,8 +123,11 @@ def test_tier1_is_every_runnable_composed_case_verbatim():
         "chain-c",
     )
     expected = [entry for name in names for entry in _entries(name)]
-    assert _entries("gym-tier1") == expected
+    tier1 = _entries("gym-tier1")
+    assert tier1[: len(expected)] == expected
     assert len(expected) == 15
+    # Rows frozen into tier1 through reviewed intake follow the composed cases.
+    assert [entry["case_id"] for entry in tier1[len(expected) :]] == ["ih-python-codeinjection-a"]
     assert not (DATASETS / "gym-tier2.json").exists()
 
 
