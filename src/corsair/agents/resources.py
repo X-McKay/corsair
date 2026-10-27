@@ -10,6 +10,7 @@ loader. The producer declares only its two source reads and the auditor no tools
 from __future__ import annotations
 
 import hashlib
+import json
 import stat
 from importlib import resources
 from pathlib import Path
@@ -345,10 +346,23 @@ def select_reference(role: str, finding: Finding, recipe_kind: str) -> tuple[str
 
 
 def runtime_skill_digest(role: str) -> str:
-    """Hash every raw byte of the role's explicitly admitted runtime resources."""
+    """Hash the reference selection tables and every admitted runtime resource byte."""
 
     digest = hashlib.sha256()
     validated_role = _validated_role(role)
+    # Which kinds and classes receive which packaged note shapes every packet, so the
+    # selection tables are part of the identity alongside the bytes they select.
+    selection = json.dumps(
+        {
+            "classes": _REFERENCE_CLASS_SELECTORS,
+            "kinds": sorted(_SELECTABLE_RECIPE_KINDS),
+            "kind_references": sorted(_RECIPE_KIND_REFERENCES.items()),
+        },
+        separators=(",", ":"),
+    )
+    digest.update(b"reference-selection\x00")
+    digest.update(selection.encode("utf-8"))
+    digest.update(b"\x00")
     for slug in load_agent_spec(validated_role).runtime_skills:
         for relative_path, content in _admitted_skill_files(validated_role, slug):
             digest.update(slug.encode("utf-8"))
