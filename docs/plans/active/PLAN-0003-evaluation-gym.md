@@ -498,3 +498,11 @@ content-addressed tags and cannot contaminate parallel runs.
   builds drafted members without family stem or trees, so `family_stem_crosses_splits` never fires for them; draft
   takes the language from a `common/` directory for C rows; freeze's tree keys do not skip the `v3/` layout. The
   survey's "12 sibling rows" resolved to 10; python pathtraversal-a/b need an unbuilt recipe adaptation.
+- 2026-10-27 s10 merged (c0f7db79, be756d04): freeze builds drafted rows with `families.request_member` (same
+  stems and trees as frozen entries), draft derives the language from the recipe kind (`families.kind_language`),
+  freeze's own tree rule removed in favour of the shared `variant_stem` check (an unreadable or changed `--against`
+  request is refused as `against_unreadable`). On the wave-3 drafts freeze and `just dataset-families` now agree for
+  every row and split; the C group re-drafted as `sib-c-integer-overflow-v2/` (`ih-c-intoverflow-b`). Known gap:
+  `family_stem` recognises only `ih-`/`chain-` prefixes, so `syn-` families match by pair and tree only. Gates on
+  `gym/loop` at c0f7db79: `just check` exit 0; `just -- test -q -W error` 1432 passed, 113 deselected. The loop
+  now waits on the owner: review decisions for the 12 drafted rows, the noise-aware gate ruling, and publication.
