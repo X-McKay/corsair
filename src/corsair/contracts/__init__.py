@@ -55,6 +55,7 @@ from .gym import RunContext as RunContext
 from .gym import RunIdentity as RunIdentity
 from .gym import Scorecard as Scorecard
 from .gym import SkipReason as SkipReason
+from .gym import TargetExceptionEpisode as TargetExceptionEpisode
 from .gym import TierGate as TierGate
 from .gym import Trajectory as Trajectory
 from .gym import VerifyRecord as VerifyRecord

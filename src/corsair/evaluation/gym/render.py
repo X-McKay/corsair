@@ -7,7 +7,14 @@ and the fixed reason sentences below are printed; no model-authored text reaches
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from corsair.contracts import GateReason, GateVerdict, GroupSummary, OperationalEpisode, Scorecard
+from corsair.contracts import (
+    GateReason,
+    GateVerdict,
+    GroupSummary,
+    OperationalEpisode,
+    Scorecard,
+    TargetExceptionEpisode,
+)
 
 REASON_TEXT: dict[GateReason, str] = {
     GateReason.DATASET_MISMATCH: "The runs scored different frozen datasets.",
@@ -124,6 +131,7 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         after = candidate.languages.get(language)
         capped_after = None if after is None else after.capped_call_episodes
         operational_after = None if after is None else after.operational_episodes
+        target_after = None if after is None else after.target_exception_episodes
         language_rows.append(
             [
                 language,
@@ -137,6 +145,9 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 _count(before.operational_episodes),
                 _count(operational_after),
                 _count_delta(before.operational_episodes, operational_after),
+                _count(before.target_exception_episodes),
+                _count(target_after),
+                _count_delta(before.target_exception_episodes, target_after),
                 "yes" if language in verdict.operationally_confounded_languages else "no",
             ]
         )
@@ -154,6 +165,9 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 "Baseline operational eps",
                 "Candidate operational eps",
                 "Operational delta",
+                "Baseline target-exception eps",
+                "Candidate target-exception eps",
+                "Target-exception delta",
                 "Confounded",
             ],
             language_rows,
@@ -180,6 +194,7 @@ def _group_rows(groups: Mapping[str, GroupSummary]) -> list[list[str]]:
             _count(summary.reasoning_cap_exhausted),
             _stops(summary.failure_stops),
             _count(summary.operational_episodes),
+            _count(summary.target_exception_episodes),
         ]
         for name, summary in groups.items()
     ]
@@ -200,6 +215,7 @@ _GROUP_HEADER = [
     "Reasoning capped",
     "Failure stops",
     "Operational eps",
+    "Target-exception eps",
 ]
 
 
@@ -208,6 +224,19 @@ def _operational_lines(stops: Sequence[OperationalEpisode]) -> list[str]:
         return []
     lines = ["", "Operational stops (scored as failures; re-run before reading them):", ""]
     lines.extend(f"- `{item.case_id}` repeat {item.repeat}: {item.reason.value}" for item in stops)
+    return lines
+
+
+def _target_exception_lines(episodes: Sequence[TargetExceptionEpisode]) -> list[str]:
+    if not episodes:
+        return []
+    lines = [
+        "",
+        "Target-side exceptions (verdict ERROR from a completed run that raised in the target; "
+        "scored 0, neither a false label nor an infrastructure fault):",
+        "",
+    ]
+    lines.extend(f"- `{item.case_id}` repeat {item.repeat}" for item in episodes)
     return lines
 
 
@@ -227,6 +256,7 @@ def render_scorecard(scorecard: Scorecard) -> str:
         f"- Capped-call episodes: {_count(scorecard.capped_call_episodes)}; "
         f"reasoning cap exhausted: {_count(scorecard.reasoning_cap_exhausted)}",
         f"- Operational episodes: {_count(scorecard.operational_episodes)}",
+        f"- Target-exception episodes: {_count(scorecard.target_exception_episodes)}",
         f"- Repeats: {scorecard.repeats}; sliced: {'yes' if scorecard.sliced else 'no'}",
         f"- Dataset digest: `{scorecard.dataset_digest}`",
         f"- Budgets digest: `{scorecard.budgets_digest or 'none'}`",
@@ -236,6 +266,7 @@ def render_scorecard(scorecard: Scorecard) -> str:
     lines.append("")
     lines.extend(_table(["Kind", *_GROUP_HEADER], _group_rows(scorecard.kinds)))
     lines.extend(_operational_lines(scorecard.operational_stops))
+    lines.extend(_target_exception_lines(scorecard.target_exceptions))
     return "\n".join(lines) + "\n"
 
 
