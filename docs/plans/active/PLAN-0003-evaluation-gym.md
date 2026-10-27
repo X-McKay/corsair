@@ -517,3 +517,13 @@ content-addressed tags and cannot contaminate parallel runs.
   CrossVul (snippets, licences unclear), CVEfixes (CC-BY-4.0 discovery index only; the sole lead for Ruby and
   Perl). First fetch: SecBench.js prototype-pollution subset and Vul4Py metadata, into `.work/intake/external/`,
   with per-package LICENSE retained and integrity checked; nothing executed on the host.
+- 2026-10-27 Legacy held-out families (8 `ih-<lang>-<class>` rows with corpus trees but no chain directory): none
+  can be drafted. All eight need a new recipe kind (sqli, idor, fileinclusion, formulainjection and xss in python;
+  xss and sessionfix in javascript; permissions in perl) and therefore a human-authored rubric; their
+  `held_out.json` digests are v2 case digests, not tree digests; finding locations exist in
+  `corpus/infosec-harness/manifest.json`; no overlap with tier0/tier1 (holdout-eligible once a kind exists); trees
+  carry no licence file (NOASSERTION). Tooling blocker found: `dataset draft` requires the chain directory under an
+  `evals/datasets` tree and admission refuses sources outside that root and symlinks, so staged material under
+  `.work/` cannot be drafted (s11: `draft --source-root` for staging; `freeze --import-into` copies reviewed trees
+  with their licence files into `evals/datasets/corpus/` under owner authorisation). The JS external intake is
+  staged but paused before draft until s11 lands.
