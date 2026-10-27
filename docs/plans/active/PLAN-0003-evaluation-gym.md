@@ -686,4 +686,13 @@ content-addressed tags and cannot contaminate parallel runs.
   --noise`), s20 (per-case stability in the band: a flip on an unstable case is within noise) and s21 (qualified
   evidence labels naming the role whose coverage or execution failed). Held: H4 (round-2+ thinking budget 8192)
   until h8 lands, since both edit the inference adapter; H2 as decision 5.
+- 2026-10-27 merged s20 (8ae6e39c): the noise band records each case's majority outcome and verified-episode
+  count per run with a stability class, and a flip on an unstable case is within noise in the paired and slice
+  gates. The reference band is rebuilt with cases (the old file kept as `noise-tier1.pre-s20.json`, which checkouts
+  before s20 must use since the contracts forbid unknown fields): 13 stable pass, 5 stable fail (adversarial01,
+  adversarial02, the two abstains, aurelia-path), 3 unstable (case02, case03, deep-override). Correction to the
+  wave-5 opening entry: under the gate's majority-per-run rule adversarial01/02 and mixin-deep/viking04-merge are
+  not coin-flips at n=2 but sit at 1 of 3 and 2 of 3 in every run, one episode from flipping; `verified_episodes`
+  keeps that visible, and a third reference run would sharpen the class. Greedy run 1 against the reference with
+  the new band: INCONCLUSIVE, the only flip (case03) within noise.
 
