@@ -234,3 +234,31 @@ content-addressed tags and cannot contaminate parallel runs.
   `_handle_eval`). Not run: tier1, 3-repeat runs, no-cache image rebuild, `--temporal-address` success path, wheel
   install outside the checkout. On `gym/loop` after the merge: `just check` exit 0, `just -- test -q -W error` 1179
   passed, 109 deselected.
+- 2026-10-27 WP1b merged (branch `gym/wp1b-sandbox-telemetry` ebc16f29): `RoleObservation.wall_seconds`,
+  `cpu_seconds` (driver-reported, cgroup v2 `usage_usec`), `host_seconds` (create→wait, measured in `docker.py` and
+  carried in the raw receipt as `host_usec` so saved-evidence re-validation can rebuild it); all six drivers emit
+  `wall_usec`/`cpu_usec`; Docker tests resolve content-addressed tags via `trusted_images.py`. Worktree gates:
+  `just -- test -q -W error` 1189 passed, 109 deselected; `just check` exit 0; `just -- test-docker -q -W error` 46
+  passed, 14 skipped (Temporal-gated); with CORSAIR_TEST_TEMPORAL=1 59 passed, 1 skipped (long probe);
+  `just -- test-temporal -q -W error` 55 passed, 11 skipped. New image tags python 00cb018, javascript 2c776a9, ruby
+  f656e91, java c53d3d6, perl 709226b, c 2dd1ca8. Live `gym-run tier0 --repeats 1` on ebc16f29 (341 s, run under
+  shared model load with the tier1 diagnostic): 5/6 pass, java ERROR (adversarial role ERROR after control held; the
+  PLAN-0002 Java aim-variance item), all roles carry wall/cpu/host seconds; INCOMPARABLE to earlier runs (new images
+  and identity). A result saved by 4915df02 decodes and re-validates with the three fields None.
+- 2026-10-27 Diagnostic tier1 (not a reference): `just -- gym-run tier1 --repeats 3 --concurrency 2` on 8c4872c7
+  (pre-WP1b), run dir `.runs/gym/gym-tier1-20261027t002030-1bcf3c` in the `gym/loop` worktree, identity b8d10250,
+  dataset ec8cd985, 45 investigations, 40 min 58 s wall, exit 0, usage known for every episode, no cached tokens
+  reported. J 1.2553, macro verified accuracy 0.967, worst language python 0.80, macro effective tokens 37,554,
+  macro p50 65.7 s. Majority-failed cases: case02 (ERROR, NOT_DEMONSTRATED, ERROR) and chain-python-cmdi-a
+  (INCONCLUSIVE ×3, `producer_abstained`). Failure stops: `provider_max_tokens` 6 episodes (all
+  python.secret_disclosure; a producer call spends the full 12,288-token output cap on reasoning, so the structured
+  decision never completes), `producer_abstained` 6, `execution_error` 2 (case03 r0, java-xxe-b r1). Repeat variance:
+  case02, case03, java-xxe-b, adversarial01, adversarial02. Top-5 token and seconds outliers are the capped-reasoning
+  episodes (case02 r1 226,978 effective tokens, 485.7 s, 15 calls); thought/output ratio 0.905 run-wide; 4×output is
+  71 % of effective tokens. Budgets derived from this run adopted as `evals/experiments/budgets.json` (a6e293f1);
+  the python.secret_disclosure budget (174,386 tokens, 425.3 s) is inflated by those outliers. Hypotheses for wave 1:
+  h1 (accuracy: reasoning-cap exhaustion on the producer call, `adapters/inference/adk.py`, possibly a reasoning
+  control in `ModelSettings`), h2 (efficiency: producer instruction and source-grounding skill decisiveness,
+  `agents/producer/instructions/system.md`, `agents/producer/skills/source-grounding/SKILL.md`), h3 (dx: thought-token
+  share and output-cap marker on scorecard and trajectory rendering, `evaluation/gym/scoring.py`, `render.py`). Gates
+  on `gym/loop` at a6e293f1: `just check` exit 0, `just -- test -q -W error` 1189 passed, 109 deselected.
