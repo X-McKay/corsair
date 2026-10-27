@@ -1,0 +1,41 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "sbj-javascript-deep-extend",
+      "family": "sbj-javascript-deep-extend",
+      "request": "datasets/corpus/sbj-javascript-deep-extend.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-deep-extend.oracle.json",
+      "request_digest": "ffd5aa492322c05d969f0287a5464ef185e1d1c4342bcf4a98ed62a657b331ad",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "held_out"
+    },
+    {
+      "case_id": "sbj-javascript-json-schema",
+      "family": "sbj-javascript-json-schema",
+      "request": "datasets/corpus/sbj-javascript-json-schema.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-json-schema.oracle.json",
+      "request_digest": "f45a1c6a7a13f301d9d3a7386134cd63e8d96147aee8a022a7354fd501db1771",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "held_out"
+    },
+    {
+      "case_id": "sbj-javascript-vega-util",
+      "family": "sbj-javascript-vega-util",
+      "request": "datasets/corpus/sbj-javascript-vega-util.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-vega-util.oracle.json",
+      "request_digest": "0322f5b5caa95fe2609199f7c9b3d80083b763a9f42620490ad0c068d9b1677b",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "held_out"
+    },
+    {
+      "case_id": "sbj-javascript-nestie",
+      "family": "sbj-javascript-nestie",
+      "request": "datasets/corpus/sbj-javascript-nestie.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-nestie.oracle.json",
+      "request_digest": "c8eeee6a31c78fa72f44dfa5decf04962597cc22db796b400e74242995271ea7",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "held_out"
+    }
+  ]
+}

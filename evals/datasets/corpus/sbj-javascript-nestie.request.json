@@ -1,0 +1,37 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-nestie",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in nestie@1.0.0 nestie",
+      "description": "nestie in dist/index.js at line 29; drafted by corsair dataset draft for owner review.",
+      "file": "dist/index.js",
+      "line": 29,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-nestie/source",
+      "expected_digest": "299cd50e1b10a05d3c1b43f05b783d63d595f19478ad8c4bba410fa046f652ce"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "dist/index.js",
+      "function": "nestie",
+      "fixed_arguments": []
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-nestie/fixed",
+      "expected_digest": "08a3af297fd5bc21b09e6ff6abd13734cabd0c3a80800980532d09f5619ffff6"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

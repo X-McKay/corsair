@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-deep-override",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/deep-override/1.0.0",
+      "snapshot_digest": "a02efa8c7e7d41c2ac23982a3c4ece3746f49f3a49efbe379fe649cf8dd6a727",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/deep-override/1.0.2",
+      "snapshot_digest": "8d6db712cdb01f0ea105fc23ca0bb54d2e6e5f6943552d529b49812b27bb8aa7",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

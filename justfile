@@ -106,7 +106,7 @@ verify request submission *args:
 eval dataset *args:
     uv run --locked --extra providers corsair eval "$@"
 
-# Run a gym tier (tier0, tier1 or a manifest path) in namespace corsair-gym; defaults to .state/settings.json.
+# Run a gym tier (tier0, tier1, tier2 = holdout for orchestrator/auditor only, or a manifest path) in namespace corsair-gym; defaults to .state/settings.json.
 gym-run tier *args:
     uv run --locked --extra providers corsair gym run "$@"
 

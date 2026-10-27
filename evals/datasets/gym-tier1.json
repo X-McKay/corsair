@@ -144,6 +144,51 @@
       "request_digest": "e12cebe2f12dd41f73fb2728ee194bf9d24901a86b06d0f332add3217bfedbbe",
       "oracle_digest": "b2bbe264f9c938d3bcde7df16411829f608f09658995294aac19ca52e711436c",
       "split": "chain"
+    },
+    {
+      "case_id": "sbj-javascript-deep-override",
+      "family": "sbj-javascript-deep-override",
+      "request": "datasets/corpus/sbj-javascript-deep-override.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-deep-override.oracle.json",
+      "request_digest": "e43a66aa8e704c1e7f8f42f5ffb4b06c20e8994505f490c5db9a52c72e32a402",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "chain"
+    },
+    {
+      "case_id": "sbj-javascript-mixin-deep",
+      "family": "sbj-javascript-mixin-deep",
+      "request": "datasets/corpus/sbj-javascript-mixin-deep.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-mixin-deep.oracle.json",
+      "request_digest": "14679219fd61a7f2e50bf0ffed6ba3e5f8a645685355df6f968ec8b64185777a",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "chain"
+    },
+    {
+      "case_id": "sbj-javascript-viking04-merge",
+      "family": "sbj-javascript-viking04-merge",
+      "request": "datasets/corpus/sbj-javascript-viking04-merge.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-viking04-merge.oracle.json",
+      "request_digest": "4f528a546b41ee02424c3a0037036ba66f0131a87ab292fc89ac02bf581106d5",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "chain"
+    },
+    {
+      "case_id": "sbj-javascript-aurelia-path",
+      "family": "sbj-javascript-aurelia-path",
+      "request": "datasets/corpus/sbj-javascript-aurelia-path.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-aurelia-path.oracle.json",
+      "request_digest": "342cac32b6f50a50e62184353de58a31dbb0339a862341ed4fe61e84fbc050a8",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "chain"
+    },
+    {
+      "case_id": "sbj-javascript-safe-flat",
+      "family": "sbj-javascript-safe-flat",
+      "request": "datasets/corpus/sbj-javascript-safe-flat.request.json",
+      "oracle": "datasets/corpus/sbj-javascript-safe-flat.oracle.json",
+      "request_digest": "3bac0bf1661923212df4b7725e7843dbcd3128f832c5f4e35c3863e00ee6e9ab",
+      "oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "split": "chain"
     }
   ]
 }

@@ -127,8 +127,29 @@ def test_tier1_is_every_runnable_composed_case_verbatim():
     assert tier1[: len(expected)] == expected
     assert len(expected) == 15
     # Rows frozen into tier1 through reviewed intake follow the composed cases.
-    assert [entry["case_id"] for entry in tier1[len(expected) :]] == ["ih-python-codeinjection-a"]
-    assert not (DATASETS / "gym-tier2.json").exists()
+    assert [entry["case_id"] for entry in tier1[len(expected) :]] == [
+        "ih-python-codeinjection-a",
+        "sbj-javascript-deep-override",
+        "sbj-javascript-mixin-deep",
+        "sbj-javascript-viking04-merge",
+        "sbj-javascript-aurelia-path",
+        "sbj-javascript-safe-flat",
+    ]
+
+
+def test_tier2_is_the_held_out_tier_outside_the_candidate_protocol():
+    """tier2 resolves by name for the orchestrator and auditor, but the candidate protocol
+    (``gym verify``) never runs it, and it shares no case with tier0 or tier1."""
+    assert gym.resolve_tier("tier2", ROOT) == DATASETS / "gym-tier2.json"
+    assert "tier2" not in gym.VERIFY_TIERS
+    tier2 = _entries("gym-tier2")
+    assert tier2 and {entry["split"] for entry in tier2} == {"held_out"}
+    lower = {entry["case_id"] for name in ("gym-tier0", "gym-tier1") for entry in _entries(name)}
+    assert not lower & {entry["case_id"] for entry in tier2}
+    _, requests, _ = load_dataset(DATASETS / "gym-tier2.json")
+    assert {request.case.recipe.kind for request in requests} == {
+        "javascript.prototype_pollution/1"
+    }
 
 
 # Task queue and run identity

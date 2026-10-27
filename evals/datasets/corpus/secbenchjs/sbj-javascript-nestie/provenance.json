@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-nestie",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/nestie/1.0.0",
+      "snapshot_digest": "299cd50e1b10a05d3c1b43f05b783d63d595f19478ad8c4bba410fa046f652ce",
+      "licence_files": [
+        "license"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/nestie/1.0.2",
+      "snapshot_digest": "08a3af297fd5bc21b09e6ff6abd13734cabd0c3a80800980532d09f5619ffff6",
+      "licence_files": [
+        "license"
+      ]
+    }
+  }
+}

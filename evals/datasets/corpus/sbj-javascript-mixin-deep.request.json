@@ -1,0 +1,39 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-mixin-deep",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in mixin-deep@2.0.0 mixin",
+      "description": "module.exports in index.js at line 21; drafted by corsair dataset draft for owner review.",
+      "file": "index.js",
+      "line": 21,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-mixin-deep/source",
+      "expected_digest": "3791acd71c87e865066ce99e348c19723e0eb84573ba02edf9675e1ca8921b41"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "index.js",
+      "function": "module.exports",
+      "fixed_arguments": [
+        {}
+      ]
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-mixin-deep/fixed",
+      "expected_digest": "26c8ae1cfd642e7443fff4b76bbdb6bd7eb87abd841b3e123469f9c2f9a81392"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

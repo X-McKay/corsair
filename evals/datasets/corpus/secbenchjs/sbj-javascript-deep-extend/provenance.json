@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-deep-extend",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/deep-extend/0.5.0",
+      "snapshot_digest": "ea3a9b1290379a69c689dcd776ecabe108f0e406a52597035ee3d3b0fc25018b",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/deep-extend/0.5.1",
+      "snapshot_digest": "6c48ab62717faf0a6d1d9661d48481069e41868c7e48885fd1622d760ed74e59",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

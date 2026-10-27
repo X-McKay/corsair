@@ -476,7 +476,9 @@ _REVIEWER_COLUMNS = 3
 _DECISIONS = ("accept", "amend", "reject")
 # Dataset.entries bound; datasets.MAX_ENTRIES is not importable here (datasets imports intake).
 _MAX_DATASET_ENTRIES = 64
-_CORPUS_PROVENANCE = {"infosec-harness": "ih", "permissive-reduced": "pr"}
+# Provenance codes by corpus directory; ``secbenchjs`` is SecBench.js-pointed npm material
+# (staged under ``external/secbenchjs/``, imported under ``corpus/secbenchjs/``).
+_CORPUS_PROVENANCE = {"infosec-harness": "ih", "permissive-reduced": "pr", "secbenchjs": "sbj"}
 _SLUG = re.compile(r"[a-z0-9][a-z0-9_.-]{0,39}")
 _TOKEN = re.compile(r"[A-Za-z0-9_.:/-]{1,64}")
 _VARIANT = re.compile(r"^(?P<stem>.+)-[ab]$")
@@ -642,7 +644,8 @@ def _chain_source(chain_dir: Path, evals_root: Path, value: object) -> Path:
 
 
 def _provenance_code(source: Path, chain_dir: Path, evals_root: Path, case: dict) -> str:
-    """``ih``/``pr`` for a known corpus, ``syn`` for a tree beside the chain, else ``unk``."""
+    """``ih``/``pr``/``sbj`` for a known corpus (by tree, else by the case's declared provenance
+    path), ``syn`` for a tree beside the chain, else ``unk``."""
     corpus = evals_root / "datasets/corpus"
     if source.is_relative_to(corpus):
         code = _CORPUS_PROVENANCE.get(source.relative_to(corpus).parts[0])

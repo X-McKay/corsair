@@ -1,0 +1,39 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-vega-util",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in vega-util@1.13.0 writeConfig",
+      "description": "mergeConfig in build/vega-util.js at line 203; drafted by corsair dataset draft for owner review.",
+      "file": "build/vega-util.js",
+      "line": 203,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-vega-util/source",
+      "expected_digest": "06ec527f177256b66c0c7f0b9dbfdd67669a0762767e736e187846e664f079ee"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "build/vega-util.js",
+      "function": "mergeConfig",
+      "fixed_arguments": [
+        {}
+      ]
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-vega-util/fixed",
+      "expected_digest": "2883c5d4982cca4720236279c427e94d96e17e323cbc52f37c48787c2e2c7396"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

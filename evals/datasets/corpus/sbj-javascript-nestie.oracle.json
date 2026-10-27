@@ -1,0 +1,11 @@
+{
+  "acceptable": [
+    "SUPPORTED"
+  ],
+  "forbidden": [],
+  "expected_execution": "COMPLETED",
+  "acceptable_verdicts": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "forbidden_verdicts": []
+}

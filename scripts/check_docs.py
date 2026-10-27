@@ -23,6 +23,9 @@ EXCLUDED_DIRECTORIES = frozenset(
         "outputs",
     }
 )
+# An imported corpus case keeps upstream package bytes, frozen by digest, beside this file;
+# its Markdown is third-party content, not maintained documentation.
+IMPORTED_TREE_MARKER = "provenance.json"
 PUBLIC_SKILL_MARKDOWN = (
     Path(".agents/skills/corsair-development/SKILL.md"),
     Path(".agents/skills/corsair-evaluations/SKILL.md"),
@@ -50,10 +53,14 @@ class Issue:
 
 
 def markdown_files(root: Path) -> list[Path]:
-    """Return public Markdown, including only allowlisted project skill instructions."""
+    """Return public Markdown, including only allowlisted project skill instructions and
+    skipping imported corpus cases (a directory holding ``provenance.json``)."""
 
     files: list[Path] = []
     for directory, child_directories, names in root.walk():
+        if IMPORTED_TREE_MARKER in names:
+            child_directories[:] = []
+            continue
         child_directories[:] = [
             name
             for name in child_directories

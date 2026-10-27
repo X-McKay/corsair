@@ -1,0 +1,37 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-aurelia-path",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in aurelia-path@1.1.0 parseComplexParam",
+      "description": "parseQueryString in dist/commonjs/aurelia-path.js at line 163; drafted by corsair dataset draft for owner review.",
+      "file": "dist/commonjs/aurelia-path.js",
+      "line": 163,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-aurelia-path/source",
+      "expected_digest": "d9fd0367a84b46f153edaf36ed0f8efab6252f3ae42d001e9832b5504a347a24"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "dist/commonjs/aurelia-path.js",
+      "function": "parseQueryString",
+      "fixed_arguments": []
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-aurelia-path/fixed",
+      "expected_digest": "6cb7025c99be6f472a5685963694facfba298ac1b06cf59156747707fffcc6e9"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}
