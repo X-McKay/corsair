@@ -359,3 +359,17 @@ content-addressed tags and cannot contaminate parallel runs.
   every language, so its objective margin is noise; the smoke gate must stop a candidate only on a language
   regression or a token-ratio breach (folded into s6), and accuracy hypotheses whose target cases exist only in tier1
   are gated on tier1.
+- 2026-10-27 s6 merged (a4ac5cca, 88245217): `RunIdentity` (config, prompt, spec, output-schema, skills, budget
+  digests, image and model ids) on trajectories and scorecards with an "Identity changes" line on the gate;
+  operational-stop rule in `scoring.operational_stop` (role ERROR always behavioural; heartbeat/activity timeouts,
+  cancellation, lost host, `evidence_not_run` with an execution stop are operational); per-language
+  `operational_episodes` and `verified_accuracy_without_operational_failures`; gate reason
+  `operationally_confounded` (keeps REJECTED); smoke gate mode (`gate(..., smoke=True)`, `corsair gym gate --smoke`).
+  Re-scores of the reference tier0/tier1 and h2's tier1 reproduce every existing field; h2 tier1 shows java 3 and
+  perl 1 heartbeat-timeout episodes (confounded), python a real regression. s5 merged (2ecb7288, 885d0a79):
+  `<gym root>/lock/holder.json` taken by `gym run` and `gym verify` (held across both tiers), `flock`-guarded
+  publish, stale-pid reclaim, bounded wait (`--lock-timeout`, default 2 h, exit 2), `gym lock status|release
+  --force`, wait recorded in `run.json`; scripted Temporal integration test shows a second run waits. `verify` now
+  gates tier0 in smoke mode (222e5893). Gates on `gym/loop` at 222e5893: `just check` exit 0; `just -- test -q -W
+  error` 1342 passed, 113 deselected. Not yet run on this HEAD: `just test-docker` (deferred until the live decisive
+  runs for h1 and h2 end, so sandbox load does not skew their timing).
