@@ -475,10 +475,16 @@ _RUNS_HEADER = [
 
 
 def _commit(row: Mapping[str, Any]) -> str:
+    """The start commit, then a marker when the checkout changed before the run finished."""
     commit = row.get("git_commit")
     if not commit:
         return "unknown"
-    return commit[:7] + ("+dirty" if row.get("git_dirty") else "")
+    text = commit[:7] + ("+dirty" if row.get("git_dirty") else "")
+    if row.get("commit_changed"):
+        text += f", changed to {str(row['git_commit_at_finish'])[:7]} at finish"
+    if row.get("source_dirty_at_finish") and not row.get("git_dirty"):
+        text += ", dirty at finish"
+    return text
 
 
 def render_runs(rows: Sequence[Mapping[str, Any]]) -> str:

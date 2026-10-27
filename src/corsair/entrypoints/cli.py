@@ -758,6 +758,10 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         safe_invocation,
     )
 
+    # Imported now, before the run: the finish imports nothing from a checkout that may
+    # change while the run executes.
+    from corsair.evaluation.gym.render import render_scorecard
+
     root = checkout_root()
     options = GymOptions(
         dataset=resolve_tier(args.tier, root),
@@ -780,7 +784,9 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         lock_timeout=args.lock_timeout,
     )
     run = await run_gym(options, root=root, observe=_gym_observer(ui))
-    _emit_view(ui, "\n".join(_gym_run_lines(run)), _gym_run_record(run))
+    _emit_view(
+        ui, "\n".join(_gym_run_lines(run, render_scorecard(run.scorecard))), _gym_run_record(run)
+    )
     unavailable = sum(item.status == "unavailable" for item in run.trajectories)
     return 1 if unavailable else 0
 
@@ -801,13 +807,12 @@ def _gym_observer(ui: Terminal) -> Callable[[Any], Awaitable[list[BatchItem]]]:
     return observe
 
 
-def _gym_run_lines(run: GymRun) -> list[str]:
+def _gym_run_lines(run: GymRun, scorecard_text: str) -> list[str]:
     from corsair.entrypoints.gym import read_run_record
-    from corsair.evaluation.gym.render import render_scorecard
 
     card = run.scorecard
     return [
-        render_scorecard(card),
+        scorecard_text,
         f"- Run directory: `{run.run_dir}`",
         f"- Store: `{read_run_record(run.run_dir).get('store', 'unknown')}`",
         f"- Temporal: {'ephemeral' if run.ephemeral else 'existing'} `{run.temporal_address}`, "
@@ -840,21 +845,27 @@ _RUN_CONTEXT_TEXT = {
 async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
     """Score a saved report into trajectories and a scorecard; no services.
 
-    The run context comes from ``run.json``, else the scorecard beside the report, else the
-    explicit flags; a context recovered from the scorecard is written to a missing ``run.json``.
+    The manifest is the run directory's pinned ``dataset.json``; ``--dataset`` must carry
+    the same digest (else ``dataset_mismatch``, exit 2) and is needed only for a run from
+    before pinning, which is scored with a warning. The run context comes from ``run.json``,
+    else the scorecard beside the report, else the explicit flags; a context recovered from
+    the scorecard is written to a missing ``run.json``.
     """
     from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import RunContext
     from corsair.entrypoints.gym import (
         RUN_FILE,
         recover_run_context,
+        run_dataset,
         run_store,
+        unpinned_warning,
         write_recovered_run_record,
     )
     from corsair.evaluation.comparison import read_report
     from corsair.evaluation.gym.budgets import load_budgets
     from corsair.evaluation.gym.render import render_scorecard
     from corsair.evaluation.gym.scoring import (
+        REPORT_FILE,
         SCORECARD_FILE,
         TRAJECTORIES_FILE,
         load_results,
@@ -863,9 +874,18 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
         write_trajectories,
     )
 
-    report_path = Path(args.report)
-    report = read_report(report_path)
+    given = Path(args.report)
+    report_path = given / REPORT_FILE if given.is_dir() else given
     run_dir = report_path.parent
+    dataset = run_dataset(run_dir, Path(args.dataset) if args.dataset else None)
+    if dataset is None:
+        raise ValueError(
+            f"`{run_dir}` has no pinned dataset.json (a run from before dataset pinning); "
+            "pass --dataset"
+        )
+    if not dataset.pinned:
+        sys.stderr.write(unpinned_warning(run_dir, dataset.path))
+    report = read_report(report_path)
     out = Path(args.out) if args.out else run_dir
     explicit = (
         RunContext(
@@ -893,10 +913,11 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
     run_ids = [str(row.get("run_id")) for row in report.get("rows", [])]
     trajectories, card = score_report(
         report,
-        Path(args.dataset),
+        dataset.path,
         load_results(store, run_ids),
         run=run,
         budgets=load_budgets(Path(args.budgets)) if args.budgets else None,
+        manifest_root=dataset.root,
     )
     write_trajectories(out / TRAJECTORIES_FILE, trajectories)
     write_scorecard(out / SCORECARD_FILE, card)
@@ -961,26 +982,39 @@ async def _handle_gym_replay(args: CliArguments, ui: Terminal) -> int:
 
 
 async def _handle_gym_capture(args: CliArguments, ui: Terminal) -> int:
-    """Freeze a case's failed repeats as agent fixtures and kernel replay cases."""
-    from corsair.entrypoints.gym import checkout_root, dataset_for_report
+    """Freeze a case's failed repeats as agent fixtures and kernel replay cases.
+
+    The manifest is the run directory's pinned copy (``--dataset`` must carry its digest);
+    a run from before pinning uses ``--dataset`` or the checked-in manifest with the report's
+    digest, with a warning.
+    """
+    from corsair.entrypoints.gym import (
+        ScoringDataset,
+        checkout_root,
+        dataset_for_report,
+        run_dataset,
+        unpinned_warning,
+    )
     from corsair.evaluation.gym.capture import capture
     from corsair.evaluation.gym.scoring import REPORT_FILE
 
     root = checkout_root()
     run_dir = Path(args.run_dir)
-    dataset = (
-        Path(args.gym_dataset)
-        if args.gym_dataset
-        else dataset_for_report(run_dir / REPORT_FILE, root)
-    )
+    dataset = run_dataset(run_dir, Path(args.gym_dataset) if args.gym_dataset else None)
+    if dataset is None:
+        found = dataset_for_report(run_dir / REPORT_FILE, root)
+        dataset = ScoringDataset(found, None, pinned=False)
+    if not dataset.pinned:
+        sys.stderr.write(unpinned_warning(run_dir, dataset.path))
     captured = capture(
         run_dir,
         args.case or "",
-        dataset_path=dataset,
+        dataset_path=dataset.path,
         store=_gym_store(args, run_dir),
         out_root=root / "evals",
         kernel_dir=root / "tests/replay/kernel",
         references=[Path(path) for path in args.references or ()],
+        manifest_root=dataset.root,
     )
     ui.emit(captured)
     return 0
@@ -1749,8 +1783,14 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     run.add_argument("--run-id", help="Batch identity (default gym-<tier>-<time>-<hex>)")
     _lock_options(run)
     score_cmd = command("score", "Score a saved report into trajectories and a scorecard")
-    score_cmd.add_argument("report", help="Composed evaluation report JSON")
-    score_cmd.add_argument("--dataset", required=True, help="The manifest it was scored against")
+    score_cmd.add_argument(
+        "report", metavar="RUN", help="Run directory, or its composed evaluation report JSON"
+    )
+    score_cmd.add_argument(
+        "--dataset",
+        help="Manifest; must carry the digest the run pinned in dataset.json (needed only for "
+        "a run from before dataset pinning)",
+    )
     score_cmd.add_argument("--out", help="Directory for the files (default: the report's)")
     score_cmd.add_argument("--budgets", help="Budgets file for the efficiency bonus")
     context_help = "used only when neither run.json nor the scorecard beside the report has one"
@@ -1803,7 +1843,10 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
         help="Another run over the same dataset that may supply demonstrated payloads",
     )
     capture_cmd.add_argument(
-        "--dataset", dest="gym_dataset", help="Manifest (default: found by the report's digest)"
+        "--dataset",
+        dest="gym_dataset",
+        help="Manifest; must carry the digest the run pinned (default: the run's dataset.json, "
+        "else the manifest with the report's digest)",
     )
     export = command("export-grpo", "Grouped rewards and advantages across runs, as JSONL")
     export.add_argument("--runs", nargs="+", required=True, metavar="RUN-DIR")

@@ -46,7 +46,7 @@ from corsair.contracts import (
 )
 from corsair.contracts.gym import Budgets, DominantCall
 from corsair.evaluation.comparison import row_stop
-from corsair.evaluation.datasets import load_dataset
+from corsair.evaluation.datasets import LoadedDataset, load_dataset
 from corsair.evaluation.gym.budgets import budgets_digest
 from corsair.evaluation.ledger import row_ledger
 from corsair.policies.verdicts import candidate_key
@@ -887,14 +887,36 @@ def score_report(
     run: RunContext,
     budgets: Budgets | None = None,
     sliced: bool = False,
+    manifest_root: Path | None = None,
 ) -> tuple[list[Trajectory], Scorecard]:
     """Score a saved report against its frozen dataset; ``results`` is keyed by run id.
 
     ``results`` from ``load_results`` also name the target-side exception and sandbox
     fault runs; a plain mapping names none, so every ``ERROR`` keeps its operational reward
-    and every recorded role ``ERROR`` stays behavioural.
+    and every recorded role ``ERROR`` stays behavioural. ``manifest_root`` resolves the
+    entries of a manifest copied out of its evaluation tree (a run's pinned copy).
     """
-    dataset, requests, oracles = load_dataset(dataset_path)
+    return score_loaded_report(
+        report,
+        load_dataset(dataset_path, root=manifest_root),
+        results,
+        run=run,
+        budgets=budgets,
+        sliced=sliced,
+    )
+
+
+def score_loaded_report(
+    report: Mapping[str, Any],
+    loaded: LoadedDataset,
+    results: Mapping[str, InvestigationResult | None],
+    *,
+    run: RunContext,
+    budgets: Budgets | None = None,
+    sliced: bool = False,
+) -> tuple[list[Trajectory], Scorecard]:
+    """``score_report`` over a dataset already loaded, as a gym run loads it at admission."""
+    dataset, requests, oracles = loaded
     dataset_digest = digest(dataset)
     if report.get("dataset_digest") != dataset_digest:
         raise ValueError("report dataset digest differs from the frozen dataset manifest")

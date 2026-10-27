@@ -49,6 +49,7 @@ from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from tests.integration.test_chain import ReferenceModel
 from tests.unit.evaluation.test_gym_capture import CASE, _evals_root
+from tests.unit.test_gym_pinning import _grow
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -445,6 +446,43 @@ async def test_a_second_gym_run_waits_for_the_first_and_then_proceeds(
     assert lock["waited_for"][0]["tier"] == "capture" and lock["wait_seconds"] >= 1.5
     assert second_record["started_at"] >= first_record["completed_at"]
     assert [row["run_id"] for row in gym.list_runs(shared)] == [second_id, first_id]
+    # Each run keeps the manifest it was admitted with beside run.json.
+    for run, record in ((first_run, first_record), (second_run, second_record)):
+        assert (run.run_dir / gym.DATASET_FILE).read_bytes() == dataset.read_bytes()
+        assert record["dataset_digest"] == run.scorecard.dataset_digest
+        assert (record["cases"], record["dataset_entries"]) == ([CASE], 1)
+        assert record["git_commit_at_finish"] == record["git"]["commit"]
+
+
+@pytest.mark.temporal
+@pytest.mark.asyncio
+async def test_a_run_scores_the_manifest_it_ran_when_the_tier_grows_mid_run(tmp_path, monkeypatch):
+    _require_temporal()
+    dataset, shared, settings = _lock_case(tmp_path, monkeypatch)
+    admitted = dataset.read_bytes()
+    pinned = digest(load_dataset(dataset)[0])
+    grown: list[str] = []
+
+    async def grow_then_wait(handle):
+        # A merge into the run's checkout replaces the tier while the episodes run.
+        grown.append(_grow(dataset.parents[1], dataset))
+        return await wait_for_result(handle)
+
+    run = await gym.run_gym(
+        gym.GymOptions(dataset=dataset, settings=settings, concurrency=1, lock=False),
+        root=ROOT,
+        compose_activities=_composer_without_docker,
+        observe=grow_then_wait,
+    )
+
+    assert grown and grown[0] != pinned
+    assert run.scorecard.dataset_digest == pinned
+    assert {name: group.cases for name, group in run.scorecard.languages.items()} == {"python": 1}
+    assert [item.case_id for item in run.trajectories] == [CASE]
+    assert (run.run_dir / gym.DATASET_FILE).read_bytes() == admitted
+    record = _record(run)
+    assert (record["dataset_digest"], record["cases"]) == (pinned, [CASE])
+    assert read_report(run.run_dir / REPORT_FILE)["dataset_digest"] == pinned
 
 
 @pytest.mark.temporal

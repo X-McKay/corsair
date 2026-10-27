@@ -90,10 +90,22 @@ def read_frozen(root: Path, relative: str, expected: Digest, kind: str) -> tuple
     return path, content
 
 
-def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
-    """Verify the frozen files first. Return oracle data only to the evaluator caller."""
-    dataset = Dataset.model_validate_json(path.read_bytes())
-    root = dataset_root(path)
+type LoadedDataset = tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]
+
+
+def load_dataset(path: Path, *, root: Path | None = None) -> LoadedDataset:
+    """Verify the frozen files first. Return oracle data only to the evaluator caller.
+
+    ``root`` resolves the entries' request and oracle paths for a manifest copied out of
+    its evaluation tree (a gym run directory's pinned ``dataset.json``); by default it is
+    the manifest's own dataset root.
+    """
+    return parse_dataset(path.read_bytes(), dataset_root(path) if root is None else root)
+
+
+def parse_dataset(content: bytes, root: Path) -> LoadedDataset:
+    """``load_dataset`` over manifest bytes already read once, resolved below ``root``."""
+    dataset = Dataset.model_validate_json(content)
     requests, oracles = [], {}
     family_splits: dict[str, str] = {}
     for entry in dataset.entries:
