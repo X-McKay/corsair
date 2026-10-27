@@ -613,3 +613,19 @@ content-addressed tags and cannot contaminate parallel runs.
   tokens 0.897× to 1.115×, p50 0.868× to 1.152×, ruby ±1.0. Open for the owner: the accuracy and efficiency tracks
   still REJECT an improvement inside the band (the objective track goes INCONCLUSIVE). Gates on `gym/loop` at
   3df3cc87: `just check` exit 0; `just -- test -q -W error` 1504 passed, 116 deselected.
+- 2026-10-27 wave-4 reference and an incident. `ref-w4-tier1` (run gym-tier1-20261027t162650-cea22f, e0fea284,
+  16-row tier1 93b3a0e9…, 3 repeats, 48 episodes, 2071 s): J 0.802, macro verified 0.788 (python 8/11, ruby 0/3,
+  every other language 3/3), tokens 34268, p50 59.2 s, target exceptions 3, capped calls 3, operational 0. Ruby is
+  0/3 again (1.0 in two earlier references), the same single-case noise the band records. Incident: c2 and s12 were
+  merged into the `gym/loop` worktree while this run executed from it, so the run scored itself against the 21-row
+  manifest on disk (five cases counted as failures, wrong digest) and then exited 2 on a late import of the new
+  noise module. Corrected by hand: the report's `dataset_digest` set to 93b3a0e9… after checking its 16 row ids
+  match that manifest exactly, re-scored with `corsair gym score --dataset` against the manifest extracted from
+  e0fea284; originals kept as `*.misscored.*` with `CORRECTION.txt` in the run directory. Rules from it: live runs
+  execute from a checkout nothing edits (reference runs now use the detached worktree
+  `.worktrees/gym/ref-<sha>`; experiments run from their own worktrees), and s15 (launched from 494f2523) pins the
+  manifest bytes and digest in the run directory, refuses a mismatched `--dataset`, and finishes without late
+  imports. Merged this wave so far: c1, c2, s12, s13, s14; h7 rejected offline; h5 and h6 live runs on the lock;
+  the new-corpus references (tier1 twice, tier2 once) are queued from `ref-494f2523`. Gates at 1c698fb4: check
+  exit 0, 1544 passed, 116 deselected; Docker suite at af03912d 64 passed, 1 skipped; wheel at af03912d installs
+  outside the checkout and loads its packaged skills, instructions and gym modules.
