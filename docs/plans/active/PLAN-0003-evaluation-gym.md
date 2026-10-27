@@ -451,3 +451,12 @@ content-addressed tags and cannot contaminate parallel runs.
   see the next bullet.
 - 2026-10-27 Gates on `gym/loop` at 4593c936 (after s8 and w2): `just check` exit 0; `just -- test -q -W error`
   1387 passed, 113 deselected, 0 warnings. Docker suite deferred until the h1 re-measurement's live run ends.
+- 2026-10-27 s9 merged (471a9bd1; `justfile` pass-through c662c9dc): gate tracks `objective` (unchanged default),
+  `accuracy` (no language regression, tokens ≤ 1.10×, macro verified accuracy up by at least one majority flip in the
+  largest language, 1/60 on tier1, or the `--target-language` up by one of its cases) and `efficiency` (no regression,
+  macro verified accuracy ≥ baseline, macro effective tokens or comparable macro p50 seconds ≤ 0.90×; latency counts
+  only at equal concurrency with 0 operational episodes); `sandbox_fault` operational reason for a role ERROR with no
+  driver record. On real data: h1's decisive run ACCEPTED under `accuracy` and REJECTED under `objective`; h2's
+  clean run REJECTED under `efficiency`; reference vs itself REJECTED under each track; c-intoverflow-a r0 in the
+  h1 run becomes operational (`sandbox_fault`) with no reward change. Gates on `gym/loop` at c662c9dc: `just check`
+  exit 0; `just -- test -q -W error` 1424 passed, 113 deselected.
