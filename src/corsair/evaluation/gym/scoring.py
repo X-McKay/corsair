@@ -22,6 +22,7 @@ from corsair.contracts import (
     Digest,
     GroupSummary,
     InvestigationResult,
+    ModelCall,
     Oracle,
     RoleObservation,
     RoundResult,
@@ -33,7 +34,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
-from corsair.contracts.gym import Budgets
+from corsair.contracts.gym import Budgets, DominantCall
 from corsair.evaluation.comparison import row_stop
 from corsair.evaluation.datasets import load_dataset
 from corsair.evaluation.gym.budgets import budgets_digest
@@ -154,6 +155,55 @@ def _call_details(usages: Sequence[Usage], field: str) -> list[dict[str, Any]]:
     return details
 
 
+def dominant_call(calls: Sequence[ModelCall]) -> DominantCall | None:
+    """The call with the most reported output tokens; the first one wins a tie."""
+    known = [
+        (position, call)
+        for position, call in enumerate(calls, start=1)
+        if call.output_tokens is not None
+    ]
+    if not known:
+        return None
+    position, call = max(known, key=lambda item: item[1].output_tokens or 0)
+    return DominantCall(
+        position=position,
+        index=call.index,
+        output_tokens=call.output_tokens or 0,
+        seconds=call.seconds,
+    )
+
+
+def cap_markers(
+    calls: Sequence[ModelCall], output_cap: int | None
+) -> tuple[int | None, bool | None]:
+    """Calls whose reported output reached the cap, and whether reasoning filled one.
+
+    Both are unknown without a cap or without per-call reports. A capped call exhausted
+    its cap on reasoning when its thought tokens are at least its output tokens (the
+    OpenAI-compatible accounting, where output includes reasoning); a capped call whose
+    thought tokens were not reported leaves that answer unknown unless another is known.
+    """
+    if output_cap is None or not calls:
+        return None, None
+    capped = [
+        call
+        for call in calls
+        if call.output_tokens is not None and call.output_tokens >= output_cap
+    ]
+    thoughts = [(call.thought_tokens, call.output_tokens or 0) for call in capped]
+    if any(thought is not None and thought >= output for thought, output in thoughts):
+        return len(capped), True
+    if any(thought is None for thought, _ in thoughts):
+        return len(capped), None
+    return len(capped), False
+
+
+def _thought_share(thought_tokens: int | None, output_tokens: int | None) -> float | None:
+    if thought_tokens is None or not output_tokens:
+        return None
+    return thought_tokens / output_tokens
+
+
 def _role_seconds(role: RoleObservation | None, field: str) -> float | None:
     value = getattr(role, field, None) if role is not None else None
     return float(value) if isinstance(value, int | float) else None
@@ -251,8 +301,13 @@ def trajectory(
     budgets: Budgets | None,
     *,
     git_commit: str | None = None,
+    output_cap: int | None = None,
 ) -> Trajectory:
-    """Score one report row; ``result`` is its stored result, or None when unavailable."""
+    """Score one report row; ``result`` is its stored result, or None when unavailable.
+
+    ``output_cap`` is the request's per-call output cap; it only sets the reasoning
+    markers, which no reward, verified flag or gate reads.
+    """
     status = row.get("status")
     status = status if status in {"pass", "fail"} else "unavailable"
     verdict = _verdict(row.get("verdict"))
@@ -266,6 +321,11 @@ def trajectory(
         for item in (result.rounds if result is not None else [])
     ]
     usages = _usages(result)
+    calls = [call for usage in usages for call in usage.model_calls]
+    capped_calls, reasoning_cap_exhausted = cap_markers(calls, output_cap)
+    thought_tokens = _int_or_none(
+        _known_sum(getattr(usage, "thought_tokens", None) for usage in usages)
+    )
     cached = _int_or_none(
         _known_sum(getattr(usage, "cached_input_tokens", None) for usage in usages)
     )
@@ -308,9 +368,7 @@ def trajectory(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached,
-        thought_tokens=_int_or_none(
-            _known_sum(getattr(usage, "thought_tokens", None) for usage in usages)
-        ),
+        thought_tokens=thought_tokens,
         agent_seconds=agent_seconds,
         sandbox_wall_seconds=_float_or_none(
             _known_sum(item.sandbox_wall_seconds for item in rounds)
@@ -319,6 +377,11 @@ def trajectory(
         sandbox_host_seconds=_float_or_none(host),
         model_calls=_call_details(usages, "model_calls"),
         tool_calls_detail=_call_details(usages, "tool_calls_detail"),
+        thought_share=_thought_share(thought_tokens, output_tokens),
+        output_cap=output_cap,
+        capped_calls=capped_calls,
+        reasoning_cap_exhausted=reasoning_cap_exhausted,
+        dominant_call=dominant_call(calls),
         usage_known=usage_known,
         effective_tokens=tokens,
         seconds=seconds,
@@ -344,6 +407,17 @@ def percentile(values: Sequence[float], rank: float) -> float | None:
 def _known_mean(values: Iterable[float | None]) -> float | None:
     known = [value for value in values if value is not None]
     return mean(known) if known else None
+
+
+def _known_count(flags: Iterable[bool | None]) -> int | None:
+    """How many known flags are set; ``None`` when no flag is known."""
+    known = [flag for flag in flags if flag is not None]
+    return sum(known) if known else None
+
+
+def _known_total(counts: Iterable[int | None]) -> int | None:
+    known = [count for count in counts if count is not None]
+    return sum(known) if known else None
 
 
 def _fraction(flags: Sequence[bool]) -> float | None:
@@ -377,6 +451,13 @@ def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
         p95_seconds=percentile(seconds, 95),
         failure_stops=dict(sorted(stops.items(), key=lambda item: (-item[1], item[0]))),
         usage_unknown=sum(not item.usage_known for item in trajectories),
+        mean_thought_share=_known_mean(
+            _known_mean(item.thought_share for item in case) for case in cases
+        ),
+        capped_call_episodes=_known_count(
+            None if item.capped_calls is None else item.capped_calls > 0 for item in trajectories
+        ),
+        reasoning_cap_exhausted=_known_count(item.reasoning_cap_exhausted for item in trajectories),
     )
 
 
@@ -442,6 +523,13 @@ def build_scorecard(
             summary.mean_effective_tokens for summary in languages.values()
         ),
         macro_p50_seconds=_macro(summary.p50_seconds for summary in languages.values()),
+        macro_thought_share=_macro(summary.mean_thought_share for summary in languages.values()),
+        capped_call_episodes=_known_total(
+            summary.capped_call_episodes for summary in languages.values()
+        ),
+        reasoning_cap_exhausted=_known_total(
+            summary.reasoning_cap_exhausted for summary in languages.values()
+        ),
     )
 
 
@@ -472,6 +560,9 @@ def score_report(
     if report.get("dataset_digest") != dataset_digest:
         raise ValueError("report dataset digest differs from the frozen dataset manifest")
     kinds = {request.case.case_id: request.case.recipe.kind for request in requests}
+    # The per-call output cap each case ran under; results and manifests do not carry
+    # the budget, but the frozen request does and ``request_digest`` binds it.
+    caps = {request.case.case_id: request.budget.max_output_tokens for request in requests}
     rows = [row for row in report.get("rows", []) if isinstance(row, Mapping)]
     unknown = sorted({str(row.get("case_id")) for row in rows} - set(kinds))
     if unknown:
@@ -485,6 +576,7 @@ def score_report(
             results.get(str(row.get("run_id"))),
             budgets,
             git_commit=run.git_commit,
+            output_cap=caps[row["case_id"]],
         )
         for row, repeat in zip(rows, _row_repeats(rows), strict=True)
     ]

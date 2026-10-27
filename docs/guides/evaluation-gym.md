@@ -56,6 +56,10 @@ Each language's image is tagged `corsair-<lang>:<tag>`, where `tag` is the first
 
 The headline `objective_j` is the macro reward plus half the worst language's verified accuracy.
 
+### Reasoning markers
+
+Each trajectory also records where the output budget went, as observations that no reward, verified flag, objective or gate reads: `thought_tokens` (the reported total, `null` when no call reported it), `thought_share` (thought over output tokens), `output_cap` (the per-call cap from the frozen request's `Budget.max_output_tokens`, which `request_digest` binds; results do not carry the budget), `capped_calls` (calls whose reported output reached that cap), `reasoning_cap_exhausted` (a capped call whose thought tokens filled its whole output) and `dominant_call` (position, episode index, output tokens and seconds of the largest call). Per kind and language the scorecard shows the case-mean thought share and the number of episodes with a capped call and with an exhausted cap, and the gate table shows the capped-episode delta per language. The counts stay unknown when a group has no cap or no per-call reports, so a scorecard written before the markers existed shows `unknown` until `corsair gym score` rescores its report. A call counts as capped when its reported output tokens reach the cap; on a route that reports reasoning outside the output count (ADK's native Gemini route) a capped call is not detected.
+
 ## Gate a candidate
 
 ```bash

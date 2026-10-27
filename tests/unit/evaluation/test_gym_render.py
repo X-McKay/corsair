@@ -54,3 +54,66 @@ def test_scorecard_summary_lists_languages_kinds_and_failure_stops():
     assert "| python |" in text
     assert "| ruby.k/1 |" in text
     assert "audit_reject 3" in text
+
+
+def _marked(card, capped: int):
+    """A copy of ``card`` whose python episodes carry reasoning markers."""
+    rows = [
+        Trajectory(
+            run_id=f"py-a-{repeat}",
+            case_id="py-a",
+            repeat=repeat,
+            kind="python.k/1",
+            language="python",
+            status="pass",
+            passed=True,
+            verified=True,
+            false_label=False,
+            usage_known=True,
+            effective_tokens=100.0,
+            seconds=12.5,
+            reward_verdict=1.0,
+            reward=1.0,
+            output_tokens=1000,
+            thought_tokens=900,
+            thought_share=0.9,
+            output_cap=12288,
+            capped_calls=1 if repeat < capped else 0,
+            reasoning_cap_exhausted=repeat < capped,
+        )
+        for repeat in range(3)
+    ]
+    return build_scorecard(
+        rows, run=card.run, dataset_digest="d" * 64, cases={"py-a": "python.k/1"}
+    )
+
+
+def test_scorecard_shows_thought_share_and_capped_episodes():
+    text = render_scorecard(_marked(_card("base", True), 2))
+    header = next(line for line in text.splitlines() if line.startswith("| Language |"))
+    assert "| Thought share | Capped eps | Reasoning capped | Failure stops |" in header
+    assert (
+        "| python | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | 0 | 0.900 | 2 | 2 |" in text
+    )
+    assert "- Capped-call episodes: 2; reasoning cap exhausted: 2" in text
+    assert "- Macro thought share: 0.900" in text
+
+
+def test_scorecard_prints_unknown_markers_as_unknown():
+    text = render_scorecard(_card("base", True))
+    assert (
+        "| ruby | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | 0 "
+        "| unknown | unknown | unknown | none |" in text
+    )
+    assert "- Capped-call episodes: unknown; reasoning cap exhausted: unknown" in text
+
+
+def test_gate_table_shows_the_capped_episode_delta_per_language():
+    baseline, candidate = _marked(_card("base", True), 3), _marked(_card("cand", True), 1)
+    text = render_gate(gate(baseline, candidate), baseline, candidate)
+    assert "| Baseline capped eps | Candidate capped eps | Capped delta |" in text
+    assert "| python | 1.000 | 1.000 | +0.000 | no | 3 | 1 | -2 |" in text
+    unknown = render_gate(
+        gate(_card("b", True), _card("c", True)), _card("b", True), _card("c", True)
+    )
+    assert "| ruby | 1.000 | 1.000 | +0.000 | no | unknown | unknown | unknown |" in unknown
