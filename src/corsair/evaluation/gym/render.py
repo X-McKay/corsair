@@ -4,16 +4,20 @@ Only numbers, fixed labels, code identifiers (languages, recipe kinds, ledger ga
 and the fixed reason sentences below are printed; no model-authored text reaches a view.
 """
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from corsair.contracts import (
+    CaseStability,
+    FlipNoise,
     GateDecision,
     GateReason,
     GateTrack,
     GateVerdict,
     GroupSummary,
     NoiseBand,
+    NoiseCase,
     NoiseSpread,
     OperationalEpisode,
     PairedCase,
@@ -101,6 +105,17 @@ SINGLE_CASE_TEXT = (
     "term; read a regression there as one case."
 )
 
+NOISE_CASES_TEXT = (
+    "A case is stable when its majority outcome was the same in every run and unstable "
+    "otherwise; a gate reads a flip of an unstable case as noise."
+)
+
+# Why a flip is within noise, as the paired view names it.
+FLIP_NOISE_TEXT: dict[FlipNoise, str] = {
+    "language_band": "language band",
+    "unstable_case": "unstable case",
+}
+
 NOISE_TEXT = (
     "A delta inside the band is noise; an improvement must exceed it, and a regression "
     "inside it is inconclusive."
@@ -122,7 +137,11 @@ SLICE_TEXT = (
 
 SLICE_NOISE_TEXT = (
     "A slice gate reads the band per case only: a flip in a language whose band is a whole "
-    "case is within noise and counts neither way."
+    "case, or of a case the band classifies unstable, is within noise and counts neither way."
+)
+
+SLICE_UNSTABLE_TEXT = (
+    "Unstable in the noise band (a flip there counts neither way; a sentinel there guards nothing)"
 )
 
 SLICE_PAIRED_TEXT = (
@@ -195,6 +214,7 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         cases = ", ".join(f"`{case}`" for case in verdict.slice_cases) or "none"
         repeats = _count(verdict.slice_repeats)
         lines.extend([f"Slice: {len(verdict.slice_cases)} cases × {repeats} repeats: {cases}.", ""])
+        lines.extend(_slice_stability_lines(verdict))
     if verdict.target_language is not None:
         lines.extend([f"Target language: {verdict.target_language}.", ""])
     if verdict.smoke:
@@ -316,6 +336,20 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
     return "\n".join(lines) + "\n"
 
 
+def _slice_stability_lines(verdict: GateVerdict) -> list[str]:
+    """Which slice cases the band classifies unstable, when a band was read and matched."""
+    noise = verdict.noise
+    if noise is None or GateReason.NOISE_MISMATCH in verdict.reasons:
+        return []
+    if noise.cases is None:
+        return [
+            "Unstable in the noise band: unknown (the band recorded no per-case stability).",
+            "",
+        ]
+    named = ", ".join(f"`{case}`" for case in verdict.slice_unstable_cases) or "none"
+    return [f"{SLICE_UNSTABLE_TEXT}: {named}.", ""]
+
+
 def _reported_only(card: Scorecard, language: str) -> str:
     cases = card.languages[language].cases
     return "reported only (single case)" if cases == 1 else f"reported only ({cases} cases)"
@@ -336,8 +370,35 @@ def _flip(case: PairedCase) -> str:
     if not case.deciding:
         notes.append("reported only")
     if case.within_noise:
-        notes.append("within noise")
+        reason = None if case.noise_reason is None else FLIP_NOISE_TEXT[case.noise_reason]
+        notes.append(f"within noise: {reason}" if reason else "within noise")
     return f"`{case.case_id}` ({', '.join(notes)})"
+
+
+def _case_ids(cases: Sequence[NoiseCase], stability: CaseStability) -> str:
+    return ", ".join(f"`{case.case_id}`" for case in cases if case.stability == stability)
+
+
+def _stability_counts(cases: Sequence[NoiseCase]) -> str:
+    counts = Counter(case.stability for case in cases)
+    return (
+        f"{counts['stable_pass']} stable pass, {counts['stable_fail']} stable fail, "
+        f"{counts['unstable']} unstable"
+    )
+
+
+def _band_stability_lines(noise: NoiseBand | None) -> list[str]:
+    """The paired view's lines for the band's per-case classification, when a band was read."""
+    if noise is None:
+        return []
+    if noise.cases is None:
+        return ["- Noise band per-case stability: unknown (the band recorded none)."]
+    lines = [f"- Noise band per-case stability: {_stability_counts(noise.cases)}."]
+    for label, stability in (("Unstable", "unstable"), ("Stable fail", "stable_fail")):
+        named = _case_ids(noise.cases, stability)
+        if named:
+            lines.append(f"- {label} in the band: {named}")
+    return lines
 
 
 def _paired_lines(verdict: GateVerdict, baseline: Scorecard) -> list[str]:
@@ -393,6 +454,7 @@ def _paired_lines(verdict: GateVerdict, baseline: Scorecard) -> list[str]:
         f"- Deciding flips outside noise: {paired.deciding_pass_to_fail} pass to fail, "
         f"{paired.deciding_fail_to_pass} fail to pass"
     )
+    lines.extend(_band_stability_lines(verdict.noise))
     for label, cases in (
         ("Baseline only (not paired)", paired.baseline_only),
         ("Candidate only (not paired)", paired.candidate_only),
@@ -527,8 +589,24 @@ def render_noise(band: NoiseBand) -> str:
             ]
         )
     lines.extend(_table(["Metric", *runs, "Mean", "Half-range", "Stdev", "Gate band"], rows))
-    lines.extend(["", NOISE_TEXT])
+    lines.extend(["", NOISE_TEXT, "", *_noise_case_lines(band)])
     return "\n".join(lines) + "\n"
+
+
+def _noise_case_lines(band: NoiseBand) -> list[str]:
+    """The band's per-case classification: counts, then the unstable and failing cases."""
+    if band.cases is None:
+        if not band.cases_unknown_runs:
+            return ["Per-case stability: not recorded (a band written before per-case stability)."]
+        runs = ", ".join(f"`{run}`" for run in band.cases_unknown_runs)
+        return [f"Per-case stability: unknown; no trajectories reproducing run {runs}."]
+    lines = [f"Per-case stability: {_stability_counts(band.cases)}. {NOISE_CASES_TEXT}", ""]
+    for label, stability in (
+        ("Unstable (a flip counts neither way)", "unstable"),
+        ("Stable fail", "stable_fail"),
+    ):
+        lines.append(f"- {label}: {_case_ids(band.cases, stability) or 'none'}")
+    return lines
 
 
 def _group_rows(groups: Mapping[str, GroupSummary]) -> list[list[str]]:

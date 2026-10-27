@@ -3,7 +3,15 @@
 import pytest
 from pydantic import ValidationError
 
-from corsair.contracts import GateDecision, GateReason, NoiseBand, NoiseSpread, Scorecard
+from corsair.contracts import (
+    GateDecision,
+    GateReason,
+    NoiseBand,
+    NoiseCase,
+    NoiseSpread,
+    Scorecard,
+    Trajectory,
+)
 from corsair.evaluation.gym.gate import chain_decision, gate
 from corsair.evaluation.gym.noise import (
     NoiseRefused,
@@ -16,6 +24,8 @@ from corsair.evaluation.gym.noise import (
 )
 from corsair.evaluation.gym.render import REASON_TEXT, render_gate, render_noise
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, NONE, _card
+from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED
+from tests.unit.evaluation.test_gym_paired import _side
 
 IDENTITY = {"config": ["c" * 64], "producer_prompt": ["p" * 64]}
 # One target-side exception's worth of noise: ruby's only verified case flips.
@@ -314,3 +324,98 @@ def test_the_noise_view_lists_every_metric_per_run():
     assert "| Metric | `ref` | `again` | Mean | Half-range | Stdev | Gate band |" in text
     assert "| ruby verified accuracy | 0.500 | 0.000 | 0.250 | 0.250 | 0.354 | ±0.500 |" in text
     assert "| Macro effective tokens | 100 | 120 | 110 | 10 | 14 | 0.833x to 1.200x |" in text
+
+
+# Per-case stability: each case's majority outcome per run, from the runs' trajectories
+
+
+def _case_runs() -> tuple[list[Scorecard], list[list[Trajectory]]]:
+    """Two runs of one configuration: py-a falls to a majority fail once, rb-a loses one
+    of its three verified repeats but keeps its majority."""
+    again = {**PAIRED, "py-a": [True, False, False], "rb-a": [True, True, False]}
+    (first, first_rows), (second, second_rows) = _side(PAIRED, "ref"), _side(again, "again")
+    return [first, second], [first_rows, second_rows]
+
+
+def test_a_band_classifies_each_case_by_its_majority_outcome_in_every_run():
+    cards, rows = _case_runs()
+    band = noise_band(cards, rows)
+    assert band.cases_unknown is None and band.cases_unknown_runs == []
+    assert band.cases is not None
+    by_case = {case.case_id: case for case in band.cases}
+    assert [case.case_id for case in band.cases] == sorted(PAIRED)
+    assert by_case["py-a"] == NoiseCase(
+        case_id="py-a",
+        language="python",
+        majority_verified=[True, False],
+        verified_episodes=[3, 1],
+        stability="unstable",
+    )
+    assert by_case["rb-a"].stability == "stable_pass"
+    assert by_case["rb-a"].verified_episodes == [3, 2]
+    assert by_case["py-c"].stability == "stable_fail"
+    assert by_case["py-c"].majority_verified == [False, False]
+    assert {case.case_id for case in band.cases if case.stability == "stable_fail"} == {
+        "py-c",
+        "jv-b",
+    }
+    # The per-language spreads are unchanged by reading the trajectories.
+    assert band.languages == noise_band(cards).languages
+
+
+def test_a_band_missing_a_runs_trajectories_records_no_cases_and_names_the_run():
+    cards, rows = _case_runs()
+    for trajectories in ([rows[0], None], [rows[0], rows[0]]):
+        # Absent, or not the trajectories of that scorecard: never guessed.
+        band = noise_band(cards, trajectories)
+        assert band.cases is None
+        assert band.cases_unknown == "trajectories_missing"
+        assert band.cases_unknown_runs == ["again"]
+    unread = noise_band(cards)
+    assert unread.cases is None and unread.cases_unknown_runs == ["ref", "again"]
+
+
+def test_a_band_written_before_per_case_stability_still_decodes_without_cases():
+    cards, rows = _case_runs()
+    record = noise_band(cards, rows).model_dump(mode="json")
+    for field in ("cases", "cases_unknown", "cases_unknown_runs"):
+        record.pop(field)
+    old = NoiseBand.model_validate(record)
+    assert old.schema_version == "corsair.gym-noise/1"
+    assert (old.cases, old.cases_unknown, old.cases_unknown_runs) == (None, None, [])
+    assert "Per-case stability: not recorded" in render_noise(old)
+
+
+def test_an_incoherent_case_record_is_refused():
+    cards, rows = _case_runs()
+    record = noise_band(cards, rows).model_dump(mode="json")
+    case = record["cases"][0]
+    with pytest.raises(ValidationError, match="follows its majority outcomes"):
+        NoiseCase.model_validate({**case, "stability": "unstable"})
+    with pytest.raises(ValidationError, match="one majority outcome and one count per run"):
+        NoiseCase.model_validate({**case, "verified_episodes": [3, 3, 3]})
+    with pytest.raises(ValidationError, match="one entry per run"):
+        NoiseBand.model_validate({**record, "cases": [{**case, **_three_runs(case)}]})
+    with pytest.raises(ValidationError, match="either its cases or why they are unknown"):
+        NoiseBand.model_validate({**record, "cases_unknown": "trajectories_missing"})
+    with pytest.raises(ValidationError, match="each case once"):
+        NoiseBand.model_validate({**record, "cases": [case, case]})
+
+
+def _three_runs(case: dict) -> dict:
+    """A coherent case record of three runs, for a band of two."""
+    return {
+        "majority_verified": [*case["majority_verified"], True],
+        "verified_episodes": [*case["verified_episodes"], 3],
+        "stability": "stable_pass" if all(case["majority_verified"]) else "unstable",
+    }
+
+
+def test_the_noise_view_counts_the_classification_and_names_unstable_and_failing_cases():
+    cards, rows = _case_runs()
+    text = render_noise(noise_band(cards, rows))
+    assert "Per-case stability: 3 stable pass, 2 stable fail, 1 unstable." in text
+    assert "- Unstable (a flip counts neither way): `py-a`" in text
+    assert "- Stable fail: `jv-b`, `py-c`" in text
+    missing = render_noise(noise_band(cards, [rows[0], None]))
+    assert "Per-case stability: unknown; no trajectories reproducing run `again`." in missing

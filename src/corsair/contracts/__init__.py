@@ -44,7 +44,9 @@ from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation
 from .evidence import RoleOutcome as RoleOutcome
 from .gym import Budgets as Budgets
+from .gym import CaseStability as CaseStability
 from .gym import DecidingMetric as DecidingMetric
+from .gym import FlipNoise as FlipNoise
 from .gym import GateDecision as GateDecision
 from .gym import GateReason as GateReason
 from .gym import GateTrack as GateTrack
@@ -55,6 +57,8 @@ from .gym import KindBudget as KindBudget
 from .gym import LedgerDecision as LedgerDecision
 from .gym import LedgerRow as LedgerRow
 from .gym import NoiseBand as NoiseBand
+from .gym import NoiseCase as NoiseCase
+from .gym import NoiseCasesUnknown as NoiseCasesUnknown
 from .gym import NoiseMetric as NoiseMetric
 from .gym import NoiseSpread as NoiseSpread
 from .gym import OperationalEpisode as OperationalEpisode

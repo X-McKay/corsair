@@ -417,13 +417,59 @@ class NoiseSpread(Contract):
         return self
 
 
+# A case across the runs of a noise band: its majority outcome held in every run (pass
+# or fail), or differed between runs (a coin-flip whose flip a gate reads as noise).
+CaseStability = Literal["stable_pass", "stable_fail", "unstable"]
+# Why a noise band records no per-case stability: a run's trajectories reproducing its
+# scorecard were not found.
+NoiseCasesUnknown = Literal["trajectories_missing"]
+# Why a paired flip is within noise: its language's band is a whole case, or the band
+# classifies the case ``unstable`` (the more specific reason wins when both hold).
+FlipNoise = Literal["language_band", "unstable_case"]
+_MAX_NOISE_CASES = 4096
+
+
+class NoiseCase(Contract):
+    """One case scored in every run of a noise band, per run in ``NoiseBand.runs`` order.
+
+    ``majority_verified`` is the case's outcome in each run (whether more than half its
+    repeats verified, ``evaluation.gym.scoring.majority_verified``); ``verified_episodes``
+    counts the repeats that verified. ``stability`` follows the outcomes.
+    """
+
+    case_id: Identifier
+    language: str = Field(min_length=1, max_length=64)
+    majority_verified: list[bool] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
+    verified_episodes: list[int] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
+    stability: CaseStability
+
+    @model_validator(mode="after")
+    def coherent_case(self):
+        if len(self.majority_verified) != len(self.verified_episodes):
+            raise ValueError("a noise case has one majority outcome and one count per run")
+        if any(count < 0 for count in self.verified_episodes):
+            raise ValueError("a noise case's verified episode counts are not negative")
+        if all(self.majority_verified):
+            expected = "stable_pass"
+        elif any(self.majority_verified):
+            expected = "unstable"
+        else:
+            expected = "stable_fail"
+        if self.stability != expected:
+            raise ValueError("a noise case's stability follows its majority outcomes")
+        return self
+
+
 class NoiseBand(Contract):
     """``corsair gym noise``: the spread of two or more runs of one configuration.
 
     Every run scored the same dataset with the same budgets, repeats and recorded
     ``run_identity``, unsliced, with known token usage; nothing is rescored. A gate given
     the band (``--noise``) reads a delta inside it as noise (see ``evaluation.gym.gate``).
-    ``macro_p50_seconds`` is unknown when any run's is.
+    ``macro_p50_seconds`` is unknown when any run's is. ``cases`` classifies every case
+    scored in all runs from the runs' trajectories; it is ``None`` with ``cases_unknown``
+    (naming ``cases_unknown_runs``) when a run's trajectories were missing, and ``None``
+    without a reason on a band written before per-case stability.
     """
 
     schema_version: Literal["corsair.gym-noise/1"] = "corsair.gym-noise/1"
@@ -439,6 +485,10 @@ class NoiseBand(Contract):
     macro_p50_seconds: NoiseSpread | None = None
     # Per language: majority verified accuracy.
     languages: dict[str, NoiseSpread] = Field(min_length=1)
+    # Per case, by case id; see the class docstring for ``None``.
+    cases: list[NoiseCase] | None = Field(default=None, max_length=_MAX_NOISE_CASES)
+    cases_unknown: NoiseCasesUnknown | None = None
+    cases_unknown_runs: list[Identifier] = Field(default_factory=list, max_length=_MAX_NOISE_RUNS)
 
     @model_validator(mode="after")
     def coherent_band(self):
@@ -450,6 +500,17 @@ class NoiseBand(Contract):
             spreads.append(self.macro_p50_seconds)
         if any(len(spread.values) != self.n_runs for spread in spreads):
             raise ValueError("every noise spread has one value per run")
+        if self.cases is not None and (self.cases_unknown or self.cases_unknown_runs):
+            raise ValueError("a noise band records either its cases or why they are unknown")
+        if not set(self.cases_unknown_runs) <= set(self.runs) or (
+            bool(self.cases_unknown_runs) != (self.cases_unknown is not None)
+        ):
+            raise ValueError("a noise band names which of its runs left its cases unknown")
+        cases = self.cases or []
+        if any(len(case.majority_verified) != self.n_runs for case in cases):
+            raise ValueError("a noise case has one entry per run")
+        if len({case.case_id for case in cases}) != len(cases):
+            raise ValueError("a noise band classifies each case once")
         return self
 
 
@@ -468,9 +529,18 @@ class PairedCase(Contract):
     language: str = Field(min_length=1, max_length=64)
     # Whether the language decides the gate (see ``GateVerdict.min_cases``).
     deciding: bool = True
-    # With a noise band whose spread for the case's language is a whole case (±1.0): the
-    # flip is read as noise, never as a regression.
+    # With a noise band whose spread for the case's language is a whole case (±1.0), or
+    # that classifies the case ``unstable``: the flip is read as noise, never as a
+    # regression or an improvement.
     within_noise: bool = False
+    # Why the flip is within noise; ``None`` on records written before reasons existed.
+    noise_reason: FlipNoise | None = None
+
+    @model_validator(mode="after")
+    def coherent_noise_reason(self):
+        if self.noise_reason is not None and not self.within_noise:
+            raise ValueError("a noise reason names a flip within noise")
+        return self
 
 
 class PairedCounts(Contract):
@@ -557,6 +627,9 @@ class GateVerdict(Contract):
     slice: bool = False
     slice_cases: list[Identifier] = Field(default_factory=list)
     slice_repeats: int | None = Field(default=None, ge=0)
+    # Slice cases the noise band classifies ``unstable`` (coin-flips): a sentinel among
+    # them guards nothing. Reported only; empty without a band or its per-case stability.
+    slice_unstable_cases: list[Identifier] = Field(default_factory=list)
 
     @property
     def exit_code(self) -> int:
