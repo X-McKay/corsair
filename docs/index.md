@@ -46,6 +46,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Python integration](guides/integration.md).
 - [Advanced usage](guides/advanced-usage.md).
 - [Add a language, framework, recipe or image](guides/extensions.md): a consistent implementation and qualification checklist, not currently supported runtimes.
+- [Evaluation gym](guides/evaluation-gym.md): run frozen tiers in the `corsair-gym` namespace, read a scorecard, gate, replay, capture, export and record.
 
 ## Operations
 

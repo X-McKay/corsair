@@ -7,6 +7,10 @@ No population-level accuracy, low false-positive rate, production baseline, or a
 
 Store raw private reports under `.runs/`. Promote a sanitized baseline only after repeat runs on frozen, human-labelled, family-grouped held-out data, with the exact source/recipe/image/model/instruction/tool/schema/budget identities and cohort recorded. A scripted runner passing is not a live-model baseline.
 
+## Configuration identity after the transport-free change
+
+Since [PLAN-0003](../../docs/plans/active/PLAN-0003-evaluation-gym.md) WP3, `Settings.identity` (each result manifest's `config_digest`) excludes the transport and storage fields `temporal_address`, `temporal_namespace`, `task_queue`, `artifact_root` and `source_root`, so a gym run's per-run task queue or Temporal port no longer changes it. Every record made before the change, including the candidates under `candidates/`, carries a configuration digest computed with those fields, so the same settings now produce a different digest. Do not read a digest difference across the change as a behaviour change, and do not mix the two in one comparison without saying so. No record was promoted, and none is rewritten.
+
 ## Checking the family-grouped split
 
 The family rule is checkable; run it before treating any split as held out:

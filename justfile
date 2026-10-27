@@ -48,6 +48,10 @@ images:
     docker build -f deploy/perl/Dockerfile -t corsair-perl:0.1 .
     docker build -f deploy/c/Dockerfile -t corsair-c:0.1 .
 
+# Build the same images tagged corsair-<lang>:<content tag> (sha256 of deploy/<lang>/ and its driver); gym runs use these.
+images-gym *args:
+    uv run --locked corsair gym images "$@"
+
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
 settings-init:
     uv run --locked python scripts/local_stack.py settings-init
@@ -101,6 +105,26 @@ verify request submission *args:
 # Run a durable frozen dataset; pass normal Corsair switches after its path.
 eval dataset *args:
     uv run --locked --extra providers corsair eval "$@"
+
+# Run a gym tier (tier0, tier1 or a manifest path) in namespace corsair-gym; defaults to .state/settings.json.
+gym-run tier *args:
+    uv run --locked --extra providers corsair gym run "$@"
+
+# Gate a candidate gym scorecard against a baseline: exit 0 accepted, 1 rejected, 2 incomparable.
+gym-gate baseline candidate:
+    uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2"
+
+# Show one case's rounds, per-call usage and failure stop from a gym run directory.
+gym-replay run case:
+    uv run --locked --extra providers corsair gym replay "$1" --case "$2"
+
+# Freeze a gym case's failed repeats as evals/ fixtures and tests/replay/kernel cases.
+gym-capture run case *args:
+    uv run --locked --extra providers corsair gym capture "$1" --case "$2" "${@:3}"
+
+# Append to (ledger append ...) or render (ledger render) the experiment ledger.
+gym-ledger *args:
+    uv run --locked --extra providers corsair gym ledger "$@"
 
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:

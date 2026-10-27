@@ -1,0 +1,140 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "case01",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case01/request.json",
+      "oracle": "fixtures/case01/oracle.json",
+      "request_digest": "ce6ec1813d3dbb3031f2b6e2d1b66dbd8f53e6769e4e6744ddb173fe58f9ed8a",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    },
+    {
+      "case_id": "case02",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case02/request.json",
+      "oracle": "fixtures/case02/oracle.json",
+      "request_digest": "0d2a791a12eca0abeb7f591c56d0cdf68f48225c79ea404a4d5c4b548f1bc4cf",
+      "oracle_digest": "696199d16e0049a31be634a2493075d91d32dde500d70e798cb210ec3189debf"
+    },
+    {
+      "case_id": "case03",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case03/request.json",
+      "oracle": "fixtures/case03/oracle.json",
+      "request_digest": "9c845872fb94cb78f3866650845e5934fca8eefe6fb6674dfb2295f514e9569e",
+      "oracle_digest": "fd2537086173c0ce421a8b03f06014163409cf2955c49b60f3690d8492980318"
+    },
+    {
+      "case_id": "safety01",
+      "family": "safety01",
+      "split": "safety",
+      "request": "datasets/safety/safety01/request.json",
+      "oracle": "datasets/safety/safety01/oracle.json",
+      "request_digest": "dfa9f490b1e75a530c7c3052c66d62f3e66c90b4e5e6f5e034dd3a2a983fa96f",
+      "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
+    },
+    {
+      "case_id": "safety02",
+      "family": "safety02",
+      "split": "safety",
+      "request": "datasets/safety/safety02/request.json",
+      "oracle": "datasets/safety/safety02/oracle.json",
+      "request_digest": "798ba8b0efd9abe64e240de2915e4d78e9c8802c3feba16c2a3b36dd7427d84a",
+      "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
+    },
+    {
+      "case_id": "adversarial01",
+      "family": "adversarial01",
+      "split": "adversarial",
+      "request": "datasets/adversarial/adversarial01/request.json",
+      "oracle": "datasets/adversarial/adversarial01/oracle.json",
+      "request_digest": "6b007bc9c17b026b7eedc3fd94c5eb9c6ee6ec20355910d07875dabf110246d7",
+      "oracle_digest": "5061c0ee1e147b88e00edb26e148f186564aed4c77c9f5e3e670b93975a0d736"
+    },
+    {
+      "case_id": "adversarial02",
+      "family": "adversarial02",
+      "split": "adversarial",
+      "request": "datasets/adversarial/adversarial02/request.json",
+      "oracle": "datasets/adversarial/adversarial02/oracle.json",
+      "request_digest": "585dec2cd9eafcffe2f8c3a41bb2a55be8533dbb8f70b5538462c63baeec8df3",
+      "oracle_digest": "5061c0ee1e147b88e00edb26e148f186564aed4c77c9f5e3e670b93975a0d736"
+    },
+    {
+      "case_id": "chain-python-cmdi-b",
+      "family": "chain-python-cmdi",
+      "split": "chain",
+      "request": "datasets/chain/python/cmdi-b/request.json",
+      "oracle": "datasets/chain/python/cmdi-b/oracle-v3.json",
+      "request_digest": "091090329684f017d9d5f64fdf2ff23802fc344445e2541c5ad34fe6506654f9",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    },
+    {
+      "case_id": "chain-python-cmdi-a",
+      "family": "chain-python-cmdi",
+      "split": "chain",
+      "request": "datasets/chain/python/cmdi-a/request.json",
+      "oracle": "datasets/chain/python/cmdi-a/oracle-v3.json",
+      "request_digest": "0bdbfbc191dc62fd436a6d872556e800a7912a999e5373f82a30204d24157a9b",
+      "oracle_digest": "b2bbe264f9c938d3bcde7df16411829f608f09658995294aac19ca52e711436c"
+    },
+    {
+      "case_id": "chain-python-codeinjection-b",
+      "family": "chain-python-codeinjection",
+      "split": "chain",
+      "request": "datasets/chain/python/codeinjection-b/request.json",
+      "oracle": "datasets/chain/python/codeinjection-b/oracle-v3.json",
+      "request_digest": "c93374d596478123a38bb79c7b3134260d37052d642a94e165b706ec41af8208",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    },
+    {
+      "case_id": "js-prototypepollution-a",
+      "family": "js-prototypepollution",
+      "split": "chain",
+      "request": "datasets/chain/javascript/prototypepollution-a-v3/request.json",
+      "oracle": "datasets/chain/javascript/prototypepollution-a-v3/oracle.json",
+      "request_digest": "0742a78f9a5e5ff694ca5d021c5a581d66016235224af132d39fd884daad6cd9",
+      "oracle_digest": "d69446ace4db7981008aa0a46ac2e6ad544bd453df0febfcdffb451a7198f9c7"
+    },
+    {
+      "case_id": "ruby-pathtraversal",
+      "family": "pathtraversal",
+      "split": "chain",
+      "request": "datasets/chain/ruby/pathtraversal-b/v3/request.json",
+      "oracle": "datasets/chain/ruby/pathtraversal-b/v3/oracle.json",
+      "request_digest": "6f8f1a582c13d0bf41b2c497daa5cc63e22f187524e09a0809d3f511dd348705",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    },
+    {
+      "case_id": "java-xxe-b",
+      "family": "xxe",
+      "split": "chain",
+      "request": "datasets/chain/java/xxe-b/v3/request.json",
+      "oracle": "datasets/chain/java/xxe-b/v3/oracle.json",
+      "request_digest": "e9b67750b384ce75bcf6f7c414900a941ecbb77ebfe023fc4119b4a4b541cb6f",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    },
+    {
+      "case_id": "perl-xss-b",
+      "family": "ih-perl-xss",
+      "split": "dev",
+      "request": "datasets/corpus/perl-xss-b.request.json",
+      "oracle": "datasets/corpus/perl-xss-b.oracle.json",
+      "request_digest": "e05b0937192010b8339d378d727e43bb2e53be6955b6d6404227b96199fc39fa",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    },
+    {
+      "case_id": "c-intoverflow-a",
+      "family": "c-intoverflow",
+      "split": "chain",
+      "request": "datasets/chain/common/c-intoverflow-a/v3/request.json",
+      "oracle": "datasets/chain/common/c-intoverflow-a/v3/oracle.json",
+      "request_digest": "deb5c1e096f46542188c86a1e7610c8d5393c16ba6684c70560b537c84d2f0d0",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
+    }
+  ]
+}

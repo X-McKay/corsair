@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import logging
+import sys
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
 from pathlib import Path
@@ -73,6 +74,29 @@ class CliArguments(argparse.Namespace):
     diff: str | None
     full: bool
     structured_tools: bool | None
+    gym_command: str
+    ledger_command: str
+    tier: str
+    cases: list[str] | None
+    languages: list[str] | None
+    temporal_address: str | None
+    budgets: str | None
+    out: str | None
+    run_dir: str
+    references: list[str] | None
+    runs: list[str]
+    source: str
+    scorecard: str
+    row_id: str
+    wave: int
+    entry: Literal["baseline", "experiment"]
+    track: str | None
+    idea: str | None
+    lesson: str
+    ledger: str
+    ledger_markdown: str
+    ledger_baseline: str | None
+    gym_dataset: str | None
 
 
 def validate_run_id(value: str) -> str:
@@ -585,6 +609,264 @@ async def _handle_agent(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+GYM_LEDGER = "evals/experiments/ledger.jsonl"
+GYM_LEDGER_MARKDOWN = "evals/experiments/LEDGER.md"
+
+
+def _gym_settings(args: CliArguments) -> Settings:
+    """``--settings``, else the checkout's live ``.state/settings.json``, else the defaults."""
+    from corsair.entrypoints.gym import checkout_root, default_settings_path
+    from corsair.settings import load_settings
+
+    return load_settings(args.settings or default_settings_path(checkout_root()))
+
+
+def _emit_view(ui: Terminal, text: str, value: object) -> None:
+    """Human and Markdown output print the code-owned Markdown view; JSON gets the record."""
+    if ui.human or ui.markdown:
+        sys.stdout.write(text)
+    else:
+        ui.emit(value)
+
+
+async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
+    """Run one tier on an in-process worker in the gym namespace; write and show its scorecard."""
+    from corsair.entrypoints.gym import GymOptions, checkout_root, resolve_tier, run_gym
+    from corsair.evaluation.gym.render import render_scorecard
+    from corsair.workflows.evaluation import EvaluationWorkflow
+
+    root = checkout_root()
+    options = GymOptions(
+        dataset=resolve_tier(args.tier, root),
+        settings=_gym_settings(args),
+        repeats=args.repeats,
+        concurrency=args.concurrency,
+        temporal_address=args.temporal_address,
+        cases=tuple(args.cases or ()),
+        languages=tuple(
+            language.strip()
+            for value in args.languages or ()
+            for language in value.split(",")
+            if language.strip()
+        ),
+        budgets=Path(args.budgets) if args.budgets else None,
+        out=Path(args.out) if args.out else None,
+        run_id=validate_run_id(args.run_id) if args.run_id else None,
+    )
+
+    async def observe(handle: Any) -> list[BatchItem]:
+        from corsair.adapters.temporal.client import wait_for_result
+
+        return await ui.wait(
+            wait_for_result(handle),
+            f"Gym {handle.id}",
+            query=lambda: handle.query(EvaluationWorkflow.status),
+        )
+
+    run = await run_gym(options, root=root, observe=observe)
+    card = run.scorecard
+    lines = [
+        render_scorecard(card),
+        f"- Run directory: `{run.run_dir}`",
+        f"- Temporal: {'ephemeral' if run.ephemeral else 'existing'} `{run.temporal_address}`, "
+        f"namespace `{card.run.temporal_namespace}`, task queue `{card.run.task_queue}`",
+        f"- Commit: `{card.run.git_branch}` `{card.run.git_commit}`",
+        *(f"- Image `{ref}`: `{image_id}`" for ref, image_id in card.run.image_ids.items()),
+        f"- Wall seconds: {run.wall_seconds:.1f}",
+        "",
+    ]
+    _emit_view(
+        ui,
+        "\n".join(lines),
+        {
+            "run_dir": str(run.run_dir),
+            "temporal_address": run.temporal_address,
+            "ephemeral": run.ephemeral,
+            "wall_seconds": run.wall_seconds,
+            "scorecard": card,
+        },
+    )
+    unavailable = sum(item.status == "unavailable" for item in run.trajectories)
+    return 1 if unavailable else 0
+
+
+async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
+    """Score a saved report into trajectories and a scorecard; no services."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import RunContext
+    from corsair.evaluation.comparison import read_report
+    from corsair.evaluation.gym.budgets import load_budgets
+    from corsair.evaluation.gym.render import render_scorecard
+    from corsair.evaluation.gym.scoring import (
+        SCORECARD_FILE,
+        TRAJECTORIES_FILE,
+        load_results,
+        read_scorecard,
+        score_report,
+        write_scorecard,
+        write_trajectories,
+    )
+
+    report_path = Path(args.report)
+    report = read_report(report_path)
+    out = Path(args.out) if args.out else report_path.parent
+    previous = out / SCORECARD_FILE
+    run = (
+        read_scorecard(previous).run
+        if previous.exists()
+        else RunContext(run_id=validate_run_id(report_path.stem))
+    )
+    store = ArtifactStore(_gym_settings(args).artifact_root)
+    run_ids = [str(row.get("run_id")) for row in report.get("rows", [])]
+    trajectories, card = score_report(
+        report,
+        Path(args.dataset),
+        load_results(store, run_ids),
+        run=run,
+        budgets=load_budgets(Path(args.budgets)) if args.budgets else None,
+    )
+    write_trajectories(out / TRAJECTORIES_FILE, trajectories)
+    write_scorecard(out / SCORECARD_FILE, card)
+    _emit_view(ui, render_scorecard(card) + f"\n- Written to `{out}`\n", card)
+    return 0
+
+
+async def _handle_gym_gate(args: CliArguments, ui: Terminal) -> int:
+    """Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable."""
+    from corsair.evaluation.gym.gate import gate
+    from corsair.evaluation.gym.render import render_gate
+    from corsair.evaluation.gym.scoring import read_scorecard
+
+    baseline, candidate = read_scorecard(Path(args.baseline)), read_scorecard(Path(args.candidate))
+    verdict = gate(baseline, candidate)
+    _emit_view(ui, render_gate(verdict, baseline, candidate), verdict)
+    return verdict.exit_code
+
+
+async def _handle_gym_replay(args: CliArguments, ui: Terminal) -> int:
+    """Show one case's rounds, per-call usage and failure stop from a gym run; no services."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.entrypoints.gym import render_replay, replay_case
+
+    store = ArtifactStore(_gym_settings(args).artifact_root)
+    view = replay_case(Path(args.run_dir), args.case or "", store)
+    _emit_view(ui, render_replay(view), view)
+    return 0
+
+
+async def _handle_gym_capture(args: CliArguments, ui: Terminal) -> int:
+    """Freeze a case's failed repeats as agent fixtures and kernel replay cases."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.entrypoints.gym import checkout_root, dataset_for_report
+    from corsair.evaluation.gym.capture import capture
+    from corsair.evaluation.gym.scoring import REPORT_FILE
+
+    root = checkout_root()
+    run_dir = Path(args.run_dir)
+    dataset = (
+        Path(args.gym_dataset)
+        if args.gym_dataset
+        else dataset_for_report(run_dir / REPORT_FILE, root)
+    )
+    captured = capture(
+        run_dir,
+        args.case or "",
+        dataset_path=dataset,
+        store=ArtifactStore(_gym_settings(args).artifact_root),
+        out_root=root / "evals",
+        kernel_dir=root / "tests/replay/kernel",
+        references=[Path(path) for path in args.references or ()],
+    )
+    ui.emit(captured)
+    return 0
+
+
+async def _handle_gym_export(args: CliArguments, ui: Terminal) -> int:
+    """Write grouped rewards and advantages from run directories for later training."""
+    from corsair.evaluation.gym.export import export_groups
+
+    count = export_groups([Path(path) for path in args.runs], Path(args.out or ""))
+    ui.emit({"export": args.out, "records": count})
+    return 0
+
+
+async def _handle_gym_budgets(args: CliArguments, ui: Terminal) -> int:
+    """Derive per-kind budgets from a scorecard's p95 values and write them with their digest."""
+    from corsair.evaluation.gym.budgets import derive_budgets, write_budgets
+    from corsair.evaluation.gym.scoring import read_scorecard
+
+    budgets = derive_budgets(read_scorecard(Path(args.source)))
+    ui.emit({"budgets": args.out, "digest": write_budgets(Path(args.out or ""), budgets)})
+    return 0
+
+
+async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
+    """Append one ledger row from a scorecard, or render LEDGER.md from the JSONL ledger."""
+    from corsair.evaluation.gym.ledger import append_ledger, build_ledger_row, render_ledger_file
+    from corsair.evaluation.gym.scoring import read_scorecard
+
+    if args.ledger_command == "render":
+        render_ledger_file(Path(args.ledger), Path(args.ledger_markdown))
+        ui.emit({"ledger": args.ledger, "markdown": args.ledger_markdown})
+        return 0
+    from datetime import date
+
+    from corsair.evaluation.gym.gate import gate
+
+    candidate = read_scorecard(Path(args.scorecard))
+    verdict = (
+        None
+        if args.ledger_baseline is None
+        else gate(read_scorecard(Path(args.ledger_baseline)), candidate)
+    )
+    row = build_ledger_row(
+        candidate,
+        row_id=args.row_id,
+        recorded_on=date.today(),
+        wave=args.wave,
+        entry=args.entry,
+        tier=args.tier,
+        track=args.track,
+        idea=args.idea,
+        gate=verdict,
+        lesson=args.lesson,
+        scorecard_path=args.scorecard,
+    )
+    append_ledger(Path(args.ledger), row)
+    ui.emit(row)
+    return 0
+
+
+async def _handle_gym_images(args: CliArguments, ui: Terminal) -> int:
+    """Build the content-addressed trusted images of this checkout; print tags and ids."""
+    from corsair.entrypoints.gym import build_gym_images, checkout_root
+
+    ids = await asyncio.to_thread(build_gym_images, checkout_root(), _gym_settings(args))
+    ui.emit({"images": ids})
+    return 0
+
+
+_GYM_HANDLERS: dict[str, Callable[[CliArguments, Terminal], Awaitable[int]]] = {
+    "run": _handle_gym_run,
+    "score": _handle_gym_score,
+    "gate": _handle_gym_gate,
+    "replay": _handle_gym_replay,
+    "capture": _handle_gym_capture,
+    "export-grpo": _handle_gym_export,
+    "budgets": _handle_gym_budgets,
+    "ledger": _handle_gym_ledger,
+    "images": _handle_gym_images,
+}
+
+
+async def _handle_gym(args: CliArguments, ui: Terminal) -> int:
+    """Dispatch one ``corsair gym`` subcommand."""
+    handler = _GYM_HANDLERS.get(args.gym_command)
+    if handler is None:
+        raise ValueError("Unknown gym command")
+    return await handler(args, ui)
+
+
 type CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
@@ -602,6 +884,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "intake": _handle_intake,
     "dataset": _handle_dataset,
     "agent": _handle_agent,
+    "gym": _handle_gym,
 }
 
 
@@ -703,6 +986,8 @@ def parser() -> argparse.ArgumentParser:
             "replay-candidates natively in Docker"
         ),
         "agent": "Inspect agent roles offline; no model provider, target or services",
+        "gym": "Evaluation gym: run a frozen tier in the corsair-gym namespace, score, gate, "
+        "replay, capture, export and record",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -851,7 +1136,101 @@ def parser() -> argparse.ArgumentParser:
     preview.add_argument(
         "--full", action="store_true", help="Human output: print every part (or diff) in full"
     )
+    _gym_parsers(commands["gym"])
     return root
+
+
+def _gym_parsers(gym: argparse.ArgumentParser) -> None:
+    """``corsair gym`` subcommands; each prints code-owned text or a JSON record."""
+    commands = gym.add_subparsers(dest="gym_command", required=True, title="gym commands")
+
+    def command(name: str, description: str) -> argparse.ArgumentParser:
+        parsed = commands.add_parser(name, help=description, description=description)
+        _presentation_options(parsed)
+        return parsed
+
+    run = command(
+        "run",
+        "Run a tier through an in-process production worker on a per-branch queue in the "
+        "corsair-gym namespace (ephemeral server unless --temporal-address); writes report, "
+        "trajectories and scorecard",
+    )
+    run.add_argument("tier", help="Tier name (tier0 -> evals/datasets/gym-tier0.json) or a path")
+    run.add_argument("--repeats", type=int, choices=range(1, 9), default=1)
+    run.add_argument("--concurrency", type=int, choices=range(1, 9), default=2)
+    run.add_argument(
+        "--temporal-address", help="Existing server; it must already have namespace corsair-gym"
+    )
+    run.add_argument(
+        "--case", dest="cases", action="append", help="Only this case (repeatable); sliced run"
+    )
+    run.add_argument(
+        "--lang", dest="languages", action="append", help="Only these languages, e.g. python,c"
+    )
+    run.add_argument(
+        "--budgets", help="Budgets file (default evals/experiments/budgets.json when present)"
+    )
+    run.add_argument("--out", help="Run directory (default <artifact_root>/gym/<run-id>)")
+    run.add_argument("--run-id", help="Batch identity (default gym-<tier>-<time>-<hex>)")
+    score_cmd = command("score", "Score a saved report into trajectories and a scorecard")
+    score_cmd.add_argument("report", help="Composed evaluation report JSON")
+    score_cmd.add_argument("--dataset", required=True, help="The manifest it was scored against")
+    score_cmd.add_argument("--out", help="Directory for the files (default: the report's)")
+    score_cmd.add_argument("--budgets", help="Budgets file for the efficiency bonus")
+    gate_cmd = command(
+        "gate", "Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable"
+    )
+    gate_cmd.add_argument("--baseline", required=True, metavar="SCORECARD")
+    gate_cmd.add_argument("--candidate", required=True, metavar="SCORECARD")
+    replay_cmd = command(
+        "replay", "One case's round timeline, per-call usage and failure stop; no services"
+    )
+    replay_cmd.add_argument("run_dir", metavar="RUN-DIR")
+    replay_cmd.add_argument("--case", required=True)
+    capture_cmd = command(
+        "capture", "Freeze a case's failed repeats as evals/ fixtures and tests/replay/kernel cases"
+    )
+    capture_cmd.add_argument("run_dir", metavar="RUN-DIR")
+    capture_cmd.add_argument("--case", required=True)
+    capture_cmd.add_argument(
+        "--reference",
+        dest="references",
+        action="append",
+        metavar="RUN-DIR",
+        help="Another run over the same dataset that may supply demonstrated payloads",
+    )
+    capture_cmd.add_argument(
+        "--dataset", dest="gym_dataset", help="Manifest (default: found by the report's digest)"
+    )
+    export = command("export-grpo", "Grouped rewards and advantages across runs, as JSONL")
+    export.add_argument("--runs", nargs="+", required=True, metavar="RUN-DIR")
+    export.add_argument("--out", required=True, metavar="FILE")
+    budgets = command("budgets", "Write per-kind budgets from a scorecard's p95 values")
+    budgets.add_argument("--from", dest="source", required=True, metavar="SCORECARD")
+    budgets.add_argument("--out", required=True, metavar="FILE")
+    command("images", "Build this checkout's content-addressed images; print tags and ids")
+    ledger = command("ledger", "Append to or render the experiment ledger")
+    ledger_commands = ledger.add_subparsers(
+        dest="ledger_command", required=True, title="ledger commands"
+    )
+    append_help = "Append one row from a scorecard (gated when --baseline is given)"
+    append = ledger_commands.add_parser("append", help=append_help, description=append_help)
+    _presentation_options(append)
+    append.add_argument("--scorecard", required=True)
+    append.add_argument("--id", dest="row_id", required=True)
+    append.add_argument("--entry", choices=("baseline", "experiment"), required=True)
+    append.add_argument("--tier", required=True)
+    append.add_argument("--wave", type=int, default=0)
+    append.add_argument("--track")
+    append.add_argument("--idea")
+    append.add_argument("--baseline", dest="ledger_baseline", metavar="SCORECARD")
+    append.add_argument("--lesson", default="")
+    append.add_argument("--ledger", default=GYM_LEDGER)
+    render_help = "Regenerate LEDGER.md's tables from the JSONL ledger"
+    render = ledger_commands.add_parser("render", help=render_help, description=render_help)
+    _presentation_options(render)
+    render.add_argument("--ledger", default=GYM_LEDGER)
+    render.add_argument("--markdown", dest="ledger_markdown", default=GYM_LEDGER_MARKDOWN)
 
 
 def main() -> None:

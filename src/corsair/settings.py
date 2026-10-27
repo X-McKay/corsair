@@ -67,6 +67,16 @@ def _default_images(python_image: str) -> dict[str, str]:
     }
 
 
+# Transport and storage settings: recorded beside a run, never part of its identity.
+TRANSPORT_FIELDS = (
+    "artifact_root",
+    "source_root",
+    "temporal_address",
+    "temporal_namespace",
+    "task_queue",
+)
+
+
 class Settings(Contract):
     artifact_root: str = ".runs"
     source_root: str = "."
@@ -118,7 +128,13 @@ class Settings(Contract):
 
     @property
     def identity(self) -> str:
-        return digest(self)
+        """Digest of the behaviour-bearing settings; where a run connects and stores is excluded.
+
+        A per-run task queue, Temporal port or namespace, or another artifact or source root
+        does not change what the worker does, so it does not change the configuration
+        identity. Images, limits, models and evidence policy do.
+        """
+        return digest(self.model_dump(mode="json", exclude=set(TRANSPORT_FIELDS)))
 
 
 def load_settings(path: str | Path | None = None) -> Settings:
