@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "case_id": "ruby-pathtraversal",
+      "input": "datasets/chain/ruby/pathtraversal-b/v3/request.json",
+      "input_digest": "6f8f1a582c13d0bf41b2c497daa5cc63e22f187524e09a0809d3f511dd348705",
+      "oracle": "fixtures/gym-gym-tier0-20261027t010807-479fc5-ruby-pathtraversal/producer-oracle.json",
+      "oracle_digest": "b688c0035ff5b384f4cc2ca9433d55f77f6a8061d13a472e2305fe973c33246b"
+    }
+  ],
+  "schema_version": "corsair.agent-dataset/1"
+}

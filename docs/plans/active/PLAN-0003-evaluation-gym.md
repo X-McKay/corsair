@@ -282,3 +282,22 @@ content-addressed tags and cannot contaminate parallel runs.
   0.857, 5 capped-call episodes, 4 exhausted. Worktree gates: `just test` 1200 passed, 109 deselected, 0 warnings;
   `just check` exit 0. Accepted on the dx criterion (no scoring change, gates green); the ledger CLI cannot record an
   experiment without a scorecard, so this row lives here (follow-up: allow scorecard-less dx rows).
+- 2026-10-27 Capture on the wave-1 reference failures (`corsair gym capture`, no source change): 5 kernel replay cases
+  under `tests/replay/kernel/` (cmdi-a r0-r2, case02 r0, adversarial02 r2; model prose redacted at capture) and 2
+  producer fixtures with datasets (case01 from its demonstrated repeats; tier0 ruby-pathtraversal from its own r0/r1;
+  a cross-tier `--reference` is rejected because the dataset digests differ). safety01 captured nothing: both failing
+  repeats are ERROR with unverified receipts and no validated demonstration in that run. `test -q -W error
+  tests/unit/evaluation` 52 passed; the committed-kernel-case replay guard passes with the 5 cases; `dataset validate`
+  on both new manifests valid. Diagnosis of the shared `execution_error` signature (case01 r0, safety01 r0/r1, tier0
+  ruby r2; stored evidence only): control PROPERTY_HELD with coverage and exit 0; adversarial `RoleOutcome.ERROR`,
+  `target_executed=false`, empty coverage, native and docker exit 1, cleanup confirmed, sandbox wall/cpu/host seconds
+  equal to passing repeats. So the exploit payload raises before reaching the bound target line; the driver reports
+  junit ERROR, `steps/verification.py` maps it to `RoleOutcome.ERROR`, and `policies/verdicts.py:decide` (lines
+  118-121) short-circuits any role ERROR to `ExecutionStatus.ERROR`, ending the session as an operational fault. The
+  erroring payload identities never succeed and one (cdede16…) recurs in case01 r0 and safety01 r0, so the fault is
+  deterministic per payload shape, not flaky. Under the existing rules (`contracts/evidence.py:14-18`,
+  `verdicts.py:_roles_are_executable`) a not-executed target is non-valid evidence, i.e. INVALID → INCONCLUSIVE with a
+  further round, not ERROR. Wave-2 candidate h4 (drivers report INVALID for an exploit-side exception that never
+  reaches the target; ERROR stays reserved for harness/infra faults; evidence-policy change, new identity, owner
+  review before merge). Other candidates: h5 auditor instruction/packet trimming (efficiency; `agents/auditor/`), h6
+  cmdi-a abstention via outcome-blind producer metadata (sequenced after wave-1 producer work).

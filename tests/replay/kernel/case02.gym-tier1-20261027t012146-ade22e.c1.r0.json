@@ -1,0 +1,653 @@
+{
+  "case_id": "case02",
+  "execution_status": "ERROR",
+  "fix_status": "NOT_REQUESTED",
+  "kind": "python.secret_disclosure/1",
+  "negative_threshold": 2,
+  "oracle": {
+    "acceptable": [
+      "INCONCLUSIVE"
+    ],
+    "acceptable_verdicts": [
+      "EXPLOIT_NOT_DEMONSTRATED",
+      "INCONCLUSIVE"
+    ],
+    "expected_execution": "COMPLETED",
+    "expected_fix": null,
+    "expected_verdict": null,
+    "forbidden": [
+      "REFUTED",
+      "SUPPORTED",
+      "CONDITIONAL"
+    ],
+    "forbidden_verdicts": [
+      "EXPLOIT_DEMONSTRATED",
+      "COMPONENT_EXPLOIT_DEMONSTRATED"
+    ]
+  },
+  "prepared": {
+    "case_id": "case02",
+    "finding": {
+      "claim_scope": "component",
+      "description": "The read_file API must not disclose a file outside its configured public root. Investigate path inputs through this API. The private test fixture is at /fixtures/private/secret.txt; its value is not available. Only the path argument is caller controlled.",
+      "file": "target.py",
+      "line": 4,
+      "scanner": null,
+      "title": "File access input validation"
+    },
+    "fixed_source": null,
+    "line_provenance": "declared",
+    "manifest": {
+      "auditor_prompt_digest": "34ab8b9e7417c5b9a7ffcdb9313e40b0fb9d385f21bda436a5e0609deba985d7",
+      "capabilities": {
+        "auditor": {
+          "budget_policy_digest": "bc3340a413422e27b5ba5d34cd07b994596e822ad188bcefa80c6f60df568d18",
+          "execution_class": "durable",
+          "governance_tier": "review",
+          "instruction_digest": "34ab8b9e7417c5b9a7ffcdb9313e40b0fb9d385f21bda436a5e0609deba985d7",
+          "output_schema_digest": "c047deb2f3c1aaf43d0677660c8bf27e0bb082b82dd82acd121f74ed2d4b6225",
+          "risk_assessment_digest": "7c48b26863c6040af491621c23d79d5b6bcd5ea5c037a0910cd18579bbe1355d",
+          "runtime_skills_digest": "1f7559fa7a08347b3bbe2ef651a0afa8cb3195cabb2ed58bbfc5cfd1ceea24e1",
+          "spec_digest": "07cd039b801c4d558dd1697560ec2a1acdf4e114253ae838485f4ba9b65a80d2",
+          "tools": []
+        },
+        "producer": {
+          "budget_policy_digest": "bc3340a413422e27b5ba5d34cd07b994596e822ad188bcefa80c6f60df568d18",
+          "execution_class": "durable",
+          "governance_tier": "restricted",
+          "instruction_digest": "29624ad88cb0bcd4285537ade06213698420ab5ef755fdaeb37c1f1bee563146",
+          "output_schema_digest": "e95163e3277278437362679552cbab1020bd7c09836337646c38c3655e47390e",
+          "risk_assessment_digest": "7c48b26863c6040af491621c23d79d5b6bcd5ea5c037a0910cd18579bbe1355d",
+          "runtime_skills_digest": "6c2a4d286062d9b6c705eda2957f94394952bd1ec08df78b1d3eddcab060babf",
+          "spec_digest": "ee215b947e6269d97e0d37e6c2c092d8bb448008fa9921fe165212bbe3bcede7",
+          "tools": [
+            "read_file",
+            "list_files"
+          ]
+        }
+      },
+      "config_digest": "34f22f5ebac5bf3aa01356fe6ec19419cd10a59ddd114b68bf635d266f21af5c",
+      "image_id": "sha256:51d235992fba14083ef4b2530d4aae5b3692d3461e10e4a8d6e5c53fecb0ab95",
+      "max_sessions": 2,
+      "models": {
+        "auditor": "hosted_vllm/Qwen3.6-35B-A3B-NVFP4",
+        "producer": "hosted_vllm/Qwen3.6-35B-A3B-NVFP4"
+      },
+      "negative_threshold": 2,
+      "package_version": "0.1.0",
+      "producer_prompt_digest": "29624ad88cb0bcd4285537ade06213698420ab5ef755fdaeb37c1f1bee563146",
+      "request_digest": "09394e77019020e84fab768ef427116b0dfca50a4c1e77e5940523f3243db297",
+      "schema_version": "corsair.manifest/1"
+    },
+    "recipe": {
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ],
+      "expected_control": "hello",
+      "fixed_kwargs": {
+        "root": "/fixtures/allowed"
+      },
+      "function": "read_file",
+      "kind": "python.secret_disclosure/1",
+      "module_file": "target.py",
+      "payload_parameter": "path",
+      "public_files": {
+        "hello.txt": "hello"
+      }
+    },
+    "source": {
+      "media_type": "application/x-tar",
+      "sha256": "849390bf6cb351b245f826096fde7cd810a4cff7192c5c39031548257ceba60d",
+      "size": 10240
+    },
+    "source_excerpt": "1: import os\n2: \n3: def read_file(root, path):\n4:     target = os.path.realpath(os.path.join(root, path))\n5:     if os.path.commonpath([os.path.realpath(root), target]) != os.path.realpath(root):\n6:         raise ValueError(\"outside permitted root\")\n7:     return open(target, encoding=\"utf-8\").read()",
+    "target_line": 4
+  },
+  "reason": "redacted at capture",
+  "recorded_verdict": "ERROR",
+  "rounds": [
+    {
+      "audit": {
+        "feedback": null,
+        "review": {
+          "decision": "ACCEPT",
+          "reason": "redacted at capture",
+          "rule": "ALL"
+        },
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 1623,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 1623,
+              "output_tokens": 2578,
+              "seconds": 39.56461742310785,
+              "thought_tokens": 2454
+            }
+          ],
+          "output_tokens": 2578,
+          "seconds": 39.5757396039553,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "semantic-review"
+          ],
+          "thought_tokens": 2454,
+          "tool_calls": 0,
+          "tool_calls_detail": []
+        }
+      },
+      "index": 1,
+      "observation": {
+        "adversarial": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            6
+          ],
+          "cpu_seconds": 0.187374,
+          "host_seconds": 0.260383,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.13085
+        },
+        "artifact": {
+          "media_type": "application/json",
+          "sha256": "2b9c4d9b41ce2f33e3c2bb1040ab17e2f4e697cff286b73c77513d13a3608bb7",
+          "size": 693
+        },
+        "cleanup_confirmed": true,
+        "control": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            7
+          ],
+          "cpu_seconds": 0.198962,
+          "host_seconds": 0.287019,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.139644
+        },
+        "feedback": null,
+        "operation_id": "gym-tier1-20261027t012146-ade22e.c1.r0.r1",
+        "source_digest": "849390bf6cb351b245f826096fde7cd810a4cff7192c5c39031548257ceba60d",
+        "submission_digest": "69d5019d276f514a2f89731c24cda28d335cdfd081ac817a64f4abcf7159d1cd"
+      },
+      "producer": {
+        "decision": {
+          "kind": "proposal",
+          "reason": null,
+          "schema_version": "corsair.producer-decision/1",
+          "submission": {
+            "control_payload": "hello.txt",
+            "exploit_payload": "../private/secret.txt",
+            "hypothesis": "redacted at capture",
+            "plan": {
+              "next_steps": [
+                "redacted at capture"
+              ],
+              "objective": "redacted at capture",
+              "parent_revision": null,
+              "reason": "redacted at capture",
+              "revision": 1
+            },
+            "schema_version": "corsair.submission/1"
+          }
+        },
+        "feedback": null,
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 2666,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2666,
+              "output_tokens": 4009,
+              "seconds": 59.504703340819106,
+              "thought_tokens": 3722
+            }
+          ],
+          "output_tokens": 4009,
+          "seconds": 59.52407017792575,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 3722,
+          "tool_calls": 1,
+          "tool_calls_detail": [
+            {
+              "index": 1,
+              "name": "set_model_response",
+              "result_bytes": 1247,
+              "seconds": 9.391107596457005e-05,
+              "truncated": false
+            }
+          ]
+        }
+      },
+      "session": 1
+    },
+    {
+      "audit": {
+        "feedback": null,
+        "review": {
+          "decision": "ACCEPT",
+          "reason": "redacted at capture",
+          "rule": "ALL"
+        },
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 1638,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 1638,
+              "output_tokens": 2401,
+              "seconds": 31.84472877997905,
+              "thought_tokens": 2303
+            }
+          ],
+          "output_tokens": 2401,
+          "seconds": 31.85580287105404,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "semantic-review"
+          ],
+          "thought_tokens": 2303,
+          "tool_calls": 0,
+          "tool_calls_detail": []
+        }
+      },
+      "index": 2,
+      "observation": {
+        "adversarial": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            6
+          ],
+          "cpu_seconds": 0.183401,
+          "host_seconds": 0.252633,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.126999
+        },
+        "artifact": {
+          "media_type": "application/json",
+          "sha256": "c5b79825ef78078b8ebd4008f7d0da36cae7e18ee22fd24ab1002f322abd52de",
+          "size": 693
+        },
+        "cleanup_confirmed": true,
+        "control": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            7
+          ],
+          "cpu_seconds": 0.189465,
+          "host_seconds": 0.278969,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.127018
+        },
+        "feedback": null,
+        "operation_id": "gym-tier1-20261027t012146-ade22e.c1.r0.r2",
+        "source_digest": "849390bf6cb351b245f826096fde7cd810a4cff7192c5c39031548257ceba60d",
+        "submission_digest": "4a95c19a16968f89f52f71d49955583af109896f20031e44aeda1e029e41c4ed"
+      },
+      "producer": {
+        "decision": {
+          "kind": "proposal",
+          "reason": null,
+          "schema_version": "corsair.producer-decision/1",
+          "submission": {
+            "control_payload": "hello.txt",
+            "exploit_payload": "../private/secret.txt",
+            "hypothesis": "redacted at capture",
+            "plan": {
+              "next_steps": [
+                "redacted at capture"
+              ],
+              "objective": "redacted at capture",
+              "parent_revision": 1,
+              "reason": "redacted at capture",
+              "revision": 2
+            },
+            "schema_version": "corsair.submission/1"
+          }
+        },
+        "feedback": null,
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 2914,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2914,
+              "output_tokens": 8992,
+              "seconds": 129.47325829812326,
+              "thought_tokens": 8689
+            }
+          ],
+          "output_tokens": 8992,
+          "seconds": 129.49136296915822,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 8689,
+          "tool_calls": 1,
+          "tool_calls_detail": [
+            {
+              "index": 1,
+              "name": "set_model_response",
+              "result_bytes": 1334,
+              "seconds": 9.692111052572727e-05,
+              "truncated": false
+            }
+          ]
+        }
+      },
+      "session": 1
+    },
+    {
+      "audit": {
+        "feedback": null,
+        "review": {
+          "decision": "ACCEPT",
+          "reason": "redacted at capture",
+          "rule": "ALL"
+        },
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 1654,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 1654,
+              "output_tokens": 2293,
+              "seconds": 32.57960038515739,
+              "thought_tokens": 2186
+            }
+          ],
+          "output_tokens": 2293,
+          "seconds": 32.59073173510842,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "semantic-review"
+          ],
+          "thought_tokens": 2186,
+          "tool_calls": 0,
+          "tool_calls_detail": []
+        }
+      },
+      "index": 1,
+      "observation": {
+        "adversarial": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            6
+          ],
+          "cpu_seconds": 0.18536,
+          "host_seconds": 0.253806,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.127703
+        },
+        "artifact": {
+          "media_type": "application/json",
+          "sha256": "d40c3c513ea0f7d02eede3a75266c9301f9c75ac113e6a7bb62c844001561245",
+          "size": 696
+        },
+        "cleanup_confirmed": true,
+        "control": {
+          "covered_lines": [
+            1,
+            3,
+            4,
+            5,
+            7
+          ],
+          "cpu_seconds": 0.192774,
+          "host_seconds": 0.269296,
+          "native_exit_code": 0,
+          "outcome": "PROPERTY_HELD",
+          "reason": "validated native pytest/coverage evidence",
+          "target_executed": true,
+          "wall_seconds": 0.129699
+        },
+        "feedback": null,
+        "operation_id": "gym-tier1-20261027t012146-ade22e.c1.r0.s2.r1",
+        "source_digest": "849390bf6cb351b245f826096fde7cd810a4cff7192c5c39031548257ceba60d",
+        "submission_digest": "f3c31b9e2fc3fc61473e30bb02d8147cda8b5b8b5d1c84838ae86f1862175f3e"
+      },
+      "producer": {
+        "decision": {
+          "kind": "proposal",
+          "reason": null,
+          "schema_version": "corsair.producer-decision/1",
+          "submission": {
+            "control_payload": "hello.txt",
+            "exploit_payload": "../private/secret.txt",
+            "hypothesis": "redacted at capture",
+            "plan": {
+              "next_steps": [
+                "redacted at capture"
+              ],
+              "objective": "redacted at capture",
+              "parent_revision": null,
+              "reason": "redacted at capture",
+              "revision": 1
+            },
+            "schema_version": "corsair.submission/1"
+          }
+        },
+        "feedback": null,
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 16303,
+          "llm_calls": 4,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2666,
+              "output_tokens": 564,
+              "seconds": 8.703856284031644,
+              "thought_tokens": 548
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 2,
+              "input_tokens": 3258,
+              "output_tokens": 42,
+              "seconds": 1.1352643999271095,
+              "thought_tokens": 14
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 3,
+              "input_tokens": 3400,
+              "output_tokens": 3464,
+              "seconds": 56.13370995782316,
+              "thought_tokens": 3084
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 4,
+              "input_tokens": 6979,
+              "output_tokens": 351,
+              "seconds": 4.794280461966991,
+              "thought_tokens": 45
+            }
+          ],
+          "output_tokens": 4421,
+          "seconds": 70.80145325488411,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 3691,
+          "tool_calls": 4,
+          "tool_calls_detail": [
+            {
+              "index": 1,
+              "name": "list_files",
+              "result_bytes": 41,
+              "seconds": 0.0003001231234520674,
+              "truncated": false
+            },
+            {
+              "index": 2,
+              "name": "read_file",
+              "result_bytes": 325,
+              "seconds": 0.0003079629968851805,
+              "truncated": false
+            },
+            {
+              "index": 3,
+              "name": "set_model_response",
+              "result_bytes": 439,
+              "seconds": 0.00011545117013156414,
+              "truncated": false
+            },
+            {
+              "index": 4,
+              "name": "set_model_response",
+              "result_bytes": 1391,
+              "seconds": 9.055109694600105e-05,
+              "truncated": false
+            }
+          ]
+        }
+      },
+      "session": 2
+    },
+    {
+      "audit": null,
+      "index": 2,
+      "observation": null,
+      "producer": {
+        "decision": null,
+        "feedback": {
+          "gate": "provider_max_tokens",
+          "operational": true,
+          "reason": "producer response stopped at the 12288-token per-request output cap (MAX_TOKENS) before structured completion; reasoning tokens count against this cap"
+        },
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 23902,
+          "llm_calls": 4,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2945,
+              "output_tokens": 3893,
+              "seconds": 67.41445532394573,
+              "thought_tokens": 3877
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 2,
+              "input_tokens": 6866,
+              "output_tokens": 41,
+              "seconds": 1.6398579189553857,
+              "thought_tokens": 13
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 3,
+              "input_tokens": 7007,
+              "output_tokens": 50,
+              "seconds": 1.2801660120021552,
+              "thought_tokens": 18
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 4,
+              "input_tokens": 7084,
+              "output_tokens": 12288,
+              "seconds": 165.05177877191454,
+              "thought_tokens": 12288
+            }
+          ],
+          "output_tokens": 16272,
+          "seconds": 235.41703465790488,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 16196,
+          "tool_calls": 3,
+          "tool_calls_detail": [
+            {
+              "index": 1,
+              "name": "list_files",
+              "result_bytes": 41,
+              "seconds": 0.0002611619420349598,
+              "truncated": false
+            },
+            {
+              "index": 2,
+              "name": "read_file",
+              "result_bytes": 325,
+              "seconds": 0.00026161083951592445,
+              "truncated": false
+            },
+            {
+              "index": 3,
+              "name": "read_file",
+              "result_bytes": 57,
+              "seconds": 0.00022428203374147415,
+              "truncated": false
+            }
+          ]
+        }
+      },
+      "session": 2
+    }
+  ],
+  "run_id": "gym-tier1-20261027t012146-ade22e.c1.r0",
+  "schema_version": "corsair.gym-kernel-case/1"
+}

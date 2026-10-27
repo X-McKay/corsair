@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "case_id": "case01",
+      "input": "fixtures/case01/request.json",
+      "input_digest": "ce6ec1813d3dbb3031f2b6e2d1b66dbd8f53e6769e4e6744ddb173fe58f9ed8a",
+      "oracle": "fixtures/gym-gym-tier1-20261027t012146-ade22e-case01/producer-oracle.json",
+      "oracle_digest": "fa0beed9dc5c1cbf3bab988b3d0b296b16237ea2e8953903cb5da9f7aab0f159"
+    }
+  ],
+  "schema_version": "corsair.agent-dataset/1"
+}

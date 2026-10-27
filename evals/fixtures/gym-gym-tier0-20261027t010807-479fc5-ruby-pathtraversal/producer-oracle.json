@@ -1,0 +1,7 @@
+{
+  "candidate_payloads": [
+    "../../../fixtures/private/secret.txt",
+    "../private/secret.txt"
+  ],
+  "control_payload": "readme.txt"
+}
