@@ -469,3 +469,6 @@ content-addressed tags and cannot contaminate parallel runs.
   measured so far, so the corpus (one case per non-Python language) and run-to-run variance, not the gate, are
   the limiting factor. h1 closed as rejected; ledger row `h1-rerun`. Next: a second reference run of the same
   configuration to measure the noise floor, then corpus growth (sibling rows into tier1 via reviewed intake).
+- 2026-10-27 Docker suite on `gym/loop` at cb4c829a (after w2, s8, s9): `CORSAIR_TEST_TEMPORAL=1 just -- test-docker
+  -q -W error` 61 passed, 1 skipped (long probe). Noise-floor run started: a second tier1 at the reference
+  configuration (identity 34f22f5e, no extra_body) to be compared case by case with `ref-w2-tier1`.
