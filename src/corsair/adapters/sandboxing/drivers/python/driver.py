@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import textwrap
+import time
 import xml.etree.ElementTree as element_tree
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
@@ -30,6 +31,8 @@ JUNIT = WORK / "junit.xml"
 COVERAGE_DATA = WORK / ".coverage"
 COVERAGE_REPORT = WORK / "coverage.json"
 TEST = WORK / "test_recipe.py"
+# The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+CPU_STAT = Path("/sys/fs/cgroup/cpu.stat")
 
 # Each recipe kind has one fixed test template. A single violation marker per kind is
 # written by this trusted code only when its own assertion genuinely fails, so a target
@@ -274,6 +277,27 @@ def _child_environment() -> dict[str, str]:
     }
 
 
+def _cgroup_cpu_usec(path: Path = CPU_STAT) -> int | None:
+    """The cgroup v2 ``usage_usec`` CPU total, or None when the file or field is absent."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in text.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "usage_usec":
+            return int(value) if value.isdigit() else None
+    return None
+
+
+def _timing(*, wall_usec: int, cpu_usec: int | None) -> dict[str, int]:
+    """Optional receipt timing: wall time of the target step and container CPU when known."""
+    timing = {"wall_usec": wall_usec}
+    if cpu_usec is not None:
+        timing["cpu_usec"] = cpu_usec
+    return timing
+
+
 def main() -> int:
     try:
         job = _safe_job(json.loads(JOB_PATH.read_text(encoding="utf-8")))
@@ -305,6 +329,7 @@ def main() -> int:
         f"--junitxml={JUNIT}",
         str(TEST),
     ]
+    started = time.monotonic_ns()
     try:
         # DockerSandbox owns the wall-clock probe deadline and stops the whole
         # container on expiry. Do not add a second target-execution timeout here.
@@ -320,6 +345,7 @@ def main() -> int:
         exit_code = completed.returncode
     except OSError:
         exit_code = 2
+    wall_usec = (time.monotonic_ns() - started) // 1000
 
     # Coverage is read only after pytest exits, so a normal target return cannot write
     # the driver record. DockerSandbox's container deadline governs the whole driver
@@ -351,6 +377,8 @@ def main() -> int:
         "covered_lines": _coverage_lines(job["recipe"].get("module_file", "")),
         "coverage_file": job["recipe"].get("module_file", ""),
     }
+    # Efficiency telemetry only: the verifier never admits an outcome from it.
+    record.update(_timing(wall_usec=wall_usec, cpu_usec=_cgroup_cpu_usec()))
     print(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
     # This is deliberately pytest's native status, not a boolean success inversion.
     return exit_code

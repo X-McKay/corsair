@@ -26,6 +26,7 @@ from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.investigation import InvestigationWorkflow
+from tests.integration.trusted_images import with_content_images
 from tests.unit.adk import text_response, tool_response
 from tests.workflow.temporal import temporal_id
 
@@ -102,7 +103,7 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     root = Path(__file__).resolve().parents[2]
     request = load_investigation_request(root / "evals/fixtures/case01/request.json")
     store = ArtifactStore(tmp_path / "artifacts")
-    settings = Settings(source_root=str(root), artifact_root=str(store.root))
+    settings = with_content_images(Settings(source_root=str(root), artifact_root=str(store.root)))
     model = ReferenceModel(model="scripted-reference")
     activities = Activities(
         settings,
@@ -170,11 +171,13 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for native batch execution")
     root = Path(__file__).resolve().parents[2]
     queue = temporal_id("batch-queue")
-    settings = Settings(
-        source_root=str(root),
-        artifact_root=str(tmp_path / "artifacts"),
-        task_queue=queue,
-        temporal_address=temporal_server.client.service_client.config.target_host,
+    settings = with_content_images(
+        Settings(
+            source_root=str(root),
+            artifact_root=str(tmp_path / "artifacts"),
+            task_queue=queue,
+            temporal_address=temporal_server.client.service_client.config.target_host,
+        )
     )
     config = tmp_path / "settings.json"
     config.write_text(settings.model_dump_json())

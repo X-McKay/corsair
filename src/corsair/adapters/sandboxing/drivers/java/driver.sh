@@ -21,6 +21,28 @@ JOB=/input/job.json
 WORK=/work
 REPORTS="$WORK/reports"
 CLASSES="$WORK/classes"
+# The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+CPU_STAT=/sys/fs/cgroup/cpu.stat
+
+# Integer microseconds of the realtime clock (bash 5 EPOCHREALTIME, "s.us").
+now_usec() {
+    local seconds=${EPOCHREALTIME%.*} micros=${EPOCHREALTIME#*.}
+    echo $((seconds * 1000000 + 10#$micros))
+}
+
+# The cgroup v2 usage_usec CPU total, or "null" when the file or field is absent.
+cgroup_cpu_usec() {
+    local key value
+    if [ -r "$CPU_STAT" ]; then
+        while read -r key value; do
+            if [ "$key" = "usage_usec" ] && [[ "$value" =~ ^[0-9]+$ ]]; then
+                echo "$value"
+                return
+            fi
+        done <"$CPU_STAT"
+    fi
+    echo null
+}
 
 emit_driver_error() {
     # No secret-bearing field is reflected: only a fixed reason string.
@@ -144,6 +166,8 @@ public class RecipeTest {
 JAVA
 
 # --- Compile the admitted source with javac alone ----------------------------------
+# Wall time covers compiling the admitted source with the fixed test and running it.
+started_usec=$(now_usec)
 mapfile -t source_files < <(
     jq -r '.recipe.source_roots[]' "$JOB" | while read -r root; do
         [ -d "/source/$root" ] && find "/source/$root" -name '*.java'
@@ -158,12 +182,14 @@ elif ! javac -encoding UTF-8 -d "$CLASSES" -cp "$JUNIT_JAR" \
 fi
 
 native_exit_code=2
+wall_usec=$(($(now_usec) - started_usec))
 if [ "$compile_ok" -eq 1 ]; then
     java "-javaagent:${JACOCO_AGENT}=destfile=$WORK/jacoco.exec" \
         -jar "$JUNIT_JAR" execute -cp "$CLASSES" --select-class=RecipeTest \
         --reports-dir="$REPORTS" --disable-banner --disable-ansi-colors \
         >"$WORK/junit.log" 2>&1
     native_exit_code=$?
+    wall_usec=$(($(now_usec) - started_usec))
     # Coverage conversion runs only after the launcher exits; the container deadline
     # continues to govern the whole driver process. A missing report stays invalid.
     java -jar "$JACOCO_CLI" report "$WORK/jacoco.exec" \
@@ -279,11 +305,15 @@ jq -cn \
     --argjson executed "$target_executed" \
     --argjson covered "$covered" \
     --arg coverage_file "$module_file" \
+    --argjson wall_usec "$wall_usec" \
+    --argjson cpu_usec "$(cgroup_cpu_usec)" \
     '{schema_version:"corsair.driver/1",operation_id:$op,role:$role,source_digest:$sd,
       submission_digest:$subd,native_exit_code:$exit,
       junit:{status:$status,tests:$tests,failures:$failures,errors:$errors,skipped:$skipped},
       outcome:$outcome,observation_kind:($kind|if .=="null" then null else . end),
-      target_executed:$executed,covered_lines:$covered,coverage_file:$coverage_file}'
+      target_executed:$executed,covered_lines:$covered,coverage_file:$coverage_file,
+      wall_usec:$wall_usec}
+      + (if $cpu_usec == null then {} else {cpu_usec:$cpu_usec} end)'
 
 # Deliberately the launcher's native status (or compile failure), not a success inversion.
 exit "$native_exit_code"

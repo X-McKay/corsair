@@ -31,6 +31,8 @@ from corsair.contracts import (
 from corsair.policies.verdicts import fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import PYTHON_KIND, content_image
 
 pytestmark = pytest.mark.docker
 
@@ -61,8 +63,8 @@ def read_file(root, path):
 
 
 def _image() -> str:
-    """The trusted image under test: the configured tag, or a scratch build's tag."""
-    return os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
+    """The trusted image under test: the content-tagged build, or a scratch build's tag."""
+    return os.environ.get("CORSAIR_TEST_IMAGE") or content_image(PYTHON_KIND)
 
 
 def _docker_client() -> docker.DockerClient:
@@ -222,6 +224,9 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(
     assert vulnerable_observation.control.outcome.value == "PROPERTY_HELD"
     assert vulnerable_observation.adversarial
     assert vulnerable_observation.adversarial.outcome.value == "VIOLATION"
+    assert_sandbox_seconds(vulnerable_observation)
+    # Saved evidence rebuilds each role, timing included, from its raw receipt.
+    assert verifier.validate_saved(vulnerable_observation, _submission(), vulnerable.manifest)
     _assert_cleanup(client, vulnerable_operation)
 
     safe_root = tmp_path / "safe-case"
@@ -362,6 +367,10 @@ def test_native_timeout_removes_owned_container(tmp_path, session_operation):
     assert observation.cleanup_confirmed
     assert observation.control is not None
     assert observation.control.outcome.value == "ERROR"
+    # A deadline stop leaves no driver record, but the host time it spent is still known.
+    assert observation.control.wall_seconds is None
+    assert observation.control.host_seconds is not None
+    assert observation.control.host_seconds >= 1
     _assert_cleanup(client, operation_id)
 
 

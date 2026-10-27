@@ -91,6 +91,11 @@ class _FakeSandbox:
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
     adversarial_violates: bool = True
+    # Sandbox timing: the trusted adapter's host_usec and the driver's wall/cpu usec.
+    # None leaves a field out of the receipt, as every receipt saved before it existed.
+    host_usec: object = None
+    wall_usec: object = None
+    cpu_usec: object = None
 
     def image_id_for(self, kind: str) -> str:
         del kind  # The double resolves one trusted image regardless of recipe kind.
@@ -125,6 +130,9 @@ class _FakeSandbox:
             "covered_lines": [4],
             "coverage_file": prepared.recipe.module_file,
         }
+        for key, value in (("wall_usec", self.wall_usec), ("cpu_usec", self.cpu_usec)):
+            if value is not None:
+                driver[key] = value
         raw = {
             "schema_version": "corsair.raw-evidence/1",
             "operation_id": operation_id,
@@ -141,6 +149,8 @@ class _FakeSandbox:
         }
         if not self.omit_raw_image_id:
             raw["image_id"] = self.raw_image_id
+        if self.host_usec is not None:
+            raw["host_usec"] = self.host_usec
         ref = store.put_json(raw)
         return ref
 
@@ -256,6 +266,73 @@ def test_raw_image_identity_must_be_a_matching_string(
         )
         is None
     )
+
+
+def _saved_input(store: ArtifactStore, operation_id: str = "operation") -> EvidenceInput:
+    """An input whose source blob is in ``store``, so saved evidence can re-validate."""
+    source = store.put(b"admitted source", "application/x-tar")
+    prepared = _prepared().model_copy(update={"source": source})
+    return _input(operation_id).model_copy(update={"prepared": prepared})
+
+
+def test_sandbox_seconds_travel_through_the_receipt_and_revalidate(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    sandbox = _FakeSandbox(store, host_usec=1_250_000, wall_usec=400_000, cpu_usec=650_000)
+    verifier = EvidenceVerifier(Settings(), store, sandbox)
+
+    observation = verifier.evaluate(_saved_input(store))
+
+    for role in (observation.control, observation.adversarial):
+        assert role is not None
+        assert role.host_seconds == 1.25
+        assert role.wall_seconds == 0.4
+        assert role.cpu_seconds == 0.65
+    assert observation.adversarial and observation.adversarial.outcome is RoleOutcome.VIOLATION
+    # Saved evidence rebuilds each role from its raw receipt, timing included.
+    assert verifier.validate_saved(observation, _submission(), _prepared().manifest) is not None
+
+
+def test_receipts_without_sandbox_seconds_still_decode_and_revalidate(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    verifier = EvidenceVerifier(Settings(), store, _FakeSandbox(store))
+
+    observation = verifier.evaluate(_saved_input(store))
+
+    assert observation.control is not None
+    assert observation.control.wall_seconds is None
+    assert observation.control.cpu_seconds is None
+    assert observation.control.host_seconds is None
+    assert verifier.validate_saved(observation, _submission(), _prepared().manifest) is not None
+    # A role observation serialized before the timing fields existed still decodes.
+    saved = {"outcome": "PROPERTY_HELD", "target_executed": True, "covered_lines": [4]}
+    assert RoleObservation.model_validate(saved).host_seconds is None
+
+
+@pytest.mark.parametrize("bad", [-1, 1.5, "100", True, [1]])
+def test_malformed_sandbox_seconds_are_unknown_and_never_change_the_outcome(
+    tmp_path: Path, bad: object
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    clean = EvidenceVerifier(Settings(), store, _FakeSandbox(store)).evaluate(_input("clean"))
+    sandbox = _FakeSandbox(store, host_usec=bad, wall_usec=bad, cpu_usec=bad)
+    verifier = EvidenceVerifier(Settings(), store, sandbox)
+
+    observation = verifier.evaluate(_saved_input(store, "malformed"))
+
+    for role in ("control", "adversarial"):
+        timed, reference = getattr(observation, role), getattr(clean, role)
+        assert timed == reference
+    assert verifier.validate_saved(observation, _submission(), _prepared().manifest) is not None
+
+
+def test_sandbox_seconds_never_reach_the_verdict(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    plain = EvidenceVerifier(Settings(), store, _FakeSandbox(store)).evaluate(_input("plain"))
+    timed = EvidenceVerifier(
+        Settings(), store, _FakeSandbox(store, host_usec=9_000_000, wall_usec=1, cpu_usec=1)
+    ).evaluate(_input("timed"))
+
+    assert decide(_prepared(), plain, _audit()) == decide(_prepared(), timed, _audit())
 
 
 def test_prior_intent_and_competing_claim_prevent_operation_replay(tmp_path: Path) -> None:
@@ -470,3 +547,23 @@ def test_driver_executed_lines_match_the_coverage_json_report(tmp_path: Path) ->
     assert executed(target, root / "missing.coverage") == []
     target.write_text("def broken(:\n", encoding="utf-8")
     assert executed(target) == []
+
+
+def test_driver_reads_container_cpu_usage_from_cgroup_v2(tmp_path: Path) -> None:
+    from corsair.adapters.sandboxing.drivers.python import driver
+
+    stat = tmp_path / "cpu.stat"
+    stat.write_text("usage_usec 15025\nuser_usec 7512\nsystem_usec 7512\n", encoding="utf-8")
+    assert driver._cgroup_cpu_usec(stat) == 15025
+    assert driver._cgroup_cpu_usec(tmp_path / "absent.stat") is None
+    stat.write_text("user_usec 7512\n", encoding="utf-8")
+    assert driver._cgroup_cpu_usec(stat) is None
+    stat.write_text("usage_usec many\n", encoding="utf-8")
+    assert driver._cgroup_cpu_usec(stat) is None
+
+
+def test_driver_timing_fields_are_omitted_when_unknown() -> None:
+    from corsair.adapters.sandboxing.drivers.python import driver
+
+    assert driver._timing(wall_usec=12, cpu_usec=None) == {"wall_usec": 12}
+    assert driver._timing(wall_usec=12, cpu_usec=34) == {"wall_usec": 12, "cpu_usec": 34}

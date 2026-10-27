@@ -1,8 +1,9 @@
 """Real-Docker evidence for the JavaScript prototype-pollution recipe.
 
-These exercise the corsair-javascript:0.1 image and drivers/javascript/driver.mjs: a
-control that holds, an adversarial violation on vulnerable source, a safe variant that
-holds, an unexpected target exception, absent relevant coverage, and confirmed cleanup.
+These exercise the content-tagged corsair-javascript image (just images-gym) and
+drivers/javascript/driver.mjs: a control that holds, an adversarial violation on
+vulnerable source, a safe variant that holds, an unexpected target exception, absent
+relevant coverage, and confirmed cleanup.
 Marked docker so the suite stays independent; operation ids are per-process unique so
 concurrent suites in sibling worktrees never collide on a labelled container.
 """
@@ -33,11 +34,13 @@ from corsair.contracts import (
 )
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import content_image, with_content_images
 
 pytestmark = pytest.mark.docker
 
-JS_IMAGE = "corsair-javascript:0.1"
 JS_KIND = "javascript.prototype_pollution/1"
+JS_IMAGE = content_image(JS_KIND)
 
 # Vulnerable: a __proto__ key in the parsed-JSON source reaches Object.prototype.
 VULNERABLE = """// Merge user preferences (parsed request JSON) onto the stored defaults.
@@ -161,10 +164,12 @@ def _prepared(tmp_path: Path, image_id: str, source_js: str, *, line: int):
         source=Source(path="project"),
         recipe=recipe,
     )
-    settings = Settings(
-        source_root=str(tmp_path),
-        artifact_root=str(tmp_path / "artifacts"),
-        runtime="runc",
+    settings = with_content_images(
+        Settings(
+            source_root=str(tmp_path),
+            artifact_root=str(tmp_path / "artifacts"),
+            runtime="runc",
+        )
     )
     store = ArtifactStore(tmp_path / "artifacts")
     return settings, store, prepare_case(case, settings, store, _manifest(image_id))
@@ -183,7 +188,7 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
 
 
 def _evaluate(client, tmp_path, source_js, *, line, operation):
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(JS_KIND)
+    image_id = DockerSandbox(with_content_images(Settings()), client=client).image_id_for(JS_KIND)
     settings, store, prepared = _prepared(tmp_path, image_id, source_js, line=line)
     sandbox = DockerSandbox(settings, client=client, store=store)
     verifier = EvidenceVerifier(settings, store, sandbox)
@@ -213,6 +218,7 @@ def test_real_docker_js_vulnerable_control_violation_and_cleanup(tmp_path: Path)
     assert observation.adversarial.outcome.value == "VIOLATION"
     assert observation.adversarial.target_executed
     assert 2 in observation.adversarial.covered_lines
+    assert_sandbox_seconds(observation)
     _assert_cleanup(client, operation)
 
 

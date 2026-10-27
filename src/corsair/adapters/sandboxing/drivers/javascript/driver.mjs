@@ -25,6 +25,8 @@ const JUNIT = path.join(WORK, "junit.xml");
 const COVERAGE_DIR = path.join(WORK, "cov");
 const OBSERVATION = path.join(WORK, "observation.json");
 const TEST = path.join(WORK, "test_recipe.mjs");
+// The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+const CPU_STAT = "/sys/fs/cgroup/cpu.stat";
 
 // The fixed test the driver writes. It reads the same job JSON, invokes the recipe
 // callable with the operator-fixed arguments plus the model payload as the final
@@ -206,6 +208,21 @@ function coverageLines(moduleFile) {
   return [...lines].sort((a, b) => a - b);
 }
 
+// The cgroup v2 `usage_usec` CPU total, or null when the file or field is absent.
+function cgroupCpuUsec() {
+  let text;
+  try {
+    text = fs.readFileSync(CPU_STAT, "ascii");
+  } catch {
+    return null;
+  }
+  for (const line of text.split("\n")) {
+    const [key, value] = line.split(" ");
+    if (key === "usage_usec") return /^[0-9]+$/.test(value || "") ? Number(value) : null;
+  }
+  return null;
+}
+
 function main() {
   let job;
   try {
@@ -227,6 +244,7 @@ function main() {
     HOME: "/tmp",
     NODE_V8_COVERAGE: COVERAGE_DIR,
   };
+  const started = process.hrtime.bigint();
   const result = spawnSync(
     process.execPath,
     [
@@ -242,6 +260,7 @@ function main() {
     },
   );
   const exitCode = typeof result.status === "number" ? result.status : 2;
+  const wallUsec = Number((process.hrtime.bigint() - started) / 1000n);
 
   const [status0, junit] = junitStatus(exitCode);
   let status = status0;
@@ -280,6 +299,10 @@ function main() {
     covered_lines: coverageLines(moduleFile),
     coverage_file: moduleFile,
   };
+  // Efficiency telemetry only: the verifier never admits an outcome from it.
+  record.wall_usec = wallUsec;
+  const cpuUsec = cgroupCpuUsec();
+  if (cpuUsec !== null) record.cpu_usec = cpuUsec;
   emit(record);
   // Deliberately the child's native status, not a boolean success inversion.
   return exitCode;

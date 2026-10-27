@@ -35,6 +35,29 @@ ROLES: tuple[SandboxRole, ...] = ("control", "adversarial")
 _VIOLATION_MARKERS = frozenset({"disclosure", "sentinel_created", "sanitizer_report"})
 
 
+def _usec_seconds(value: object) -> float | None:
+    """A non-negative integer microsecond count as seconds; anything else is unknown."""
+    if type(value) is not int or value < 0:
+        return None
+    return value / 1_000_000
+
+
+def _sandbox_seconds(raw: dict[str, Any]) -> dict[str, float | None]:
+    """Timing telemetry from a cleanup-confirmed receipt, read apart from its admission.
+
+    ``host_usec`` is written by the trusted Docker adapter; ``wall_usec`` and ``cpu_usec``
+    are driver-reported. Malformed or absent values are unknown and never change the
+    outcome, coverage or validity the receipt's driver record is admitted with.
+    """
+    record = raw.get("driver")
+    driver = record if isinstance(record, dict) else {}
+    return {
+        "host_seconds": _usec_seconds(raw.get("host_usec")),
+        "wall_seconds": _usec_seconds(driver.get("wall_usec")),
+        "cpu_seconds": _usec_seconds(driver.get("cpu_usec")),
+    }
+
+
 class EvidenceVerifier:
     """Synchronously verify one durable operation, never replaying an unknown run."""
 
@@ -174,6 +197,29 @@ class EvidenceVerifier:
         )
         if isinstance(raw, str):
             return self._invalid(raw), False
+        observation, valid = self._admitted_role(
+            raw,
+            expected_operation=expected_operation,
+            expected_role=expected_role,
+            expected_source=expected_source,
+            expected_submission=expected_submission,
+            prepared=prepared,
+            fixed=fixed,
+        )
+        return observation.model_copy(update=_sandbox_seconds(raw)), valid
+
+    def _admitted_role(
+        self,
+        raw: dict[str, Any],
+        *,
+        expected_operation: str,
+        expected_role: str,
+        expected_source: str,
+        expected_submission: str,
+        prepared: PreparedCase,
+        fixed: bool,
+    ) -> tuple[RoleObservation, bool]:
+        """Admit one identity- and cleanup-checked receipt's driver record, or say why not."""
         record = raw.get("driver")
         if not isinstance(record, dict) or record.get("schema_version") != "corsair.driver/1":
             if isinstance(raw.get("error"), str):

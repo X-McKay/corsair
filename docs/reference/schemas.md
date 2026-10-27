@@ -99,6 +99,14 @@ A role observation reports one of these **execution outcomes**:
 
 It also states whether the target actually executed, optional covered lines, reason, and optional native exit code. These are verifier-level facts about one role execution. They are not the final verdict, and an absent/invalid/error observation cannot be converted into a negative security conclusion.
 
+Three optional fields carry sandbox timing for efficiency scoring only; none enters an outcome, coverage, audit or verdict decision, and `null` means unknown, never zero:
+
+- `wall_seconds`: the trusted driver's `wall_usec`, wall time around its native target step (the test child for Python, JavaScript and Perl; compile plus run for Java and C; the in-process check for Ruby).
+- `cpu_seconds`: the driver's `cpu_usec`, the container cgroup v2 `usage_usec` from `/sys/fs/cgroup/cpu.stat` when the driver writes its record (omitted when the file is absent). It is driver-reported and the untrusted target shares that container.
+- `host_seconds`: the Docker adapter's `host_usec` on the raw receipt, from container create until its wait returns (or the deadline stop).
+
+The driver record (`corsair.driver/1`) and raw receipt (`corsair.raw-evidence/1`) keep their schema versions: the integer microsecond fields are optional, and saved-evidence re-validation rebuilds them from the receipt like every other role field. A missing, negative or non-integer value is unknown and never changes the admitted role. Receipts saved before these fields existed decode with all three `null` and still re-validate.
+
 The narrow ports preserve this separation: `SourceSnapshotPort` produces a prepared case from local admission; `InferencePort` produces/audits typed models; `SandboxPort` returns an immutable raw receipt `ArtifactRef`, not a trusted verdict. Docker SDK execution and receipt verification occur outside the agent proposal boundary.
 
 ## Results, status, disposition, and fix
