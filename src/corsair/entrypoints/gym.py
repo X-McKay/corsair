@@ -1164,7 +1164,8 @@ async def verify_candidate(
                 reference=str(references[name]),
                 scorecard=str(run.run_dir / SCORECARD_FILE),
                 run_dir=str(run.run_dir),
-                gate=gate(baselines[name], run.scorecard),
+                # tier0 is the smoke gate: the objective margin is reported, never rejecting.
+                gate=gate(baselines[name], run.scorecard, smoke=(name == "tier0")),
             )
             if on_gate is not None:
                 on_gate(name, gates[name], baselines[name], run)

@@ -19,6 +19,8 @@ Holdout hygiene: a holdout tier is only held out if no family, family stem, chai
 
 ## Verify a candidate
 
+`verify` gates tier0 in smoke mode (`--smoke` on `corsair gym gate`): a language regression or a token-ratio breach at tier0 stops the candidate, but the objective margin is only reported there, because every tier0 language already verifies and its margin is noise; tier1 is gated in full.
+
 The standard candidate protocol is one command:
 
 ```bash

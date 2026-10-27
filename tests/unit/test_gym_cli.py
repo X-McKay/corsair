@@ -397,7 +397,7 @@ async def test_verify_stops_at_a_tier0_rejection_without_running_tier1(
     assert ran == ["tier0"]
     text = capsys.readouterr().out
     assert text.startswith("### tier0")
-    assert "## Gate: REJECTED" in text
+    assert "## Gate (smoke): REJECTED" in text
     assert "- tier1 was not run because tier0 was REJECTED." in text
     assert text.rstrip().splitlines()[-1] == "VERDICT: REJECTED"
     (verdict_path,) = (tmp_path / "artifacts/gym/verify").glob("*/verdict.json")
@@ -420,7 +420,8 @@ async def test_verify_stops_at_a_tier0_rejection_without_running_tier1(
     [
         ({**BASELINE, "py-b": ALL}, {**BASELINE, "py-b": ALL}, 0, "ACCEPTED"),
         ({**BASELINE, "py-b": ALL}, {**BASELINE, "rb-a": NONE}, 1, "REJECTED"),
-        (BASELINE, {**BASELINE, "py-b": ALL}, 1, "REJECTED"),
+        # An unchanged tier0 passes the smoke gate (objective margin reported, not rejecting).
+        (BASELINE, {**BASELINE, "py-b": ALL}, 0, "ACCEPTED"),
     ],
 )
 async def test_verify_runs_tier1_after_tier0_and_decides_over_both_gates(
@@ -432,9 +433,13 @@ async def test_verify_runs_tier1_after_tier0_and_decides_over_both_gates(
 
     assert await _run(_arguments(*args)) == code
     record = json.loads(capsys.readouterr().out)
-    assert ran == (["tier0"] if tier0 == BASELINE else ["tier0", "tier1"])
+    assert ran == ["tier0", "tier1"]
     assert record["decision"] == decision
     assert Path(record["verdict"]).is_file()
+    # tier0 is gated in smoke mode (objective margin reported, not rejecting); tier1 is not.
+    assert record["tier0"]["gate"]["smoke"] is True
+    if record["tier1"] is not None:
+        assert record["tier1"]["gate"]["smoke"] is False
 
 
 @pytest.mark.asyncio
