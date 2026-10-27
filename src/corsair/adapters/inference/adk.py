@@ -12,7 +12,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,6 +26,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.base_tool import BaseTool
+from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 from pydantic import ValidationError
@@ -42,14 +43,21 @@ from corsair.agents.producer.contracts import (
 )
 from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.toolsets import build_producer_toolset
-from corsair.agents.resources import RoleName, load_agent_spec, select_reference
+from corsair.agents.resources import (
+    RoleName,
+    load_agent_spec,
+    packet_probe_text,
+    select_reference,
+)
 from corsair.contracts import (
+    ArtifactRef,
     Feedback,
     Finding,
     JavaRecipe,
     LineProvenance,
     Recipe,
     Usage,
+    digest,
 )
 from corsair.contracts.common import MAX_USAGE_CALL_ENTRIES, ModelCall, ToolCall
 from corsair.observability.logging import event
@@ -59,6 +67,7 @@ from corsair.policies.time_bounds import (
     episode_bounds,
     producer_activity_seconds,
 )
+from corsair.ports.scm import SourceAdmissionError
 from corsair.settings import ModelSettings, Settings
 
 _MAX_PROMPT_BYTES = 32_768
@@ -485,6 +494,57 @@ def _auditor_prompt(audit_input: AuditInput) -> str:
     return _fit_excerpt(
         audit_input.source_excerpt, lambda excerpt: before + _fenced_block(excerpt) + after
     )
+
+
+class _ProbeSources:
+    """The packet probe's source reader: its tools are declared, never called."""
+
+    def read_text(self, snapshot: ArtifactRef, path: str, *, max_bytes: int) -> str:
+        del snapshot, path, max_bytes
+        raise SourceAdmissionError("the packet probe admits no source")
+
+    def iter_files(self, snapshot: ArtifactRef) -> Iterable[tuple[str, bytes]]:
+        del snapshot
+        raise SourceAdmissionError("the packet probe admits no source")
+
+
+def probe_packet_parts(role: RoleName) -> list[tuple[str, str]]:
+    """Render the role's packaged probe request into its deterministic request parts.
+
+    Each tool declaration the live toolset gives native ADK (compact JSON, in declaration
+    order, named ``tool.<name>``) and then the ``packet`` from the live packet builder:
+    the parts ``corsair agent preview`` splits a captured request into, without the
+    instruction (``*_prompt_digest`` covers it), the response schema (the output-schema
+    digest) or any route-specific ``set_model_response`` tool (the model identity).
+    """
+
+    if role == "producer":
+        producer_input = ProducerInput.model_validate_json(packet_probe_text(role))
+        tools = build_producer_toolset(producer_input, _ProbeSources())
+        declarations = [FunctionTool(func=tool)._get_declaration() for tool in tools]
+        parts = [
+            (
+                f"tool.{declaration.name}",
+                _packet_json(declaration.model_dump(mode="json", exclude_none=True)),
+            )
+            for declaration in declarations
+            if declaration is not None
+        ]
+        return [*parts, ("packet", _producer_prompt(producer_input))]
+    audit_input = AuditInput.model_validate_json(packet_probe_text(role))
+    return [("packet", _auditor_prompt(audit_input))]
+
+
+def packet_parts_digest(parts: Iterable[tuple[str, str]]) -> str:
+    """The digest of named request parts, in order: the manifest's packet digest form."""
+
+    return digest([{"name": name, "text": text} for name, text in parts])
+
+
+def probe_packet_digest(role: RoleName) -> str:
+    """The run manifest's ``<role>_packet_digest``: the rendered probe's parts digest."""
+
+    return packet_parts_digest(probe_packet_parts(role))
 
 
 def _feedback_for_provider(code: str | None, message: str | None) -> Feedback:

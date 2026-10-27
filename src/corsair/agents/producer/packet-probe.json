@@ -1,0 +1,56 @@
+{
+  "run_id": "packet-probe",
+  "prepared": {
+    "case_id": "packet-probe",
+    "finding": {
+      "title": "Path traversal in the public file reader",
+      "description": "The read_file API must not disclose a file outside its configured public root. Only the path argument is caller controlled.",
+      "file": "target.py",
+      "line": 4,
+      "claim_scope": "component"
+    },
+    "recipe": {
+      "kind": "python.secret_disclosure/1",
+      "module_file": "target.py",
+      "function": "read_file",
+      "payload_parameter": "path",
+      "fixed_kwargs": {"root": "/fixtures/allowed"}
+    },
+    "source": {
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 0,
+      "media_type": "application/x-tar"
+    },
+    "source_excerpt": "1: import os\n2: \n3: def read_file(root, path):\n4:     target = os.path.realpath(os.path.join(root, path))\n5:     if not target.startswith(os.path.realpath(root)):\n6:         raise ValueError(\"outside permitted root\")\n7:     return open(target, encoding=\"utf-8\").read()",
+    "manifest": {
+      "package_version": "packet-probe",
+      "request_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "config_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "producer_prompt_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "auditor_prompt_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "image_id": "packet-probe:no-native-execution",
+      "models": {}
+    },
+    "line_provenance": "recipe_function",
+    "target_line": 4
+  },
+  "budget": {},
+  "round_index": 2,
+  "previous": {
+    "hypothesis": "A parent-directory path escapes the configured public root.",
+    "plan": {
+      "revision": 1,
+      "objective": "propose a declarative payload pair",
+      "next_steps": ["submit the payload pair"],
+      "reason": "the join of root and path is not confined"
+    },
+    "control_payload": "hello.txt",
+    "exploit_payload": "../private/secret.txt"
+  },
+  "feedback": {
+    "gate": "audit_reject",
+    "reason": "The submission was rejected; revise it."
+  },
+  "llm_call_limit": 1,
+  "tool_call_limit": 1
+}

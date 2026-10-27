@@ -375,8 +375,12 @@ def _identity(result: InvestigationResult) -> Panel:
             ("Config", manifest.config_digest),
             ("Producer prompt", manifest.producer_prompt_digest),
             ("Auditor prompt", manifest.auditor_prompt_digest),
+            ("Producer packet", manifest.producer_packet_digest),
+            ("Auditor packet", manifest.auditor_packet_digest),
         ):
-            table.add_row(field_label(key), as_text(short_digest(value)))
+            table.add_row(
+                field_label(key), as_text("unknown" if value is None else short_digest(value))
+            )
         for role, model in manifest.models.items():
             table.add_row(field_label(f"{role.title()} model"), as_text(model))
         table.add_row(

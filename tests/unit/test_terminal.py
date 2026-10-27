@@ -765,6 +765,9 @@ def test_human_result_leads_with_verdict_then_rounds_identity_and_totals(capsys,
     assert "ACCEPT" in output and "ALL" in output
     assert "3 llm · 4 tool" in output and "1200/210 tok" in output
     assert "scripted-producer" in output and "sha256:555555555555" in output
+    # A manifest recorded before the packet digests shows them as unknown.
+    packets = [line for line in output.splitlines() if "packet " in line]
+    assert len(packets) == 2 and all("unknown" in line for line in packets)
     # Totals come from the shared scoring calculation: producer plus audit usage.
     assert "LLM calls       4 " in output and "Input tokens    1500" in output
     assert "Cost            unknown" in output
