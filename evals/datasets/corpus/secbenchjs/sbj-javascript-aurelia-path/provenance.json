@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-aurelia-path",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/aurelia-path/1.1.0",
+      "snapshot_digest": "d9fd0367a84b46f153edaf36ed0f8efab6252f3ae42d001e9832b5504a347a24",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/aurelia-path/1.1.7",
+      "snapshot_digest": "6cb7025c99be6f472a5685963694facfba298ac1b06cf59156747707fffcc6e9",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

@@ -382,12 +382,15 @@ def test_checked_in_dataset_families_keep_one_split():
 
 
 def test_checked_in_gym_tiers_keep_one_split_per_family_stem_and_source_tree():
-    paths = [ROOT / "evals/datasets/gym-tier0.json", ROOT / "evals/datasets/gym-tier1.json"]
+    paths = [ROOT / f"evals/datasets/gym-tier{tier}.json" for tier in (0, 1, 2)]
 
     result = check_family_splits(paths)
 
     assert result["ok"] is True, result["violations"]
-    assert result["family_stems"] == 12
+    # 12 composed stems plus 9 SecBench.js package stems (5 in tier1, 4 held out in tier2).
+    assert result["family_stems"] == 21
+    tier2 = next(item for item in result["datasets"] if item["path"].endswith("gym-tier2.json"))
+    assert tier2["splits"] == ["held_out"]
 
 
 def test_the_module_entrypoint_exits_by_violation_and_names_a_remedy(tmp_path, monkeypatch, capsys):

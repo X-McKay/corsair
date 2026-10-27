@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-viking04-merge",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/@viking04/merge/1.0.0",
+      "snapshot_digest": "230efc5c73deb6d3c7a857b023c9d3c6f1916659ab5ea230e7a2ce70eee6ec5d",
+      "licence_files": [
+        "LICENCE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/@viking04/merge/1.0.2",
+      "snapshot_digest": "222c1eb3829a36a73df36c1bdfd142a63d8e4f45c5d342a663602e8bfbc61401",
+      "licence_files": [
+        "LICENCE"
+      ]
+    }
+  }
+}

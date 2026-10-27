@@ -1,0 +1,39 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-deep-override",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in deep-override@1.0.0 override",
+      "description": "module.exports in src/index.js at line 53; drafted by corsair dataset draft for owner review.",
+      "file": "src/index.js",
+      "line": 53,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-deep-override/source",
+      "expected_digest": "a02efa8c7e7d41c2ac23982a3c4ece3746f49f3a49efbe379fe649cf8dd6a727"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "src/index.js",
+      "function": "module.exports",
+      "fixed_arguments": [
+        {}
+      ]
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-deep-override/fixed",
+      "expected_digest": "8d6db712cdb01f0ea105fc23ca0bb54d2e6e5f6943552d529b49812b27bb8aa7"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

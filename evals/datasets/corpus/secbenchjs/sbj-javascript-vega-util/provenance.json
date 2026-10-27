@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-vega-util",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/vega-util/1.13.0",
+      "snapshot_digest": "06ec527f177256b66c0c7f0b9dbfdd67669a0762767e736e187846e664f079ee",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/vega-util/1.13.1",
+      "snapshot_digest": "2883c5d4982cca4720236279c427e94d96e17e323cbc52f37c48787c2e2c7396",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

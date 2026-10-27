@@ -1,0 +1,37 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-safe-flat",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in safe-flat@2.0.0 unflat",
+      "description": "unflatten in src/index.js at line 48; drafted by corsair dataset draft for owner review.",
+      "file": "src/index.js",
+      "line": 48,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-safe-flat/source",
+      "expected_digest": "9c789c346a49dbd1e3b3a4f6a22f3cf505284ec3f481c1cde9439914d9b6d85b"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "src/index.js",
+      "function": "unflatten",
+      "fixed_arguments": []
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-safe-flat/fixed",
+      "expected_digest": "bec82fbba9ba5aa2b1c3cf71f39b13abb98c69857017a1b0d39c8d94c7f19b0a"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

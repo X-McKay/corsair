@@ -1,0 +1,39 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-deep-extend",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in deep-extend@0.5.0 deepExtend",
+      "description": "module.exports in lib/deep-extend.js at line 117; drafted by corsair dataset draft for owner review.",
+      "file": "lib/deep-extend.js",
+      "line": 117,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-deep-extend/source",
+      "expected_digest": "ea3a9b1290379a69c689dcd776ecabe108f0e406a52597035ee3d3b0fc25018b"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "lib/deep-extend.js",
+      "function": "module.exports",
+      "fixed_arguments": [
+        {}
+      ]
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-deep-extend/fixed",
+      "expected_digest": "6c48ab62717faf0a6d1d9661d48481069e41868c7e48885fd1622d760ed74e59"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}
