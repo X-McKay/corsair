@@ -185,6 +185,16 @@ content-addressed tags and cannot contaminate parallel runs.
    push to the same branch. Corpus decisions made by the orchestrator under that instruction are marked
    `pending owner audit` in the review sheets and listed in the record.
 2. Whether the gate tolerance (majority-of-3) is acceptable, or a stricter paired rule is wanted at higher repeat counts.
+3. Whether production and the gym share greedy decoding (`models.decoding`); the greedy pair shows it does not make
+   episodes repeatable on the hosted_vllm route, and it changes python's round-1 behaviour (loops to the cap).
+4. Reference text the wave-5 auditor found contradictory or missing, all owner-authored: the producer and auditor
+   command-sentinel texts disagree on no-sink code (`references/command-sentinel.md` lines 7-9 against 19-23, with
+   `SKILL.md` line 14); no note on deriving path depth for traversal exploits (every python/ruby `target_exception`
+   used one `..` more than the passing episodes); no prototype-pollution rubric for either role (auditor R4 names
+   only python kinds; the producer system prompt still says "one Python secret-disclosure finding").
+5. Whether a session may end at its first qualified clean negative (auditor wave-5 H2). Not run: tier1 has no
+   clean negative on a positive case, so the gym cannot measure the false-negative cost of stopping early, and the
+   rule changes what a verdict's evidence scope means; it stays an owner decision, not an experiment.
 
 ## Record
 
@@ -638,7 +648,7 @@ content-addressed tags and cannot contaminate parallel runs.
   configuration identity, b261324f; unset keeps every recorded identity; the route accepts temperature 0 and seed
   7). Owner question open: whether production and the gym share greedy decoding. Launched from the detached
   worktree `ref-greedy-b261324f` (settings plus `models.decoding = {temperature: 0, seed: 7}`, config identity
-  334e2547…): two tier1 runs on the 21-row corpus to measure the greedy band against the sampled band. s17 (gate
+  83017e1a…): two tier1 runs on the 21-row corpus to measure the greedy band against the sampled band. s17 (gate
   decides on languages with ≥ 3 cases, paired per-case outcomes) in progress.
 - 2026-10-27 wave 5 opens on the 21-row corpus. Two same-identity tier1 runs at 494f2523 (e6b13d from `gym/loop`
   before any merge, 38d675 from the detached `ref-494f2523`): J 1.074 / 1.124, macro 0.881 / 0.884, worst (python)
@@ -649,8 +659,9 @@ content-addressed tags and cannot contaminate parallel runs.
   the worst-language term any more; python's own spread across four runs at this commit (5 to 8 of 11) is still
   wider than the n=2 band says. Per case over three runs: chain-python-cmdi-a, ih-python-codeinjection-a and
   sbj-javascript-aurelia-path fail every episode; adversarial01, adversarial02, case02, sbj-javascript-mixin-deep
-  and sbj-javascript-viking04-merge are coin-flips; the other 13 cases pass every repeat. Greedy run 1 (8df25d,
-  config 334e2547…) has the same stable fails and different coin-flip outcomes (case02 0/3, mixin-deep 2/3), so
+  and sbj-javascript-viking04-merge are coin-flips; case03 and sbj-javascript-deep-override each majority-failed
+  in one run; the other 11 cases pass every repeat. Greedy run 1 (8df25d,
+  config 83017e1a…) has the same stable fails and different coin-flip outcomes (case02 0/3, mixin-deep 2/3), so
   temperature 0 with a seed does not make episodes repeatable on this route; run 2 is in flight. h5 rejected (run
   b39557 vs ref-w4-tier1, 16-row dataset): python `language_regressed` on case02 (3/3 → 1/3), ruby 0 → 1.0 is
   reported-only under `--min-cases 3` and both new-corpus references already score ruby 1.0, the java case is XXE
@@ -659,4 +670,20 @@ content-addressed tags and cannot contaminate parallel runs.
   once, so the next reference pair runs at or after 23f818d9. Merged s17 (`--min-cases`, paired outcomes) and s18
   (`--slice` screens) at 5066e40b; check exit 0, 1628 passed. Queue behind greedy run 2: tier2 holdout baseline
   from `ref-494f2523` (orchestrator-only). Auditor brief on the new pair requested at `.work/wave5/auditor-brief.md`.
+- 2026-10-27 wave-5 auditor brief (`.work/wave5/auditor-brief.md`, read-only over 189 trajectories): aurelia-path
+  fails because the producer's control payload (a plain `k=v` key) never executes the finding line, so the coverage
+  gate (`steps/verification.py`) marks the control INVALID in all 16 executed rounds while the exploit was covered
+  in 14; the same split explains every JavaScript coin-flip (all 32 control-INVALID rounds used `{}`, JSON text in a
+  string or a plain key; every held control was a non-empty object). Those rounds are filed as `evidence_unverified`
+  because `validate_saved` fails before the `coverage` gate is named. The two python abstains are
+  `producer_abstained` in 12 of 12 sampled episodes and need owner text (decision 4). Coin-flips: 21 of 24 terminal
+  fails are producer `provider_max_tokens`, 12 of them round-1 deliberation (8 in the greedy run); all 9 python/ruby
+  `target_exception` fails used one `..` too many. Tokens: producer 78 % / auditor 22 %; only 2 of 16 capped calls
+  were a round's first call, 11 were rounds 2+; a cap scoped by language or call position is not supported, a
+  round-2+ cap only at about 8192. Launched h8 (producer packet: both payloads must execute the finding line; a
+  payload is a JSON value, not JSON text; slice screen aurelia-path, mixin-deep, viking04-merge with sentinels
+  js-prototypepollution-a and safe-flat at 5 repeats, then tier1 with `--target-language javascript --min-cases 3
+  --noise`), s20 (per-case stability in the band: a flip on an unstable case is within noise) and s21 (qualified
+  evidence labels naming the role whose coverage or execution failed). Held: H4 (round-2+ thinking budget 8192)
+  until h8 lands, since both edit the inference adapter; H2 as decision 5.
 
