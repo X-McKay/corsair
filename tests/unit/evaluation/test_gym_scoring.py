@@ -209,6 +209,52 @@ def test_shaping_charges_repeated_candidates_and_oversized_or_truncated_requests
     assert scored.rounds[2].exploit_payload == "../b"
 
 
+def test_a_stored_unverified_stop_is_named_by_its_recorded_failing_role():
+    """A report saved before qualified labels re-scores under the role's recorded cause;
+    rewards, shaping and every other stop are unchanged."""
+    from tests.unit.test_gate_ledger import _UNCOVERED
+    from tests.unit.test_verdicts import _VIOLATION, _observation
+
+    uncovered = _observation(_UNCOVERED, _VIOLATION)
+    result = InvestigationResult(
+        run_id="run-1",
+        case_id="case01",
+        disposition=Disposition.INCONCLUSIVE,
+        verdict=Verdict.INCONCLUSIVE,
+        execution_status="COMPLETED",
+        reason="probe evidence was invalid",
+        rounds=[
+            RoundResult(index=1, producer=_proposal("../a"), observation=uncovered),
+            RoundResult(index=2, producer=_proposal("../b"), observation=uncovered),
+        ],
+    )
+    ledger = [
+        {"session": 1, "round": 1, "stage": "kernel", "gate": "evidence_unverified", "reason": ""},
+        {"session": 1, "round": 2, "stage": "kernel", "gate": "evidence_unverified", "reason": ""},
+    ]
+    row = _row(
+        status="fail",
+        verdict="INCONCLUSIVE",
+        disposition="INCONCLUSIVE",
+        verdict_allowed=False,
+        correctly_resolved=False,
+        gate_ledger=ledger,
+    )
+    scored = _score(row, result=result)
+    unscored = _score(row)
+    assert scored.failure_stop == "evidence_unverified:coverage_control"
+    assert [item.stop for item in scored.rounds] == ["evidence_unverified:coverage_control"] * 2
+    # Without a stored result nothing is re-derived: the stored label stands.
+    assert unscored.failure_stop == "evidence_unverified"
+    assert (scored.reward_verdict, scored.shaping, scored.reward) == (0.0, 0.0, 0.0)
+    assert row["gate_ledger"] == ledger
+    card = build_scorecard(
+        [scored], run=_context(), dataset_digest="d" * 64, cases={"case01": KIND}
+    )
+    assert card.languages["python"].failure_stops == {"evidence_unverified:coverage_control": 1}
+    assert card.kinds[KIND].failure_stops == {"evidence_unverified:coverage_control": 1}
+
+
 def _trajectory(case: str, language: str, verified: bool, *, reward=None, tokens=100.0):
     return Trajectory(
         run_id=f"run-{case}",

@@ -48,7 +48,7 @@ from corsair.contracts.gym import Budgets, DominantCall
 from corsair.evaluation.comparison import row_stop
 from corsair.evaluation.datasets import LoadedDataset, load_dataset
 from corsair.evaluation.gym.budgets import budgets_digest
-from corsair.evaluation.ledger import row_ledger
+from corsair.evaluation.ledger import qualify_unverified, row_ledger
 from corsair.policies.verdicts import candidate_key
 
 DEMONSTRATED = frozenset({Verdict.EXPLOIT_DEMONSTRATED, Verdict.COMPONENT_EXPLOIT_DEMONSTRATED})
@@ -557,6 +557,17 @@ def _float_or_none(value: object) -> float | None:
     return float(value)
 
 
+def _qualified_row(row: Mapping[str, Any], result: InvestigationResult | None) -> Mapping[str, Any]:
+    """The row with its stored ``evidence_unverified`` round stops named from the stored
+    result (``ledger.qualify_unverified``), so a report saved before qualified labels
+    scores under the same stop names as a new one. Only gate names change: no reward,
+    shaping or operational rule reads an ``evidence_unverified`` stop."""
+    ledger = row.get("gate_ledger")
+    if result is None or not isinstance(ledger, list):
+        return row
+    return {**row, "gate_ledger": qualify_unverified(ledger, result)}
+
+
 def trajectory(
     row: Mapping[str, Any],
     repeat: int,
@@ -578,6 +589,7 @@ def trajectory(
     ``sandbox_fault`` is ``sandbox_fault(store, result)``; it names a failed row's recorded
     role ``ERROR`` operational (``operational_stop``) and never changes a reward.
     """
+    row = _qualified_row(row, result)
     status = row.get("status")
     status = status if status in {"pass", "fail"} else "unavailable"
     verdict = _verdict(row.get("verdict"))

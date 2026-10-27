@@ -184,7 +184,7 @@ Decoding is part of `config`. `models.decoding` ([configuration](../reference/co
 - Reward: 1 for passed and verified, 0 for an unresolved abstention or a [target-side exception](#target-side-exceptions), -0.5 for any other `ERROR` or `UNABLE_TO_RUN`, -1 for a forbidden label or wrong decisive verdict, plus an efficiency bonus (only when verified and usage is known and a budget exists) and small shaping penalties.
 - Effective tokens: uncached input + 0.1 × cached input + 4 × output. Unknown usage stays unknown and earns no bonus.
 - Seconds: agent seconds plus sandbox host seconds, reported as p50 and p95.
-- Failure stops: the gate-ledger stop of each failed episode, counted; a target-side exception counts as `target_exception` instead of its ledger gate `execution_error`.
+- Failure stops: the gate-ledger stop of each failed episode, counted; a target-side exception counts as `target_exception` instead of its ledger gate `execution_error`, and an unverified round with a recorded INVALID or ERROR role counts under its qualified name (`evidence_unverified:coverage_control`, see [evaluations](../agents/evaluations.md)), also when a report saved before qualified labels is rescored.
 
 The headline `objective_j` is the macro reward plus half the worst language's verified accuracy.
 

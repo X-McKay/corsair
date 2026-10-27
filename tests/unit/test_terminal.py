@@ -1013,6 +1013,25 @@ def test_human_result_without_receipt_verification_marks_kernel_rounds_unverifie
     _assert_private_content_absent(output)
 
 
+def test_a_qualified_unverified_round_keeps_the_unverified_caption(capsys, monkeypatch):
+    from tests.unit.test_gate_ledger import _UNCOVERED
+    from tests.unit.test_verdicts import _VIOLATION
+    from tests.unit.test_verdicts import _observation as _pair
+
+    result = _inconclusive_result()
+    rounds = [
+        item.model_copy(update={"observation": _pair(_UNCOVERED, _VIOLATION)})
+        for item in result.rounds
+    ]
+    result = result.model_copy(update={"rounds": rounds})
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert "evidence_unverified:coverage_control" in _line(output, "1.1")
+    assert "evidence_unverified:coverage_control" in _line(output, "2.2")
+    assert "were not validated against the artifact store" in output
+
+
 def test_case_stop_falls_back_to_the_last_round_and_never_repeats_the_result_reason(
     capsys, monkeypatch
 ):
