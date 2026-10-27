@@ -485,3 +485,16 @@ content-addressed tags and cannot contaminate parallel runs.
   3-repeat differences inside the band as noise; (b) the gate needs a repeat-aware criterion (delta outside the
   measured band, or a confirmation run) before any behavioural acceptance; (c) corpus growth is the next lever:
   12 sibling rows into tier1 and the xxe pair, through `dataset draft` and owner-reviewed oracles.
+- 2026-10-27 Wave-3 intake draft (private, `.work/intake/wave3/`, nothing frozen, no oracle decided): 12 rows
+  drafted with `corsair dataset draft`; 10 sibling rows fit existing kinds and belong in tier1 (8 under split
+  `chain`, perl's 2 under `dev`, matching their anchors; drafted as `held_out` they are refused by pair, source-tree
+  or family-stem overlap) and the python xxe pair is holdout-eligible (no overlap in any split). Review sheets per
+  group plus `review-index.md`; freeze on every unreviewed sheet exits 2 `decision_missing` without writing. Owner
+  notes: 5 rows (java xxe-a, javascript prototypepollution-b, perl xss-a, ruby pathtraversal-a, c intoverflow-b)
+  carry legacy negative or unsupported labels their kinds cannot express (not in `CLEAN_NEGATIVE_QUALIFIED_KINDS`),
+  so they need amend or reject; 4 rows share a snapshot digest with a frozen tier tree (perl xss-a/b, java xxe-a, c
+  intoverflow-b) and are likely duplicates. Templates per kind under `.work/intake/wave3/templates/` with operator
+  notes in `.note.json` sidecars (the template loader refuses unknown fields). Tooling gaps found (s10): freeze
+  builds drafted members without family stem or trees, so `family_stem_crosses_splits` never fires for them; draft
+  takes the language from a `common/` directory for C rows; freeze's tree keys do not skip the `v3/` layout. The
+  survey's "12 sibling rows" resolved to 10; python pathtraversal-a/b need an unbuilt recipe adaptation.
