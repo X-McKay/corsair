@@ -77,10 +77,13 @@ class CliArguments(argparse.Namespace):
     chain_dirs: list[str]
     split: str
     budget: str | None
+    staging_root: str | None
     draft_dir: str
     review: str
     into: str
     against: list[str]
+    import_into: str | None
+    allow_noassertion: bool
     agent_command: str
     role: Literal["producer", "auditor"]
     round: int
@@ -594,6 +597,7 @@ async def _handle_dataset_draft(args: CliArguments, ui: Terminal) -> int:
             split=args.split,
             out=Path(out),
             budget=Path(args.budget) if args.budget else None,
+            source_root=Path(args.staging_root) if args.staging_root else None,
         )
     except DraftRefused as error:
         message = safe_text(error)
@@ -614,6 +618,8 @@ async def _handle_dataset_freeze(args: CliArguments, ui: Terminal) -> int:
         review=Path(args.review),
         into=Path(args.into),
         against=[Path(path) for path in args.against],
+        import_into=Path(args.import_into) if args.import_into else None,
+        allow_noassertion=args.allow_noassertion,
     )
     ui.emit(result)
     if result["refusals"]:
@@ -1444,6 +1450,13 @@ def parser() -> argparse.ArgumentParser:
     draft.add_argument("--split", required=True, help="Split for every drafted row")
     draft.add_argument("--out", required=True, help="New draft directory outside the evals tree")
     draft.add_argument("--budget", help="Budget JSON for every drafted request")
+    draft.add_argument(
+        "--source-root",
+        dest="staging_root",
+        metavar="DIR",
+        help="Staging root (e.g. .work/intake) holding the chain directories and their trees; "
+        "the draft is marked staged and freeze must import its reviewed trees",
+    )
     freeze_help = (
         "Freeze a reviewed draft's accepted and amended rows into a manifest; refuse (exit 2) "
         "incomplete reviews, invalid rows and cross-split overlap; exit 1 after writing"
@@ -1459,6 +1472,17 @@ def parser() -> argparse.ArgumentParser:
         required=True,
         metavar="MANIFEST",
         help="Manifests whose families and source trees must not cross into this split",
+    )
+    freeze.add_argument(
+        "--import-into",
+        metavar="DIR",
+        help="For a staged draft: evals/datasets/corpus/<dir> to copy each accepted row's "
+        "trees into, with their licence files",
+    )
+    freeze.add_argument(
+        "--allow-noassertion",
+        action="store_true",
+        help="Import a tree without a licence file, recording licence NOASSERTION",
     )
     for name in ("report", "compare"):
         commands[name].add_argument(
