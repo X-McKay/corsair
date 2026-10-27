@@ -1,0 +1,32 @@
+Corsair evaluation gym: wave-1 reference scorecards (private evidence; not promoted)
+
+git branch:        gym/loop
+git commit:        0697ff08b8932ce037ed2d713afba865e51057cb (clean working tree)
+identity digest:   34f22f5ebac5bf3aa01356fe6ec19419cd10a59ddd114b68bf635d266f21af5c (both tiers)
+budgets digest:    63137bce9c63ce011f1aa6ed0495de2e358098d92a6a54dfa095bdbee47b6ce4 (evals/experiments/budgets.json, picked up by default)
+models:            producer and auditor hosted_vllm/Qwen3.6-35B-A3B-NVFP4 (.state/settings.json)
+temporal:          ephemeral start-dev, namespace corsair-gym, task queue gym-gym-loop-0697ff0
+repeats:           3, sliced false
+concurrency:       2
+
+tier0.json  <- .runs/gym/gym-tier0-20261027t010807-479fc5/scorecard.json
+  command:  nix develop -c just -- gym-run tier0 --repeats 3 --concurrency 2
+  dataset:  97fc4873928d75c04d1b458927e971274befed5fe620bd2a7041cf1e0ef77501 (evals/datasets/gym-tier0.json)
+  episodes: 18, exit 0, wall 13:31 (811 s)
+
+tier1.json  <- .runs/gym/gym-tier1-20261027t012146-ade22e/scorecard.json
+  command:  nix develop -c just -- gym-run tier1 --repeats 3 --concurrency 2
+  dataset:  ec8cd98558ed21df701aed35ca34ce59c86d44fef1e66a4fcc2b0b665d2dbd17 (evals/datasets/gym-tier1.json)
+  episodes: 45, exit 0, wall 35:26 (2126 s)
+  run sequentially after tier0, never concurrently
+
+images (content tags, identical in both runs):
+  corsair-c:2dd1ca8           sha256:07f712406f6980466d38f3df1226045df1c45c43aa61c836849e52bdd63f473e
+  corsair-java:c53d3d6        sha256:968db84fdab7f2b2da9d59e4b665e370e7047d67d706e86880896164d7bb3d7a
+  corsair-javascript:2c776a9  sha256:54bf4c88f96412865845f2da2381f42500b4f8ecd6f0cb24855050f28404749d
+  corsair-perl:709226b        sha256:71e923b9da045c47fcda92dcadc6573ca4d01b42dee75062ecd3a11f2088cdfc
+  corsair-python:00cb018      sha256:51d235992fba14083ef4b2530d4aae5b3692d3461e10e4a8d6e5c53fecb0ab95
+  corsair-ruby:f656e91        sha256:2263664eec6644937b3444f7dbedfbb9bf4bc77a0caa822288f8e0d93282877b
+
+file sha256: tier0.json 127cf3f4daf13bf1e8ba065159f18c08ff43cae30f41d6fbb1f47c1f40b8844d
+             tier1.json 0121282120cf3ec74ee150adbab5a2f05425fd7825df96c713daace592f88056

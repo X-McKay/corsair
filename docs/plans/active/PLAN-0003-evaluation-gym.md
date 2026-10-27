@@ -250,7 +250,8 @@ content-addressed tags and cannot contaminate parallel runs.
   dataset ec8cd985, 45 investigations, 40 min 58 s wall, exit 0, usage known for every episode, no cached tokens
   reported. J 1.2553, macro verified accuracy 0.967, worst language python 0.80, macro effective tokens 37,554,
   macro p50 65.7 s. Majority-failed cases: case02 (ERROR, NOT_DEMONSTRATED, ERROR) and chain-python-cmdi-a
-  (INCONCLUSIVE ×3, `producer_abstained`). Failure stops: `provider_max_tokens` 6 episodes (all
+  (INCONCLUSIVE ×3, `producer_abstained`). Failure stops: `provider_max_tokens` 4 terminal stops over 5 capped-call episodes (the earlier count of 6
+  included inner rounds; corrected by h3's re-score; all
   python.secret_disclosure; a producer call spends the full 12,288-token output cap on reasoning, so the structured
   decision never completes), `producer_abstained` 6, `execution_error` 2 (case03 r0, java-xxe-b r1). Repeat variance:
   case02, case03, java-xxe-b, adversarial01, adversarial02. Top-5 token and seconds outliers are the capped-reasoning
@@ -262,3 +263,22 @@ content-addressed tags and cannot contaminate parallel runs.
   `agents/producer/instructions/system.md`, `agents/producer/skills/source-grounding/SKILL.md`), h3 (dx: thought-token
   share and output-cap marker on scorecard and trajectory rendering, `evaluation/gym/scoring.py`, `render.py`). Gates
   on `gym/loop` at a6e293f1: `just check` exit 0, `just -- test -q -W error` 1189 passed, 109 deselected.
+- 2026-10-27 Wave-1 reference on 0697ff08 (identity 34f22f5e, budgets 63137bce, images python 00cb018, javascript
+  2c776a9, ruby f656e91, java c53d3d6, perl 709226b, c 2dd1ca8, concurrency 2, no overlapping live runs): tier0
+  `.runs/gym/gym-tier0-20261027t010807-479fc5` 18 episodes 811 s, J 1.4554, verified 1.0 all languages, macro
+  effective tokens 37,512, p50 76.2 s (ruby varied: ED, ED, ERROR `execution_error`); tier1
+  `.runs/gym/gym-tier1-20261027t012146-ade22e` 45 episodes 2126 s, J 1.4025, macro verified 0.9667, python 0.80,
+  macro effective tokens 37,079, p50 57.9 s; majority-failed cmdi-a (INCONCLUSIVE ×3, `producer_abstained`) and
+  safety01 (ERROR, ERROR, ED); varied: adversarial02 (r2 `provider_max_tokens`), case01 (r0 `execution_error`),
+  case02 (r0 `provider_max_tokens` after a clean negative in round 3: 214,564 effective tokens, 601 s), safety01.
+  All four `execution_error` episodes across both tiers share one signature: one round, audit ACCEPT, control
+  PROPERTY_HELD, adversarial ERROR "exploit did not run the target", stop `evidence_unverified` (wave-2 candidate).
+  Sandbox seconds present on every episode that reached the sandbox (java host median 4.1 s, others 0.2 to 0.6 s).
+  Ledger rows `ref-w1-tier0`, `ref-w1-tier1`; candidate record `evals/baselines/candidates/gym-20261027-0697ff0/`.
+- 2026-10-27 h3 merged (7d637e28, branch `gym/h3-scorecard-reasoning-markers` f6455392; dx track, offline):
+  `thought_share`, `output_cap`, `capped_calls`, `reasoning_cap_exhausted`, `dominant_call` on trajectories, kind,
+  language and scorecard; render columns and gate delta. Proof of no semantic change: re-scoring the tier1 diagnostic
+  reproduces every existing scorecard and trajectory field exactly (J 1.2553 etc.); new values python thought share
+  0.857, 5 capped-call episodes, 4 exhausted. Worktree gates: `just test` 1200 passed, 109 deselected, 0 warnings;
+  `just check` exit 0. Accepted on the dx criterion (no scoring change, gates green); the ledger CLI cannot record an
+  experiment without a scorecard, so this row lives here (follow-up: allow scorecard-less dx rows).
