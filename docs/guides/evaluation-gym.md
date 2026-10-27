@@ -79,8 +79,13 @@ INCOMPARABLE means the two scorecards answer different questions, so neither a w
 ## Budgets and the ledger
 
 - `corsair gym budgets --from SCORECARD --out FILE` derives per-kind token and time budgets from a scorecard's p95 values and prints their digest. Both sides of a gate must use the same budgets file.
-- `just -- gym-ledger append --scorecard S --id ID --entry baseline|experiment --tier T [--wave N] [--track …] [--idea …] [--baseline SCORECARD] [--lesson …]` appends one row to `evals/experiments/ledger.jsonl`; with `--baseline` the row carries the gate verdict. An existing id is refused.
-- `just -- gym-ledger render` regenerates the tables of `evals/experiments/LEDGER.md` below its hand-written header.
+- `just -- gym-ledger append --id ID --entry baseline|experiment [--wave N] [--track …] [--idea …] [--lesson …] …` appends one row to `evals/experiments/ledger.jsonl` ([`LedgerRow`](../../src/corsair/contracts/gym.py)). A row's `branch` and `commit` always name the candidate; every source that names them (`--branch`/`--commit`, the scorecards, a verify record) must agree, and a short commit agrees with its full form.
+  - Baseline: `--scorecard S --tier T` records the scorecard's headline metrics. A baseline without a scorecard is refused.
+  - Experiment with gates: `--tier0 RUN-DIR|SCORECARD` and `--tier1 RUN-DIR|SCORECARD` gate each candidate against `--reference-tier0`/`--reference-tier1` (a ledger row id or a scorecard path; default the latest baseline row of that tier) and record the reference, the scorecard, the run directory (when a directory was given) and the gate verdict with its ΔJ, token ratio and per-language deltas. `--verdict FILE` instead copies both tier gates and the candidate identity from a [`VerifyRecord`](../../src/corsair/contracts/gym.py) (`verdict.json`, schema `corsair.gym-verify/1`); it cannot be combined with `--tier0`/`--tier1`. `--scorecard S --tier T --baseline REFERENCE` still gates a single scorecard.
+  - Experiment without a scorecard (an offline dx change): `--branch B --commit C` alone.
+  - `--decision accepted|rejected|inconclusive|merged` records the orchestrator's decision; `merged` requires `--merge-commit SHA`, and only `merged` takes one.
+  - Refusals exit 2 with a fixed message and leave the ledger unchanged: an existing id, a baseline without a scorecard, a merged decision without its merge commit, disagreeing candidate identities, `--reference-tierN` without `--tierN`.
+- `just -- gym-ledger render` regenerates the tables of `evals/experiments/LEDGER.md` below its hand-written header (everything above `## Baselines` is kept byte for byte). The Waves table shows, per experiment, id, track, `branch@commit`, the tier0 and tier1 gate (decision, reason codes, regressed languages), ΔJ and token ratio as `tier0 / tier1`, the decision (with the merge commit) and the lesson; `—` marks a value the row does not record. The rejected-ideas table lists rows whose decision is `rejected`. Lesson and idea text is printed as given on one line with pipes escaped; the contract bounds it at 500 and 300 characters.
 
 ## Limits
 
