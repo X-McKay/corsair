@@ -1,4 +1,4 @@
-"""Canonical evaluation-gym records: trajectories, scorecards, gate verdicts, budgets, ledger.
+"""Canonical evaluation-gym records: trajectories, scorecards, gates, budgets, verify, ledger.
 
 These are evaluator-side records derived from a scored report, its frozen dataset and the
 stored results. They never reach an agent, tool or workflow input. Usage counts that were
@@ -11,7 +11,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import ConfigDict, Field, JsonValue, RootModel
+from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
 
 from .agents import AuditDecision, AuditRule
 from .common import Contract, DiagnosticText, Digest, Identifier
@@ -231,8 +231,43 @@ class Budgets(RootModel[dict[str, KindBudget]]):
     model_config = ConfigDict(frozen=True)
 
 
+class TierGate(Contract):
+    """One tier's gate: a candidate scorecard against the reference it was gated against.
+
+    ``reference`` is the baseline ledger row id or reference scorecard path, as given;
+    the per-language deltas are ``gate.language_deltas``.
+    """
+
+    reference: str = Field(min_length=1, max_length=300)
+    scorecard: str = Field(min_length=1, max_length=300)
+    run_dir: str | None = Field(default=None, max_length=300)
+    gate: GateVerdict
+
+
+class VerifyRecord(Contract):
+    """``verdict.json`` of a verified candidate: its git identity and each tier's gate.
+
+    ``corsair gym ledger append --verdict`` copies these into one experiment row.
+    """
+
+    schema_version: Literal["corsair.gym-verify/1"] = "corsair.gym-verify/1"
+    branch: str | None = Field(default=None, min_length=1, max_length=200)
+    commit: str | None = Field(default=None, min_length=7, max_length=64)
+    tier0: TierGate | None = None
+    tier1: TierGate | None = None
+
+
+LedgerDecision = Literal["accepted", "rejected", "inconclusive", "merged"]
+
+
 class LedgerRow(Contract):
-    """One append-only experiment-ledger record: a reference run or a gated experiment."""
+    """One append-only experiment-ledger record: a reference run or an experiment.
+
+    A baseline carries its scorecard's headline metrics. An experiment may carry a
+    scorecard (gated against ``--baseline`` into ``gate``), the tier0 and tier1 gates of
+    its candidate, and the orchestrator's decision; an offline change may carry none.
+    ``branch`` and ``commit`` always name the candidate.
+    """
 
     schema_version: Literal["corsair.gym-ledger/1"] = "corsair.gym-ledger/1"
     id: Identifier
@@ -241,21 +276,35 @@ class LedgerRow(Contract):
     entry: Literal["baseline", "experiment"]
     branch: str = Field(min_length=1, max_length=200)
     commit: str = Field(min_length=7, max_length=64)
-    tier: str = Field(min_length=1, max_length=64)
+    tier: str | None = Field(default=None, min_length=1, max_length=64)
     track: str | None = Field(default=None, max_length=64)
     idea: str | None = Field(default=None, max_length=300)
-    dataset_digest: Digest
+    dataset_digest: Digest | None = None
     identity_digests: list[str] = Field(default_factory=list)
     budgets_digest: Digest | None = None
-    repeats: int = Field(ge=0)
+    repeats: int | None = Field(default=None, ge=0)
     scorecard: str | None = Field(default=None, max_length=300)
-    objective_j: float
-    macro_verified_accuracy: float
-    worst_language_verified_accuracy: float
+    objective_j: float | None = None
+    macro_verified_accuracy: float | None = None
+    worst_language_verified_accuracy: float | None = None
     macro_effective_tokens: float | None = None
     macro_p50_seconds: float | None = None
     gate: GateVerdict | None = None
+    tier0: TierGate | None = None
+    tier1: TierGate | None = None
+    decision: LedgerDecision | None = None
+    merge_commit: str | None = Field(default=None, min_length=7, max_length=64)
     lesson: str = Field(default="", max_length=500)
+
+    @model_validator(mode="after")
+    def coherent_entry(self):
+        if self.entry == "baseline" and (
+            self.tier is None or self.dataset_digest is None or self.objective_j is None
+        ):
+            raise ValueError("a baseline row needs a scorecard and its tier")
+        if (self.decision == "merged") != (self.merge_commit is not None):
+            raise ValueError("a merged decision needs its merge commit, and only it has one")
+        return self
 
 
 class KernelCase(Contract):

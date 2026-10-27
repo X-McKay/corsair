@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 import sys
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -22,7 +22,7 @@ from corsair.observability.logging import configure_logging, event, safe_text
 
 if TYPE_CHECKING:
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.contracts import BatchItem, InvestigationResult, Oracle
+    from corsair.contracts import BatchItem, InvestigationResult, LedgerRow, Oracle, TierGate
     from corsair.entrypoints.terminal import Terminal
     from corsair.settings import Settings
 
@@ -86,7 +86,7 @@ class CliArguments(argparse.Namespace):
     references: list[str] | None
     runs: list[str]
     source: str
-    scorecard: str
+    scorecard: str | None
     row_id: str
     wave: int
     entry: Literal["baseline", "experiment"]
@@ -96,6 +96,16 @@ class CliArguments(argparse.Namespace):
     ledger: str
     ledger_markdown: str
     ledger_baseline: str | None
+    ledger_tier: str | None
+    ledger_branch: str | None
+    ledger_commit: str | None
+    ledger_tier0: str | None
+    ledger_tier1: str | None
+    ledger_reference_tier0: str | None
+    ledger_reference_tier1: str | None
+    ledger_verdict: str | None
+    ledger_decision: Literal["accepted", "rejected", "inconclusive", "merged"] | None
+    ledger_merge_commit: str | None
     gym_dataset: str | None
 
 
@@ -800,9 +810,44 @@ async def _handle_gym_budgets(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+def _ledger_tier_gates(
+    args: CliArguments, rows: Sequence[LedgerRow]
+) -> tuple[dict[str, TierGate | None], list[tuple[str | None, str | None]]]:
+    """Each tier's gate and the candidate identities they name, from --verdict or --tierN."""
+    from corsair.contracts import VerifyRecord
+    from corsair.evaluation.gym.ledger import gate_tier, latest_baseline
+
+    candidates = {"tier0": args.ledger_tier0, "tier1": args.ledger_tier1}
+    references = {"tier0": args.ledger_reference_tier0, "tier1": args.ledger_reference_tier1}
+    if args.ledger_verdict is not None:
+        if any(candidates.values()) or any(references.values()):
+            raise ValueError("--verdict already carries the tier gates; drop --tier0/--tier1")
+        record = VerifyRecord.model_validate_json(Path(args.ledger_verdict).read_text())
+        return {"tier0": record.tier0, "tier1": record.tier1}, [(record.branch, record.commit)]
+    gates: dict[str, TierGate | None] = {}
+    identities: list[tuple[str | None, str | None]] = []
+    for tier, candidate in candidates.items():
+        reference = references[tier]
+        if candidate is None:
+            if reference is not None:
+                raise ValueError(f"--reference-{tier} needs --{tier}")
+            continue
+        gated, run = gate_tier(rows, Path(candidate), reference or latest_baseline(rows, tier))
+        gates[tier] = gated
+        identities.append((run.git_branch, run.git_commit))
+    return gates, identities
+
+
 async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
-    """Append one ledger row from a scorecard, or render LEDGER.md from the JSONL ledger."""
-    from corsair.evaluation.gym.ledger import append_ledger, build_ledger_row, render_ledger_file
+    """Append one ledger row, or render LEDGER.md from the JSONL ledger."""
+    from corsair.evaluation.gym.ledger import (
+        append_ledger,
+        build_ledger_row,
+        candidate_identity,
+        read_ledger,
+        reference_scorecard,
+        render_ledger_file,
+    )
     from corsair.evaluation.gym.scoring import read_scorecard
 
     if args.ledger_command == "render":
@@ -813,22 +858,37 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
 
     from corsair.evaluation.gym.gate import gate
 
-    candidate = read_scorecard(Path(args.scorecard))
+    rows = read_ledger(Path(args.ledger))
+    if any(row.id == args.row_id for row in rows):
+        raise ValueError(f"ledger already records {args.row_id}")
+    if (args.scorecard is None) != (args.ledger_tier is None):
+        raise ValueError("--scorecard and --tier go together")
+    candidate = None if args.scorecard is None else read_scorecard(Path(args.scorecard))
+    if args.ledger_baseline is not None and candidate is None:
+        raise ValueError("--baseline gates --scorecard; pass both")
     verdict = (
         None
-        if args.ledger_baseline is None
-        else gate(read_scorecard(Path(args.ledger_baseline)), candidate)
+        if args.ledger_baseline is None or candidate is None
+        else gate(read_scorecard(reference_scorecard(rows, args.ledger_baseline)), candidate)
     )
+    gates, identities = _ledger_tier_gates(args, rows)
+    branch, commit = candidate_identity([(args.ledger_branch, args.ledger_commit), *identities])
     row = build_ledger_row(
         candidate,
         row_id=args.row_id,
         recorded_on=date.today(),
         wave=args.wave,
         entry=args.entry,
-        tier=args.tier,
+        tier=args.ledger_tier,
+        branch=branch,
+        commit=commit,
         track=args.track,
         idea=args.idea,
         gate=verdict,
+        tier0=gates.get("tier0"),
+        tier1=gates.get("tier1"),
+        decision=args.ledger_decision,
+        merge_commit=args.ledger_merge_commit,
         lesson=args.lesson,
         scorecard_path=args.scorecard,
     )
@@ -1213,17 +1273,53 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     ledger_commands = ledger.add_subparsers(
         dest="ledger_command", required=True, title="ledger commands"
     )
-    append_help = "Append one row from a scorecard (gated when --baseline is given)"
+    append_help = (
+        "Append one row: a baseline from --scorecard, or an experiment with its tier gates "
+        "(--tier0/--tier1 or --verdict), decision and lesson; scorecard-less rows name "
+        "--branch and --commit"
+    )
     append = ledger_commands.add_parser("append", help=append_help, description=append_help)
     _presentation_options(append)
-    append.add_argument("--scorecard", required=True)
     append.add_argument("--id", dest="row_id", required=True)
     append.add_argument("--entry", choices=("baseline", "experiment"), required=True)
-    append.add_argument("--tier", required=True)
     append.add_argument("--wave", type=int, default=0)
     append.add_argument("--track")
     append.add_argument("--idea")
-    append.add_argument("--baseline", dest="ledger_baseline", metavar="SCORECARD")
+    append.add_argument("--branch", dest="ledger_branch", help="Candidate branch")
+    append.add_argument("--commit", dest="ledger_commit", help="Candidate commit")
+    append.add_argument("--scorecard", help="Headline scorecard; required for a baseline")
+    append.add_argument("--tier", dest="ledger_tier", help="The --scorecard's tier")
+    append.add_argument(
+        "--baseline",
+        dest="ledger_baseline",
+        metavar="REFERENCE",
+        help="Gate --scorecard against a ledger row id or scorecard",
+    )
+    for tier in ("tier0", "tier1"):
+        append.add_argument(
+            f"--{tier}",
+            dest=f"ledger_{tier}",
+            metavar="RUN-DIR|SCORECARD",
+            help=f"Candidate {tier} run, gated against --reference-{tier}",
+        )
+        append.add_argument(
+            f"--reference-{tier}",
+            dest=f"ledger_reference_{tier}",
+            metavar="REFERENCE",
+            help=f"Ledger row id or scorecard (default: the latest {tier} baseline row)",
+        )
+    append.add_argument(
+        "--verdict",
+        dest="ledger_verdict",
+        metavar="FILE",
+        help="A verify record (verdict.json) carrying both tier gates",
+    )
+    append.add_argument(
+        "--decision",
+        dest="ledger_decision",
+        choices=("accepted", "rejected", "inconclusive", "merged"),
+    )
+    append.add_argument("--merge-commit", dest="ledger_merge_commit", help="Required if merged")
     append.add_argument("--lesson", default="")
     append.add_argument("--ledger", default=GYM_LEDGER)
     render_help = "Regenerate LEDGER.md's tables from the JSONL ledger"

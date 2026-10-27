@@ -46,11 +46,14 @@ from .gym import GateVerdict as GateVerdict
 from .gym import GroupSummary as GroupSummary
 from .gym import KernelCase as KernelCase
 from .gym import KindBudget as KindBudget
+from .gym import LedgerDecision as LedgerDecision
 from .gym import LedgerRow as LedgerRow
 from .gym import RoundSummary as RoundSummary
 from .gym import RunContext as RunContext
 from .gym import Scorecard as Scorecard
+from .gym import TierGate as TierGate
 from .gym import Trajectory as Trajectory
+from .gym import VerifyRecord as VerifyRecord
 from .intake import Repository as Repository
 from .intake import ScannerClaim as ScannerClaim
 from .intake import ScannerFinding as ScannerFinding
