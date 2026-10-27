@@ -5,7 +5,9 @@ label, never reaches an agent, tool or workflow input, and reads no oracle. Ever
 entry is derived from data recorded in the ``InvestigationResult`` plus, for rounds
 that reached the kernel, the prepared case recovered from that round's own validated
 receipts. A round whose receipts do not validate is reported as unverified rather
-than classified from unverified fields.
+than classified from unverified fields; when a recorded role is INVALID or ERROR, which
+by itself keeps the receipts from validating, the label names that role and its trusted
+cause class (``evidence_unverified:coverage_control``) without deriving a kernel gate.
 
 An isolated agent row has one entry, derived from the row's own recorded match kind,
 adapter feedback and auditor decision; its reasons are fixed evaluator text or the
@@ -13,8 +15,8 @@ adapter's feedback, never oracle content.
 """
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Literal, get_args
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
@@ -23,7 +25,9 @@ from corsair.contracts import (
     FixStatus,
     InvestigationResult,
     MatchKind,
+    Observation,
     PreparedCase,
+    RoleObservation,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -63,6 +67,19 @@ _INVALID_QUALIFIERS = (
 )
 _QUALIFIED_GATES = frozenset({"producer_invalid", "audit_invalid"})
 
+# An unverified round's qualifier: ``<cause>_<roles>``, naming the recorded role whose
+# outcome by itself keeps the receipts from validating (any INVALID or ERROR role does).
+# Causes are in kernel order: an ERROR role before an INVALID one (``decide``), a harness
+# or sandbox ERROR before a target exception, and a coverage miss before other invalid
+# evidence (the ledger's ``coverage`` gate precedes ``probe_invalid``).
+UNVERIFIED = "evidence_unverified"
+UnverifiedCause = Literal["execution_error", "target_exception", "coverage", "probe_invalid"]
+UnverifiedRoles = Literal["control", "adversarial", "both"]
+_CAUSE_ORDER: tuple[UnverifiedCause, ...] = get_args(UnverifiedCause)
+# The trusted verifier's fixed reason for an INVALID role that missed the relevant source
+# (steps/verification.py; pinned there by tests/unit/test_line_binding.py).
+_COVERAGE_MISS = "relevant source coverage was not observed"
+
 # Isolated agent rows: the role's stage, the auditor's fixed rubric ids (any other
 # model-chosen rule text stays out of the gate name), and fixed oracle-stage reasons.
 _AGENT_STAGES = {"producer": "producer", "auditor": "audit"}
@@ -93,6 +110,60 @@ def _qualified(gate: str, reason: str) -> str:
             if marker in reason:
                 return f"{gate}:{qualifier}"
     return gate
+
+
+def _role_cause(role: RoleObservation | None) -> UnverifiedCause | None:
+    """The trusted class of a recorded role that cannot validate, from its outcome, error
+    kind and the verifier's fixed reason; None for an admitted or missing role."""
+    if role is None:
+        return None
+    if role.outcome is RoleOutcome.ERROR:
+        return "target_exception" if role.error_kind == "target_exception" else "execution_error"
+    if role.outcome is RoleOutcome.INVALID:
+        return "coverage" if role.reason == _COVERAGE_MISS else "probe_invalid"
+    return None
+
+
+def unverified_gate(observation: Observation | None) -> str:
+    """``evidence_unverified``, qualified by the first recorded failing role in kernel order.
+
+    Reads only the role records trusted verifier code wrote into the result; the round
+    stays unverified and no kernel gate is derived from them.
+    """
+    if observation is None:
+        return UNVERIFIED
+    control, adversarial = _role_cause(observation.control), _role_cause(observation.adversarial)
+    for cause in _CAUSE_ORDER:
+        named: UnverifiedRoles
+        if control == adversarial == cause:
+            named = "both"
+        elif control == cause:
+            named = "control"
+        elif adversarial == cause:
+            named = "adversarial"
+        else:
+            continue
+        return f"{UNVERIFIED}:{cause}_{named}"
+    return UNVERIFIED
+
+
+def qualify_unverified(ledger: Sequence[Any], result: InvestigationResult | None) -> list[Any]:
+    """A stored ledger with each unqualified ``evidence_unverified`` round entry named from
+    its round in ``result`` (see ``unverified_gate``); other entries are kept as they are.
+
+    Lets a report saved before qualified labels re-score under the same names; the stored
+    ledger is not modified.
+    """
+    if result is None:
+        return list(ledger)
+    observations = {(item.session, item.index): item.observation for item in result.rounds}
+    qualified: list[Any] = []
+    for entry in ledger:
+        key = (entry.get("session"), entry.get("round")) if isinstance(entry, Mapping) else None
+        if key in observations and entry.get("gate") == UNVERIFIED:
+            entry = {**entry, "gate": unverified_gate(observations[key])}
+        qualified.append(entry)
+    return qualified
 
 
 def _audit_gate(item: RoundResult) -> tuple[str, str]:
@@ -181,7 +252,7 @@ def _round_entry(item: RoundResult, prepared: PreparedCase | None) -> tuple[dict
             session,
             index,
             "kernel",
-            "evidence_unverified",
+            unverified_gate(observation),
             "the round's persisted receipts did not validate",
         ), False
     entry = _kernel_entry(item, prepared)

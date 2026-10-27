@@ -3,6 +3,8 @@
 import inspect
 import json
 
+import pytest
+
 from corsair.adapters.inference import adk
 from corsair.contracts import (
     AuditDecision,
@@ -15,6 +17,7 @@ from corsair.contracts import (
     Oracle,
     ProducerDecision,
     ProducerOutput,
+    RoleObservation,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -374,3 +377,78 @@ def test_a_receipt_named_for_another_round_is_unverified(tmp_path, monkeypatch):
     item = _round(_proposal(), _clean_negative(), _audit())
     relabelled = item.model_copy(update={"session": 2})
     assert set(verified_rounds(_result([item, relabelled]), store)) == {(1, 1)}
+
+
+# The role records trusted verifier code writes (steps/verification.py) when a receipt is
+# not admitted; test_line_binding pins the coverage reason on the verifier's side.
+_UNCOVERED = RoleObservation(
+    outcome=RoleOutcome.INVALID,
+    target_executed=False,
+    covered_lines=[],
+    reason="relevant source coverage was not observed",
+    native_exit_code=None,
+)
+_JUNIT_INVALID = _UNCOVERED.model_copy(update={"reason": "native junit report is invalid"})
+_RAISED = RoleObservation(
+    outcome=RoleOutcome.ERROR,
+    target_executed=True,
+    covered_lines=[4],
+    reason="native target execution or observer reporting failed",
+    native_exit_code=1,
+    error_kind="target_exception",
+)
+_HARNESS = _RAISED.model_copy(update={"error_kind": "harness", "target_executed": False})
+
+
+@pytest.mark.parametrize(
+    ("control", "adversarial", "gate"),
+    [
+        (_UNCOVERED, _VIOLATION, "evidence_unverified:coverage_control"),
+        (_HELD, _UNCOVERED, "evidence_unverified:coverage_adversarial"),
+        (_UNCOVERED, _UNCOVERED, "evidence_unverified:coverage_both"),
+        (_JUNIT_INVALID, _VIOLATION, "evidence_unverified:probe_invalid_control"),
+        (_HELD, _RAISED, "evidence_unverified:target_exception_adversarial"),
+        (_RAISED, _RAISED, "evidence_unverified:target_exception_both"),
+        (_HARNESS, _VIOLATION, "evidence_unverified:execution_error_control"),
+        # Kernel order: an ERROR role is named before an INVALID one, and a harness or
+        # sandbox ERROR before a target exception.
+        (_UNCOVERED, _RAISED, "evidence_unverified:target_exception_adversarial"),
+        (_RAISED, _HARNESS, "evidence_unverified:execution_error_adversarial"),
+        (_HELD, _VIOLATION, "evidence_unverified"),
+    ],
+)
+def test_an_unverified_round_names_its_recorded_failing_role(control, adversarial, gate):
+    result = _result([_round(_proposal(), _observation(control, adversarial), _audit())])
+    entries = gate_ledger(result)
+    assert _gates(entries) == [("kernel", gate)]
+    # The reason stays fixed evaluator text; the qualifier is the only addition.
+    assert entries[0]["reason"] == "the round's persisted receipts did not validate"
+
+
+def test_a_verified_round_never_takes_an_unverified_qualifier():
+    invalid = _observation(_HELD, _role(RoleOutcome.INVALID, [4], 0))
+    result = _result([_round(_proposal(), invalid, _audit())])
+    assert _gates(gate_ledger(result, _verified((1, 1)))) == [("evidence", "probe_invalid")]
+
+
+def test_a_stored_unqualified_ledger_is_qualified_from_its_result():
+    result = _result(
+        [
+            _round(_proposal(), _observation(_UNCOVERED, _VIOLATION), _audit()),
+            _round(_proposal(), _observation(_HELD, _VIOLATION), _audit(), index=2),
+        ]
+    )
+    stored = [
+        {"session": 1, "round": 1, "stage": "kernel", "gate": "evidence_unverified", "reason": ""},
+        {"session": 1, "round": 2, "stage": "kernel", "gate": "evidence_unverified", "reason": ""},
+        {"session": 1, "round": None, "stage": "policy", "gate": "budget_exhausted", "reason": ""},
+    ]
+    qualified = ledger.qualify_unverified(stored, result)
+    assert [entry["gate"] for entry in qualified] == [
+        "evidence_unverified:coverage_control",
+        "evidence_unverified",
+        "budget_exhausted",
+    ]
+    # The stored ledger itself is not rewritten.
+    assert stored[0]["gate"] == "evidence_unverified"
+    assert ledger.qualify_unverified(stored, None) == stored
