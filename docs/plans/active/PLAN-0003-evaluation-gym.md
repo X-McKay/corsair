@@ -640,3 +640,23 @@ content-addressed tags and cannot contaminate parallel runs.
   worktree `ref-greedy-b261324f` (settings plus `models.decoding = {temperature: 0, seed: 7}`, config identity
   334e2547…): two tier1 runs on the 21-row corpus to measure the greedy band against the sampled band. s17 (gate
   decides on languages with ≥ 3 cases, paired per-case outcomes) in progress.
+- 2026-10-27 wave 5 opens on the 21-row corpus. Two same-identity tier1 runs at 494f2523 (e6b13d from `gym/loop`
+  before any merge, 38d675 from the detached `ref-494f2523`): J 1.074 / 1.124, macro 0.881 / 0.884, worst (python)
+  0.455 / 0.636, tokens 42.3k / 44.2k. `gym noise` over the pair is installed as `reference/noise-tier1.json`
+  (J half-range 0.025, macro 0.0013, tokens 1.046×, p50 1.134×, python ±0.091, javascript ±0.083, c/java/perl/ruby
+  0; n=2) and e6b13d as `reference/tier1.json` (cea22f kept as `tier1.pre-w5.json`; ledger `ref-w5-tier1`). The
+  21-row band is twenty times tighter in J than the 16-row one (±0.55), because no single-case language can flip
+  the worst-language term any more; python's own spread across four runs at this commit (5 to 8 of 11) is still
+  wider than the n=2 band says. Per case over three runs: chain-python-cmdi-a, ih-python-codeinjection-a and
+  sbj-javascript-aurelia-path fail every episode; adversarial01, adversarial02, case02, sbj-javascript-mixin-deep
+  and sbj-javascript-viking04-merge are coin-flips; the other 13 cases pass every repeat. Greedy run 1 (8df25d,
+  config 334e2547…) has the same stable fails and different coin-flip outcomes (case02 0/3, mixin-deep 2/3), so
+  temperature 0 with a seed does not make episodes repeatable on this route; run 2 is in flight. h5 rejected (run
+  b39557 vs ref-w4-tier1, 16-row dataset): python `language_regressed` on case02 (3/3 → 1/3), ruby 0 → 1.0 is
+  reported-only under `--min-cases 3` and both new-corpus references already score ruby 1.0, the java case is XXE
+  and matched no class keyword; branch `gym/h5-reference-selection` at 93d6b8b4. Its by-product, that the reference
+  selection tables were outside every identity component, is merged as s19 (23f818d9): both skills digests move
+  once, so the next reference pair runs at or after 23f818d9. Merged s17 (`--min-cases`, paired outcomes) and s18
+  (`--slice` screens) at 5066e40b; check exit 0, 1628 passed. Queue behind greedy run 2: tier2 holdout baseline
+  from `ref-494f2523` (orchestrator-only). Auditor brief on the new pair requested at `.work/wave5/auditor-brief.md`.
+
