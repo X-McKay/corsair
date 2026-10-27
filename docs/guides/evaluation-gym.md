@@ -15,6 +15,8 @@ Tiers are frozen `corsair.dataset/1` manifests whose entries are copied verbatim
 
 `corsair dataset validate evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json` checks both. A holdout tier is filled only through reviewed intake and does not exist yet.
 
+Holdout hygiene: a holdout tier is only held out if no family, family stem, chain pair or source tree it uses appears in another split. `just dataset-families evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json` (adding `gym-tier2.json` once it exists) checks the tiers together and exits `1` on a family id or its `<language>/<class>` stem (so bare `xxe` under a Java recipe and `ih-java-xxe` collide), a case, a chain pair in any request layout (`<class>-a`/`<class>-b`, `…/v3/`, `…-v3`) or a source tree (same resolved path, same pair stem directory or same declared digest) that crosses splits; the rules are listed in the [baseline policy](../../evals/baselines/README.md#checking-the-family-grouped-split). A row that shares any of these with tier0 or tier1 belongs in tier1, not the holdout.
+
 ## Run a tier
 
 ```bash

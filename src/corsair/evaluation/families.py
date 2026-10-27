@@ -2,11 +2,12 @@
 
 A family is one vulnerability class in one target (both variants of a chain pair, and any
 adversarial row built on them). The baseline policy promotes only on family-grouped
-held-out data, so a family must sit in exactly one split across every dataset manifest,
-and a chain pair (request directories ``<class>-a`` and ``<class>-b`` under one parent)
-must keep one split and one family. The check reads manifests only: frozen request and
-oracle bytes are verified by :func:`corsair.evaluation.datasets.load_dataset`, and no oracle
-content is read here. The report views group already-scored rows; they never re-score.
+held-out data, so across every manifest checked together a family id, its family stem
+(language and class, :func:`family_stem`), a case, a chain pair (:func:`variant_stem`) and
+a source tree must each keep one split, and a chain pair must keep one family id. The
+check reads manifests and each labelled entry's digest-verified request (for its recipe
+kind and source trees); it never reads an oracle. The report views group already-scored
+rows; they never re-score.
 """
 
 import argparse
@@ -16,14 +17,31 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePath, PurePosixPath
 from typing import Any
 
-from corsair.contracts import Dataset, digest
+from corsair.contracts import Dataset, DatasetEntry, InvestigationRequest, digest
+from corsair.evaluation.datasets import dataset_root, read_frozen
 from corsair.evaluation.intake import INTAKE_SCHEMA, IntakeDataset
 from corsair.evaluation.scoring import summarize
+from corsair.observability.logging import safe_error_detail
 
-_PAIR_DIRECTORY = re.compile(r"^(?P<stem>.+)-(?P<variant>[ab])$")
+_VARIANT_DIRECTORY = re.compile(r"^(?:(?P<stem>.+)-)?[ab](?:-v\d+)?$")
+_LAYOUT_DIRECTORY = re.compile(r"^v\d+$")
+# Family ids written ``ih-<language>-<class>`` or ``chain-<language>-<class>`` always name
+# the language; an unprefixed id names one only through a known language token.
+_LANGUAGE_PREFIXES = frozenset({"ih", "chain"})
+_LANGUAGES = {
+    "c": "c",
+    "java": "java",
+    "javascript": "javascript",
+    "js": "javascript",
+    "perl": "perl",
+    "py": "python",
+    "python": "python",
+    "rb": "ruby",
+    "ruby": "ruby",
+}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DECISIVE = frozenset(
     {"EXPLOIT_DEMONSTRATED", "COMPONENT_EXPLOIT_DEMONSTRATED", "EXPLOIT_NOT_DEMONSTRATED"}
@@ -43,20 +61,103 @@ _GROUP_FIELDS = (
 
 @dataclass(frozen=True)
 class Member:
-    """One manifest entry's membership; ``family``/``split`` are None when undeclared."""
+    """One manifest entry's membership; ``family``/``split`` are None when undeclared.
+
+    ``trees`` maps each source-tree key (an absolute resolved path or a content digest) to
+    its display text; ``problem`` records why a labelled entry's request was unreadable."""
 
     source: str
     case_id: str
     family: str | None
     split: str | None
     pair: str | None
+    stem: str | None = None
+    trees: tuple[tuple[str, str], ...] = ()
+    problem: str | None = None
+
+
+def variant_stem[P: PurePath](directory: P) -> P | None:
+    """The pair stem a variant directory belongs to, or None outside a pair.
+
+    This is the one pair-layout rule. Trailing ``v<N>`` layout directories are skipped;
+    the remaining directory is a variant when it is named ``<class>-a`` or ``<class>-b``
+    (optionally suffixed ``-v<N>``), or is a bare ``a``/``b`` corpus tree::
+
+        chain/python/cmdi-a                      -> chain/python/cmdi
+        chain/java/xxe-b/v3                      -> chain/java/xxe
+        chain/javascript/prototypepollution-a-v3 -> chain/javascript/prototypepollution
+        corpus/infosec-harness/perl/xss/b        -> corpus/infosec-harness/perl/xss
+        chain/python/ineffective-fix             -> None
+    """
+    while _LAYOUT_DIRECTORY.match(directory.name) and directory.parent != directory:
+        directory = directory.parent
+    match = _VARIANT_DIRECTORY.match(directory.name)
+    if match is None:
+        return None
+    return directory.parent / match["stem"] if match["stem"] else directory.parent
 
 
 def chain_pair(path: str) -> str | None:
-    """``chain/python/cmdi-a/request.json`` belongs to pair ``chain/python/cmdi``."""
-    parent = PurePosixPath(path).parent
-    match = _PAIR_DIRECTORY.match(parent.name)
-    return str(parent.parent / match["stem"]) if match else None
+    """The pair of a request file, read from its directory by :func:`variant_stem`.
+
+    ``chain/python/cmdi-a/request.json`` and ``chain/java/xxe-b/v3/request.json`` belong to
+    pairs ``chain/python/cmdi`` and ``chain/java/xxe``."""
+    stem = variant_stem(PurePosixPath(path).parent)
+    return None if stem is None else str(stem)
+
+
+def family_stem(family: str, kind: str | None) -> str:
+    """A family's language and class, ``<language>/<class>``, so spellings compare equal.
+
+    The language comes from an ``ih-``/``chain-`` prefix, a leading language token, or else
+    the request's recipe kind (``java.secret_disclosure/1`` is java); the class drops
+    ``-``/``_`` separators. ``xxe`` under a java kind and ``ih-java-xxe`` are both ``java/xxe``;
+    without any language the stem is the class alone."""
+    tokens = family.lower().split("-")
+    language = None
+    if tokens[0] in _LANGUAGE_PREFIXES and len(tokens) > 2:
+        language, tokens = _LANGUAGES.get(tokens[1], tokens[1]), tokens[2:]
+    elif tokens[0] in _LANGUAGES and len(tokens) > 1:
+        language, tokens = _LANGUAGES[tokens[0]], tokens[1:]
+    elif kind is not None:
+        language = _LANGUAGES.get(kind.split(".", 1)[0], kind.split(".", 1)[0])
+    name = "".join(tokens).replace("_", "")
+    return f"{language}/{name}" if language else name
+
+
+def _tree_display(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+
+
+def _source_trees(
+    request: InvestigationRequest, request_path: Path, root: Path
+) -> tuple[tuple[str, str], ...]:
+    """Key each source tree by its pair stem directory (else the resolved tree, so a symlink
+    names its target) and by its declared content digest, so a copied tree still matches."""
+    trees: dict[str, str] = {}
+    for source in (request.case.source, request.case.fixed_source):
+        if source is None:
+            continue
+        tree = (request_path.parent / source.path).resolve()
+        anchor = variant_stem(tree) or variant_stem(tree.parent) or tree
+        trees[str(anchor)] = _tree_display(anchor, root)
+        if source.expected_digest is not None:
+            trees[f"digest:{source.expected_digest}"] = f"digest:{source.expected_digest}"
+    return tuple(trees.items())
+
+
+def _case_member(source: str, root: Path, entry: DatasetEntry) -> Member:
+    """A labelled entry's membership, with its family stem and source trees from its request."""
+    pair = chain_pair(entry.request)
+    try:
+        request_path, content = read_frozen(root, entry.request, entry.request_digest, "request")
+        request = InvestigationRequest.model_validate_json(content)
+    except (OSError, ValueError) as error:
+        problem = safe_error_detail(error)
+        return Member(source, entry.case_id, entry.family, entry.split, pair, problem=problem)
+    stem = family_stem(entry.family, request.case.recipe.kind)
+    trees = _source_trees(request, request_path, root.resolve())
+    return Member(source, entry.case_id, entry.family, entry.split, pair, stem, trees)
 
 
 def dataset_members(path: Path) -> list[Member]:
@@ -72,10 +173,8 @@ def dataset_members(path: Path) -> list[Member]:
         raise ValueError(f"{source}: dataset manifest must be a JSON object")
     schema = raw.get("schema_version")
     if schema == "corsair.dataset/1":
-        return [
-            Member(source, entry.case_id, entry.family, entry.split, chain_pair(entry.request))
-            for entry in Dataset.model_validate(raw).entries
-        ]
+        root = dataset_root(path)
+        return [_case_member(source, root, entry) for entry in Dataset.model_validate(raw).entries]
     if schema == "corsair.agent-dataset/1":
         entries = raw.get("entries")
         if not isinstance(entries, list) or not all(
@@ -96,7 +195,10 @@ def dataset_members(path: Path) -> list[Member]:
             for entry in IntakeDataset.model_validate(raw).entries
         ]
     if raw and all(isinstance(value, str) and _SHA256.match(value) for value in raw.values()):
-        return [Member(source, family, family, path.stem, None) for family in sorted(raw)]
+        return [
+            Member(source, family, family, path.stem, None, family_stem(family, None))
+            for family in sorted(raw)
+        ]
     raise ValueError(f"{source}: unsupported dataset manifest (schema_version={schema!r})")
 
 
@@ -114,32 +216,102 @@ def _crossing(
     return found
 
 
+def _placements(members: Iterable[Member]) -> dict[str, list[str]]:
+    placed: dict[str, set[str]] = defaultdict(set)
+    for member in members:
+        placed[str(member.split)].add(f"{member.source}:{member.case_id}")
+    return {split: sorted(names) for split, names in sorted(placed.items())}
+
+
+def _stem_crossings(stems: dict[str, list[Member]]) -> list[dict[str, Any]]:
+    """Stems that cross splits under more than one family id (one id is the family rule)."""
+    found = []
+    for stem, members in sorted(stems.items()):
+        splits = _placements(members)
+        families = sorted({str(member.family) for member in members})
+        if len(splits) > 1 and len(families) > 1:
+            message = (
+                f"family stem {stem} is shared by families {', '.join(families)} "
+                f"in splits {', '.join(splits)}"
+            )
+            found.append(
+                {
+                    "rule": "family_stem_crosses_splits",
+                    "stem": stem,
+                    "families": families,
+                    "splits": splits,
+                    "message": message,
+                }
+            )
+    return found
+
+
+def _tree_crossings(trees: dict[str, list[Member]], shown: dict[str, str]) -> list[dict[str, Any]]:
+    """Source trees shared across splits; keys with the same placement report once."""
+    merged: dict[str, dict[str, Any]] = {}
+    for key, members in trees.items():
+        splits = _placements(members)
+        if len(splits) > 1:
+            found = merged.setdefault(
+                json.dumps(splits, sort_keys=True),
+                {"rule": "source_tree_crosses_splits", "trees": [], "splits": splits},
+            )
+            found["trees"].append(shown[key])
+    for found in merged.values():
+        # Path keys before content digests, each in name order.
+        found["trees"].sort(key=lambda tree: (tree.startswith("digest:"), tree))
+    return sorted(merged.values(), key=lambda found: found["trees"])
+
+
 def split_violations(members: Iterable[Member]) -> list[dict[str, Any]]:
-    """Families, cases and chain pairs that cross splits, and pairs that cross families.
+    """Families, family stems, cases, chain pairs and source trees that cross splits, pairs
+    that cross families, and labelled entries whose request could not be read.
 
     Only members that declare a split are checked; unlabelled entries carry no split
     claim to contradict."""
     families: dict[str, list[Member]] = defaultdict(list)
+    stems: dict[str, list[Member]] = defaultdict(list)
     cases: dict[str, list[Member]] = defaultdict(list)
     pairs: dict[str, list[Member]] = defaultdict(list)
+    trees: dict[str, list[Member]] = defaultdict(list)
+    shown: dict[str, str] = {}
+    unreadable = []
     for member in members:
         if member.split is None:
             continue
         if member.family is not None:
             families[member.family].append(member)
+        if member.stem is not None:
+            stems[member.stem].append(member)
         cases[member.case_id].append(member)
         if member.pair is not None:
             pairs[member.pair].append(member)
+        for key, display in member.trees:
+            trees[key].append(member)
+            shown.setdefault(key, display)
+        if member.problem is not None:
+            unreadable.append(
+                {
+                    "rule": "request_unreadable",
+                    "case_id": member.case_id,
+                    "dataset": member.source,
+                    "problem": member.problem,
+                }
+            )
     return [
+        *unreadable,
         *_crossing("family_crosses_splits", "family", families, "split"),
+        *_stem_crossings(stems),
         *_crossing("case_crosses_splits", "case_id", cases, "split"),
         *_crossing("pair_crosses_splits", "pair", pairs, "split"),
         *_crossing("pair_crosses_families", "pair", pairs, "family"),
+        *_tree_crossings(trees, shown),
     ]
 
 
 def check_family_splits(paths: Iterable[Path]) -> dict[str, Any]:
-    """Check every family, case and chain pair keeps one split across these manifests."""
+    """Check every family, family stem, case, chain pair and source tree keeps one split
+    across these manifests, checked together as one population."""
     datasets, members = [], []
     for path in paths:
         found = dataset_members(path)
@@ -157,6 +329,7 @@ def check_family_splits(paths: Iterable[Path]) -> dict[str, Any]:
     return {
         "ok": not violations,
         "families": len({member.family for member in members if member.split and member.family}),
+        "family_stems": len({member.stem for member in members if member.split and member.stem}),
         "unlabelled_entries": sum(member.split is None for member in members),
         "datasets": datasets,
         "violations": violations,
