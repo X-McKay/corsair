@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from statistics import mean
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import BaseModel
 
@@ -702,8 +702,20 @@ def _fraction(flags: Sequence[bool]) -> float | None:
     return sum(flags) / len(flags) if flags else None
 
 
-def _majority_verified(repeats: Sequence[Trajectory]) -> bool:
+def majority_verified(repeats: Sequence[Trajectory]) -> bool:
+    """A case's outcome: whether more than half of its repeats verified."""
     return 2 * sum(item.verified for item in repeats) > len(repeats)
+
+
+def case_outcomes(trajectories: Sequence[Trajectory]) -> dict[str, tuple[str, bool]]:
+    """Per case id: its language and its majority outcome (``majority_verified``)."""
+    by_case: dict[str, list[Trajectory]] = defaultdict(list)
+    for item in trajectories:
+        by_case[item.case_id].append(item)
+    return {
+        case: (repeats[0].language, majority_verified(repeats))
+        for case, repeats in sorted(by_case.items())
+    }
 
 
 def _majority_verified_without_operational_failures(repeats: Sequence[Trajectory]) -> bool:
@@ -724,7 +736,7 @@ def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
         cases=len(cases),
         attempts=len(trajectories),
         raw_accuracy=_fraction([item.passed for item in trajectories]),
-        verified_accuracy=_fraction([_majority_verified(case) for case in cases]),
+        verified_accuracy=_fraction([majority_verified(case) for case in cases]),
         mean_reward=mean(mean(item.reward for item in case) for case in cases) if cases else None,
         mean_effective_tokens=_known_mean(
             _known_mean(item.effective_tokens for item in case) for case in cases
@@ -810,6 +822,34 @@ def _macro(values: Iterable[float | None]) -> float | None:
     return mean(value for value in collected if value is not None)
 
 
+class ObjectiveTerms(NamedTuple):
+    """The objective and its terms over a set of language summaries."""
+
+    macro_verified_accuracy: float
+    worst_language_verified_accuracy: float
+    macro_reward: float
+    objective_j: float
+
+
+def objective_terms(languages: Mapping[str, GroupSummary]) -> ObjectiveTerms:
+    """J = macro reward + ``WORST_LANGUAGE_WEIGHT`` x worst language verified accuracy.
+
+    Means over ``languages``; a language with unknown accuracy or reward counts as 0.
+    """
+    if not languages:
+        raise ValueError("the objective needs at least one language")
+    accuracy = [summary.verified_accuracy or 0.0 for summary in languages.values()]
+    rewards = [summary.mean_reward or 0.0 for summary in languages.values()]
+    macro_reward = mean(rewards)
+    worst = min(accuracy)
+    return ObjectiveTerms(
+        macro_verified_accuracy=mean(accuracy),
+        worst_language_verified_accuracy=worst,
+        macro_reward=macro_reward,
+        objective_j=macro_reward + WORST_LANGUAGE_WEIGHT * worst,
+    )
+
+
 def build_scorecard(
     trajectories: Sequence[Trajectory],
     *,
@@ -823,10 +863,7 @@ def build_scorecard(
     if not trajectories:
         raise ValueError("a scorecard needs at least one scored row")
     languages = _grouped(trajectories, "language")
-    accuracy = [summary.verified_accuracy or 0.0 for summary in languages.values()]
-    rewards = [summary.mean_reward or 0.0 for summary in languages.values()]
-    macro_reward = mean(rewards)
-    worst = min(accuracy)
+    terms = objective_terms(languages)
     models: dict[str, set[str]] = defaultdict(set)
     for item in trajectories:
         for role, model in item.models.items():
@@ -844,10 +881,10 @@ def build_scorecard(
         sliced=sliced or bool(missing),
         kinds=_grouped(trajectories, "kind"),
         languages=languages,
-        macro_verified_accuracy=mean(accuracy),
-        worst_language_verified_accuracy=worst,
-        macro_reward=macro_reward,
-        objective_j=macro_reward + WORST_LANGUAGE_WEIGHT * worst,
+        macro_verified_accuracy=terms.macro_verified_accuracy,
+        worst_language_verified_accuracy=terms.worst_language_verified_accuracy,
+        macro_reward=terms.macro_reward,
+        objective_j=terms.objective_j,
         macro_effective_tokens=_macro(
             summary.mean_effective_tokens for summary in languages.values()
         ),

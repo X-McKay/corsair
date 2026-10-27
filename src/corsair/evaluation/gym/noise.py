@@ -11,8 +11,8 @@ import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from corsair.contracts import GateReason, NoiseBand, NoiseSpread, Scorecard
-from corsair.evaluation.gym.gate import MIN_REPEATS, incomparable_reasons
+from corsair.contracts import GateReason, NoiseBand, Scorecard
+from corsair.evaluation.gym.gate import MIN_REPEATS, incomparable_reasons, spread
 from corsair.evaluation.gym.render import REASON_TEXT
 
 
@@ -36,21 +36,6 @@ def noise_refusals(cards: Sequence[Scorecard], min_repeats: int = MIN_REPEATS) -
         if card.repeats != first.repeats:
             reasons.add(GateReason.REPEATS_MISMATCH)
     return [reason for reason in GateReason if reason in reasons]
-
-
-def spread(values: Sequence[float], *, ratio: bool = False) -> NoiseSpread:
-    """Mean, half-range and sample deviation; ``max_ratio`` for a positive scale metric."""
-    values = list(values)
-    mean = sum(values) / len(values)
-    stdev = (sum((value - mean) ** 2 for value in values) / (len(values) - 1)) ** 0.5
-    positive = ratio and min(values) > 0
-    return NoiseSpread(
-        values=values,
-        mean=mean,
-        half_range=(max(values) - min(values)) / 2,
-        stdev=stdev,
-        max_ratio=max(values) / min(values) if positive else None,
-    )
 
 
 def noise_band(cards: Sequence[Scorecard]) -> NoiseBand:

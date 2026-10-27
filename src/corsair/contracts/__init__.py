@@ -44,6 +44,7 @@ from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation
 from .evidence import RoleOutcome as RoleOutcome
 from .gym import Budgets as Budgets
+from .gym import DecidingMetric as DecidingMetric
 from .gym import GateDecision as GateDecision
 from .gym import GateReason as GateReason
 from .gym import GateTrack as GateTrack
@@ -58,6 +59,9 @@ from .gym import NoiseMetric as NoiseMetric
 from .gym import NoiseSpread as NoiseSpread
 from .gym import OperationalEpisode as OperationalEpisode
 from .gym import OperationalReason as OperationalReason
+from .gym import PairedCase as PairedCase
+from .gym import PairedCounts as PairedCounts
+from .gym import PairedOutcomes as PairedOutcomes
 from .gym import RoundSummary as RoundSummary
 from .gym import RunContext as RunContext
 from .gym import RunIdentity as RunIdentity
