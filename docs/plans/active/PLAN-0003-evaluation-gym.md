@@ -460,3 +460,12 @@ content-addressed tags and cannot contaminate parallel runs.
   clean run REJECTED under `efficiency`; reference vs itself REJECTED under each track; c-intoverflow-a r0 in the
   h1 run becomes operational (`sandbox_fault`) with no reward change. Gates on `gym/loop` at c662c9dc: `just check`
   exit 0; `just -- test -q -W error` 1424 passed, 113 deselected.
+- 2026-10-27 h1 re-measurement (`gym/h1-rerun` f98323ca = h1 + gym/loop, budget 4096, s8 reward, verify
+  `verify-20261027t102336-60e6a5`): tier0 smoke ACCEPTED (J +0.083, tokens 0.900×, all languages 1.0); tier1
+  REJECTED (`language_regressed` ruby 1.0 → 0.0 via 2 `target_exception` episodes, `objective_below_threshold` ΔJ
+  −0.570, `tokens_above_ceiling` 1.210×; macro verified 0.967 → 0.817; p50 +28 s with javascript 64 → 159 s; cap
+  stops 2 → 0 and python 0.8 → 0.9 as before; 0 operational episodes). Compared with h1's first decisive run of the
+  same configuration (tokens 1.070×, ruby 1.0, J 1.259): the two runs differ more than any candidate effect
+  measured so far, so the corpus (one case per non-Python language) and run-to-run variance, not the gate, are
+  the limiting factor. h1 closed as rejected; ledger row `h1-rerun`. Next: a second reference run of the same
+  configuration to measure the noise floor, then corpus growth (sibling rows into tier1 via reviewed intake).
