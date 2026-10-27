@@ -506,3 +506,14 @@ content-addressed tags and cannot contaminate parallel runs.
   `family_stem` recognises only `ih-`/`chain-` prefixes, so `syn-` families match by pair and tree only. Gates on
   `gym/loop` at c0f7db79: `just check` exit 0; `just -- test -q -W error` 1432 passed, 113 deselected. The loop
   now waits on the owner: review decisions for the 12 drafted rows, the noise-aware gate ruling, and publication.
+- 2026-10-27 Public dataset survey (read-only, nothing fetched): the seven existing kinds need small offline programs
+  in fixed call shapes, so whole-repository datasets with dependencies do not fit. Feeds for existing kinds:
+  SecBench.js (no licence file: usable only as a pointer list; packages' own npm tarballs carry their licences;
+  192 prototype-pollution rows, est. 40–70 mappable to `javascript.prototype_pollution/1`), OpenSSF CVE Benchmark
+  (MIT metadata; est. 10–25 CWE-1321/471 pointers overlapping SecBench.js), Vul4Py (MIT; 100 Python rows; est. 5–15
+  for `python.command_sentinel/1`/`secret_disclosure/1` after stdlib reduction; its exploit tests stay evaluator-side).
+  No fit without authoring or a new kind: Juliet/SARD (public domain, synthetic, `bad()/good()` shapes), ARVO
+  (new kind), OWASP Benchmark (GPL, servlet), Vul4J (Maven), PatchEval (500 GB images), BigVul/DiverseVul/Devign/
+  CrossVul (snippets, licences unclear), CVEfixes (CC-BY-4.0 discovery index only; the sole lead for Ruby and
+  Perl). First fetch: SecBench.js prototype-pollution subset and Vul4Py metadata, into `.work/intake/external/`,
+  with per-package LICENSE retained and integrity checked; nothing executed on the host.
