@@ -709,5 +709,14 @@ content-addressed tags and cannot contaminate parallel runs.
   safe-flat unstable). Gated against the sampled reference with the band: run 1 INCONCLUSIVE (only flip case03,
   within noise), run 2 REJECTED (`sbj-javascript-safe-flat` pass to fail, a stable-pass case, J −0.17). Data for
   owner decision 3: on this route temperature 0 with a seed neither repeats episodes nor improves them; the gym
-  keeps server-default sampling. Lock queue now: tier2 holdout baseline (8c7740, running), then h8's slice screen.
+  keeps server-default sampling. Lock queue now: h8's slice screen (8c7740, running), then the tier2 holdout baseline.
+- 2026-10-27 h8 rejected at the slice screen (run 8c7740, 5 cases × 5 repeats; ledger `h8`; branch
+  `gym/h8-control-coverage-note` at 847839cd): `slice_regressed`, `slice_not_improved`. The packet note did what it
+  targeted: controls marked INVALID by the coverage gate fell from about 45 % to 7 % of executed rounds, no `{}` or
+  JSON-in-string control appeared, aurelia-path went 0/3, 0/3 → 2/5 and mixin-deep and viking04-merge 2/3 → 4/5,
+  but the sentinel safe-flat fell 3/3, 2/3 → 2/5 on two producer cap-outs and one abstain after an R1 reject, and
+  2/5 on aurelia is still a majority fail. JavaScript episodes passed 17 of 25 against 13 and 10 of 18 in the
+  reference runs. The binding failures on JavaScript are now the producer output cap (`provider_max_tokens`, an
+  operational stop that ends the episode) and the aurelia exploit shape (`constructor[prototype]` forms that held;
+  owner decision 4's prototype-pollution rubric). Identity: `producer_packet` only, plus the s19 skills digests.
 
