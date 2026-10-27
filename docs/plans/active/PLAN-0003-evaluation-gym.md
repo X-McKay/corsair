@@ -582,3 +582,16 @@ content-addressed tags and cannot contaminate parallel runs.
   kinds) was stopped by the harness's safety classifier before any tree was written: no agent in this loop authors
   deliberately vulnerable sample programs, so growth of java, ruby, perl and c in tier1 needs owner-authored trees;
   the licensed JavaScript rows from c2 are split between tier1 (chain) and tier2 (held_out) instead.
+- 2026-10-27 wave-4 auditor brief (`.work/wave4/auditor-brief.md`, re-score of all 8 stored tier1 runs, 360 episodes,
+  92 failed): terminal stops target_exception 33, provider_max_tokens 26, producer_abstained 24, execution_error 7,
+  audit_reject 1, clean_negative_unqualified 1. Consistent signal: chain-python-cmdi-a 0/24 (always abstains).
+  Flips: ruby 15/24, case02 12/24, adversarial02 13/24; ruby alone swings J 1.40↔0.86 at fixed identity. Target
+  exceptions are one deterministic shape in the adversarial role only (bound line covered, cleanup confirmed); the
+  ruby and java secret_disclosure kinds select no class reference. provider_max_tokens is producer-only, 15 of 26 on
+  the first call of a round (reasoning length, not packet growth). Latency is model generation (36,449 of 36,485
+  agent-seconds; sandbox host 239 s). Producer 71% of effective tokens, auditor 29% (one call per round, 95%
+  thought). Launched from dd023b00: h5 (reference selection for ruby/java secret_disclosure; accuracy, target ruby),
+  h6 (producer proposes a grounded candidate on qualified clean-negative kinds instead of abstaining; accuracy, target
+  python), h7 (producer packet de-duplication; efficiency, offline preview first). Not taken: the depth-derivation
+  reference text (H5-2: reviewer-sensitive, close to authoring the payload) and auditor brevity (H5-4: token noise
+  band ±0.23× makes a 0.90× win undetectable on this corpus).
