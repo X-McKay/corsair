@@ -301,3 +301,19 @@ content-addressed tags and cannot contaminate parallel runs.
   reaches the target; ERROR stays reserved for harness/infra faults; evidence-policy change, new identity, owner
   review before merge). Other candidates: h5 auditor instruction/packet trimming (efficiency; `agents/auditor/`), h6
   cmdi-a abstention via outcome-blind producer metadata (sequenced after wave-1 producer work).
+- 2026-10-27 Tier2 intake survey (read-only): 126 un-manifested chain directories; all 126 sources resolve once the
+  legacy `benchmarks/corpus/` prefix is mapped to `evals/datasets/corpus/`. Only python `xxe-a`/`xxe-b` are
+  holdout-eligible today; 12 other rows fit an existing kind but share a family or source tree with tier0/tier1 (they
+  belong in tier1, which changes its digest and needs a new reference); 14 rows are operational (`UNABLE_TO_RUN` in
+  lite's matrix, to be re-checked natively); 95 need a new recipe kind (no new kind without a human-authored rubric);
+  3 are out of boundary. Legacy `oracle.json` fields (`expected_rule` R0/R4/R5/R6, lite tree digests) do not map
+  mechanically onto `Oracle`; every oracle needs owner review. Proposed tooling (not built): `corsair dataset draft
+  CHAIN_DIR… --recipe-template --split held_out --out .work/intake/<wave>/` producing request.json, a proposed oracle,
+  a `corsair.dataset-draft/1` file no loader accepts, and a code-owned review sheet; `corsair dataset freeze DRAFT
+  --review review.md --into evals/datasets/gym-tier2.json` refusing on missing decisions, oracle check failures,
+  cross-split families, source-stem overlap with tier0/tier1 or more than 64 entries, exiting 1 after writing with
+  old and new identities. Gaps found: `families.py` `chain_pair` misses the `/v3/` and `-v3` layouts and compares
+  family ids as plain strings (`xxe` vs a later `ih-java-xxe`); family ids are inconsistent across manifests. Wave
+  order proposed: python xxe pair → operational rows natively re-checked → sibling rows into tier1 → reviewed python
+  recipe adaptations (each a new identity) → one language per wave once its kind has a rubric. Open owner items:
+  Perl licence (PLAN-0001/0002), NOASSERTION corpus trees (point in place, copy nothing), rubrics for new kinds.
