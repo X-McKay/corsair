@@ -425,3 +425,8 @@ content-addressed tags and cannot contaminate parallel runs.
   `--git-commit`/`--git-branch`, else warns; recovers `run.json` for imported runs; `gym run` stores the run block in
   `run.json`. Gates on `gym/loop` at 6c4228b8: `just check` exit 0; `just -- test -q -W error` 1345 passed, 113
   deselected; `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` 61 passed, 1 skipped.
+- 2026-10-27 Delivery gate on `gym/loop` at 8deb2e21: `just build` exit 0 (`corsair-0.1.0-py3-none-any.whl`);
+  installed with the providers extra into a fresh venv outside the checkout; `python -I` loads the producer
+  instruction (2,131 B) and the gym modules from the wheel; the wheel contains no `.runs`, `.state`, `.work` or
+  ledger content. 54 commits ahead of `main`, nothing pushed. Blocked on the owner's rulings (target-side
+  exception policy; coverage discard on ERROR observations; publication of `gym/loop`; xxe oracle review).
