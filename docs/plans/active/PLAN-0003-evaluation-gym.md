@@ -595,3 +595,21 @@ content-addressed tags and cannot contaminate parallel runs.
   python), h7 (producer packet de-duplication; efficiency, offline preview first). Not taken: the depth-derivation
   reference text (H5-2: reviewer-sensitive, close to authoring the payload) and auditor brevity (H5-4: token noise
   band ±0.23× makes a 0.90× win undetectable on this corpus).
+- 2026-10-27 c2 merged (81488dfb, ca549c01): nine SecBench.js JavaScript rows frozen through the staged intake with
+  licence-retaining import under `evals/datasets/corpus/secbenchjs/` (provenance code `sbj`): five into tier1
+  (`chain`; tier1 16 → 21 rows, digest 93b3a0e9… → 27523a1a…, javascript now 6 cases) and four into the new
+  held-out `evals/datasets/gym-tier2.json` (digest 2080d512…; never run past experimenter agents). Nine rejected:
+  seven on recipe shape (the vulnerable argument is not the recipe's last argument, or the sink runs in a returned
+  closure), one not exported, one with a fixed tree lacking its entry file. Binding proven in the real JavaScript
+  image with operator reference pairs (`corsair verify`): all nine vulnerable trees VIOLATION with the finding line
+  covered; eight fixed trees hold, aurelia-path's fix raises on the key (ERROR, unscored). Side fixes: corpus
+  `build/` and `dist/` re-included, `.gitattributes` keeps corpus line endings, docs check skips imported trees, and
+  `dataset freeze --against` is repeatable (`action="extend"`; a repeated flag silently kept only the last value).
+- 2026-10-27 s12 merged (3df3cc87, 19e25b69): `corsair gym noise RUN RUN…` writes a `corsair.gym-noise/1` band from
+  runs of one identity, dataset, budgets and repeat count; `gym gate --noise` / `gym verify --noise` report metrics
+  within the band and return INCONCLUSIVE (exit 3) when every deciding regression lies inside it, REJECTED when any
+  lies outside, and INCOMPARABLE on a mismatched band; `single_case_languages` labels fragile regressions; ledger rows
+  record the band. Measured band (reference ade22e vs 29968e, identity 4e2423a5): J ±0.550, macro verified ±0.167,
+  tokens 0.897× to 1.115×, p50 0.868× to 1.152×, ruby ±1.0. Open for the owner: the accuracy and efficiency tracks
+  still REJECT an improvement inside the band (the objective track goes INCONCLUSIVE). Gates on `gym/loop` at
+  3df3cc87: `just check` exit 0; `just -- test -q -W error` 1504 passed, 116 deselected.

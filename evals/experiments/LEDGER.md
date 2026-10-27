@@ -60,6 +60,14 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | s11 | dx | `gym/s11-draft-source-root@676cb8b` | — | — | — | — | merged `ca5f614` | Offline; 22 tests; 18 JavaScript rows drafted from .work/intake (1 blocked: json-ptr fixed tree lacks index.js); freeze refuses unreviewed sheets; nothing under evals/ written |
 | w3 | accuracy | `gym/w3-js-driver-default-export@c931d25` | — | — | — | — | merged `9847fa7` | Trusted driver change; JavaScript image 2c776a9 to 9ca2c53 (new identity); Docker 64 passed; covers 7 more of the 18 staged rows; 7 remain unbindable (not exported by name, UMD factories) |
 
+### Wave 4
+
+| Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| c1 | dx | `gym/c1-tier1-siblings@97a381b` | — | — | — | — | merged `e0fea28` | Offline; 1 of 11 rows frozen (python negative, chain-python-cmdi-a convention); ten rejected as clean negatives for unqualified kinds or duplicate trees; tier1 15 to 16, digest ec8cd985 to 93b3a0e9; decisions pending owner audit |
+| c2 | dx | `gym/c2-tier2-secbenchjs@ca549c0` | — | — | — | — | merged `81488df` | Offline plus real-Docker binding proof (corsair verify, 9 of 9 vulnerable trees VIOLATION with the line covered); 9 of 18 rows frozen (5 tier1 chain, 4 tier2 held_out), 9 rejected on recipe shape or binding; provenance code sbj; tier1 16 to 21 (digest 27523a1a), tier2 new (2080d512); corpus build/dist re-included and CRLF preserved by .gitattributes |
+| s12 | dx | `gym/s12-noise-gate@19e25b6` | — | — | — | — | merged `3df3cc8` | Offline; 32 tests; band from the two identical-identity tier1 runs: J ±0.550, macro acc ±0.167, tokens 0.897x to 1.115x, ruby ±1.0; the same-configuration run gates INCONCLUSIVE (exit 3) instead of REJECTED, h1-rerun stays REJECTED outside the band; accuracy and efficiency tracks still reject an improvement inside the band (owner ruling pending) |
+
 ## Rejected ideas (do not retry without new evidence)
 
 | Idea | Wave | Why it failed |
