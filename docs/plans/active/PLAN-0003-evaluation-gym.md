@@ -403,3 +403,12 @@ content-addressed tags and cannot contaminate parallel runs.
   control-role ERROR. Separate correctness defect, also for the owner: `_error()` discards coverage so stored ERROR
   observations misreport execution; fixing it changes rebuilt observations and so saved-evidence re-validation of
   old ERROR results. Ledger row `h4` (rejected: premise false).
+- 2026-10-27 h2a (wave 2, efficiency, `gym/h2a-decision-shape` 873a8c56; producer prompt digest 29624ad8 →
+  cd7f1df2, +181 B): `just -- gym-verify` (verdict `verify-20261027t044743-f332ad`): tier0 smoke ACCEPTED
+  (J −0.111 reported only; tokens 0.974×; p50 76.2 → 58.1 s), tier1 REJECTED (`language_regressed` python 0.8 →
+  0.6 and ruby 1.0 → 0.0; J −0.600; tokens 0.985×; no operational confound). Response-validation retries fell 16 →
+  4 (tier0) and 41 → 17 (tier1), model calls per episode 4.69 → 4.38, but the token saving is 1.5–2.6 %, under the
+  10 % bar. Stops: tier1 `execution_error` 3 → 6, `provider_max_tokens` 2 → 5. Worktree gates: `just test` 1343
+  passed, `just check` exit 0, wheel resources load outside the checkout. Ledger row `h2a` (rejected). Instrument
+  notes: `verify` prints JSON only when piped (no `VERDICT:` text line); the reference scorecards predate
+  `run_identity`, so the gate's identity line reads unknown until the reference is re-scored.
