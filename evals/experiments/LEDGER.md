@@ -47,6 +47,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | h2a | efficiency | `gym/h2a-decision-shape@873a8c5` | ACCEPTED (objective_below_threshold) | REJECTED (language_regressed, objective_below_threshold; regressed: python, ruby) | -0.111 / -0.600 | 0.974 / 0.985 | rejected | Validation retries 16 to 4 (tier0) and 41 to 17 (tier1) but tokens only -2.6% / -1.5%; tier1 regressed python (provider_max_tokens 2 to 5) and ruby (2 of 3 execution_error, evidence_unverified); J is dominated by target-side exception ERRORs and reasoning-cap exhaustion, both prerequisites |
 | s7 | dx | `gym/s7-verify-score-nits@890616e` | — | — | — | — | merged `6c4228b` | Offline; 9 tests; gates on gym/loop after merge: check clean, 1345 tests, Docker 61 passed |
 | s8 | dx | `gym/s8-target-exception-reward@b97a592` | — | — | — | — | merged `7ab7235` | Offline; 27 tests; reference re-scored in place; h1 still REJECTED on the J margin alone (single-case languages make one ERROR cost ~0.085 J), so track-specific gate criteria follow (s9) |
+| w2 | dx | `gym/w2-error-observation-coverage@008fdc0` | — | — | — | — | merged `4593c93` | Verdict-neutral: 425 stored rounds under old and new code, 0 differences in validate_saved, decide, session_verdict; 32 of 38 stored ERROR roles are target_exception with the bound line covered; Docker 61 passed, Temporal 57 passed in the worktree |
 
 ## Rejected ideas (do not retry without new evidence)
 

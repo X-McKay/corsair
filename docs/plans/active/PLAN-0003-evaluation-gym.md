@@ -437,3 +437,15 @@ content-addressed tags and cannot contaminate parallel runs.
   verdict-neutral, with re-validation tolerant of results stored before the change. Publication of `gym/loop` and
   the xxe oracle freeze remain pending explicit instruction. Next: re-score the reference under the new reward (same
   runs), then re-measure h1 at budget 4096 against it.
+- 2026-10-27 s8 merged (7ab72351, b97a592e): gym reward 0 for a target-side exception episode (`target_exception`
+  stop, derived from the raw receipt: driver record with `observation_kind=execution_error`, cleanup confirmed, bound
+  line covered, no error); reference re-scored in place under this reward (tier0 J 1.4554 → 1.4832 with 1 such
+  episode; tier1 1.4025 → 1.4108 with 3; previous copies `*.pre-s8.json`; ledger rows `ref-w2-tier0/tier1`). h1's
+  decisive run re-scored: J 1.2261 → 1.2594 (3 of 5 ERROR episodes reclassified; c r0 `SandboxExecutionError` and
+  java r1 control ERROR stay −0.5); against the re-scored reference still REJECTED on the J margin only (ΔJ −0.151,
+  verified 0.967 → 0.983, worst 0.8 → 0.9, tokens 1.070, no regression): with one case per non-Python language a
+  single ERROR episode costs ≈0.085 J, so track-specific criteria follow (s9). w2 merged (4593c936, 008fdc0c): ERROR
+  observations keep receipt coverage, `target_executed` derived in the verifier, `RoleObservation.error_kind`
+  (target_exception / harness / sandbox); no driver, image or identity change; re-validation unchanged for old results
+  (ERROR roles were never admissible); 425 stored rounds show 0 verdict differences. Gates on `gym/loop` at 4593c936:
+  see the next bullet.
