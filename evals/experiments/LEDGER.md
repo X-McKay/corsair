@@ -57,6 +57,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | Experiment | Track | Branch@commit | Tier0 gate | Tier1 gate | ΔJ (t0 / t1) | Token ratio (t0 / t1) | Decision | Lesson |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | s10 | dx | `gym/s10-freeze-overlap@be756d0` | — | — | — | — | merged `c0f7db7` | Offline; 78 intake/family tests; freeze now agrees with just dataset-families on every wave-3 draft; only the C group's ids change (ih-c-intoverflow-b) |
+| s11 | dx | `gym/s11-draft-source-root@676cb8b` | — | — | — | — | merged `ca5f614` | Offline; 22 tests; 18 JavaScript rows drafted from .work/intake (1 blocked: json-ptr fixed tree lacks index.js); freeze refuses unreviewed sheets; nothing under evals/ written |
 
 ## Rejected ideas (do not retry without new evidence)
 

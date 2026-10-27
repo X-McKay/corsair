@@ -545,3 +545,14 @@ content-addressed tags and cannot contaminate parallel runs.
   which `driver.mjs` (`require(module_file)[function]`) cannot find by name; several are path setters whose payload is
   not the last argument (recipe shape; authoring). Drafting waits for s11 (`draft --source-root`); provenance will
   read `unk` unless a code is added. Backfill from ranks 25–49 possible.
+- 2026-10-27 s11 merged (ca5f6144, 676cb8b6): `dataset draft --source-root DIR` (chain dirs and sources strictly
+  below a real staging directory, symlinks refused, `--out` never under evals/datasets; draft records `staged`,
+  `source_root`, staged tree and licence-file columns); `dataset freeze` on a staged draft requires `--import-into
+  <evals>/datasets/corpus/<subdir>`, copies accepted/amended trees byte for byte with every licence/notice file,
+  re-admits against the drafted digests, writes `<case>/provenance.json` (`licence: retained|NOASSERTION`), refuses
+  `import_required`, `import_not_staged`, `import_outside_corpus`, `import_target_exists`, `import_source_changed`,
+  `licence_missing` (unless `--allow-noassertion`) and `import_digest_mismatch` with nothing left behind. Gates on
+  `gym/loop` at ca5f6144: `just check` exit 0; `just -- test -q -W error` 1454 passed, 113 deselected. Real draft:
+  18 JavaScript rows at `.work/intake/wave3-js/holdout-javascript/review.md` (all with licence files in both trees;
+  `unk-javascript-json-ptr` blocked: fixed tree lacks index.js; case ids carry provenance `unk` until a code for
+  SecBench.js material is decided); freeze on the unreviewed sheet: exit 2, 18 × `decision_missing`, nothing written.
