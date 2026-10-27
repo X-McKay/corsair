@@ -124,6 +124,8 @@ class CliArguments(argparse.Namespace):
     ledger_merge_commit: str | None
     gym_dataset: str | None
     gym_root: str | None
+    git_commit: str | None
+    git_branch: str | None
     runs_tier: str | None
     reference: str | None
     skip_tier1: bool
@@ -798,9 +800,28 @@ def _gym_run_record(run: GymRun) -> dict[str, object]:
     }
 
 
+_RUN_CONTEXT_TEXT = {
+    "run.json": "from the run directory's `run.json`",
+    "scorecard.json": "recovered from the scorecard beside the report",
+    "flags": "from --run-id, --git-commit and --git-branch",
+    "unknown": "unknown",
+}
+
+
 async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
-    """Score a saved report into trajectories and a scorecard; no services."""
+    """Score a saved report into trajectories and a scorecard; no services.
+
+    The run context comes from ``run.json``, else the scorecard beside the report, else the
+    explicit flags; a context recovered from the scorecard is written to a missing ``run.json``.
+    """
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import RunContext
+    from corsair.entrypoints.gym import (
+        RUN_FILE,
+        recover_run_context,
+        run_store,
+        write_recovered_run_record,
+    )
     from corsair.evaluation.comparison import read_report
     from corsair.evaluation.gym.budgets import load_budgets
     from corsair.evaluation.gym.render import render_scorecard
@@ -808,7 +829,6 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
         SCORECARD_FILE,
         TRAJECTORIES_FILE,
         load_results,
-        read_scorecard,
         score_report,
         write_scorecard,
         write_trajectories,
@@ -816,14 +836,31 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
 
     report_path = Path(args.report)
     report = read_report(report_path)
-    out = Path(args.out) if args.out else report_path.parent
-    previous = out / SCORECARD_FILE
-    run = (
-        read_scorecard(previous).run
-        if previous.exists()
-        else RunContext(run_id=validate_run_id(report_path.stem))
+    run_dir = report_path.parent
+    out = Path(args.out) if args.out else run_dir
+    explicit = (
+        RunContext(
+            run_id=validate_run_id(args.run_id or report_path.stem),
+            git_branch=args.git_branch,
+            git_commit=args.git_commit,
+        )
+        if args.run_id or args.git_commit or args.git_branch
+        else None
     )
-    store = _gym_store(args, report_path.parent)
+    run, source = recover_run_context(
+        run_dir, explicit=explicit, fallback=RunContext(run_id=validate_run_id(report_path.stem))
+    )
+    if source == "unknown":
+        sys.stderr.write(
+            f"Warning: the run context is unknown: `{run_dir}` has no {RUN_FILE} and no "
+            f"{SCORECARD_FILE} naming a commit, and no --run-id, --git-commit or --git-branch "
+            f"was given; the scorecard names only run `{run.run_id}`.\n"
+        )
+    store_root = run_store(run_dir, None, _gym_settings(args))
+    recorded = source == "scorecard.json" and write_recovered_run_record(
+        run_dir, run, store=store_root
+    )
+    store = ArtifactStore(store_root)
     run_ids = [str(row.get("run_id")) for row in report.get("rows", [])]
     trajectories, card = score_report(
         report,
@@ -834,7 +871,10 @@ async def _handle_gym_score(args: CliArguments, ui: Terminal) -> int:
     )
     write_trajectories(out / TRAJECTORIES_FILE, trajectories)
     write_scorecard(out / SCORECARD_FILE, card)
-    _emit_view(ui, render_scorecard(card) + f"\n- Written to `{out}`\n", card)
+    lines = [f"- Run context: {_RUN_CONTEXT_TEXT[source]}", f"- Written to `{out}`"]
+    if recorded:
+        lines.append(f"- Wrote `{run_dir / RUN_FILE}` with the recovered run context")
+    _emit_view(ui, render_scorecard(card) + "\n" + "\n".join(lines) + "\n", card)
     return 0
 
 
@@ -1103,17 +1143,19 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         observe=_gym_observer(ui),
         on_gate=show,
     )
+    verdict = f"VERDICT: {result.decision.value}"
     if human:
         skipped = result.record.skipped.items()
         lines = [f"- {tier} {_SKIPPED_TEXT[reason]}" for tier, reason in skipped]
-        lines += [
-            f"- Verdict record: `{result.verdict_path}`",
-            "",
-            f"VERDICT: {result.decision.value}",
-        ]
+        lines += [f"- Verdict record: `{result.verdict_path}`", "", verdict]
         sys.stdout.write("\n".join(lines) + "\n")
     else:
         ui.emit({"verdict": str(result.verdict_path), **result.record.model_dump(mode="json")})
+    # The verdict line also goes to stderr in every format, so a captured log always ends
+    # with it while JSON on stdout stays one valid record.
+    sys.stdout.flush()
+    sys.stderr.write(verdict + "\n")
+    sys.stderr.flush()
     return {"ACCEPTED": 0, "REJECTED": 1}.get(result.decision.value, 2)
 
 
@@ -1522,6 +1564,10 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     score_cmd.add_argument("--dataset", required=True, help="The manifest it was scored against")
     score_cmd.add_argument("--out", help="Directory for the files (default: the report's)")
     score_cmd.add_argument("--budgets", help="Budgets file for the efficiency bonus")
+    context_help = "used only when neither run.json nor the scorecard beside the report has one"
+    score_cmd.add_argument("--run-id", help=f"The run's identity; {context_help}")
+    score_cmd.add_argument("--git-commit", help=f"The run's commit; {context_help}")
+    score_cmd.add_argument("--git-branch", help=f"The run's branch; {context_help}")
     gate_cmd = command(
         "gate", "Gate a candidate scorecard: exit 0 accepted, 1 rejected, 2 incomparable"
     )

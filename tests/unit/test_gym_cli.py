@@ -223,10 +223,97 @@ async def test_score_writes_trajectories_and_a_scorecard_beside_the_report(tmp_p
     )
 
     assert await _run(args) == 0
-    card = Scorecard.model_validate(json.loads(capsys.readouterr().out))
+    captured = capsys.readouterr()
+    card = Scorecard.model_validate(json.loads(captured.out))
     assert card == read_scorecard(run_dir / SCORECARD_FILE)
     assert card.run.run_id == "report"
+    assert "run context is unknown" in captured.err
+    assert not (run_dir / gym.RUN_FILE).exists()
     assert [item.case_id for item in read_trajectories(run_dir / TRAJECTORIES_FILE)] == [CASE] * 2
+
+
+IMPORTED = "gym-tier0-20261027t010807-479fc5"
+IMPORTED_RUN = RunContext(
+    run_id=IMPORTED,
+    git_branch="gym/loop",
+    git_commit="0697ff08" + "0" * 32,
+    temporal_namespace="corsair-gym",
+    task_queue="gym-gym-loop-0697ff0",
+    concurrency=2,
+    image_ids={"corsair-python:00cb018": "sha256:" + "1" * 64},
+)
+
+
+def _score_args(run_dir: Path, dataset_path: Path, settings: Path, *extra: str) -> cli.CliArguments:
+    report = str(run_dir / "report.json")
+    return _arguments(
+        "gym", "score", report, "--dataset", str(dataset_path), "--settings", str(settings), *extra
+    )
+
+
+@pytest.mark.asyncio
+async def test_score_recovers_an_imported_runs_context_from_its_old_scorecard(tmp_path, capsys):
+    _, dataset_path, settings, imported = _saved_run(tmp_path)
+    # An imported run: report and scorecard under <gym root>/runs/, no run.json.
+    run_dir = tmp_path / "gym/runs" / IMPORTED
+    shutil.copytree(imported, run_dir)
+    old = _card(run_dir / SCORECARD_FILE, BASELINE, run_id=IMPORTED)
+    write_scorecard(old, read_scorecard(old).model_copy(update={"run": IMPORTED_RUN}))
+    out = tmp_path / "rescored"
+    flags = ("--run-id", "ignored", "--git-commit", "b" * 40)
+
+    assert await _run(_score_args(run_dir, dataset_path, settings, "--out", str(out), *flags)) == 0
+    captured = capsys.readouterr()
+    card = Scorecard.model_validate(json.loads(captured.out))
+    assert card.run == IMPORTED_RUN
+    assert read_scorecard(out / SCORECARD_FILE).run == IMPORTED_RUN
+    assert "unknown" not in captured.err
+    # run.json is written beside the report so the next score, replay or runs finds it.
+    record = json.loads((run_dir / gym.RUN_FILE).read_text())
+    assert record["run"] == IMPORTED_RUN.model_dump(mode="json")
+    assert record["recovered_from"] == SCORECARD_FILE
+    assert record["store"] == str(tmp_path / "artifacts")
+    assert record["git"] == {"branch": "gym/loop", "commit": IMPORTED_RUN.git_commit}
+    assert record["tier"] == "tier0"
+
+    # The next score reads run.json even when the old scorecard is gone.
+    (run_dir / SCORECARD_FILE).unlink()
+    assert await _run(_score_args(run_dir, dataset_path, settings)) == 0
+    assert read_scorecard(run_dir / SCORECARD_FILE).run == IMPORTED_RUN
+    capsys.readouterr()
+
+    assert await _run(_arguments("gym", "runs", "--root", str(tmp_path / "gym"))) == 0
+    (row,) = json.loads(capsys.readouterr().out)
+    assert (row["run_id"], row["git_commit"], row["tier"]) == (
+        IMPORTED,
+        IMPORTED_RUN.git_commit,
+        "tier0",
+    )
+
+
+@pytest.mark.asyncio
+async def test_score_prefers_run_json_then_explicit_flags(tmp_path, capsys):
+    _, dataset_path, settings, run_dir = _saved_run(tmp_path)
+    flags = ("--run-id", "gym-x", "--git-commit", "b" * 40, "--git-branch", "gym/x")
+
+    assert await _run(_score_args(run_dir, dataset_path, settings, *flags)) == 0
+    captured = capsys.readouterr()
+    assert Scorecard.model_validate(json.loads(captured.out)).run == RunContext(
+        run_id="gym-x", git_branch="gym/x", git_commit="b" * 40
+    )
+    assert "unknown" not in captured.err
+    # Explicit flags are the operator's claim, not a recovered record: no run.json.
+    assert not (run_dir / gym.RUN_FILE).exists()
+
+    (run_dir / gym.RUN_FILE).write_text(json.dumps({"run": IMPORTED_RUN.model_dump(mode="json")}))
+    assert await _run(_score_args(run_dir, dataset_path, settings, *flags)) == 0
+    assert Scorecard.model_validate(json.loads(capsys.readouterr().out)).run == IMPORTED_RUN
+
+    # A run.json written before it recorded the context falls through to the scorecard.
+    (run_dir / gym.RUN_FILE).write_text(json.dumps({"tier": "tier0"}))
+    assert await _run(_score_args(run_dir, dataset_path, settings)) == 0
+    assert Scorecard.model_validate(json.loads(capsys.readouterr().out)).run == IMPORTED_RUN
+    assert json.loads((run_dir / gym.RUN_FILE).read_text()) == {"tier": "tier0"}
 
 
 async def _score(run_dir: Path, dataset_path: Path, settings: Path) -> None:
@@ -395,7 +482,10 @@ async def test_verify_stops_at_a_tier0_rejection_without_running_tier1(
 
     assert await _run(_arguments(*args, format="markdown")) == 1
     assert ran == ["tier0"]
-    text = capsys.readouterr().out
+    captured = capsys.readouterr()
+    text = captured.out
+    # The final line is on stdout in the human view and on stderr in every format.
+    assert captured.err.rstrip().splitlines()[-1] == "VERDICT: REJECTED"
     assert text.startswith("### tier0")
     assert "## Gate (smoke): REJECTED" in text
     assert "- tier1 was not run because tier0 was REJECTED." in text
@@ -432,7 +522,10 @@ async def test_verify_runs_tier1_after_tier0_and_decides_over_both_gates(
     args += ["--settings", str(_settings_file(tmp_path))]
 
     assert await _run(_arguments(*args)) == code
-    record = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    record = json.loads(captured.out)
+    assert captured.err.rstrip().splitlines()[-1] == f"VERDICT: {decision}"
+    assert "VERDICT" not in captured.out
     assert ran == ["tier0", "tier1"]
     assert record["decision"] == decision
     assert Path(record["verdict"]).is_file()
@@ -461,7 +554,9 @@ async def test_verify_with_skip_tier1_or_a_mismatched_reference(tmp_path, capsys
     sliced = reference / "tier0.json"
     _card(sliced, BASELINE, run_id="ref-tier0", sliced=True)
     assert await _run(_arguments(*args, "--skip-tier1")) == 2
-    assert json.loads(capsys.readouterr().out)["decision"] == "INCOMPARABLE"
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["decision"] == "INCOMPARABLE"
+    assert captured.err.rstrip().splitlines()[-1] == "VERDICT: INCOMPARABLE"
     with pytest.raises(ValueError, match="no reference directory"):
         await _run(_arguments("gym", "verify", "--reference", str(tmp_path / "x"), *settings))
 
