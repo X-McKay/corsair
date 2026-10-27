@@ -472,3 +472,16 @@ content-addressed tags and cannot contaminate parallel runs.
 - 2026-10-27 Docker suite on `gym/loop` at cb4c829a (after w2, s8, s9): `CORSAIR_TEST_TEMPORAL=1 just -- test-docker
   -q -W error` 61 passed, 1 skipped (long probe). Noise-floor run started: a second tier1 at the reference
   configuration (identity 34f22f5e, no extra_body) to be compared case by case with `ref-w2-tier1`.
+- 2026-10-27 Noise floor (`gym-tier1-20261027t111450-29968e`, reference configuration, identity 34f22f5e, same
+  images, budgets and dataset, 40 min 6 s, 0 operational episodes) vs `ref-w2-tier1`: J 1.411 → 0.860, macro
+  verified 0.967 → 0.800 (ruby 1.0 → 0.0 on 2 `target_exception` episodes), macro tokens 1.115×, p50 1.152×;
+  per-language token deltas −18 % to +86 %. Majority flips 3 of 15 (case02 lost on `provider_max_tokens`, ruby lost
+  on `target_exception`, safety01 gained), every flip on one of those two stops; six cases identical across four
+  runs. Bootstrapped 95 % band for two identical runs at 3 repeats: J ±0.54, macro verified ±0.20, python verified
+  ±0.30, token ratio 0.79–1.26; probability that identical configurations trip the gate: J ≥ +0.01 0.47, tokens
+  > 1.10× 0.21, some language regressed 0.48. At equal cost, 3× cases per language narrows the J band to ≈0.30
+  versus ≈0.49 for 9 repeats; the five single-case languages amplify J through the worst-language term. All three
+  gate tracks REJECTED the identical configuration. Ledger row `ref-w2b-tier1`. Consequences: (a) treat tier1
+  3-repeat differences inside the band as noise; (b) the gate needs a repeat-aware criterion (delta outside the
+  measured band, or a confirmation run) before any behavioural acceptance; (c) corpus growth is the next lever:
+  12 sibling rows into tier1 and the xxe pair, through `dataset draft` and owner-reviewed oracles.
