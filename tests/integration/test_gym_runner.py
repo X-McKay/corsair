@@ -21,7 +21,14 @@ from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.adapters.temporal.client import wait_for_result
-from corsair.contracts import GateDecision, GroupSummary, RunContext, Scorecard, digest
+from corsair.contracts import (
+    GateDecision,
+    GroupSummary,
+    RunContext,
+    Scorecard,
+    VerifyRecord,
+    digest,
+)
 from corsair.entrypoints import cli, gym
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.comparison import read_report
@@ -254,20 +261,30 @@ async def test_verify_rejected_at_tier0_skips_tier1_and_keeps_the_run_in_the_sha
     )
 
     assert result.decision is GateDecision.REJECTED
-    assert result.skipped == {"tier1": "rejected_at_tier0"}
-    (tier0,) = result.gates
-    assert tier0.verdict.decision is GateDecision.REJECTED, tier0.verdict
-    assert tier0.verdict.language_deltas == {"python": 0.0}
-    run_dir = tier0.run.run_dir
+    assert result.record.skipped == {"tier1": "rejected_at_tier0"}
+    tier0, (run,) = result.record.tier0, result.runs.values()
+    assert tier0 is not None and result.record.tier1 is None
+    assert tier0.gate.decision is GateDecision.REJECTED, tier0.gate
+    assert tier0.gate.language_deltas == {"python": 0.0}
+    run_dir = run.run_dir
     assert run_dir.parent == shared / "runs"
-    assert tier0.run.scorecard.repeats == 3 and tier0.run.scorecard.macro_effective_tokens
+    assert run.scorecard.repeats == 3 and run.scorecard.macro_effective_tokens
     record = json.loads((run_dir / gym.RUN_FILE).read_text())
     assert record["store"] == str(shared / "store")
     assert (run_dir / gym.BUDGETS_FILE).read_bytes() == BUDGETS.read_bytes()
     assert any((shared / "store/blobs").iterdir()) and any((shared / "store/operations").iterdir())
-    verdict = json.loads(result.verdict_path.read_text())
+    verdict = VerifyRecord.model_validate_json(result.verdict_path.read_text())
     assert result.verdict_path.parent.parent == shared / "verify"
-    assert verdict["decision"] == "REJECTED" and len(verdict["tiers"]) == 1
+    assert verdict == result.record
+    assert (verdict.decision, verdict.complete) == (GateDecision.REJECTED, False)
+    assert verdict.reference == str(shared / "reference")
+    assert verdict.tier0 is not None and verdict.tier1 is None
+    assert verdict.tier0.reference == str(shared / "reference/tier0.json")
+    assert (verdict.tier0.scorecard, verdict.tier0.run_dir) == (
+        str(run_dir / SCORECARD_FILE),
+        str(run_dir),
+    )
+    assert verdict.commit == run.scorecard.run.git_commit
 
     (row,) = gym.list_runs(shared)
     assert (row["run_id"], row["tier"], row["repeats"]) == (run_dir.name, "capture", 3)
@@ -300,10 +317,15 @@ async def test_verify_runs_tier1_when_tier0_is_not_rejected(tmp_path, monkeypatc
     )
 
     # One repeat is below the gate's minimum, so each gate is INCOMPARABLE, never a verdict.
-    assert [item.verdict.decision for item in result.gates] == [GateDecision.INCOMPARABLE] * 2
-    assert result.decision is GateDecision.INCOMPARABLE and result.skipped == {}
+    gates = [result.record.tier0, result.record.tier1]
+    assert [item and item.gate.decision for item in gates] == [GateDecision.INCOMPARABLE] * 2
+    assert result.decision is GateDecision.INCOMPARABLE and result.record.skipped == {}
     rows = gym.list_runs(shared)
     assert [row["run_dir"] for row in rows] == [
-        str(item.run.run_dir) for item in reversed(result.gates)
+        str(run.run_dir) for run in reversed(result.runs.values())
     ]
-    assert json.loads(result.verdict_path.read_text())["complete"] is True
+    verdict = VerifyRecord.model_validate_json(result.verdict_path.read_text())
+    assert (verdict.decision, verdict.complete) == (GateDecision.INCOMPARABLE, True)
+    assert [item and item.run_dir for item in (verdict.tier0, verdict.tier1)] == [
+        str(run.run_dir) for run in result.runs.values()
+    ]

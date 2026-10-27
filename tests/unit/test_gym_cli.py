@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import RunContext, Scorecard
+from corsair.contracts import GateDecision, RunContext, Scorecard, VerifyRecord
 from corsair.entrypoints import cli, gym
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.gym.budgets import load_budgets
@@ -401,14 +401,17 @@ async def test_verify_stops_at_a_tier0_rejection_without_running_tier1(
     assert "- tier1 was not run because tier0 was REJECTED." in text
     assert text.rstrip().splitlines()[-1] == "VERDICT: REJECTED"
     (verdict_path,) = (tmp_path / "artifacts/gym/verify").glob("*/verdict.json")
-    record = json.loads(verdict_path.read_text())
-    assert record["decision"] == "REJECTED" and record["complete"] is False
-    assert record["skipped"] == {"tier1": "rejected_at_tier0"}
-    (tier0,) = record["tiers"]
-    assert tier0["candidate_scorecard"] == str(tmp_path / "runs/tier0" / SCORECARD_FILE)
-    assert tier0["reference_scorecard"] == str(tmp_path / "reference/tier0.json")
-    assert tier0["gate"]["language_deltas"] == {"python": 0.0, "ruby": -0.5}
-    assert record["invocation"]
+    record = VerifyRecord.model_validate_json(verdict_path.read_text())
+    assert (record.branch, record.commit) == ("gym/loop", "a" * 40)
+    assert (record.decision, record.complete) == (GateDecision.REJECTED, False)
+    assert record.skipped == {"tier1": "rejected_at_tier0"}
+    assert record.reference == str(tmp_path / "reference")
+    assert record.tier0 is not None and record.tier1 is None
+    assert record.tier0.scorecard == str(tmp_path / "runs/tier0" / SCORECARD_FILE)
+    assert record.tier0.run_dir == str(tmp_path / "runs/tier0")
+    assert record.tier0.reference == str(tmp_path / "reference/tier0.json")
+    assert record.tier0.gate.language_deltas == {"python": 0.0, "ruby": -0.5}
+    assert record.invocation and record.recorded_at is not None
 
 
 @pytest.mark.asyncio
@@ -456,6 +459,34 @@ async def test_verify_with_skip_tier1_or_a_mismatched_reference(tmp_path, capsys
     assert json.loads(capsys.readouterr().out)["decision"] == "INCOMPARABLE"
     with pytest.raises(ValueError, match="no reference directory"):
         await _run(_arguments("gym", "verify", "--reference", str(tmp_path / "x"), *settings))
+
+
+@pytest.mark.asyncio
+async def test_a_verify_record_appends_to_the_ledger_and_renders(tmp_path, capsys, monkeypatch):
+    _fake_runs(monkeypatch, tmp_path, {"tier0": {**BASELINE, "py-b": ALL}, "tier1": BASELINE})
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    verify = ["gym", "verify", "--reference", str(_reference(tmp_path)), *settings]
+    assert await _run(_arguments(*verify)) == 1
+    verdict = Path(json.loads(capsys.readouterr().out)["verdict"])
+    record = VerifyRecord.model_validate_json(verdict.read_text())
+    assert (record.decision, record.complete) == (GateDecision.REJECTED, True)
+
+    ledger, markdown = tmp_path / "ledger.jsonl", tmp_path / "LEDGER.md"
+    shutil.copy(ROOT / "evals/experiments/LEDGER.md", markdown)
+    common = ["--ledger", str(ledger)]
+    append = ["gym", "ledger", "append", "--id", "exp-v", "--entry", "experiment"]
+    append += ["--wave", "1", "--track", "prompt", "--verdict", str(verdict), *common]
+    assert await _run(_arguments(*append, "--decision", "rejected")) == 0
+    render = ["gym", "ledger", "render", *common, "--markdown", str(markdown)]
+    assert await _run(_arguments(*render)) == 0
+
+    (row,) = read_ledger(ledger)
+    assert (row.branch, row.commit) == ("gym/loop", "a" * 40)
+    assert (row.tier0, row.tier1) == (record.tier0, record.tier1)
+    text = markdown.read_text()
+    assert "| exp-v | prompt | `gym/loop@aaaaaaa` | ACCEPTED | REJECTED (" in text, text
+    with pytest.raises(ValueError, match="name different candidates"):
+        await _run(_arguments(*append[:3], "--id", "exp-w", *append[5:], "--commit", "b" * 40))
 
 
 def test_verify_defaults_to_the_standard_protocol():

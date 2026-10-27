@@ -45,12 +45,14 @@ from corsair.contracts import (
     BatchRequest,
     Budgets,
     GateDecision,
-    GateVerdict,
     InvestigationRequest,
     InvestigationResult,
     RunContext,
     Scorecard,
+    SkipReason,
+    TierGate,
     Trajectory,
+    VerifyRecord,
     digest,
 )
 from corsair.entrypoints.api import start_evaluation
@@ -59,6 +61,7 @@ from corsair.evaluation.datasets import load_dataset
 from corsair.evaluation.families import label_rows
 from corsair.evaluation.gym.budgets import budgets_digest, load_budgets
 from corsair.evaluation.gym.gate import chain_decision, gate
+from corsair.evaluation.gym.ledger import candidate_identity
 from corsair.evaluation.gym.scoring import (
     REPORT_FILE,
     SCORECARD_FILE,
@@ -714,20 +717,16 @@ async def run_gym(
 # The candidate protocol: tier0, gate, then tier1 and gate unless tier0 was rejected
 
 
-@dataclass(frozen=True)
-class TierGate:
-    tier: str
-    reference: Path
-    baseline: Scorecard
-    run: GymRun
-    verdict: GateVerdict
+type GateObserver = Callable[[str, TierGate, Scorecard, GymRun], None]
 
 
 @dataclass(frozen=True)
 class Verification:
+    """One ``verify``: its chain decision, canonical record and runs, and the record's path."""
+
     decision: GateDecision
-    gates: list[TierGate]
-    skipped: dict[str, str]
+    record: VerifyRecord
+    runs: dict[str, GymRun]
     verdict_path: Path
 
 
@@ -736,26 +735,35 @@ def new_verify_id() -> str:
     return f"verify-{stamp}-{uuid4().hex[:6]}"
 
 
-def verdict_record(result: Verification, reference: Path, options: GymOptions) -> dict[str, Any]:
-    """``verdict.json``: both scorecards, both gate verdicts and the per-language deltas."""
-    return {
-        "schema_version": "corsair.gym-verify/1",
-        "decision": result.decision.value,
-        "complete": not result.skipped,
-        "reference": str(reference),
-        "invocation": list(options.invocation),
-        "tiers": [
-            {
-                "tier": item.tier,
-                "reference_scorecard": str(item.reference),
-                "candidate_scorecard": str(item.run.run_dir / SCORECARD_FILE),
-                "run_dir": str(item.run.run_dir),
-                "gate": item.verdict.model_dump(mode="json"),
-            }
-            for item in result.gates
-        ],
-        "skipped": dict(result.skipped),
-    }
+def verify_record(
+    gates: Mapping[str, TierGate],
+    runs: Mapping[str, GymRun],
+    skipped: Mapping[str, SkipReason],
+    *,
+    decision: GateDecision,
+    reference: Path,
+    invocation: Sequence[str],
+) -> VerifyRecord:
+    """``verdict.json``: the candidate's identity, the chain decision and each tier's gate.
+
+    The candidate is the one every run's scorecard names; a skipped tier makes the record
+    incomplete, so its decision is not an acceptance.
+    """
+    branch, commit = candidate_identity(
+        [(run.scorecard.run.git_branch, run.scorecard.run.git_commit) for run in runs.values()]
+    )
+    return VerifyRecord(
+        branch=branch,
+        commit=commit,
+        tier0=gates.get("tier0"),
+        tier1=gates.get("tier1"),
+        decision=decision,
+        complete=not skipped,
+        skipped=dict(skipped),
+        reference=str(reference),
+        invocation=list(invocation) or None,
+        recorded_at=datetime.now(UTC),
+    )
 
 
 async def verify_candidate(
@@ -767,24 +775,28 @@ async def verify_candidate(
     skip: Sequence[str] = (),
     compose_activities: ActivityComposer = compose_worker_activities,
     observe: BatchObserver = wait_for_result,
-    on_gate: Callable[[TierGate], None] | None = None,
+    on_gate: GateObserver | None = None,
 ) -> Verification:
-    """Run and gate each tier in order against ``<reference>/<tier>.json``; stop on REJECTED.
+    """Run and gate tier0, then tier1 unless tier0 was rejected.
 
-    The final decision is REJECTED when any gate rejected, else INCOMPARABLE when any gate
-    was incomparable, else ACCEPTED. ``verdict.json`` is written under the gym root.
+    Each tier is gated against ``<reference>/<tier>.json``; ``tiers`` maps ``tier0`` and
+    ``tier1``, in that order, to their manifests. The canonical ``VerifyRecord`` is
+    written to ``verdict.json`` under the gym root.
     """
+    if tuple(tiers) != VERIFY_TIERS:
+        raise ValueError(f"verify runs exactly {', '.join(VERIFY_TIERS)}, in that order")
     wanted = [name for name in tiers if name not in skip]
     references = {name: reference / f"{name}.json" for name in wanted}
     missing = [str(path) for path in references.values() if not path.is_file()]
     if missing:
         raise ValueError(f"no reference scorecard {', '.join(missing)}")
     baselines = {name: read_scorecard(path) for name, path in references.items()}
-    gates: list[TierGate] = []
-    skipped = {name: "skipped_by_request" for name in tiers if name in skip}
+    gates: dict[str, TierGate] = {}
+    runs: dict[str, GymRun] = {}
+    skipped: dict[str, SkipReason] = {name: "skipped_by_request" for name in tiers if name in skip}
     for name in wanted:
-        if gates and gates[-1].verdict.decision is GateDecision.REJECTED:
-            skipped[name] = f"rejected_at_{gates[-1].tier}"
+        if "tier0" in gates and gates["tier0"].gate.decision is GateDecision.REJECTED:
+            skipped[name] = "rejected_at_tier0"
             continue
         run = await run_gym(
             replace(options, dataset=tiers[name], out=None, run_id=None),
@@ -792,16 +804,29 @@ async def verify_candidate(
             compose_activities=compose_activities,
             observe=observe,
         )
-        baseline = baselines[name]
-        item = TierGate(name, references[name], baseline, run, gate(baseline, run.scorecard))
-        gates.append(item)
+        runs[name] = run
+        gates[name] = TierGate(
+            reference=str(references[name]),
+            scorecard=str(run.run_dir / SCORECARD_FILE),
+            run_dir=str(run.run_dir),
+            gate=gate(baselines[name], run.scorecard),
+        )
         if on_gate is not None:
-            on_gate(item)
-    decision = chain_decision([item.verdict.decision for item in gates])
+            on_gate(name, gates[name], baselines[name], run)
+    # REJECTED when any gate rejected, else INCOMPARABLE when any was, else ACCEPTED.
+    decision = chain_decision([item.gate.decision for item in gates.values()])
+    record = verify_record(
+        gates,
+        runs,
+        skipped,
+        decision=decision,
+        reference=reference,
+        invocation=options.invocation,
+    )
     verify_dir = gym_paths(root, options.settings).root / "verify" / new_verify_id()
-    result = Verification(decision, gates, skipped, verify_dir / VERDICT_FILE)
-    _write_json(result.verdict_path, verdict_record(result, reference, options))
-    return result
+    verdict_path = verify_dir / VERDICT_FILE
+    _write_json(verdict_path, record.model_dump(mode="json"))
+    return Verification(decision, record, runs, verdict_path)
 
 
 # Stored runs

@@ -22,7 +22,14 @@ from corsair.observability.logging import configure_logging, event, safe_text
 
 if TYPE_CHECKING:
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.contracts import BatchItem, InvestigationResult, LedgerRow, Oracle, TierGate
+    from corsair.contracts import (
+        BatchItem,
+        InvestigationResult,
+        LedgerRow,
+        Oracle,
+        Scorecard,
+        TierGate,
+    )
     from corsair.entrypoints.gym import GymRun
     from corsair.entrypoints.terminal import Terminal
     from corsair.settings import Settings
@@ -930,7 +937,6 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
     from corsair.entrypoints.gym import (
         VERIFY_TIERS,
         GymOptions,
-        TierGate,
         checkout_root,
         gym_paths,
         resolve_tier,
@@ -956,12 +962,12 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
     )
     human = ui.human or ui.markdown
 
-    def show(item: TierGate) -> None:
+    def show(tier: str, gated: TierGate, baseline: Scorecard, run: GymRun) -> None:
         if human:
             sys.stdout.write(
-                f"### {item.tier}\n\n- Run directory: `{item.run.run_dir}`\n"
-                f"- Reference: `{item.reference}`\n\n"
-                + render_gate(item.verdict, item.baseline, item.run.scorecard)
+                f"### {tier}\n\n- Run directory: `{run.run_dir}`\n"
+                f"- Reference: `{gated.reference}`\n\n"
+                + render_gate(gated.gate, baseline, run.scorecard)
                 + "\n"
             )
             sys.stdout.flush()
@@ -976,7 +982,8 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         on_gate=show,
     )
     if human:
-        lines = [f"- {tier} {_SKIPPED_TEXT[reason]}" for tier, reason in result.skipped.items()]
+        skipped = result.record.skipped.items()
+        lines = [f"- {tier} {_SKIPPED_TEXT[reason]}" for tier, reason in skipped]
         lines += [
             f"- Verdict record: `{result.verdict_path}`",
             "",
@@ -984,12 +991,8 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         ]
         sys.stdout.write("\n".join(lines) + "\n")
     else:
-        ui.emit({"verdict": str(result.verdict_path), **_read_json(result.verdict_path)})
+        ui.emit({"verdict": str(result.verdict_path), **result.record.model_dump(mode="json")})
     return {"ACCEPTED": 0, "REJECTED": 1}.get(result.decision.value, 2)
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text())
 
 
 async def _handle_gym_images(args: CliArguments, ui: Terminal) -> int:

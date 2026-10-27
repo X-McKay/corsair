@@ -7,7 +7,7 @@ not reported stay ``None``; nothing here turns an unknown into zero.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
@@ -244,10 +244,19 @@ class TierGate(Contract):
     gate: GateVerdict
 
 
+# Why ``corsair gym verify`` did not run a tier: on request, or after an earlier rejection.
+SkipReason = Literal["skipped_by_request", "rejected_at_tier0"]
+
+
 class VerifyRecord(Contract):
     """``verdict.json`` of a verified candidate: its git identity and each tier's gate.
 
-    ``corsair gym ledger append --verdict`` copies these into one experiment row.
+    ``corsair gym verify`` writes one; ``corsair gym ledger append --verdict`` copies the
+    identity and tier gates into one experiment row. ``decision`` is the chain decision
+    over the gates that ran; ``complete`` is false when a tier was not run (``skipped``),
+    so its decision is not an acceptance. Fields ``verify`` records but a hand-written
+    record may omit (``reference``, ``invocation``, ``recorded_at``, ``complete``) stay
+    unknown rather than defaulted.
     """
 
     schema_version: Literal["corsair.gym-verify/1"] = "corsair.gym-verify/1"
@@ -255,6 +264,13 @@ class VerifyRecord(Contract):
     commit: str | None = Field(default=None, min_length=7, max_length=64)
     tier0: TierGate | None = None
     tier1: TierGate | None = None
+    decision: GateDecision | None = None
+    complete: bool | None = None
+    skipped: dict[str, SkipReason] = Field(default_factory=dict)
+    # The reference directory holding ``<tier>.json``; each tier gate names its file.
+    reference: str | None = Field(default=None, min_length=1, max_length=300)
+    invocation: list[str] | None = Field(default=None, max_length=256)
+    recorded_at: datetime | None = None
 
 
 LedgerDecision = Literal["accepted", "rejected", "inconclusive", "merged"]
