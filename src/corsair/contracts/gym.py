@@ -52,6 +52,20 @@ class RoundSummary(Contract):
     sandbox_host_seconds: float | None = Field(default=None, ge=0)
 
 
+class DominantCall(Contract):
+    """The episode's largest model call by output tokens; the first one wins a tie.
+
+    ``position`` is the 1-based place in the trajectory's ``model_calls`` list (producer
+    calls of every round, then auditor calls); ``index`` is the call's dispatch ordinal
+    within its own episode, so it repeats across episodes.
+    """
+
+    position: int = Field(ge=1)
+    index: int = Field(ge=1)
+    output_tokens: int = Field(ge=0)
+    seconds: float = Field(ge=0)
+
+
 class Trajectory(Contract):
     """One scored row (one case, one repeat) with its reward decomposition."""
 
@@ -89,6 +103,16 @@ class Trajectory(Contract):
     tool_calls_detail: list[dict[str, JsonValue]] = Field(
         default_factory=list, max_length=_MAX_CALL_DETAIL
     )
+    # Reasoning markers; observations only, never a reward, gate or verdict input.
+    # ``thought_share`` is thought / output tokens, unknown when either is unknown.
+    thought_share: float | None = Field(default=None, ge=0)
+    # The per-call output cap: the frozen request's ``Budget.max_output_tokens``.
+    output_cap: int | None = Field(default=None, ge=1)
+    # Calls whose reported output reached ``output_cap``; unknown without a cap or calls.
+    capped_calls: int | None = Field(default=None, ge=0)
+    # Whether a capped call's reported thought tokens filled its whole output.
+    reasoning_cap_exhausted: bool | None = None
+    dominant_call: DominantCall | None = None
     usage_known: bool
     effective_tokens: float | None = Field(default=None, ge=0)
     seconds: float | None = Field(default=None, ge=0)
@@ -116,6 +140,11 @@ class GroupSummary(Contract):
     p95_seconds: float | None = None
     failure_stops: dict[str, int] = Field(default_factory=dict)
     usage_unknown: int = Field(default=0, ge=0)
+    # Reasoning markers (see ``Trajectory``): case means of repeat means, and attempt
+    # counts that stay unknown when no attempt in the group knows its output cap.
+    mean_thought_share: float | None = None
+    capped_call_episodes: int | None = Field(default=None, ge=0)
+    reasoning_cap_exhausted: int | None = Field(default=None, ge=0)
 
 
 class RunContext(Contract):
@@ -147,6 +176,10 @@ class Scorecard(Contract):
     objective_j: float
     macro_effective_tokens: float | None = None
     macro_p50_seconds: float | None = None
+    # Reasoning markers: the mean over languages and the attempt totals; none feeds J.
+    macro_thought_share: float | None = None
+    capped_call_episodes: int | None = Field(default=None, ge=0)
+    reasoning_cap_exhausted: int | None = Field(default=None, ge=0)
 
 
 class GateDecision(StrEnum):

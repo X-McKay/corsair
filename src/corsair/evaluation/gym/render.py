@@ -32,6 +32,14 @@ def _signed(value: float | None) -> str:
     return "unknown" if value is None else f"{value:+.3f}"
 
 
+def _count(value: int | None) -> str:
+    return "unknown" if value is None else str(value)
+
+
+def _count_delta(before: int | None, after: int | None) -> str:
+    return "unknown" if before is None or after is None else f"{after - before:+d}"
+
+
 def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
     lines = ["| " + " | ".join(header) + " |", "| " + " | ".join("---" for _ in header) + " |"]
     lines.extend("| " + " | ".join(row) + " |" for row in rows)
@@ -87,20 +95,33 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
     lines.append("")
     language_rows = []
     for language, delta in verdict.language_deltas.items():
-        before = baseline.languages[language].verified_accuracy
+        before = baseline.languages[language]
         after = candidate.languages.get(language)
+        capped_after = None if after is None else after.capped_call_episodes
         language_rows.append(
             [
                 language,
-                _number(before),
+                _number(before.verified_accuracy),
                 _number(None if after is None else after.verified_accuracy),
                 _signed(delta),
                 "yes" if language in verdict.regressed_languages else "no",
+                _count(before.capped_call_episodes),
+                _count(capped_after),
+                _count_delta(before.capped_call_episodes, capped_after),
             ]
         )
     lines.extend(
         _table(
-            ["Language", "Baseline verified", "Candidate verified", "Delta", "Regressed"],
+            [
+                "Language",
+                "Baseline verified",
+                "Candidate verified",
+                "Delta",
+                "Regressed",
+                "Baseline capped eps",
+                "Candidate capped eps",
+                "Capped delta",
+            ],
             language_rows,
         )
     )
@@ -120,6 +141,9 @@ def _group_rows(groups: Mapping[str, GroupSummary]) -> list[list[str]]:
             _number(summary.p50_seconds, 1),
             _number(summary.p95_seconds, 1),
             str(summary.usage_unknown),
+            _number(summary.mean_thought_share),
+            _count(summary.capped_call_episodes),
+            _count(summary.reasoning_cap_exhausted),
             _stops(summary.failure_stops),
         ]
         for name, summary in groups.items()
@@ -136,6 +160,9 @@ _GROUP_HEADER = [
     "p50 s",
     "p95 s",
     "Usage unknown",
+    "Thought share",
+    "Capped eps",
+    "Reasoning capped",
     "Failure stops",
 ]
 
@@ -152,6 +179,9 @@ def render_scorecard(scorecard: Scorecard) -> str:
         + _number(scorecard.worst_language_verified_accuracy),
         f"- Macro effective tokens: {_number(scorecard.macro_effective_tokens, 0)}",
         f"- Macro p50 seconds: {_number(scorecard.macro_p50_seconds, 1)}",
+        f"- Macro thought share: {_number(scorecard.macro_thought_share)}",
+        f"- Capped-call episodes: {_count(scorecard.capped_call_episodes)}; "
+        f"reasoning cap exhausted: {_count(scorecard.reasoning_cap_exhausted)}",
         f"- Repeats: {scorecard.repeats}; sliced: {'yes' if scorecard.sliced else 'no'}",
         f"- Dataset digest: `{scorecard.dataset_digest}`",
         f"- Budgets digest: `{scorecard.budgets_digest or 'none'}`",
