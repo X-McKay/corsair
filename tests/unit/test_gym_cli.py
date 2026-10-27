@@ -482,8 +482,8 @@ def _fake_runs(monkeypatch, tmp_path: Path, cards: dict[str, dict[str, list[bool
     """Replace the runner: each tier returns a stored scorecard; the tiers run are recorded."""
     ran: list[str] = []
 
-    async def run_gym(options, *, root, compose_activities, observe, held=None):
-        del root, compose_activities, observe, held
+    async def run_gym(options, *, root, compose_activities, observe, held=None, pinned=None):
+        del root, compose_activities, observe, held, pinned
         tier = gym.tier_name(options.dataset)
         ran.append(tier)
         run_dir = tmp_path / "runs" / tier

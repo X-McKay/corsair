@@ -402,6 +402,7 @@ def capture(
     out_root: Path,
     kernel_dir: Path,
     references: Sequence[Path] = (),
+    manifest_root: Path | None = None,
 ) -> dict[str, Any]:
     """Capture every failed repeat of ``case_id`` in a gym run.
 
@@ -409,8 +410,11 @@ def capture(
     repository); fixtures go to ``fixtures/gym-<run>-<case>/`` and manifests to
     ``datasets/``. ``references`` are other run directories over the same dataset whose
     demonstrated payloads may supply the producer oracle (a case that flipped to failing).
+    ``manifest_root`` resolves the entries of a manifest copied out of its evaluation tree
+    (the run directory's pinned ``dataset.json``).
     """
-    dataset, requests, oracles = load_dataset(dataset_path)
+    root = dataset_root(dataset_path) if manifest_root is None else manifest_root
+    dataset, requests, oracles = load_dataset(dataset_path, root=root)
     dataset_digest = digest(dataset)
     report = _report(run_dir, dataset_digest)
     if case_id not in oracles:
@@ -442,7 +446,7 @@ def capture(
         for result in load_results(store, run_ids).values():
             if result is not None and result.case_id == case_id:
                 pairs.extend(_demonstrated_pairs(result, store))
-    request_path = dataset_root(dataset_path) / entry.request
+    request_path = root / entry.request
     _capture_producer(capture_state, case_id, request_path, entry.request_digest, failed, pairs)
     return {
         "case_id": case_id,

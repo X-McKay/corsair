@@ -14,6 +14,12 @@ records, ``runs/<run-id>/`` each run directory and ``reference/`` the reference 
 so a run outlives the worktree that produced it. ``lock/`` holds the run lock: one live
 ``gym run`` or ``gym verify`` at a time per gym root, because every live run shares one model
 endpoint and overlapping runs skew each other's timing and failures.
+
+A run pins what it scores: the manifest is read once at admission, its bytes are kept as
+``dataset.json`` in the run directory with its digest in ``run.json``, and the end of the
+run scores against that copy, never against whatever the checkout holds by then. Every
+module the finish imports on first use is imported at admission too, so a checkout edited
+while a run executes can change neither its score nor its completion.
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import fcntl
 import hashlib
+import importlib
 import json
 import logging
 import os
@@ -56,6 +63,7 @@ from corsair.contracts import (
     BatchItem,
     BatchRequest,
     Budgets,
+    Dataset,
     GateDecision,
     GateTrack,
     InvestigationRequest,
@@ -71,7 +79,7 @@ from corsair.contracts import (
 )
 from corsair.entrypoints.api import start_evaluation
 from corsair.entrypoints.worker import compose_worker, compose_worker_activities
-from corsair.evaluation.datasets import load_dataset
+from corsair.evaluation.datasets import LoadedDataset, dataset_root, parse_dataset
 from corsair.evaluation.families import label_rows
 from corsair.evaluation.gym.budgets import budgets_digest, load_budgets
 from corsair.evaluation.gym.gate import admit_track, chain_decision, gate
@@ -84,7 +92,7 @@ from corsair.evaluation.gym.scoring import (
     language_of,
     load_results,
     read_scorecard,
-    score_report,
+    score_loaded_report,
     write_scorecard,
     write_trajectories,
 )
@@ -103,6 +111,8 @@ DRIVER_DIR = Path("src/corsair/adapters/sandboxing/drivers")
 SHARED_ROOT = Path(".runs/gym")
 RUN_FILE = "run.json"
 BUDGETS_FILE = "budgets.json"
+# The exact manifest bytes a run was admitted with, beside run.json.
+DATASET_FILE = "dataset.json"
 VERDICT_FILE = "verdict.json"
 VERIFY_TIERS = ("tier0", "tier1")
 _RUN_STAMP = re.compile(r"-(\d{8}t\d{6})-[0-9a-f]{6}$")
@@ -120,12 +130,20 @@ DEFAULT_LOCK_TIMEOUT = 2 * 60 * 60.0
 LOCK_POLL_SECONDS = 2.0
 LOCK_NOTICE_SECONDS = 60.0
 
+# Modules the end of a run imports on first use: scoring revalidates saved receipts with the
+# evidence verifier, which other callers import lazily because it loads the Docker SDK.
+FINISH_IMPORTS = ("corsair.steps.verification",)
+
 type ActivityComposer = Callable[[Settings], Activities]
 type BatchObserver = Callable[[WorkflowHandle[Any, list[BatchItem]]], Awaitable[list[BatchItem]]]
 
 
 class GymRefused(ValueError):
     """A run the gym will not start; nothing was submitted."""
+
+
+class DatasetMismatch(GymRefused):
+    """A manifest whose digest is not the one a run pinned; nothing was scored."""
 
 
 # Tiers, selection and identities
@@ -207,6 +225,23 @@ def git_dirty(root: Path) -> bool:
     return bool(_git(root, "status", "--porcelain"))
 
 
+def git_at_finish(root: Path) -> dict[str, object]:
+    """``run.json``'s commit and dirty flag of the checkout when the run finished.
+
+    A commit that differs from the one the run started at means the checkout changed while
+    the run executed. A fact git cannot report stays None, never a guess.
+    """
+    try:
+        commit: str | None = git_revision(root)[1]
+    except (ValueError, OSError):
+        commit = None
+    try:
+        dirty: bool | None = git_dirty(root)
+    except (ValueError, OSError):
+        dirty = None
+    return {"git_commit_at_finish": commit, "source_dirty_at_finish": dirty}
+
+
 def checkout_root() -> Path:
     """The git top level of the current directory: the tree whose images and tiers run."""
     return Path(_git(Path.cwd(), "rev-parse", "--show-toplevel"))
@@ -266,6 +301,101 @@ def run_store(run_dir: Path, root: Path | None, settings: Settings) -> Path:
     if isinstance(recorded, str) and Path(recorded).is_dir():
         return Path(recorded)
     return gym_paths(root, settings).store
+
+
+# The pinned dataset
+
+
+@dataclass(frozen=True)
+class PinnedDataset:
+    """A run's manifest read once at admission: its bytes, the dataset root its entries
+    resolve against, and the dataset, requests and oracles parsed from those bytes."""
+
+    source: Path
+    root: Path
+    content: bytes
+    loaded: LoadedDataset
+
+    @property
+    def dataset_digest(self) -> str:
+        return digest(self.loaded[0])
+
+    @property
+    def entries(self) -> int:
+        return len(self.loaded[0].entries)
+
+
+def pin_dataset(path: Path) -> PinnedDataset:
+    """Read the manifest once and load its frozen requests and oracles from those bytes."""
+    content = path.read_bytes()
+    root = dataset_root(path)
+    return PinnedDataset(path, root, content, parse_dataset(content, root))
+
+
+def manifest_digest(path: Path) -> str:
+    """The dataset digest a report and scorecard record for this manifest."""
+    return digest(Dataset.model_validate_json(path.read_bytes()))
+
+
+@dataclass(frozen=True)
+class ScoringDataset:
+    """The manifest an offline command reads for a run, and whether the run pinned it.
+
+    ``root`` resolves the entries of the run directory's copy; None means the manifest's
+    own dataset root.
+    """
+
+    path: Path
+    root: Path | None
+    pinned: bool
+
+
+def run_dataset(run_dir: Path, explicit: Path | None) -> ScoringDataset | None:
+    """The manifest to score or capture ``run_dir`` against.
+
+    A run keeps the manifest it was admitted with as ``dataset.json`` and its digest in
+    ``run.json``; that copy is the default, resolved below the recorded dataset root.
+    ``explicit`` (``--dataset``) is accepted only when its digest is the pinned one; any
+    other digest raises ``DatasetMismatch`` naming both, so a run is never re-scored against
+    another manifest. A run from before pinning has no copy: ``explicit`` is returned
+    unpinned, and None when there is none.
+    """
+    copy = run_dir / DATASET_FILE
+    if not copy.is_file():
+        return None if explicit is None else ScoringDataset(explicit, None, pinned=False)
+    record = read_run_record(run_dir)
+    pinned = manifest_digest(copy)
+    recorded = record.get("dataset_digest")
+    if recorded != pinned:
+        raise DatasetMismatch(
+            f"dataset_mismatch: the pinned copy {copy} has digest {pinned}, but {RUN_FILE} "
+            f"recorded {recorded or 'no digest'}; the run directory was altered after the run."
+        )
+    if explicit is not None:
+        given = manifest_digest(explicit)
+        if given != pinned:
+            raise DatasetMismatch(
+                f"dataset_mismatch: --dataset {explicit} has digest {given}, but run "
+                f"{run_dir.name} ran the manifest with digest {pinned}; a run is scored only "
+                f"against the manifest it ran. Omit --dataset to use its pinned copy {copy}."
+            )
+        return ScoringDataset(explicit, None, pinned=True)
+    root = record.get("dataset_root")
+    if not isinstance(root, str):
+        raise ValueError(
+            f"{run_dir / RUN_FILE} records no dataset_root for the pinned copy; pass --dataset "
+            f"with digest {pinned}"
+        )
+    return ScoringDataset(copy, Path(root), pinned=True)
+
+
+def unpinned_warning(run_dir: Path, manifest: Path) -> str:
+    """The code-owned stderr line for a run from before pinning."""
+    return (
+        f"Warning: dataset_unpinned: `{run_dir}` has no {DATASET_FILE} (a run from before "
+        f"dataset pinning); using `{manifest}`, whose digest cannot be checked against the "
+        "manifest the run executed.\n"
+    )
 
 
 type RunContextSource = Literal["run.json", "scorecard.json", "flags", "unknown"]
@@ -925,7 +1055,7 @@ async def execute_batch(
 
 def write_run_records(
     run_dir: Path,
-    dataset_path: Path,
+    pinned: PinnedDataset,
     items: Sequence[BatchItem],
     store: ArtifactStore,
     *,
@@ -933,16 +1063,19 @@ def write_run_records(
     budgets: Budgets | None,
     sliced: bool,
 ) -> tuple[list[Trajectory], Scorecard]:
-    """Write ``report.json`` as ``corsair eval`` would, then the trajectories and scorecard."""
-    dataset, _, oracles = load_dataset(dataset_path)
+    """Write ``report.json`` as ``corsair eval`` would, then the trajectories and scorecard.
+
+    Scores against the dataset pinned at admission, never the manifest on disk now.
+    """
+    dataset, _, oracles = pinned.loaded
     report = save_report(
         run_dir / REPORT_FILE,
         label_rows(score_batch(items, store, oracles), dataset),
-        dataset_digest=digest(dataset),
+        dataset_digest=pinned.dataset_digest,
     )
     run_ids = [str(row.get("run_id")) for row in report["rows"]]
-    trajectories, scorecard = score_report(
-        report, dataset_path, load_results(store, run_ids), run=run, budgets=budgets, sliced=sliced
+    trajectories, scorecard = score_loaded_report(
+        report, pinned.loaded, load_results(store, run_ids), run=run, budgets=budgets, sliced=sliced
     )
     write_trajectories(run_dir / TRAJECTORIES_FILE, trajectories)
     write_scorecard(run_dir / SCORECARD_FILE, scorecard)
@@ -984,17 +1117,25 @@ def run_record(
     git: Mapping[str, object],
     budgets: Mapping[str, str] | None,
     sliced: bool,
+    dataset: PinnedDataset,
+    cases: Sequence[str],
     lock: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
     """``run.json``: safe metadata on how and where a run executed; never settings values.
 
-    ``lock`` records whether the run held the gym root's lock and whom it waited for.
+    ``dataset`` is the manifest pinned at admission (its digest, entry count and the root
+    its entries resolve against) and ``cases`` the case ids actually run; ``case_filter``
+    and ``languages`` keep the ``--case`` and ``--lang`` selection. ``lock`` records whether
+    the run held the gym root's lock and whom it waited for.
     """
     return {
         "schema_version": "corsair.gym-run/1",
         "run_id": run_id,
         "tier": tier_name(options.dataset),
         "dataset": str(options.dataset),
+        "dataset_digest": dataset.dataset_digest,
+        "dataset_entries": dataset.entries,
+        "dataset_root": str(dataset.root),
         "invocation": list(options.invocation),
         "git": dict(git),
         "store": str(paths.store),
@@ -1002,7 +1143,8 @@ def run_record(
         "run_dir": str(run_dir),
         "repeats": options.repeats,
         "concurrency": options.concurrency,
-        "cases": list(options.cases),
+        "cases": list(cases),
+        "case_filter": list(options.cases),
         "languages": list(options.languages),
         "sliced": sliced,
         "budgets": None if budgets is None else dict(budgets),
@@ -1012,6 +1154,53 @@ def run_record(
     }
 
 
+def preload_finish() -> None:
+    """Import at admission every module the end of a run imports on first use.
+
+    A checkout edited while the run executes (a merge into the worktree) must not break
+    the finish with an import of the changed source.
+    """
+    for name in FINISH_IMPORTS:
+        importlib.import_module(name)
+
+
+def finish_run(
+    run_dir: Path,
+    record: Mapping[str, Any],
+    pinned: PinnedDataset,
+    items: Sequence[BatchItem],
+    store: ArtifactStore,
+    *,
+    root: Path,
+    run: RunContext,
+    budgets: Budgets | None,
+    sliced: bool,
+    started: float,
+) -> tuple[list[Trajectory], Scorecard, float]:
+    """Score the finished batch against the pinned dataset and complete ``run.json``.
+
+    Reads no manifest and imports nothing that admission did not; the checkout's commit
+    and dirty flag at this point are recorded beside the ones the run started from.
+    """
+    trajectories, scorecard = write_run_records(
+        run_dir, pinned, items, store, run=run, budgets=budgets, sliced=sliced
+    )
+    wall = time.monotonic() - started
+    _write_json(
+        run_dir / RUN_FILE,
+        {
+            **record,
+            "completed_at": _now(),
+            "wall_seconds": round(wall, 1),
+            "episodes": len(items),
+            **git_at_finish(root),
+            # The scorecard's run context, so a rescore of this run recovers it.
+            "run": run.model_dump(mode="json"),
+        },
+    )
+    return trajectories, scorecard, wall
+
+
 async def run_gym(
     options: GymOptions,
     *,
@@ -1019,15 +1208,18 @@ async def run_gym(
     compose_activities: ActivityComposer = compose_worker_activities,
     observe: BatchObserver = wait_for_result,
     held: LockWait | None = None,
+    pinned: PinnedDataset | None = None,
 ) -> GymRun:
     """Run one tier, write report, trajectories and scorecard, and return the run.
 
     The gym root's run lock is taken after the run is admitted and before any image build
     or Temporal server, and released when the run ends; ``held`` is the lock a caller
-    (``verify``) already holds for this run.
+    (``verify``) already holds for this run. Admission reads the manifest once (``pinned``
+    when the caller already read it) and imports what the finish needs; the run directory
+    keeps the manifest bytes as ``dataset.json``.
     """
-    _, requests, _ = load_dataset(options.dataset)
-    selected = select_requests(requests, cases=options.cases, languages=options.languages)
+    pinned = pinned or pin_dataset(options.dataset)
+    selected = select_requests(pinned.loaded[1], cases=options.cases, languages=options.languages)
     sliced = bool(options.cases or options.languages)
     check_concurrency(options.settings, options.concurrency)
     if options.temporal_address is not None:
@@ -1039,6 +1231,7 @@ async def run_gym(
     paths = gym_paths(root, options.settings)
     run_id = options.run_id or new_run_id(options.dataset)
     holder = new_lock_holder(run_id, tier=tier_name(options.dataset), branch=branch, commit=commit)
+    preload_finish()
     async with _lock_scope(options, paths.root, holder, held) as lock:
         # Wall time starts once the lock is held; the wait is recorded on its own.
         started = time.monotonic()
@@ -1057,9 +1250,12 @@ async def run_gym(
             if budgets is None
             else {"source": str(budgets_path), "digest": budgets_digest(budgets)},
             sliced=sliced,
+            dataset=pinned,
+            cases=[request.case.case_id for request in selected],
             lock={"used": False} if lock is None else lock.record(),
         )
         _write_json(run_dir / RUN_FILE, record)
+        (run_dir / DATASET_FILE).write_bytes(pinned.content)
         if budgets_path is not None:
             (run_dir / BUDGETS_FILE).write_bytes(budgets_path.read_bytes())
         batch = BatchRequest(
@@ -1087,26 +1283,17 @@ async def run_gym(
             concurrency=options.concurrency,
             image_ids=image_ids,
         )
-        trajectories, scorecard = write_run_records(
+        trajectories, scorecard, wall = finish_run(
             run_dir,
-            options.dataset,
+            record,
+            pinned,
             items,
             ArtifactStore(settings.artifact_root),
+            root=root,
             run=run,
             budgets=budgets,
             sliced=sliced,
-        )
-        wall = time.monotonic() - started
-        _write_json(
-            run_dir / RUN_FILE,
-            {
-                **record,
-                "completed_at": _now(),
-                "wall_seconds": round(wall, 1),
-                "episodes": len(items),
-                # The scorecard's run context, so a rescore of this run recovers it.
-                "run": run.model_dump(mode="json"),
-            },
+            started=started,
         )
     event("gym.completed", run_id=run_id, seconds=round(wall, 1), total=len(trajectories))
     return GymRun(
@@ -1206,6 +1393,8 @@ async def verify_candidate(
     if missing:
         raise ValueError(f"no reference scorecard {', '.join(missing)}")
     baselines = {name: read_scorecard(path) for name, path in references.items()}
+    # Every tier's manifest is read now, so tier1 runs the manifest verify was started with.
+    manifests = {name: pin_dataset(tiers[name]) for name in wanted}
     for baseline in baselines.values():
         # Refuse a target language a reference lacks now, not after an hour of runs.
         admit_track(baseline, track, target_language)
@@ -1231,6 +1420,7 @@ async def verify_candidate(
                 compose_activities=compose_activities,
                 observe=observe,
                 held=held,
+                pinned=manifests[name],
             )
             # Only the first tier waited; later tiers run under the lock already held.
             if held is not None:
@@ -1325,11 +1515,16 @@ def run_summary(run_dir: Path) -> dict[str, Any]:
         if summary.verified_accuracy is not None
     ]
     worst = min(known) if known else None
+    finish = record.get("git_commit_at_finish")
     return {
         "run_id": run.run_id,
         "started_at": _started(run_dir, record, run.run_id),
         "git_commit": run.git_commit,
         "git_dirty": record.get("git", {}).get("dirty"),
+        "git_commit_at_finish": finish,
+        "source_dirty_at_finish": record.get("source_dirty_at_finish"),
+        # None when either commit is unknown (a run recorded before the finish fields).
+        "commit_changed": None if not (finish and run.git_commit) else finish != run.git_commit,
         "tier": _run_tier(record, run.run_id),
         "repeats": card.repeats,
         "sliced": card.sliced,
@@ -1365,7 +1560,6 @@ def list_runs(
 
 def dataset_for_report(report_path: Path, root: Path) -> Path:
     """The checked-in case manifest whose digest the report was scored against."""
-    from corsair.contracts import Dataset
     from corsair.evaluation.comparison import read_report
 
     wanted = read_report(report_path).get("dataset_digest")

@@ -266,8 +266,8 @@ async def test_verify_holds_one_lock_across_both_tiers(tmp_path, monkeypatch):
         _card(reference / f"{tier}.json", BASELINE, run_id=f"ref-{tier}")
     seen: list[tuple[str, str | None, dict | None]] = []
 
-    async def run_gym(options, *, root, compose_activities, observe, held=None):
-        del root, compose_activities, observe
+    async def run_gym(options, *, root, compose_activities, observe, held=None, pinned=None):
+        del root, compose_activities, observe, pinned
         tier = gym.tier_name(options.dataset)
         holder = gym.read_lock(gym_root)
         seen.append(
@@ -284,7 +284,8 @@ async def test_verify_holds_one_lock_across_both_tiers(tmp_path, monkeypatch):
         return gym.GymRun(run_dir, card, [], "127.0.0.1:1", True, 1.0)
 
     monkeypatch.setattr(gym, "run_gym", run_gym)
-    tiers = {name: Path(f"gym-{name}.json") for name in gym.VERIFY_TIERS}
+    root = Path(__file__).resolve().parents[2]
+    tiers = {name: root / f"evals/datasets/gym-{name}.json" for name in gym.VERIFY_TIERS}
     result = await gym.verify_candidate(
         gym.GymOptions(dataset=tiers["tier0"], settings=settings),
         reference,
