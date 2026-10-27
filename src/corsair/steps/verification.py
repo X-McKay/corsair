@@ -19,6 +19,7 @@ from corsair.contracts import (
     Submission,
     digest,
 )
+from corsair.contracts.evidence import ErrorKind
 from corsair.ports.sandboxing import SandboxPort, SandboxRole, SandboxUnavailable
 from corsair.settings import Settings
 
@@ -58,6 +59,18 @@ def _sandbox_seconds(raw: dict[str, Any]) -> dict[str, float | None]:
     }
 
 
+def _target_covered(prepared: PreparedCase, lines: list[int], *, fixed: bool) -> bool:
+    """Whether recipe-module coverage reached the target.
+
+    On vulnerable source with a bound line that line must be covered in the finding's
+    own file; fixed source may delete the old line, so any recipe-module line counts.
+    """
+    line = prepared.bound_line
+    if not fixed and line is not None:
+        return prepared.finding.file == prepared.recipe.module_file and line in lines
+    return bool(lines)
+
+
 class EvidenceVerifier:
     """Synchronously verify one durable operation, never replaying an unknown run."""
 
@@ -79,12 +92,13 @@ class EvidenceVerifier:
         )
 
     @staticmethod
-    def _error(reason: str, native_exit_code: int | None = None) -> RoleObservation:
+    def _error(reason: str, error_kind: ErrorKind) -> RoleObservation:
+        """An ERROR role with no admitted driver record: nothing shows the target ran."""
         return RoleObservation(
             outcome=RoleOutcome.ERROR,
             target_executed=False,
             reason=reason,
-            native_exit_code=native_exit_code,
+            error_kind=error_kind,
         )
 
     @staticmethod
@@ -223,7 +237,7 @@ class EvidenceVerifier:
         record = raw.get("driver")
         if not isinstance(record, dict) or record.get("schema_version") != "corsair.driver/1":
             if isinstance(raw.get("error"), str):
-                return self._error("trusted sandbox execution failed"), False
+                return self._error("trusted sandbox execution failed", "sandbox"), False
             return self._invalid("trusted driver record is absent"), False
         if (
             record.get("operation_id") != expected_operation
@@ -260,8 +274,23 @@ class EvidenceVerifier:
             return self._invalid("trusted driver outcome is invalid"), False
         status = junit.get("status")
         if outcome == RoleOutcome.ERROR and status == "ERROR":
-            return self._error(
-                "native target execution or observer reporting failed", exit_code
+            # Keep the receipt's coverage when it is reported for the recipe module (the
+            # file check every outcome passes) and derive target_executed from it: the
+            # driver's own flag is false for every ERROR kind. Cleanup is already
+            # confirmed here. An ERROR role is never valid evidence.
+            covered = lines if record.get("coverage_file") == prepared.recipe.module_file else []
+            kind: ErrorKind = (
+                "target_exception"
+                if record.get("observation_kind") == "execution_error"
+                else "harness"
+            )
+            return RoleObservation(
+                outcome=outcome,
+                target_executed=_target_covered(prepared, covered, fixed=fixed),
+                covered_lines=covered,
+                reason="native target execution or observer reporting failed",
+                native_exit_code=exit_code,
+                error_kind=kind,
             ), False
         counts = [junit.get(name) for name in ("tests", "failures", "errors", "skipped")]
         if any(type(count) is not int or count < 0 for count in counts) or junit.get("tests") != 1:
@@ -295,15 +324,7 @@ class EvidenceVerifier:
         # A vulnerable source needs the bound finding line (or, where no line
         # exists, actual recipe-module execution). Fixed source can delete the old
         # line but must still execute the relevant callable.
-        relevant = bool(lines) and target_executed
-        line = prepared.bound_line
-        if not fixed and line is not None:
-            relevant = (
-                prepared.finding.file == prepared.recipe.module_file
-                and line in lines
-                and target_executed
-            )
-        if not relevant:
+        if not (target_executed and _target_covered(prepared, lines, fixed=fixed)):
             return self._invalid("relevant source coverage was not observed"), False
         return (
             RoleObservation(
@@ -458,20 +479,12 @@ class EvidenceVerifier:
                 # DockerSandbox.finally has already attempted cleanup of role one.
                 raise
             except SandboxUnavailable:
-                observations[role] = RoleObservation(
-                    outcome=RoleOutcome.ERROR,
-                    target_executed=False,
-                    reason="trusted sandbox became unavailable",
-                )
+                observations[role] = self._error("trusted sandbox became unavailable", "sandbox")
                 raw_refs[role] = None
                 # Do not run a fresh second container after infrastructure loss.
                 break
             except Exception:
-                observations[role] = RoleObservation(
-                    outcome=RoleOutcome.ERROR,
-                    target_executed=False,
-                    reason="trusted sandbox role execution failed",
-                )
+                observations[role] = self._error("trusted sandbox role execution failed", "sandbox")
                 raw_refs[role] = None
                 continue
             observations[role], _valid = self._validate_raw(
@@ -492,7 +505,8 @@ class EvidenceVerifier:
                 break
 
         for role in ROLES:
-            observations.setdefault(role, self._error("role was not executed"))
+            # Only a sandbox fault (lost sandbox, unconfirmed control cleanup) skips a role.
+            observations.setdefault(role, self._error("role was not executed", "sandbox"))
             raw_refs.setdefault(role, None)
         cleanup_confirmed = all(
             self._physical_cleanup_confirmed(

@@ -241,6 +241,12 @@ def test_real_ruby_unexpected_exception_is_error_not_positive(tmp_path: Path) ->
     assert observation.control and observation.control.outcome.value == "PROPERTY_HELD"
     assert observation.adversarial and observation.adversarial.outcome.value == "ERROR"
     assert observation.adversarial.outcome.value != "VIOLATION"
+    # The raise on line 3 stops before the bound File.read line: the ERROR role keeps the
+    # lines that did run, and target_executed follows the bound line's coverage.
+    assert observation.adversarial.error_kind == "target_exception"
+    assert 3 in observation.adversarial.covered_lines
+    assert prepared.bound_line not in observation.adversarial.covered_lines
+    assert observation.adversarial.target_executed is False
     _assert_cleanup(client, "ruby-error")
 
 
