@@ -1,0 +1,63 @@
+{
+  "schema_version": "corsair.dataset-review/1",
+  "manifest": "evals/datasets/gym-tier1.json",
+  "old_manifest_digest": "93b3a0e9a0e11f9816ddc7fb1c818ec312e400fe4a023d53743ed2f5aae5d7a5",
+  "new_manifest_digest": "27523a1a21d8045ac4d4dea1eb0eeaed0537f1a07f1d9e927781de89fa4c519b",
+  "draft_id": "c2-secbenchjs",
+  "staged": true,
+  "split": "chain",
+  "reconstructed": true,
+  "reconstructed_from": "orchestrator wave-4 agent reports; sheets lost with the agent worktrees. Freeze commit ca549c01 (c2, merged 81488dfb): SecBench.js staged drafts imported into evals/datasets/corpus/secbenchjs with licences retained; tier1 rows in split chain, tier2 rows in split held_out; manifest digests from the manifests before and after that commit. Draft, sheet and reviewed-oracle digests and the staging root were not recoverable. The nine rejected rows are recorded with the held_out record.",
+  "entries": [
+    {
+      "case_id": "sbj-javascript-aurelia-path",
+      "family": "sbj-javascript-aurelia-path",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-aurelia-path"
+    },
+    {
+      "case_id": "sbj-javascript-deep-override",
+      "family": "sbj-javascript-deep-override",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-deep-override"
+    },
+    {
+      "case_id": "sbj-javascript-mixin-deep",
+      "family": "sbj-javascript-mixin-deep",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-mixin-deep"
+    },
+    {
+      "case_id": "sbj-javascript-safe-flat",
+      "family": "sbj-javascript-safe-flat",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-safe-flat"
+    },
+    {
+      "case_id": "sbj-javascript-viking04-merge",
+      "family": "sbj-javascript-viking04-merge",
+      "kind": "javascript.prototype_pollution/1",
+      "decision": "accept",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "32e6abdac7821f723dff5388c62f5b247ffa6b728e17d4faf5469497d8dc3f03",
+      "licence": "retained",
+      "import_target": "evals/datasets/corpus/secbenchjs/sbj-javascript-viking04-merge"
+    }
+  ]
+}

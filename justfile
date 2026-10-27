@@ -157,3 +157,7 @@ live-chain dataset *args:
 # Check that dataset families, cases and chain pairs keep one split; default evals/datasets/*.json.
 dataset-families *datasets:
     uv run --locked python -m corsair.evaluation.families "$@"
+
+# List manifest rows with their latest review record, flagging unreviewed rows and pending owner audits; default evals/datasets/gym-tier*.json.
+dataset-audit *manifests:
+    uv run --locked corsair dataset audit "$@"

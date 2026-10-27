@@ -1,0 +1,75 @@
+{
+  "schema_version": "corsair.dataset-review/1",
+  "manifest": "evals/datasets/gym-tier1.json",
+  "old_manifest_digest": "ec8cd98558ed21df701aed35ca34ce59c86d44fef1e66a4fcc2b0b665d2dbd17",
+  "new_manifest_digest": "93b3a0e9a0e11f9816ddc7fb1c818ec312e400fe4a023d53743ed2f5aae5d7a5",
+  "draft_id": "sib-python-sentinel-expr",
+  "staged": false,
+  "split": "chain",
+  "reconstructed": true,
+  "reconstructed_from": "orchestrator wave-4 agent reports; sheets lost with the agent worktrees. Freeze commit 2d2a46c7 (c1, merged e0fea284); manifest digests from the manifest before and after that commit. The draft group is the c1 agent's; rejected rows of other languages were drafted in sibling groups (one recipe template per draft). The c1 merge record counts eleven drafted rows and ten rejections; the agent reports name the nine rejections below. Draft, sheet and reviewed-oracle digests, and the kinds and families of rejected rows, were not recoverable.",
+  "entries": [
+    {
+      "case_id": "ih-python-codeinjection-a",
+      "family": "ih-python-codeinjection",
+      "kind": "python.command_sentinel/1",
+      "decision": "amend",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "frozen_oracle_digest": "b2bbe264f9c938d3bcde7df16411829f608f09658995294aac19ca52e711436c"
+    },
+    {
+      "case_id": "ih-python-ineffective-fix",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "no frozen convention for the ineffective-fix truth type; tree differs from chain-python-cmdi-b only by requirements.txt and tests/.gitkeep"
+    },
+    {
+      "case_id": "ih-c-intoverflow-b",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "fixed-comparison tree of c-intoverflow-a, unsupported truth type, C has no clean-negative rubric"
+    },
+    {
+      "case_id": "ih-java-xxe-a",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "clean negative for an unqualified kind; also java-xxe-b's fixed tree"
+    },
+    {
+      "case_id": "ih-javascript-prototypepollution-a",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "same file, function and line as the tier1 javascript row"
+    },
+    {
+      "case_id": "ih-javascript-prototypepollution-b",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "clean negative for an unqualified kind"
+    },
+    {
+      "case_id": "ih-javascript-finding-text-injection",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "same tree digest as the -a row"
+    },
+    {
+      "case_id": "ih-perl-xss-a",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "clean negative for an unqualified kind"
+    },
+    {
+      "case_id": "ih-perl-xss-b",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "same tree digest as tier1 perl-xss-b"
+    },
+    {
+      "case_id": "syn-ruby-pathtraversal-a",
+      "decision": "reject",
+      "reviewer": "orchestrator-wave4 (pending owner audit)",
+      "reason": "clean negative for an unqualified kind"
+    }
+  ]
+}

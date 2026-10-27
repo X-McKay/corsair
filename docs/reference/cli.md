@@ -425,12 +425,23 @@ With `--source-root DIR` (a staging root such as `.work/intake`) the chain direc
 corsair dataset freeze .work/intake/wave1/draft --review .work/intake/wave1/review.md \
   --into evals/datasets/gym-tier2.json \
   --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json \
-  [--import-into evals/datasets/corpus/DIR [--allow-noassertion]]
+  [--import-into evals/datasets/corpus/DIR [--allow-noassertion]] [--record-review DIR]
 ```
 
 Freezes the rows of a reviewed draft whose decision is `accept` (the proposed oracle) or `amend` (the `oracle.json` the reviewer wrote in the row's draft directory) into a `corsair.dataset/1` manifest with frozen digests, appending to an existing manifest. It refuses with exit `2` and writes nothing when any row lacks a decision or has an invalid one, a code-owned cell was edited, a draft file changed, a filled reviewed oracle digest does not match, an accepted row fails the `dataset validate` checks, a family, case, chain pair or source tree (variant stem or snapshot digest) sits in a different split in an `--against` manifest or the existing `--into` manifest, a case is already frozen there, or the result would exceed 64 entries; each refusal names its rule. After writing it logs `dataset.frozen` with the old (`none`) and new dataset digests, re-validates the manifest, and exits `1`: a new cohort identity to review and commit. It exits `0` without writing when every row was rejected.
 
 A staged draft (`dataset draft --source-root`) requires `--import-into`, a directory below `<evals tree of --into>/datasets/corpus/`; `--import-into` for an unstaged draft is refused. Before writing, freeze also refuses (exit `2`) a target outside the corpus (`import_outside_corpus`), an existing `<DIR>/<case id>/` (`import_target_exists`), a staged tree whose snapshot digest changed since the draft (`import_source_changed`), and a tree without a `LICENSE`/`LICENCE`/`COPYING`/`UNLICENSE`/`NOTICE` file unless `--allow-noassertion` is given (`licence_missing`). For accepted and amended rows only it copies each admitted tree byte for byte into `<DIR>/<case id>/source/` and `fixed/`, re-admits each copy against its digest (on a mismatch it removes the copies and refuses `import_digest_mismatch`), writes `<DIR>/<case id>/provenance.json` (`licence` `retained` or `NOASSERTION`, staged paths, snapshot digests and licence files per tree), and then writes the requests, oracles and manifest as above with sources pointing at the imported trees; the output's `imported` list names each copied row and its licence.
+
+Every complete review, including one that rejects every row, is recorded before the manifest is replaced as `<DIR>/<manifest stem>/<draft id>-<split>.json` (`corsair.dataset-review/1`; `DIR` defaults to `reviews/` beside the manifest, `--record-review DIR` redirects it), and the output's `review_record` names the file; a refused freeze records nothing. The sheet may carry an optional last `reason` column. See [review records](../guides/evaluation-gym.md#review-records-and-the-audit).
+
+### `dataset audit [MANIFEST...]`
+
+```bash
+corsair dataset audit evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json \
+  evals/datasets/gym-tier2.json [--reviews DIR] [--format json]
+```
+
+Lists every row of each manifest (default `evals/datasets/gym-tier*.json`) with its latest review record from `<DIR>/<manifest stem>/` (`DIR` defaults to `reviews/` beside the manifest): decision, reviewer, record file, and the flags `unreviewed`, `pending_owner_audit`, `oracle_changed` and `rejected_but_frozen`, with counts. An unreadable manifest or record is listed as a problem. It reads only and always exits `0`; the human table prints reviewer names only as short plain text and never a reason, which stays in the JSON.
 
 Do not delete an intent to obtain a pass, reuse a run ID with a different request, or blindly rerun an uncertain operation. Preserve the run ID, inspect owned resource identifiers, and record uncertainty. Temporal history alone cannot restore a separate local artifact filesystem after host loss.
 

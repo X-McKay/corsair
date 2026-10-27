@@ -43,7 +43,8 @@ def test_default_just_lists_recipes_without_running_side_effects():
     recipes = ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up")
     gym = ("gym-run", "gym-gate", "gym-verify", "gym-runs", "gym-replay", "gym-capture")
     gym += ("gym-ledger", "images-gym", "gym-noise")
-    for recipe in (*recipes, "live-agent", "live-chain", "dataset-families", *gym):
+    datasets = ("dataset-families", "dataset-audit")
+    for recipe in (*recipes, "live-agent", "live-chain", *datasets, *gym):
         assert recipe in process.stdout
 
 
@@ -109,6 +110,13 @@ def test_default_just_lists_recipes_without_running_side_effects():
             ["run", "--locked", "--extra", "providers", "corsair", "gym", "ledger"],
         ),
         ("images-gym", ["--settings", "a b.json"], ["run", "--locked", "corsair", "gym", "images"]),
+        (
+            "dataset-audit",
+            ["evals/datasets/gym tier1.json", "tier2 $(touch SHOULD_NOT_EXIST).json"]
+            + ["--format", "json"],
+            ["run", "--locked", "corsair", "dataset", "audit"],
+        ),
+        ("dataset-audit", [], ["run", "--locked", "corsair", "dataset", "audit"]),
     ],
 )
 def test_literal_forwarding_through_real_just(tmp_path, recipe, arguments, prefix):

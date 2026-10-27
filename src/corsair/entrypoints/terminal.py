@@ -24,7 +24,12 @@ from rich.text import Text
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import InvestigationResult, Observation
-from corsair.entrypoints.render.checks import print_checks, print_datasets, print_intake
+from corsair.entrypoints.render.checks import (
+    print_checks,
+    print_datasets,
+    print_intake,
+    print_review_audit,
+)
 from corsair.entrypoints.render.preview import print_preview, print_preview_diff
 from corsair.entrypoints.render.progress import (
     child_changes,
@@ -114,6 +119,8 @@ class Terminal:
             print_runs(self.out, rendered)
         elif isinstance(rendered, dict) and {"intake", "findings"} <= set(rendered):
             print_intake(self.out, rendered)
+        elif isinstance(rendered, dict) and "dataset_audit" in rendered:
+            print_review_audit(self.out, rendered)
         elif isinstance(rendered, dict) and {"datasets", "valid"} <= set(rendered):
             print_datasets(self.out, rendered)
         elif isinstance(rendered, dict) and "observations" in rendered:

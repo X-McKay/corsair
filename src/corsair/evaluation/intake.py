@@ -36,10 +36,11 @@ import re
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 from uuid import uuid4
 
 from pydantic import Field, ValidationError
@@ -59,6 +60,8 @@ from corsair.contracts import (
     Contract,
     Dataset,
     DatasetEntry,
+    DatasetReview,
+    DatasetReviewEntry,
     Digest,
     Disposition,
     ExecutionStatus,
@@ -68,6 +71,8 @@ from corsair.contracts import (
     InvestigationRequest,
     LineProvenance,
     Oracle,
+    ReviewDecision,
+    ReviewLicence,
     ScannerFinding,
     ScanReport,
     Scope,
@@ -78,7 +83,7 @@ from corsair.contracts import (
 )
 from corsair.contracts.intake import MAX_SCANNER_FINDINGS
 from corsair.contracts.recipes import CLEAN_NEGATIVE_QUALIFIED_KINDS
-from corsair.evaluation import datasets
+from corsair.evaluation import datasets, reviews
 from corsair.evaluation.scoring import summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail, safe_text
 from corsair.policies.target_binding import (
@@ -473,6 +478,8 @@ REVIEW_COLUMNS = (
 # A staged draft's sheet also names each tree below the staging root and its licence files.
 STAGED_REVIEW_COLUMNS = (*REVIEW_COLUMNS[:5], "staged tree", "licence file", *REVIEW_COLUMNS[5:])
 _REVIEWER_COLUMNS = 3
+# An optional last column a reviewer may add to the sheet for the reason of a decision.
+REASON_COLUMN = "reason"
 _DECISIONS = ("accept", "amend", "reject")
 # Dataset.entries bound; datasets.MAX_ENTRIES is not importable here (datasets imports intake).
 _MAX_DATASET_ENTRIES = 64
@@ -482,6 +489,7 @@ _CORPUS_PROVENANCE = {"infosec-harness": "ih", "permissive-reduced": "pr", "secb
 _SLUG = re.compile(r"[a-z0-9][a-z0-9_.-]{0,39}")
 _TOKEN = re.compile(r"[A-Za-z0-9_.:/-]{1,64}")
 _VARIANT = re.compile(r"^(?P<stem>.+)-[ab]$")
+_DIGEST = re.compile(r"[0-9a-f]{64}")
 _BASIS_LABELS = {
     "legacy_expected_label": "legacy label",
     "legacy_expected_rule": "legacy rule",
@@ -496,7 +504,7 @@ _PROGRAM_SUFFIXES = {
     *(".c", ".cjs", ".go", ".h", ".java", ".js", ".json", ".mjs", ".pl", ".pm", ".py"),
     *(".rb", ".rs", ".ts"),
 }
-NOASSERTION = "NOASSERTION"
+NOASSERTION: Final = "NOASSERTION"
 
 
 class DraftRefused(ValueError):
@@ -850,13 +858,16 @@ def review_sheet(draft: DatasetDraft, proposals: Mapping[str, Oracle]) -> str:
         "# Dataset intake review",
         "",
         f"Draft `draft.json` ({DRAFT_SCHEMA}), split `{split}`, {len(draft.entries)} row(s). "
-        "Edit only the last three columns of a row.",
+        "Edit only the last three columns of a row (and the optional reason column).",
         "",
         "- decision: `accept` freezes the row's `oracle.proposed.json`; `amend` freezes the "
         "`oracle.json` you write beside it; `reject` leaves the row out.",
         "- reviewer: who reviewed the row.",
         "- reviewed oracle digest: optional SHA-256 of the oracle file you reviewed; freeze "
         "refuses a mismatch.",
+        f"- {REASON_COLUMN}: optionally add a last column headed `{REASON_COLUMN}` for why a "
+        "row was rejected or amended. Freeze records every decision, reviewer and reason in "
+        "a tracked review record beside the manifest (`reviews/`).",
         "",
         "Each proposed oracle is mechanical: it admits every decisive verdict the recipe kind "
         "can reach for a component claim and sets no expected verdict. Narrow it by amending. "
@@ -1056,33 +1067,48 @@ class _Reviewed:
     oracle_bytes: bytes
 
 
+@dataclass(frozen=True)
+class _Decision:
+    """One row's reviewer cells as the sheet gave them; the record keeps every decision."""
+
+    entry: DraftEntry
+    decision: ReviewDecision
+    reviewer: str
+    reviewed: str
+    reason: str
+
+
 def _refusal(rule: str, detail: str) -> dict[str, str]:
     return {"rule": rule, "detail": detail}
 
 
-def _sheet_rows(text: str, columns: tuple[str, ...]) -> dict[str, list[str]] | None:
-    """The review table's rows by case id; None when the code-owned header is absent."""
+def _sheet_rows(
+    text: str, columns: tuple[str, ...]
+) -> tuple[dict[str, list[str]] | None, tuple[str, ...]]:
+    """The review table's rows by case id and its header; rows are None when the code-owned
+    header is absent. The header may end with the reviewer's optional ``reason`` column."""
     rows: dict[str, list[str]] | None = None
+    header = columns
     for line in text.splitlines():
         stripped = line.strip()
         if not (stripped.startswith("|") and stripped.endswith("|") and len(stripped) > 1):
             continue
         cells = [cell.strip() for cell in stripped[1:-1].split("|")]
         if rows is None:
-            if tuple(cells) == columns:
-                rows = {}
+            if tuple(cells) in (columns, (*columns, REASON_COLUMN)):
+                rows, header = {}, tuple(cells)
             continue
         if all(set(cell) <= {"-", ":"} for cell in cells):
             continue
         rows[cells[0]] = cells
-    return rows
+    return rows, header
 
 
 def _reviewed_rows(
     draft_dir: Path, draft: DatasetDraft, sheet: str, refusals: list[dict[str, str]]
-) -> tuple[list[_Reviewed], list[str]]:
-    """Check the draft's files and the reviewer's sheet; return the rows to freeze and the
-    case ids the reviewer rejected."""
+) -> tuple[list[_Reviewed], list[_Decision]]:
+    """Check the draft's files and the reviewer's sheet; return the rows to freeze and every
+    row's decision, in draft order."""
     proposals: dict[str, Oracle] = {}
     for entry in draft.entries:
         try:
@@ -1093,9 +1119,8 @@ def _reviewed_rows(
             proposals[entry.case_id] = Oracle.model_validate_json(content)
         except ValueError as error:
             refusals.append(_refusal("draft_changed", f"{entry.case_id}: {safe_text(error)}"))
-    columns = draft.columns
-    code_columns = len(columns) - _REVIEWER_COLUMNS
-    rows = _sheet_rows(sheet, columns)
+    code_columns = len(draft.columns) - _REVIEWER_COLUMNS
+    rows, columns = _sheet_rows(sheet, draft.columns)
     if rows is None:
         refusals.append(
             _refusal("sheet_missing_table", "no review table with the code-owned header")
@@ -1104,7 +1129,8 @@ def _reviewed_rows(
     known = {entry.case_id for entry in draft.entries}
     for case_id in sorted(set(rows) - known):
         refusals.append(_refusal("sheet_row_unknown", f"{_cell(case_id)} is not a drafted case"))
-    selected, rejected = [], []
+    selected: list[_Reviewed] = []
+    decisions: list[_Decision] = []
     for entry in draft.entries:
         cells = rows.get(entry.case_id)
         if cells is None:
@@ -1119,7 +1145,8 @@ def _reviewed_rows(
                 _refusal("sheet_mismatch", f"{entry.case_id}: a code-owned column was edited")
             )
             continue
-        decision, _, reviewed = (cell.strip() for cell in cells[code_columns:])
+        decision, reviewer, reviewed = cells[code_columns : code_columns + _REVIEWER_COLUMNS]
+        reason = cells[-1] if len(columns) > len(draft.columns) else ""
         decision = decision.lower()
         if not decision:
             refusals.append(_refusal("decision_missing", f"{entry.case_id} has no decision"))
@@ -1131,8 +1158,9 @@ def _reviewed_rows(
                 )
             )
             continue
+        made = _Decision(entry, ReviewDecision(decision), reviewer, reviewed, reason)
         if decision == "reject":
-            rejected.append(entry.case_id)
+            decisions.append(made)
             continue
         oracle = entry.oracle if decision == "accept" else f"{entry.case_id}/oracle.json"
         try:
@@ -1151,7 +1179,8 @@ def _reviewed_rows(
             )
             continue
         selected.append(_Reviewed(entry, oracle, content))
-    return selected, rejected
+        decisions.append(made)
+    return selected, decisions
 
 
 def _manifest_members(path: Path, split: str, refusals: list[dict[str, str]]) -> list[Member]:
@@ -1284,7 +1313,7 @@ class _Import:
     trees: list[_ImportTree]
 
     @property
-    def licence(self) -> str:
+    def licence(self) -> ReviewLicence:
         return NOASSERTION if any(not tree.licence_files for tree in self.trees) else "retained"
 
     def provenance(self) -> dict[str, Any]:
@@ -1430,7 +1459,68 @@ def _freeze_result(
         "imported": [],
         "absolute_sources": False,
         "validation": None,
+        "review_record": None,
     }
+
+
+def _staged_licence(entry: DraftEntry) -> ReviewLicence | None:
+    """A staged row's licence status: ``retained`` when every drafted tree holds a licence
+    or notice file, ``NOASSERTION`` otherwise; None for an unstaged row."""
+    trees = [tree for tree in (entry.staged_source, entry.staged_fixed_source) if tree]
+    if not trees:
+        return None
+    return NOASSERTION if any(not tree.licence_files for tree in trees) else "retained"
+
+
+def _review_record(
+    draft_dir: Path,
+    draft: DatasetDraft,
+    decisions: Sequence[_Decision],
+    *,
+    into: Path,
+    frozen: Mapping[str, str],
+    imports: Mapping[str, _Import],
+    identity: tuple[str | None, str | None],
+    digests: tuple[str, str],
+    now: datetime,
+) -> DatasetReview:
+    """The tracked ``corsair.dataset-review/1`` record of one freeze: every drafted row's
+    decision and reviewer, the frozen oracle of each accepted or amended row, and for a
+    staged row its licence status and import target."""
+    entries = []
+    for made in decisions:
+        entry = made.entry
+        item = imports.get(entry.case_id)
+        entries.append(
+            DatasetReviewEntry(
+                case_id=entry.case_id,
+                family=entry.family,
+                kind=entry.kind,
+                decision=made.decision,
+                reviewer=_cell(made.reviewer) or None,
+                # A rejected row's digest cell is never checked, so only a digest is kept.
+                reviewed_oracle_digest=made.reviewed if _DIGEST.fullmatch(made.reviewed) else None,
+                frozen_oracle_digest=frozen.get(entry.case_id),
+                reason=_cell(made.reason) or None,
+                licence=_staged_licence(entry) if item is None else item.licence,
+                import_target=None
+                if item is None
+                else reviews.repository_path(item.directory, into),
+            )
+        )
+    return DatasetReview(
+        manifest=reviews.repository_path(into, into),
+        old_manifest_digest=identity[0],
+        new_manifest_digest=identity[1],
+        draft_id=reviews.draft_identity(draft_dir, now),
+        draft_digest=digests[0],
+        review_sheet_digest=digests[1],
+        source_root=reviews.repository_path(Path(draft.source_root), into),
+        staged=draft.staged,
+        split=draft.entries[0].split,
+        recorded_at=now,
+        entries=entries,
+    )
 
 
 def freeze_dataset(
@@ -1441,6 +1531,7 @@ def freeze_dataset(
     against: Sequence[Path],
     import_into: Path | None = None,
     allow_noassertion: bool = False,
+    record_review: Path | None = None,
 ) -> dict[str, Any]:
     """Freeze a reviewed draft's accepted and amended rows into a ``corsair.dataset/1`` manifest.
 
@@ -1449,16 +1540,24 @@ def freeze_dataset(
     and reports the old and new dataset identities. A staged draft needs ``import_into``
     (below the corpus of ``into``'s evals tree): each accepted row's trees are first copied
     there byte for byte, with their licence files, and their digests re-checked.
+
+    Every complete review, including one that rejects every row, is recorded as a
+    ``corsair.dataset-review/1`` file under ``record_review`` (default ``reviews/`` beside
+    ``into``), written before the manifest is replaced.
     """
     result = _freeze_result(draft_dir, review, into, against, import_into)
     refusals: list[dict[str, str]] = result["refusals"]
     base = draft_dir.resolve()
     try:
-        draft = DatasetDraft.model_validate_json((base / "draft.json").read_bytes())
-        sheet = review.read_text()
+        draft_bytes = (base / "draft.json").read_bytes()
+        draft = DatasetDraft.model_validate_json(draft_bytes)
+        sheet_bytes = review.read_bytes()
+        sheet = sheet_bytes.decode()
     except (OSError, ValueError) as error:
         refusals.append(_refusal("draft_unreadable", safe_error_detail(error)))
         return result
+    now = datetime.now(UTC)
+    destination = record_review or reviews.default_reviews_directory(into)
     if draft.staged and import_into is None:
         detail = "a staged draft is frozen only with --import-into evals/datasets/corpus/<dir>"
         refusals.append(_refusal("import_required", detail))
@@ -1467,8 +1566,30 @@ def freeze_dataset(
         detail = "--import-into copies a staged draft's trees; this draft is not staged"
         refusals.append(_refusal("import_not_staged", detail))
         return result
-    rows, result["rejected"] = _reviewed_rows(base, draft, sheet, refusals)
-    if refusals or not rows:
+    rows, decisions = _reviewed_rows(base, draft, sheet, refusals)
+    result["rejected"] = [
+        made.entry.case_id for made in decisions if made.decision is ReviewDecision.REJECT
+    ]
+    if refusals:
+        return result
+    if not rows:
+        try:
+            unchanged = digest(Dataset.model_validate_json(into.read_bytes()))
+        except (OSError, ValueError):
+            unchanged = None
+        record = _review_record(
+            base,
+            draft,
+            decisions,
+            into=into,
+            frozen={},
+            imports={},
+            identity=(unchanged, unchanged),
+            digests=(digest(draft_bytes), digest(sheet_bytes)),
+            now=now,
+        )
+        written = reviews.write_review(record, manifest=into, reviews=destination, now=now)
+        result["review_record"] = str(written)
         return result
     existing: Dataset | None = None
     if into.exists():
@@ -1590,6 +1711,19 @@ def freeze_dataset(
             )
         )
     manifest = Dataset(entries=[*kept, *added])
+    record = _review_record(
+        base,
+        draft,
+        decisions,
+        into=into,
+        frozen={entry.case_id: entry.oracle_digest for entry in added},
+        imports=plan,
+        identity=(None if existing is None else digest(existing), digest(manifest)),
+        digests=(digest(draft_bytes), digest(sheet_bytes)),
+        now=now,
+    )
+    written = reviews.write_review(record, manifest=into, reviews=destination, now=now)
+    result["review_record"] = str(written)
     temporary = into.with_name(f".{into.name}.tmp")
     temporary.write_bytes(_json_bytes(manifest.model_dump(mode="json")))
     os.replace(temporary, into)

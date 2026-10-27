@@ -126,3 +126,19 @@ def test_coding_agent_workflow_guide_links_the_canonical_skills():
         "../guides/extensions.md",
     ):
         assert destination in content
+
+
+def test_docs_checker_accepts_links_into_the_dataset_review_records(tmp_path: Path):
+    records = tmp_path / "evals/datasets/reviews/gym-tier1"
+    records.mkdir(parents=True)
+    (records / "wave-chain.json").write_text("{}\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/guide.md").write_text(
+        "# Guide\n\n[Records](../evals/datasets/reviews/)\n"
+        "[One](../evals/datasets/reviews/gym-tier1/wave-chain.json)\n"
+    )
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (ROOT / "evals/datasets/reviews").is_dir()
