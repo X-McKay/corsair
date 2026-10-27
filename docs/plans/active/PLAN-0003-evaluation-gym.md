@@ -373,3 +373,18 @@ content-addressed tags and cannot contaminate parallel runs.
   gates tier0 in smoke mode (222e5893). Gates on `gym/loop` at 222e5893: `just check` exit 0; `just -- test -q -W
   error` 1342 passed, 113 deselected. Not yet run on this HEAD: `just test-docker` (deferred until the live decisive
   runs for h1 and h2 end, so sandbox load does not skew their timing).
+- 2026-10-27 Decisive tier1 runs, serialised, no overlap, gated against `ref-w1-tier1` (same dataset, budgets,
+  images). h1 at `thinking_token_budget` 4096 (identity 483d950c; run `gym-tier1-20261027t032630-712b10`, 34 min
+  26 s): REJECTED on `objective_below_threshold` only (ΔJ −0.176, token ratio 1.070, no language regressed);
+  `provider_max_tokens` 2 → 0, calls at the 12,288 cap 2 → 1, python verified 0.8 → 0.9, macro verified 0.967 →
+  0.983; J fell because 5 `execution_error` episodes (trusted probe ERROR after audit ACCEPT; safety01 r1,
+  adversarial02 r0, ruby r1, java r1, c r0) score −0.5 each against 3 in the reference. h2 clean (identity
+  34f22f5e; run `gym-tier1-20261027t040114-47b765`, 39 min 5 s): REJECTED on `language_regressed` (python 0.8 →
+  0.6) and the objective (ΔJ −0.222), token ratio 0.956; java and perl recovered fully from the overlapped run
+  (heartbeat timeouts 4 → 0), so the earlier confound was real and the python regression is behavioural
+  (`provider_max_tokens` 4, probe ERROR 5, one `audit_reject` R4 on cmdi-a r0). Lessons: the reward's −0.5 for
+  ERROR plus the kernel's ERROR classification of a payload that raises before the target make J hostage to
+  3–6 such episodes per tier1; h4 is the prerequisite for measuring h1 again; h2's stop-criteria text is dropped
+  and its decision-shape sentence becomes h2a. Observation to check: c-intoverflow-a r0 in the h1 run hit the
+  output cap but was recorded as `execution_error`, not `provider_max_tokens`. Run directories of h1/h2 copied into
+  the shared store. Ledger rows `h1-tier1`, `h2-tier1` (rejected).
