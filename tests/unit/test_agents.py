@@ -760,8 +760,8 @@ async def test_output_cap_names_the_smaller_cap_actually_applied_to_the_request(
     store = ArtifactStore(tmp_path)
     model = ScriptedLlm(model="scripted-truncated", responses=[truncated_response()])
 
-    def build_with_lower_cap(model_arg):
-        agent = build_auditor(model_arg)
+    def build_with_lower_cap(model_arg, *, decoding=None):
+        agent = build_auditor(model_arg, decoding=decoding)
         agent.generate_content_config = types.GenerateContentConfig(max_output_tokens=300)
         return agent
 

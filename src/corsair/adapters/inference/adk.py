@@ -31,7 +31,7 @@ from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 from pydantic import ValidationError
 
-from corsair.adapters.inference.models import model_for_role
+from corsair.adapters.inference.models import decoding_config, model_for_role
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditInput, AuditOutput, AuditResult
@@ -713,6 +713,20 @@ def _role_model(
     return model_for_role(settings, role, request_timeout_seconds=bounds.request_seconds)
 
 
+def _role_decoding(
+    settings: Settings | ModelSettings, role: RoleName
+) -> types.GenerateContentConfig | None:
+    """The role's configured sampling parameters as a native generation config.
+
+    ADK copies the agent's config into every request of the episode, and its LiteLLM
+    route sends only the non-null fields. Nothing set means no config, so the server's
+    own defaults apply exactly as before decoding was configurable.
+    """
+
+    model_settings = settings.models if isinstance(settings, Settings) else settings
+    return decoding_config(model_settings.decoding.for_role(role))
+
+
 def _effective_limit(requested: int, configured: int) -> int:
     """Respect both caller/root remaining budget and the per-episode budget."""
 
@@ -773,7 +787,11 @@ async def run_producer(
     bounds = _role_bounds(
         settings, window_seconds, producer_activity_seconds(producer_input.budget, 0)
     )
-    agent = build_producer(_role_model(settings, "producer", bounds, model_override), private_tools)
+    agent = build_producer(
+        _role_model(settings, "producer", bounds, model_override),
+        private_tools,
+        decoding=_role_decoding(settings, "producer"),
+    )
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
@@ -863,7 +881,10 @@ async def run_auditor(
             feedback=_feedback_for_packet(error),
         )
     bounds = _role_bounds(settings, window_seconds, AUDITOR_ACTIVITY_SECONDS)
-    agent = build_auditor(_role_model(settings, "auditor", bounds, model_override))
+    agent = build_auditor(
+        _role_model(settings, "auditor", bounds, model_override),
+        decoding=_role_decoding(settings, "auditor"),
+    )
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(

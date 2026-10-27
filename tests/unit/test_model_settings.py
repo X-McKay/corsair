@@ -4,7 +4,7 @@ import pytest
 
 from corsair.adapters.inference.models import model_for_role
 from corsair.agents.resources import AgentSpec, load_agent_spec, prompt_text
-from corsair.settings import ModelSettings
+from corsair.settings import Decoding, ModelSettings, RoleDecoding
 
 
 def test_gemini_role_models_remain_plain_native_ids():
@@ -86,6 +86,57 @@ def test_litellm_openai_route_is_allowed_for_the_tool_free_auditor():
         connector="litellm", producer="hosted_vllm/qwen", auditor="openai/qwen"
     )
     assert settings.auditor == "openai/qwen"
+
+
+def test_decoding_is_unset_by_default_for_both_roles():
+    decoding = ModelSettings().decoding
+
+    assert decoding == RoleDecoding()
+    assert decoding.producer == decoding.auditor == Decoding()
+    assert decoding.producer.temperature is None
+    assert decoding.producer.top_p is None
+    assert decoding.producer.seed is None
+    assert decoding.producer.unset and decoding.auditor.unset
+
+
+def test_a_flat_decoding_block_is_shared_by_both_roles():
+    shared = ModelSettings.model_validate({"decoding": {"temperature": 0, "seed": 7}})
+
+    assert shared.decoding.producer == shared.decoding.auditor
+    assert shared.decoding.for_role("producer") == Decoding(temperature=0.0, seed=7)
+    assert shared.decoding == RoleDecoding(
+        producer=Decoding(temperature=0, seed=7), auditor=Decoding(temperature=0, seed=7)
+    )
+
+
+def test_a_per_role_decoding_block_sets_each_role_independently():
+    settings = ModelSettings.model_validate(
+        {"decoding": {"producer": {"temperature": 0.2, "top_p": 0.9}, "auditor": {"seed": 3}}}
+    )
+
+    assert settings.decoding.for_role("producer") == Decoding(temperature=0.2, top_p=0.9)
+    assert settings.decoding.for_role("auditor") == Decoding(seed=3)
+    assert not settings.decoding.producer.unset
+
+
+@pytest.mark.parametrize(
+    "decoding",
+    [
+        {"temperature": -0.1},
+        {"temperature": 2.5},
+        {"top_p": 0},
+        {"top_p": 1.5},
+        {"seed": -1},
+        {"seed": 2**31},
+        {"temperature": float("nan")},
+        {"top_k": 40},
+        {"temperature": 0, "producer": {"seed": 1}},
+        {"producer": {"max_output_tokens": 64}},
+    ],
+)
+def test_decoding_rejects_out_of_range_and_unknown_parameters(decoding: dict[str, object]):
+    with pytest.raises(ValueError):
+        ModelSettings.model_validate({"decoding": decoding})
 
 
 def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field():

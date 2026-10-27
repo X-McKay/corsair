@@ -9,6 +9,42 @@ from pydantic import Field, field_validator, model_validator
 from corsair.contracts import Contract, digest
 
 
+class Decoding(Contract):
+    """One role's sampling parameters; ``None`` leaves the inference server's default unset.
+
+    A set value is sent through the SDK's native generation config; an unset one is not
+    sent at all, so the server's own default applies. Decoding is behaviour, so it is part
+    of ``Settings.identity``.
+    """
+
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    top_p: float | None = Field(default=None, gt=0.0, le=1.0)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+
+    @property
+    def unset(self) -> bool:
+        """True when every parameter is left at the server default."""
+        return self.temperature is None and self.top_p is None and self.seed is None
+
+
+class RoleDecoding(Contract):
+    """Decoding per role. A flat block (``{"temperature": 0}``) applies to both roles."""
+
+    producer: Decoding = Field(default_factory=Decoding)
+    auditor: Decoding = Field(default_factory=Decoding)
+
+    @model_validator(mode="before")
+    @classmethod
+    def shared_block(cls, data: object) -> object:
+        """Expand one shared block into the same decoding for each role."""
+        if isinstance(data, dict) and data and set(data) <= set(Decoding.model_fields):
+            return {"producer": data, "auditor": data}
+        return data
+
+    def for_role(self, role: Literal["producer", "auditor"]) -> Decoding:
+        return self.producer if role == "producer" else self.auditor
+
+
 class ModelSettings(Contract):
     connector: Literal["gemini", "litellm"] = "gemini"
     producer: str = "gemini-2.5-flash"
@@ -16,6 +52,7 @@ class ModelSettings(Contract):
     api_base: str | None = None
     request_timeout_seconds: int = Field(default=120, ge=1, le=300)
     extra_body: dict = Field(default_factory=dict)
+    decoding: RoleDecoding = Field(default_factory=RoleDecoding)
 
     @field_validator("api_base")
     @classmethod
@@ -132,9 +169,16 @@ class Settings(Contract):
 
         A per-run task queue, Temporal port or namespace, or another artifact or source root
         does not change what the worker does, so it does not change the configuration
-        identity. Images, limits, models and evidence policy do.
+        identity. Images, limits, models, decoding and evidence policy do.
+
+        An unset decoding block (every parameter at the server default) is left out of the
+        digest, so a configuration recorded before decoding was configurable keeps its
+        identity; any set parameter changes it.
         """
-        return digest(self.model_dump(mode="json", exclude=set(TRANSPORT_FIELDS)))
+        data = self.model_dump(mode="json", exclude=set(TRANSPORT_FIELDS))
+        if self.models.decoding.producer.unset and self.models.decoding.auditor.unset:
+            del data["models"]["decoding"]
+        return digest(data)
 
 
 def load_settings(path: str | Path | None = None) -> Settings:
