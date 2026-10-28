@@ -126,9 +126,9 @@ gym-verify reference *args:
 gym-runs *args:
     uv run --locked --extra providers corsair gym runs "$@"
 
-# Show one case's rounds, per-call usage and failure stop from a gym run directory.
-gym-replay run case:
-    uv run --locked --extra providers corsair gym replay "$1" --case "$2"
+# Show one case's rounds, per-call usage and failure stop from a gym run directory; --superseded adds retried first attempts.
+gym-replay run case *args:
+    uv run --locked --extra providers corsair gym replay "$1" --case "$2" "${@:3}"
 
 # Freeze a gym case's failed repeats as evals/ fixtures and tests/replay/kernel cases.
 gym-capture run case *args:

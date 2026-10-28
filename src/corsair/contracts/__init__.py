@@ -71,6 +71,7 @@ from .gym import PairedCase as PairedCase
 from .gym import PairedCounts as PairedCounts
 from .gym import PairedOutcomes as PairedOutcomes
 from .gym import ResampledInterval as ResampledInterval
+from .gym import RetriedEpisode as RetriedEpisode
 from .gym import RoundSummary as RoundSummary
 from .gym import RunContext as RunContext
 from .gym import RunIdentity as RunIdentity

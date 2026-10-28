@@ -25,9 +25,13 @@ class MatchKind(StrEnum):
     OPERATIONAL_FAILURE = "operational_failure"
 
 
+# The most requests one evaluation batch carries.
+MAX_BATCH_REQUESTS = 64
+
+
 class BatchRequest(Contract):
     batch_id: Identifier
-    requests: list[InvestigationRequest] = Field(min_length=1, max_length=64)
+    requests: list[InvestigationRequest] = Field(min_length=1, max_length=MAX_BATCH_REQUESTS)
     repeats: int = Field(default=1, ge=1, le=8)
     concurrency: int = Field(default=2, ge=1, le=8)
 

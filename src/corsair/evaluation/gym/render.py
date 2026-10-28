@@ -24,6 +24,7 @@ from corsair.contracts import (
     OperationalEpisode,
     PairedCase,
     ResampledInterval,
+    RetriedEpisode,
     Scorecard,
     TargetExceptionEpisode,
 )
@@ -1391,6 +1392,22 @@ def _operational_lines(stops: Sequence[OperationalEpisode]) -> list[str]:
     return lines
 
 
+def _retry_lines(retries: Sequence[RetriedEpisode]) -> list[str]:
+    if not retries:
+        return []
+    lines = [
+        "",
+        "Retried episodes (an operational first attempt run once more; the retry is scored "
+        "and the first attempt is kept in superseded.jsonl):",
+        "",
+    ]
+    lines.extend(
+        f"- `{item.case_id}` repeat {item.repeat}: {item.reason.value}; retry `{item.run_id}`"
+        for item in retries
+    )
+    return lines
+
+
 def _target_exception_lines(episodes: Sequence[TargetExceptionEpisode]) -> list[str]:
     if not episodes:
         return []
@@ -1422,7 +1439,8 @@ def render_scorecard(scorecard: Scorecard) -> str:
         f"- Macro thought share: {_number(scorecard.macro_thought_share)}",
         f"- Capped-call episodes: {_count(scorecard.capped_call_episodes)}; "
         f"reasoning cap exhausted: {_count(scorecard.reasoning_cap_exhausted)}",
-        f"- Operational episodes: {_count(scorecard.operational_episodes)}",
+        f"- Operational episodes: {_count(scorecard.operational_episodes)}; "
+        f"retried: {_count(scorecard.retried_episodes)}",
         f"- Target-exception episodes: {_count(scorecard.target_exception_episodes)}",
         f"- Repeats: {scorecard.repeats}; sliced: {'yes' if scorecard.sliced else 'no'}",
         f"- Dataset digest: `{scorecard.dataset_digest}`",
@@ -1433,6 +1451,7 @@ def render_scorecard(scorecard: Scorecard) -> str:
     lines.append("")
     lines.extend(_table(["Kind", *_GROUP_HEADER], _group_rows(scorecard.kinds)))
     lines.extend(_operational_lines(scorecard.operational_stops))
+    lines.extend(_retry_lines(scorecard.retries))
     lines.extend(_target_exception_lines(scorecard.target_exceptions))
     return "\n".join(lines) + "\n"
 

@@ -199,6 +199,11 @@ GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
         ),
         ("gym-replay", ["run dir", "case01"], [*GYM, "replay", "run dir", "--case", "case01"]),
         (
+            "gym-replay",
+            ["run dir", "case01", "--superseded"],
+            [*GYM, "replay", "run dir", "--case", "case01", "--superseded"],
+        ),
+        (
             "gym-verify",
             ["ref dir", "--skip-tier1"],
             [*GYM, "verify", "--reference", "ref dir", "--skip-tier1"],
