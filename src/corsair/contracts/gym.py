@@ -986,6 +986,62 @@ class TierGate(Contract):
 # Why ``corsair gym verify`` did not run a tier: on request, or after an earlier rejection.
 SkipReason = Literal["skipped_by_request", "rejected_at_tier0"]
 
+# Why ``corsair gym verify`` did not run an INCONCLUSIVE tier's confirmation: the
+# candidate's run has no trajectories reproducing its scorecard, the gate's band carries no
+# pooled per-case counts, the reference run's trajectories were not found, or no deciding
+# case flipped within noise or in a regressed language.
+ConfirmationSkip = Literal[
+    "trajectories_missing", "band_not_pooled", "reference_trajectories_missing", "no_cases"
+]
+
+# What a confirmation decided on (``evaluation.gym.gate.confirmation_decision``): a
+# re-run case's regression separated from the band's pooled episodes (REJECTED); none did
+# and the gate's improvement criterion held (ACCEPTED); J's gain was within noise and a
+# re-run case's improvement separated (ACCEPTED) or none did (INCONCLUSIVE); the token
+# ratio within noise, which a re-run of cases cannot read (INCONCLUSIVE); or the slice
+# screen of the re-run was INCOMPARABLE (INCONCLUSIVE).
+ConfirmationBasis = Literal[
+    "regression_separated",
+    "no_regression_separated",
+    "improvement_separated",
+    "improvement_not_separated",
+    "tokens_within_noise",
+    "screen_incomparable",
+]
+
+
+class Confirmation(Contract):
+    """One INCONCLUSIVE tier's confirmation stage in ``corsair gym verify``.
+
+    The candidate re-ran only ``cases`` (each deciding case whose paired flip was within
+    noise, and each flipped case of a regressed deciding language), ``repeats`` times each,
+    under the same lock hold; ``screen`` is the slice gate of that run against the tier's
+    reference and band, and ``decision`` the tier's decision from it, for the reason
+    ``basis``. A confirmation that was not run names why (``skipped``), records nothing
+    else and leaves the tier INCONCLUSIVE.
+    """
+
+    cases: list[Identifier] = Field(default_factory=list, max_length=256)
+    repeats: int | None = Field(default=None, ge=1)
+    run_dir: str | None = Field(default=None, max_length=300)
+    scorecard: str | None = Field(default=None, max_length=300)
+    screen: GateVerdict | None = None
+    decision: GateDecision = GateDecision.INCONCLUSIVE
+    basis: ConfirmationBasis | None = None
+    skipped: ConfirmationSkip | None = None
+
+    @model_validator(mode="after")
+    def run_or_skip(self):
+        ran = (self.repeats, self.run_dir, self.scorecard, self.screen, self.basis)
+        if self.skipped is not None:
+            if any(value is not None for value in ran):
+                raise ValueError("a skipped confirmation records no run")
+            if self.decision is not GateDecision.INCONCLUSIVE:
+                raise ValueError("a skipped confirmation leaves the tier INCONCLUSIVE")
+        elif None in ran or not self.cases:
+            raise ValueError("a confirmation records its cases, run, screen and basis")
+        return self
+
 
 class VerifyRecord(Contract):
     """``verdict.json`` of a verified candidate: its git identity and each tier's gate.
@@ -1014,6 +1070,11 @@ class VerifyRecord(Contract):
     recorded_at: datetime | None = None
     # The noise band files given (``--noise``); each tier gate embeds the band it read.
     noise: list[str] = Field(default_factory=list, max_length=8)
+    # Per tier whose gate was INCONCLUSIVE when no tier was rejected or incomparable: its
+    # confirmation stage, run or skipped. ``decision`` is then the chain over each tier's
+    # confirmation decision (else its gate's). Empty with ``--no-confirm`` and on records
+    # written before confirmations.
+    confirmation: dict[str, Confirmation] = Field(default_factory=dict)
 
 
 LedgerDecision = Literal["accepted", "rejected", "inconclusive", "merged"]

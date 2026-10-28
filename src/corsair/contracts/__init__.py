@@ -46,6 +46,9 @@ from .evidence import RoleOutcome as RoleOutcome
 from .gym import SIGNIFICANCE_LEVEL as SIGNIFICANCE_LEVEL
 from .gym import Budgets as Budgets
 from .gym import CaseStability as CaseStability
+from .gym import Confirmation as Confirmation
+from .gym import ConfirmationBasis as ConfirmationBasis
+from .gym import ConfirmationSkip as ConfirmationSkip
 from .gym import DecidingMetric as DecidingMetric
 from .gym import EpisodeRate as EpisodeRate
 from .gym import FlipNoise as FlipNoise

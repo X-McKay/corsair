@@ -1420,7 +1420,7 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         safe_invocation,
         verify_candidate,
     )
-    from corsair.evaluation.gym.render import render_gate
+    from corsair.evaluation.gym.render import render_confirmation, render_gate
 
     root = checkout_root()
     settings = _gym_settings(args)
@@ -1461,11 +1461,14 @@ async def _handle_gym_verify(args: CliArguments, ui: Terminal) -> int:
         target_language=args.target_language,
         noise=_noise_bands(args.noise),
         min_cases=args.min_cases,
+        confirm_repeats=None if args.no_confirm else args.confirm_repeats,
         observe=_gym_observer(ui),
         on_gate=show,
     )
     verdict = f"VERDICT: {result.decision.value}"
     if human:
+        for tier, confirmation in result.record.confirmation.items():
+            sys.stdout.write(render_confirmation(tier, confirmation) + "\n")
         skipped = result.record.skipped.items()
         lines = [f"- {tier} {_SKIPPED_TEXT[reason]}" for tier, reason in skipped]
         lines += [f"- Verdict record: `{result.verdict_path}`", "", verdict]
@@ -2115,6 +2118,22 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     _gate_track_options(verify)
     _noise_option(verify, repeatable=True)
     _min_cases_option(verify, scope="tier1 gate only (tier0 has one case per language): ")
+    confirm = verify.add_mutually_exclusive_group()
+    confirm.add_argument(
+        "--confirm-repeats",
+        type=int,
+        choices=range(3, 9),
+        default=5,
+        metavar="N",
+        help="An INCONCLUSIVE tier re-runs its deciding flips within noise (and its regressed "
+        "languages' flips) N times each (3 to 8, default 5) under the same lock and gates "
+        "them by their episodes against the band's pooled episodes",
+    )
+    confirm.add_argument(
+        "--no-confirm",
+        action="store_true",
+        help="Leave an INCONCLUSIVE verify without a confirmation stage",
+    )
     verify.add_argument(
         "--temporal-address", help="Existing server; it must already have namespace corsair-gym"
     )

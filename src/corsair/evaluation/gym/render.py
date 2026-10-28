@@ -10,6 +10,9 @@ from typing import Any
 
 from corsair.contracts import (
     CaseStability,
+    Confirmation,
+    ConfirmationBasis,
+    ConfirmationSkip,
     EpisodeRate,
     FlipNoise,
     GateDecision,
@@ -860,6 +863,80 @@ def _paired_lines(verdict: GateVerdict, baseline: Scorecard) -> list[str]:
         if cases:
             lines.append(f"- {label}: " + ", ".join(f"`{case}`" for case in cases))
     return lines
+
+
+CONFIRMATION_TEXT = (
+    "Each re-run case that flipped against the installed reference is read by Fisher's exact "
+    "test (two-sided) on its re-run episodes against the band's pooled episodes; the tier's "
+    "other figures are the full run's."
+)
+
+CONFIRMATION_SKIP_TEXT: dict[ConfirmationSkip, str] = {
+    "trajectories_missing": "the candidate's run has no trajectories reproducing its scorecard.",
+    "band_not_pooled": "the gate's noise band carries no pooled per-case episode counts.",
+    "reference_trajectories_missing": (
+        "the reference run's trajectories were not found beside its scorecard or under the "
+        "gym root's runs."
+    ),
+    "no_cases": "no deciding case flipped within noise or in a regressed language.",
+}
+
+CONFIRMATION_BASIS_TEXT: dict[ConfirmationBasis, str] = {
+    "regression_separated": "A re-run case went from pass to fail outside noise.",
+    "no_regression_separated": (
+        "No re-run case went from pass to fail outside noise, and the gate's improvement "
+        "criterion held."
+    ),
+    "improvement_separated": (
+        "No re-run case went from pass to fail outside noise, and a re-run case went from "
+        "fail to pass outside it, which meets the objective gain the full run left within "
+        "noise."
+    ),
+    "improvement_not_separated": (
+        "No re-run case went from pass to fail outside noise, but none went from fail to "
+        "pass outside it, so the objective gain the full run left within noise is still "
+        "unmet."
+    ),
+    "tokens_within_noise": (
+        "No re-run case went from pass to fail outside noise, but the token ratio within "
+        "noise is a figure of the full run, which a re-run of cases does not read."
+    ),
+    "screen_incomparable": (
+        "The re-run could not be compared with the reference as a slice (see its screen's "
+        "reasons), so it decides nothing."
+    ),
+}
+
+
+def render_confirmation(tier: str, confirmation: Confirmation) -> str:
+    """One tier's confirmation stage in ``corsair gym verify``'s human view."""
+    lines = [f"### {tier} confirmation", ""]
+    if confirmation.skipped is not None:
+        lines.append(
+            f"- Not run: {CONFIRMATION_SKIP_TEXT[confirmation.skipped]} {tier} stays INCONCLUSIVE."
+        )
+        return "\n".join(lines) + "\n"
+    count = len(confirmation.cases)
+    cases = ", ".join(f"`{case}`" for case in confirmation.cases)
+    lines.append(
+        f"Re-ran {count} case{'s' if count != 1 else ''} × {confirmation.repeats} repeats "
+        f"under the same lock hold: {cases}. {CONFIRMATION_TEXT}"
+    )
+    lines.extend(["", f"- Run directory: `{confirmation.run_dir}`"])
+    screen = confirmation.screen
+    paired = None if screen is None else screen.paired
+    if paired is None:
+        reasons = ", ".join(reason.value for reason in screen.reasons) if screen else ""
+        lines.append(f"- Screen: INCOMPARABLE ({reasons})")
+    else:
+        for label, flipped in (
+            ("Pass to fail", paired.pass_to_fail_cases),
+            ("Fail to pass", paired.fail_to_pass_cases),
+        ):
+            lines.append(f"- {label}: " + (", ".join(_flip(case) for case in flipped) or "none"))
+    basis = "" if confirmation.basis is None else CONFIRMATION_BASIS_TEXT[confirmation.basis]
+    lines.append(f"- Decision: {confirmation.decision.value}. {basis}".rstrip())
+    return "\n".join(lines) + "\n"
 
 
 def _difference_band(spread: NoiseSpread | None) -> str:

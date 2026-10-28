@@ -104,6 +104,14 @@ J, macro accuracy, tokens and language deltas are recomputed over the slice and 
 they never decide, and neither does unknown token usage. The verdict names the slice
 cases the band classifies ``unstable`` (``slice_unstable_cases``), so a coin-flip sentinel
 is visible; that is reported, never a refusal.
+
+Confirmations (``confirmation_cases``, ``confirmation_decision``): ``corsair gym verify``
+re-runs only the cases of an INCONCLUSIVE gate whose deciding flips were within noise (and
+every flipped case of a regressed deciding language) and gates that run as a slice screen
+against the same reference and band. A re-run regression outside noise rejects; otherwise
+the gate's regressions within noise are resolved and its improvement criterion decides,
+J's gain counting as met by a re-run improvement outside noise; the token ratio within
+noise stays INCONCLUSIVE.
 """
 
 from collections import Counter
@@ -112,6 +120,7 @@ from dataclasses import dataclass
 from statistics import mean
 
 from corsair.contracts import (
+    ConfirmationBasis,
     DecidingMetric,
     EpisodeRate,
     FlipNoise,
@@ -1318,3 +1327,74 @@ def chain_decision(decisions: Sequence[GateDecision]) -> GateDecision:
     if GateDecision.INCONCLUSIVE in decisions:
         return GateDecision.INCONCLUSIVE
     return GateDecision.ACCEPTED
+
+
+# The confirmation stage of an INCONCLUSIVE gate (``corsair gym verify``)
+
+
+def _deciding_reasons(verdict: GateVerdict) -> list[GateReason]:
+    """The reasons that decided ``verdict``: none informational, and on a smoke gate no
+    improvement criterion."""
+    return [
+        reason
+        for reason in verdict.reasons
+        if reason not in _INFORMATIONAL and not (verdict.smoke and reason in _IMPROVEMENT)
+    ]
+
+
+def confirmation_cases(
+    verdict: GateVerdict,
+    baseline_trajectories: Sequence[Trajectory],
+    candidate_trajectories: Sequence[Trajectory],
+) -> list[str]:
+    """The cases an INCONCLUSIVE gate's confirmation re-runs: each deciding case whose
+    paired flip lies within noise, and each flipped case of a regressed deciding language.
+
+    The flips are the gate's paired outcomes when it read them (``min_cases``), else those
+    of the two runs' trajectories against the gate's band, every language deciding as at
+    ``min_cases`` 1.
+    """
+    paired = verdict.paired
+    if paired is None:
+        deciding = verdict.deciding_languages or sorted(
+            {item.language for item in baseline_trajectories}
+        )
+        paired = paired_outcomes(
+            baseline_trajectories, candidate_trajectories, deciding=deciding, noise=verdict.noise
+        )
+    regressed = set(verdict.regressed_languages)
+    return sorted(
+        {
+            case.case_id
+            for case in (*paired.pass_to_fail_cases, *paired.fail_to_pass_cases)
+            if case.deciding and (case.within_noise or case.language in regressed)
+        }
+    )
+
+
+def confirmation_decision(
+    verdict: GateVerdict, screen: GateVerdict
+) -> tuple[GateDecision, ConfirmationBasis]:
+    """The tier's decision once ``screen`` (the slice gate of the re-run cases against the
+    reference and band) confirmed the INCONCLUSIVE ``verdict``, and its basis.
+
+    A re-run case that went from pass to fail outside noise rejects. Otherwise the gate's
+    regressions within noise (a language, the accuracy floor) are resolved; the token
+    ratio within noise is not, as no re-run of cases reads it; and J's gain within noise
+    (objective track) is met only by a re-run case that went from fail to pass outside
+    noise. The screen's own decision (``slice_not_improved``) never decides here; an
+    INCOMPARABLE screen leaves the tier INCONCLUSIVE.
+    """
+    paired = screen.paired
+    if screen.decision is GateDecision.INCOMPARABLE or paired is None:
+        return GateDecision.INCONCLUSIVE, "screen_incomparable"
+    if any(case.deciding and not case.within_noise for case in paired.pass_to_fail_cases):
+        return GateDecision.REJECTED, "regression_separated"
+    deciding = _deciding_reasons(verdict)
+    if GateReason.TOKENS_ABOVE_CEILING in deciding:
+        return GateDecision.INCONCLUSIVE, "tokens_within_noise"
+    if GateReason.OBJECTIVE_BELOW_THRESHOLD in deciding:
+        if any(case.deciding and not case.within_noise for case in paired.fail_to_pass_cases):
+            return GateDecision.ACCEPTED, "improvement_separated"
+        return GateDecision.INCONCLUSIVE, "improvement_not_separated"
+    return GateDecision.ACCEPTED, "no_regression_separated"

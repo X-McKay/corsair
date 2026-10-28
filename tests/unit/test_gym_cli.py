@@ -37,9 +37,12 @@ from corsair.evaluation.gym.scoring import (
 )
 from corsair.settings import Settings
 from tests.unit.evaluation.test_gym_capture import CASE, _evals_root, _gym_run
+from tests.unit.evaluation.test_gym_confirmation import IMPROVEMENT_RUNS, REGRESSION_RUNS
+from tests.unit.evaluation.test_gym_confirmation import band as confirmation_band
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, CASES, NONE, _trajectory
 from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED_BASELINE
 from tests.unit.evaluation.test_gym_paired import _side as paired_side
+from tests.unit.evaluation.test_gym_paired import legacy_band
 from tests.unit.evaluation.test_gym_slice import _sliced as sliced_side
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -636,6 +639,9 @@ def test_verify_defaults_to_the_standard_protocol():
     args = _arguments("gym", "verify")
     assert (args.reference, args.repeats, args.concurrency, args.skip_tier1) == (None, 3, 2, False)
     assert (args.track, args.target_language) == ("objective", None)
+    assert (args.confirm_repeats, args.no_confirm) == (5, False)
+    with pytest.raises(SystemExit):
+        _arguments("gym", "verify", "--no-confirm", "--confirm-repeats", "4")
 
 
 @pytest.mark.asyncio
@@ -1240,3 +1246,230 @@ async def test_ledger_append_records_a_slice_screen_against_the_tier1_reference(
     with pytest.raises(ValueError, match="drop --tier0/--tier1/--slice/--noise"):
         await _run(_arguments(*append, "--id", "s3", "--slice", str(run), "--verdict", "v.json"))
     assert len(read_ledger(ledger)) == 1
+
+
+# The confirmation stage of an INCONCLUSIVE verify
+
+
+def _confirm_case(
+    tmp_path: Path,
+    monkeypatch,
+    tier1: dict[str, list[bool]],
+    reruns: dict[str, list[bool]],
+    *,
+    runs: tuple[dict[str, list[bool]], ...] = REGRESSION_RUNS,
+    trajectories: bool = True,
+    pooled: bool = True,
+) -> tuple[list[str], list[tuple[str, tuple[str, ...], int]], Path]:
+    """verify arguments, the recorded confirmation runs and the band file: a tier1
+    reference run (the band's first) with its trajectories under the gym root, a tier0 of
+    another dataset that the candidate matches, and a runner whose tier runs score ``tier1``
+    and whose confirmation runs score ``reruns`` at the requested repeats."""
+    gym_root = tmp_path / "artifacts/gym"
+    reference = tmp_path / "reference"
+    reference.mkdir()
+    shutil.copy(_paired_run(gym_root / "runs/ref-0", runs[0], "ref-0"), reference / "tier1.json")
+    other = {"dataset_digest": "e" * 64}
+    write_scorecard(
+        reference / "tier0.json", paired_side(runs[0], "ref-tier0")[0].model_copy(update=other)
+    )
+    noise = tmp_path / "noise-tier1.json"
+    band = confirmation_band(*runs)
+    write_noise(noise, band if pooled else legacy_band(band))
+    confirmed: list[tuple[str, tuple[str, ...], int]] = []
+
+    async def run_gym(options, *, root, compose_activities, observe, held=None, pinned=None):
+        del root, compose_activities, observe, held, pinned
+        tier = gym.tier_name(options.dataset)
+        if options.cases:
+            confirmed.append((tier, options.cases, options.repeats))
+            verified = {case: reruns[case][: options.repeats] for case in options.cases}
+            run_dir = _slice_run(tmp_path / "runs" / f"confirm-{tier}", verified, "confirm")
+            card = read_scorecard(run_dir / SCORECARD_FILE)
+            rows = read_trajectories(run_dir / TRAJECTORIES_FILE)
+            return gym.GymRun(run_dir, card, rows, "127.0.0.1:1", True, 1.0)
+        run_dir = tmp_path / "runs" / tier
+        if tier == "tier0":
+            card, rows = paired_side(runs[0], "cand-tier0")
+            card = card.model_copy(update=other)
+            write_scorecard(run_dir / SCORECARD_FILE, card)
+        else:
+            _paired_run(run_dir, tier1, "cand-tier1")
+            card = read_scorecard(run_dir / SCORECARD_FILE)
+            rows = read_trajectories(run_dir / TRAJECTORIES_FILE)
+        return gym.GymRun(run_dir, card, rows if trajectories else [], "127.0.0.1:1", True, 1.0)
+
+    monkeypatch.setattr(gym, "run_gym", run_gym)
+    settings = ["--settings", str(_settings_file(tmp_path))]
+    verify = ["gym", "verify", "--reference", str(reference), "--min-cases", "3", *settings]
+    return [*verify, "--noise", str(noise)], confirmed, noise
+
+
+def _verdict(captured: str) -> VerifyRecord:
+    return VerifyRecord.model_validate_json(Path(json.loads(captured)["verdict"]).read_text())
+
+
+@pytest.mark.asyncio
+async def test_an_inconclusive_verify_confirms_its_within_noise_flips_and_rejects_a_separated_one(
+    tmp_path, capsys, monkeypatch
+):
+    verify, confirmed, _ = _confirm_case(
+        tmp_path, monkeypatch, {**PAIRED_BASELINE, "py-a": NONE}, {"py-a": FIVE_NONE}
+    )
+
+    assert await _run(_arguments(*verify)) == 1
+    captured = capsys.readouterr()
+    assert captured.err.rstrip().splitlines()[-1] == "VERDICT: REJECTED"
+    # Only py-a, the deciding flip within noise, is re-run, at five repeats.
+    assert confirmed == [("tier1", ("py-a",), 5)]
+    record = _verdict(captured.out)
+    assert record.tier1 is not None and record.tier1.gate.decision is GateDecision.INCONCLUSIVE
+    assert record.decision is GateDecision.REJECTED
+    assert list(record.confirmation) == ["tier1"]
+    stage = record.confirmation["tier1"]
+    assert (stage.cases, stage.repeats, stage.skipped) == (["py-a"], 5, None)
+    assert (stage.decision, stage.basis) == (GateDecision.REJECTED, "regression_separated")
+    assert stage.run_dir == str(tmp_path / "runs/confirm-tier1")
+    assert stage.scorecard == str(tmp_path / "runs/confirm-tier1" / SCORECARD_FILE)
+    assert stage.screen is not None and stage.screen.slice
+    assert stage.screen.slice_cases == ["py-a"] and stage.screen.slice_repeats == 5
+    (flip,) = stage.screen.paired.pass_to_fail_cases if stage.screen.paired else []
+    assert (flip.within_noise, flip.candidate_episodes, flip.reference_episodes) == (False, 5, 9)
+
+    confirmed.clear()
+    assert await _run(_arguments(*verify, format="markdown")) == 1
+    text = capsys.readouterr().out
+    assert "### tier1 confirmation\n" in text
+    assert "Re-ran 1 case × 5 repeats under the same lock hold: `py-a`." in text
+    assert "- Pass to fail: `py-a` (python, 0/5 vs 6/9 episodes, p 0.031)" in text
+    assert "- Decision: REJECTED. A re-run case went from pass to fail outside noise" in text
+    assert text.index("### tier1 confirmation") < text.index("- Verdict record:")
+    assert text.rstrip().endswith("VERDICT: REJECTED")
+
+
+@pytest.mark.asyncio
+async def test_a_confirmation_that_separates_an_improvement_accepts_at_the_requested_repeats(
+    tmp_path, capsys, monkeypatch
+):
+    third = IMPROVEMENT_RUNS[0]
+    verify, confirmed, _ = _confirm_case(
+        tmp_path, monkeypatch, {**third, "py-c": ALL}, {"py-c": FIVE}, runs=IMPROVEMENT_RUNS
+    )
+
+    assert await _run(_arguments(*verify)) == 0
+    record = _verdict(capsys.readouterr().out)
+    assert confirmed == [("tier1", ("py-c",), 5)]
+    stage = record.confirmation["tier1"]
+    assert (stage.decision, stage.basis) == (GateDecision.ACCEPTED, "improvement_separated")
+    assert record.decision is GateDecision.ACCEPTED
+
+    # Three repeats of 3/3 against 3/9 cannot separate (p = 2/11): still INCONCLUSIVE.
+    confirmed.clear()
+    assert await _run(_arguments(*verify, "--confirm-repeats", "3")) == 3
+    record = _verdict(capsys.readouterr().out)
+    assert confirmed == [("tier1", ("py-c",), 3)]
+    stage = record.confirmation["tier1"]
+    assert (stage.decision, stage.basis) == (GateDecision.INCONCLUSIVE, "improvement_not_separated")
+    assert record.decision is GateDecision.INCONCLUSIVE
+    with pytest.raises(SystemExit):
+        _arguments(*verify, "--confirm-repeats", "2")
+    capsys.readouterr()
+
+
+@pytest.mark.asyncio
+async def test_no_confirm_keeps_an_inconclusive_verify_without_a_confirmation(
+    tmp_path, capsys, monkeypatch
+):
+    verify, confirmed, _ = _confirm_case(
+        tmp_path, monkeypatch, {**PAIRED_BASELINE, "py-a": NONE}, {"py-a": FIVE_NONE}
+    )
+
+    assert await _run(_arguments(*verify, "--no-confirm")) == 3
+    record = _verdict(capsys.readouterr().out)
+    assert confirmed == []
+    assert (record.decision, record.confirmation) == (GateDecision.INCONCLUSIVE, {})
+    assert await _run(_arguments(*verify, "--no-confirm", format="markdown")) == 3
+    assert "### tier1 confirmation" not in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("trajectories", "pooled", "reason", "text"),
+    [
+        (
+            False,
+            True,
+            "trajectories_missing",
+            "Not run: the candidate's run has no trajectories reproducing its scorecard.",
+        ),
+        (
+            True,
+            False,
+            "band_not_pooled",
+            "Not run: the gate's noise band carries no pooled per-case episode counts.",
+        ),
+    ],
+)
+async def test_a_confirmation_without_trajectories_or_pooled_counts_is_skipped_with_its_reason(
+    tmp_path, capsys, monkeypatch, trajectories, pooled, reason, text
+):
+    verify, confirmed, _ = _confirm_case(
+        tmp_path,
+        monkeypatch,
+        {**PAIRED_BASELINE, "py-a": NONE},
+        {"py-a": FIVE_NONE},
+        trajectories=trajectories,
+        pooled=pooled,
+    )
+
+    assert await _run(_arguments(*verify)) == 3
+    record = _verdict(capsys.readouterr().out)
+    assert confirmed == []
+    assert record.tier1 is not None and record.tier1.gate.decision is GateDecision.INCONCLUSIVE
+    stage = record.confirmation["tier1"]
+    assert (stage.skipped, stage.decision, stage.run_dir) == (
+        reason,
+        GateDecision.INCONCLUSIVE,
+        None,
+    )
+    assert record.decision is GateDecision.INCONCLUSIVE
+    assert await _run(_arguments(*verify, format="markdown")) == 3
+    assert f"- {text} tier1 stays INCONCLUSIVE." in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_a_confirmation_without_the_reference_runs_trajectories_is_skipped(
+    tmp_path, capsys, monkeypatch
+):
+    verify, confirmed, _ = _confirm_case(
+        tmp_path, monkeypatch, {**PAIRED_BASELINE, "py-a": NONE}, {"py-a": FIVE_NONE}
+    )
+    (tmp_path / "artifacts/gym/runs/ref-0" / TRAJECTORIES_FILE).unlink()
+
+    # Without the reference's trajectories the tier1 gate has no paired outcomes either.
+    assert await _run(_arguments(*verify)) == 3
+    record = _verdict(capsys.readouterr().out)
+    assert confirmed == []
+    assert record.confirmation["tier1"].skipped == "reference_trajectories_missing"
+
+
+@pytest.mark.asyncio
+async def test_a_verify_record_with_a_confirmation_appends_to_the_ledger(
+    tmp_path, capsys, monkeypatch
+):
+    verify, _, noise = _confirm_case(
+        tmp_path, monkeypatch, {**PAIRED_BASELINE, "py-a": NONE}, {"py-a": FIVE_NONE}
+    )
+    assert await _run(_arguments(*verify)) == 1
+    verdict = Path(json.loads(capsys.readouterr().out)["verdict"])
+    record = VerifyRecord.model_validate_json(verdict.read_text())
+    assert record.confirmation
+
+    ledger = tmp_path / "ledger.jsonl"
+    append = ["gym", "ledger", "append", "--id", "exp-c", "--entry", "experiment"]
+    append += ["--wave", "5", "--verdict", str(verdict), "--ledger", str(ledger)]
+    # The scripted runs record no git identity; the row names the candidate explicitly.
+    append += ["--branch", "gym/s27", "--commit", "c" * 40]
+    assert await _run(_arguments(*append, "--decision", "rejected")) == 0
+    (row,) = read_ledger(ledger)
+    assert (row.tier0, row.tier1, row.noise) == (record.tier0, record.tier1, [str(noise)])
