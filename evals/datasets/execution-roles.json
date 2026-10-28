@@ -1,0 +1,34 @@
+{
+  "schema_version": "corsair.execution-role-dataset/1",
+  "status": "candidate-pending-human-review",
+  "entries": [
+    {
+      "case_id": "producer-traversal",
+      "input": "fixtures/execution-roles/producer-traversal/input.json",
+      "oracle": "fixtures/execution-roles/producer-traversal/oracle.json",
+      "input_digest": "73a793afa8fd4708a48ac9fd8e07027596f9372a8a33ce5b447c1105edc9ae98",
+      "oracle_digest": "82e9c8560fa6887740e207c6096e043c8da88da86cd66f8ff3c4eed8ae5afaff"
+    },
+    {
+      "case_id": "audit-target",
+      "input": "fixtures/execution-roles/audit-target/input.json",
+      "oracle": "fixtures/execution-roles/audit-target/oracle.json",
+      "input_digest": "602b9f4e1b5b12f894c05a2734a5433259072b6ab21f733322ceaafaa509679b",
+      "oracle_digest": "0e8f5329ee96162ca7d133e8076236d75a177cfe6d6da649c6526c7f28f1e7a5"
+    },
+    {
+      "case_id": "audit-unrelated",
+      "input": "fixtures/execution-roles/audit-unrelated/input.json",
+      "oracle": "fixtures/execution-roles/audit-unrelated/oracle.json",
+      "input_digest": "0a2b947d6fc2b3eb78f961855b4e95259cdfc7bbf10a5623947d85b0c0ecf6f1",
+      "oracle_digest": "b688253accf15c5b38125e917fcd8f9a1dccb861530eeaff11c15ee40797892d"
+    },
+    {
+      "case_id": "audit-modified",
+      "input": "fixtures/execution-roles/audit-modified/input.json",
+      "oracle": "fixtures/execution-roles/audit-modified/oracle.json",
+      "input_digest": "e25de74c3d97da8b5742160ccfa9186b0d54bbf7aac4d2d6491d16c0e62357f5",
+      "oracle_digest": "4b9aa7df42f1fab3f465008e7e512763c1be7cc05afd81fa000cf229fab2fb01"
+    }
+  ]
+}

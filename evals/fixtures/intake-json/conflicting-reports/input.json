@@ -1,0 +1,50 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/2",
+    "input": {
+      "kind": "json",
+      "payload": {
+        "same_issue_id": "ASSET001",
+        "reports": [
+          {
+            "title": "Asset path traversal in resolve_asset",
+            "description": "In resolver.py, resolve_asset(root, name) accepts an untrusted name and reads files outside the asset root. This security finding concerns private file disclosure through that function."
+          },
+          {
+            "title": "Rename the asset helper",
+            "description": "This report requests only a cosmetic function rename. It explicitly reports no security defect."
+          }
+        ],
+        "conflict_unresolved": true
+      }
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "573c752d61f5855634bf1c23fa508cf25e57a6dd7c5ef16cf4f024db801063dc"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    }
+  },
+  "inventory": {
+    "images": [
+      {
+        "reference": "corsair-python:0.1",
+        "language": "python",
+        "execution_mode": "callable",
+        "requirements": [],
+        "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "source_digest": "573c752d61f5855634bf1c23fa508cf25e57a6dd7c5ef16cf4f024db801063dc",
+  "family": "asset-disclosure",
+  "format": "conflicting-reports"
+}

@@ -11,7 +11,12 @@ from corsair.agents.resources import load_agent_spec, load_runtime_skills
 from corsair.contracts import ProducerInput
 from corsair.ports.scm import SourceReader
 
-from .tools import create_list_files, create_read_file
+from .tools import (
+    create_list_files,
+    create_preview_invocation,
+    create_read_file,
+    create_relative_path,
+)
 
 
 def _callable_name(tool: Callable[..., Any]) -> str:
@@ -24,18 +29,20 @@ def _callable_name(tool: Callable[..., Any]) -> str:
 def build_producer_toolset(
     producer_input: ProducerInput, sources: SourceReader
 ) -> list[Callable[..., Any] | SkillToolset]:
-    """Return source reads that are always present plus the finite native loader."""
+    """Return episode-bound source reads, pure helpers and the finite native loader."""
 
     spec = load_agent_spec("producer")
-    source_tools = [
+    function_tools = [
         create_read_file(producer_input, sources),
         create_list_files(producer_input, sources),
+        create_preview_invocation(producer_input),
+        create_relative_path(producer_input),
     ]
-    names = [_callable_name(tool) for tool in source_tools]
-    if names != spec.source_tools:
-        raise ValueError("producer source tool creators do not match approved metadata")
+    names = [_callable_name(tool) for tool in function_tools]
+    if names != [*spec.source_tools, *spec.mechanical_tools]:
+        raise ValueError("producer function tool creators do not match approved metadata")
     return [
-        *source_tools,
+        *function_tools,
         SkillToolset(
             skills=load_runtime_skills("producer"),
             discovery_mode=SkillDiscoveryMode.EAGER,

@@ -21,6 +21,8 @@ src/corsair/agents/
       __init__.py
       read_file.py                      # bounded admitted-snapshot reader
       list_files.py                     # bounded admitted-snapshot lister
+      preview_invocation.py             # pure declared-argument preview
+      relative_path.py                  # pure lexical POSIX calculation
     skills/
       source-grounding/
         SKILL.md                        # private procedural guidance
@@ -52,7 +54,7 @@ The system instruction and a procedure skill have different jobs. `instructions/
 
 ## Native skill loading boundary
 
-Role-local `toolsets.py` initializes the native ADK `SkillToolset` in `EAGER` mode from an explicit role allowlist of built-package files. It exposes only the native `load_skill` and `load_skill_resource` calls after filtering. Producer composition also retains the static, episode-private `read_file` and `list_files` functions. Auditor composition exposes no source or external function tool.
+Role-local `toolsets.py` initializes the native ADK `SkillToolset` in `EAGER` mode from an explicit role allowlist of built-package files. It exposes only the native `load_skill` and `load_skill_resource` calls after filtering. Producer composition also retains the static, episode-private `read_file` and `list_files` functions and pure `preview_invocation`/`relative_path` helpers. The helper implementation bytes are identified from the installed package and bound into producer manifests and isolated evaluation records. Auditor composition exposes no source, mechanical or external function tool.
 
 A loaded skill or resource becomes context for that single native episode. It is not a script runner, a code executor, a state-injection mechanism, a filesystem browser, an environment loader, a remote catalog, or an alternate agent loop. The current skills contain only `SKILL.md`; do not create a resource directory until a specific admitted, useful resource requires one.
 

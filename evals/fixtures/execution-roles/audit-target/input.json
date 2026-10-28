@@ -1,0 +1,40 @@
+{
+  "role": "auditor",
+  "issue": {
+    "title": "Path traversal in read_file",
+    "description": "The function joins an untrusted path without checking containment.",
+    "locations": [
+      {
+        "path": "reader.py",
+        "symbol": "read_file"
+      }
+    ]
+  },
+  "source": {
+    "reader.py": "from pathlib import Path\ndef read_file(root, path):\n    return (Path(root) / path).read_text()\n"
+  },
+  "plan": {
+    "hypothesis": "Exercise traversal against the unchanged target",
+    "revision": 1,
+    "locations": [
+      {
+        "path": "reader.py",
+        "symbol": "read_file"
+      }
+    ],
+    "files": [
+      {
+        "path": "check.py",
+        "content": "import sys\nsys.path.insert(0,'/source')\nfrom reader import read_file\nfrom pathlib import Path\nPath('/work/public').mkdir(exist_ok=True)\nPath('/work/private.txt').write_text('marker')\nassert read_file('/work/public','../private.txt') == 'marker'\n"
+      }
+    ],
+    "commands": [
+      {
+        "argv": [
+          "python",
+          "/work/check.py"
+        ]
+      }
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-"""Hardened Docker execution for trusted Python evidence checks.
+"""Hardened Docker execution for the concrete trusted language evidence drivers.
 
 There is intentionally no host-process fallback.  If the Docker SDK, daemon, image,
 or driver record is unavailable, callers receive non-admissible evidence instead of a
@@ -28,6 +28,7 @@ from corsair.contracts import (
     ArtifactRef,
     Budget,
     PreparedCase,
+    Recipe,
     Submission,
     digest,
 )
@@ -61,7 +62,7 @@ class DockerSandbox:
         self.settings = settings
         self._client: docker.DockerClient | None = client
         self._client_error: str | None = None
-        self._image_id: str | None = None
+        self._image_ids: dict[str, str] = {}
         if client is None:
             try:
                 self._client = docker.from_env()
@@ -71,26 +72,30 @@ class DockerSandbox:
     @property
     def image_id(self) -> str:
         """Return the immutable Docker image ID or raise if it cannot be obtained."""
-        return self._ensure_image()
+        return self._ensure_image(self.settings.image)
 
-    def _ensure_image(self) -> str:
-        if self._image_id is not None:
-            return self._image_id
+    def image_id_for(self, recipe: Recipe) -> str:
+        """Resolve the configured recipe image to its immutable Docker identity."""
+        return self._ensure_image(self.settings.image_for_recipe(recipe))
+
+    def _ensure_image(self, image_name: str) -> str:
+        if image_name in self._image_ids:
+            return self._image_ids[image_name]
         client = self._client
         if client is None:
             raise SandboxUnavailable(
                 f"Docker client unavailable: {self._client_error or 'unknown error'}"
             )
         try:
-            image = client.images.get(self.settings.image)
+            image = client.images.get(image_name)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with just images"
+                f"trusted image {image_name} unavailable; build its reviewed Dockerfile"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
-        self._image_id = str(image.id)
-        return self._image_id
+        self._image_ids[image_name] = str(image.id)
+        return self._image_ids[image_name]
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         """An old labeled container means the operation may have run; never rerun it."""
@@ -267,7 +272,7 @@ class DockerSandbox:
 
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
-        image_id = self._ensure_image()
+        image_id = self.image_id_for(prepared.recipe)
         client = self._client
         if client is None:
             raise SandboxUnavailable(

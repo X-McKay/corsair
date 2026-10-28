@@ -14,7 +14,12 @@ from corsair.adapters.inference.adk import run_auditor, run_producer
 from corsair.adapters.scm.local import prepare_case
 from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.agents.resources import load_agent_spec, prompt_text, runtime_skill_digest
+from corsair.agents.resources import (
+    load_agent_spec,
+    mechanical_tools_digest,
+    prompt_text,
+    runtime_skill_digest,
+)
 from corsair.contracts import (
     AuditInput,
     AuditOutput,
@@ -141,9 +146,16 @@ def fixture_score_row(
         "config_digest": settings.identity,
         "agent_resources_digest": digest(
             {
-                "spec": load_agent_spec(agent).model_dump(mode="json"),
+                "spec": load_agent_spec(agent).model_dump(
+                    mode="json", exclude={"mechanical_tools"} if agent == "auditor" else set()
+                ),
                 "instruction": prompt_text(agent),
                 "runtime_skills_digest": runtime_skill_digest(agent),
+                **(
+                    {"mechanical_tools_digest": mechanical_tools_digest()}
+                    if agent == "producer"
+                    else {}
+                ),
             }
         ),
         "llm_calls": output.usage.llm_calls,

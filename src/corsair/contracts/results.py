@@ -6,7 +6,7 @@ import json
 from enum import StrEnum
 from typing import Any, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from .agents import AuditOutput, ProducerOutput
 from .common import ArtifactRef, Contract, DiagnosticText, Identifier, format_diagnostic
@@ -38,6 +38,13 @@ class ExecutionStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class AssessmentOutcome(StrEnum):
+    """The two completed assessment conclusions for newly recorded results."""
+
+    DEMONSTRATED = "DEMONSTRATED"
+    NOT_DEMONSTRATED = "NOT_DEMONSTRATED"
+
+
 class FixStatus(StrEnum):
     NOT_REQUESTED = "NOT_REQUESTED"
     DEMONSTRATION_BLOCKED = "DEMONSTRATION_BLOCKED"
@@ -46,12 +53,15 @@ class FixStatus(StrEnum):
 
 
 class InvestigationResult(Contract):
-    schema_version: Literal["corsair.result/1"] = "corsair.result/1"
+    schema_version: Literal["corsair.result/1", "corsair.result/2"] = "corsair.result/2"
     run_id: Identifier
     case_id: Identifier
     disposition: Disposition
     execution_status: ExecutionStatus
     reason: DiagnosticText
+    # ``None`` records an incomplete assessment. It is deliberately not a third
+    # security conclusion and uses ``reason`` for the attributable incomplete gate.
+    assessment_outcome: AssessmentOutcome | None = None
     scope: Scope = Scope.COMPONENT
     manifest: RunManifest | None = None
     rounds: list[RoundResult] = Field(default_factory=list, max_length=MAX_TERMINAL_ROUNDS)
@@ -59,6 +69,28 @@ class InvestigationResult(Contract):
     fix_status: FixStatus = FixStatus.NOT_REQUESTED
     fix_observation: Observation | None = None
     result_artifact: ArtifactRef | None = None
+
+    @model_validator(mode="after")
+    def assessment_version_is_conservative(self) -> Self:
+        if self.schema_version == "corsair.result/1" and self.assessment_outcome is not None:
+            raise ValueError("legacy result records cannot carry an assessment outcome")
+        if self.schema_version == "corsair.result/2" and self.disposition is Disposition.REFUTED:
+            raise ValueError("REFUTED is not a valid disposition for newly recorded results")
+        if (
+            self.schema_version == "corsair.result/2"
+            and self.assessment_outcome is not None
+            and self.execution_status is not ExecutionStatus.COMPLETED
+        ):
+            raise ValueError("completed assessment outcomes require completed execution")
+        return self
+
+    @model_serializer(mode="wrap")
+    def versioned_wire(self, handler):
+        """Keep pre-outcome result payloads byte-shape compatible for replay."""
+        value = handler(self)
+        if self.schema_version == "corsair.result/1":
+            value.pop("assessment_outcome", None)
+        return value
 
     @model_validator(mode="after")
     def bounded_terminal_wire(self) -> Self:

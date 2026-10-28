@@ -167,3 +167,35 @@ def test_match_kind_does_not_change_exact_pass_rule_or_totals(tmp_path):
     assert summarize(rows)["attempts"] == 6
     assert summarize(rows)["passed"] == 2
     assert summarize(rows)["failed"] == 4
+
+
+def test_helper_implementation_changes_only_producer_resource_identity(tmp_path, monkeypatch):
+    from corsair.evaluation import agents
+
+    store = ArtifactStore(tmp_path)
+    auditor_output = AuditOutput(
+        review=AuditResult(decision=AuditDecision.ACCEPT, rule="test", reason="test")
+    )
+
+    def row(agent):
+        return fixture_score_row(
+            auditor_output if agent == "auditor" else _producer_output(),
+            {"decision": "ACCEPT"}
+            if agent == "auditor"
+            else {"control_payload": "control", "candidate_payloads": ["candidate"]},
+            identity="identity-test",
+            case_id="case01",
+            repeat=0,
+            agent=agent,
+            settings=Settings(),
+            store=store,
+        )
+
+    before = {agent: row(agent) for agent in ("producer", "auditor")}
+    monkeypatch.setattr(agents, "mechanical_tools_digest", lambda: "a" * 64)
+    after = {agent: row(agent) for agent in ("producer", "auditor")}
+    assert (
+        before["producer"]["agent_resources_digest"] != after["producer"]["agent_resources_digest"]
+    )
+    assert before["auditor"]["agent_resources_digest"] == after["auditor"]["agent_resources_digest"]
+    assert all(item["status"] == "pass" for item in [*before.values(), *after.values()])

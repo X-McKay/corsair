@@ -1,0 +1,9 @@
+{
+  "role": "auditor",
+  "audit": {
+    "decision": "rejected",
+    "reasons": [
+      "UNRELATED_TEST"
+    ]
+  }
+}

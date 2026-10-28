@@ -1,0 +1,37 @@
+{
+  "classifications": [
+    null
+  ],
+  "surfaces": [
+    "unknown",
+    "function"
+  ],
+  "languages": [
+    "unknown",
+    "python"
+  ],
+  "execution_modes": [
+    "unknown",
+    "callable"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [
+    "unknown"
+  ],
+  "required_reasons": [],
+  "permitted_reasons": [
+    "INSUFFICIENT_ISSUE_INFORMATION",
+    "SOURCE_LOCATION_UNRESOLVED",
+    "REQUIREMENTS_UNRESOLVED",
+    "IMAGE_UNDETERMINED",
+    "NO_COMPATIBLE_IMAGE",
+    "MULTIPLE_ISSUES"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [],
+  "permitted_paths": [
+    "resolver.py"
+  ]
+}

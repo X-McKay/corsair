@@ -1,0 +1,30 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "function"
+  ],
+  "languages": [
+    "python"
+  ],
+  "execution_modes": [
+    "callable"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "reader.py"
+  ]
+}

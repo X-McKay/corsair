@@ -1,0 +1,314 @@
+{
+  "record_kind": "local-working-tree-qualification-not-promoted-baseline",
+  "date": "2026-10-25",
+  "branch": "manus/just",
+  "base_commit": "6beebbcb6b3791ec4d5b144bebe245f3c73a23c5",
+  "host": "macOS-arm64; Docker Linux VM",
+  "native_before_final_instruction_cleanup": {
+    "tests": 285,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 369.46
+  },
+  "native_postcleanup": {
+    "tests": 285,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 376.76
+  },
+  "checks": {
+    "ruff_lint_format": "pass",
+    "ty_error_on_warning": "pass",
+    "just_format": "pass",
+    "local_documentation": "pass",
+    "outside_checkout_wheel_resources": "pass",
+    "sdist_private_data_exclusion": "pass",
+    "original_frozen_and_pin_files_preserved": 37,
+    "actual_marker_absent_legacy_temporal_replays": 2,
+    "scripted_adk_real_docker_temporal_assessment_cli_and_rescore": "4/4 completed and matched; not a live-model accuracy result"
+  },
+  "image_ids": {
+    "python": "sha256:ec868e12ff819c542ebdca87ef0e4550e1da24dabff054f1fa8b2142787be258",
+    "node": "sha256:d316017da6a73280429226c9bda9bd67ce9c968c2b1da2217b82d6190c35fb8f",
+    "java": "sha256:571e606602e0dc2188c9106b3cb58f62c2fb9fd2a87aaef487855dada6baf4e5"
+  },
+  "configuration_digest": "3d7bbf2e9c4e5aee63908f8e13d5bc541d511988d37b91fe1dfae0017ce87c4b",
+  "role_instruction_sha256": {
+    "producer": "b3ab6d069f7cbfb209b9e413857bc65e792d64ddb22bbca6ddeaa1c92d2c8695",
+    "auditor": "52d969fb159a74fed40381f61396ece7df6cfd896c83b3eac40441cb4b2e80dd"
+  },
+  "frozen_role_diagnostics": {
+    "languages-auditor-language-neutral": {
+      "summary": {
+        "attempts": 12,
+        "passed": 8,
+        "failed": 4,
+        "pass_rate": 0.6666666666666666,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 26454,
+        "output_tokens": 2150,
+        "cost_usd": null
+      },
+      "dataset_digest": "a49bd89bc2a96300778fa6c9adc093271c523e2dd043e82c400eeb9f302d22b6",
+      "match_kinds": {
+        "exact_match": 8,
+        "candidate_exact_mismatch": 4
+      }
+    },
+    "languages-auditor": {
+      "summary": {
+        "attempts": 12,
+        "passed": 8,
+        "failed": 4,
+        "pass_rate": 0.6666666666666666,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 26310,
+        "output_tokens": 2918,
+        "cost_usd": null
+      },
+      "dataset_digest": "a49bd89bc2a96300778fa6c9adc093271c523e2dd043e82c400eeb9f302d22b6",
+      "match_kinds": {
+        "exact_match": 8,
+        "candidate_exact_mismatch": 4
+      }
+    },
+    "languages-producer": {
+      "summary": {
+        "attempts": 12,
+        "passed": 1,
+        "failed": 11,
+        "pass_rate": 0.08333333333333333,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 27414,
+        "output_tokens": 5152,
+        "cost_usd": null
+      },
+      "dataset_digest": "811d36d4ec1e0dfd56ddb990e765d5b43b8b98ade446295d2d40e97a96808bdb",
+      "match_kinds": {
+        "candidate_exact_mismatch": 6,
+        "no_valid_output": 3,
+        "exact_match": 1,
+        "control_mismatch": 2
+      }
+    },
+    "legacy-auditor-language-neutral": {
+      "summary": {
+        "attempts": 12,
+        "passed": 8,
+        "failed": 4,
+        "pass_rate": 0.6666666666666666,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 25482,
+        "output_tokens": 1827,
+        "cost_usd": null
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7",
+      "match_kinds": {
+        "candidate_exact_mismatch": 4,
+        "exact_match": 8
+      }
+    },
+    "legacy-auditor": {
+      "summary": {
+        "attempts": 12,
+        "passed": 11,
+        "failed": 1,
+        "pass_rate": 0.9166666666666666,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 25338,
+        "output_tokens": 1936,
+        "cost_usd": null
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7",
+      "match_kinds": {
+        "exact_match": 11,
+        "candidate_exact_mismatch": 1
+      }
+    },
+    "legacy-producer": {
+      "summary": {
+        "attempts": 9,
+        "passed": 2,
+        "failed": 7,
+        "pass_rate": 0.2222222222222222,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 20211,
+        "output_tokens": 3124,
+        "cost_usd": null
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2",
+      "match_kinds": {
+        "control_mismatch": 4,
+        "candidate_exact_mismatch": 3,
+        "exact_match": 2
+      }
+    }
+  },
+  "live_candidate_cohorts": {
+    "live-assessments": {
+      "summary": {
+        "attempts": 4,
+        "passed": 0,
+        "failed": 4,
+        "pass_rate": 0.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 4,
+        "forbidden_labels": 0,
+        "inconclusive": 4,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 29411,
+        "output_tokens": 4360,
+        "cost_usd": null,
+        "assessment_completed": 0,
+        "assessment_incomplete": 4,
+        "demonstrated": 0,
+        "not_demonstrated": 0
+      },
+      "dataset_digest": "69e727a190fbcadfbf9600fa89bc478e7cbfc45ad6e9a04c5109361bff645ab6",
+      "rows": [
+        {
+          "case_id": "node01",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        },
+        {
+          "case_id": "node02",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        },
+        {
+          "case_id": "java01",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        },
+        {
+          "case_id": "java02",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        }
+      ]
+    },
+    "live-neutral-assessments": {
+      "summary": {
+        "attempts": 4,
+        "passed": 1,
+        "failed": 3,
+        "pass_rate": 0.25,
+        "correctly_resolved": 1,
+        "invalid_positive_evidence": 3,
+        "forbidden_labels": 0,
+        "inconclusive": 3,
+        "operational_failures": 1,
+        "unavailable_results": 0,
+        "llm_calls": 11,
+        "tool_calls": 0,
+        "input_tokens": 27679,
+        "output_tokens": 5410,
+        "cost_usd": null,
+        "assessment_completed": 1,
+        "assessment_incomplete": 3,
+        "demonstrated": 1,
+        "not_demonstrated": 0
+      },
+      "dataset_digest": "69e727a190fbcadfbf9600fa89bc478e7cbfc45ad6e9a04c5109361bff645ab6",
+      "rows": [
+        {
+          "case_id": "node01",
+          "status": "pass",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": "DEMONSTRATED"
+        },
+        {
+          "case_id": "node02",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        },
+        {
+          "case_id": "java01",
+          "status": "fail",
+          "execution_status": "ERROR",
+          "assessment_outcome": null
+        },
+        {
+          "case_id": "java02",
+          "status": "fail",
+          "execution_status": "COMPLETED",
+          "assessment_outcome": null
+        }
+      ]
+    }
+  },
+  "cost_usd": null,
+  "linux_amd64_current_revision": "unrun; CI gates configured, not run or published",
+  "publication": "local implementation only; no commit/push/CI run in this task",
+  "cleanup": {
+    "task_owned_live_services": "stopped; port 17573 closed",
+    "owned_container_listing_empty": true,
+    "temporal_sqlite_backup": "integrity verified; original state and all immutable evidence retained",
+    "original_python_image_tag": "unchanged",
+    "user_stashes_other_worktrees": "untouched",
+    "container_owner_label": "corsair.security=true"
+  },
+  "build_warnings": [
+    "uv noted project-local cache location; inspected wheel/sdist exclude it",
+    "uv build backend version-range warning retained; pinned dependencies unchanged"
+  ],
+  "limitations": [
+    "new cohorts are AI-authored diagnostic candidates, not human-promoted held-out benchmarks",
+    "model completion/review quality remains open in ISSUE-0014; native success does not qualify live reliability",
+    "NOT_DEMONSTRATED is bounded protocol evidence, not non-exploitability or application clearance",
+    "no generic npm/Maven/Gradle builds, arbitrary model-authored probes, hostile-process attestation or production-readiness claim"
+  ]
+}

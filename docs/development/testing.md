@@ -1,6 +1,6 @@
 # Development testing
 
-This guide maps the current Just recipes to the boundary they exercise. It is not a replacement for the [CLI reference](../reference/cli.md), agent-evaluation guidance, or the current qualification record in [plans](../plans/README.md). Run commands from the repository root after [setup](setup.md).
+This guide maps current Just recipes to the boundary they exercise. It does not replace the [CLI reference](../reference/cli.md), [evaluation guidance](../agents/evaluations.md), [language guide](../guides/languages.md), or the [PLAN-0127 record](../plans/archive/plans/PLAN-0127-outcomes-node-java.md), which records actual results and pending gates. Run commands from the repository root after [setup](setup.md).
 
 ## Fast local gates
 
@@ -11,53 +11,36 @@ just -- test -q -W error
 just build
 ```
 
-`just sync` installs the locked development dependencies. `just check` runs Ruff lint, Ruff format check, Just formatting, `ty check --error-on-warning` across maintained source, tests, evaluators and developer scripts, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test, which creates a fresh environment and loads the actual wheel outside the checkout. `just build` creates the source distribution and wheel.
+`just check` runs Ruff lint/format checks, Just formatting, `ty check --error-on-warning`, and local Markdown link/anchor checks. `just test` (also `test-offline`) selects `not docker and not temporal and not live`; it includes the built-wheel resource test. Report counts, deselections, skips, warnings, and unrun prerequisites. A skip is not a completed boundary.
 
-Recipe arguments after `just -- RECIPE` go directly to pytest or the CLI. Use `-W error` for a strict qualification run; the recipes forward it rather than silently changing warning policy. Report test counts, deselections, skips, and warnings with the command result. A skip is an unexecuted boundary, not a pass.
+`just docs-check` runs the maintained local documentation checker. It does not start a service, build an image, or execute target source.
 
-`just docs-check` runs the maintained developer checker without services or network access. Offline tests also enforce forbidden package dependencies; they do not freeze every directory name for cosmetic reasons. See [local files](local-files.md) for temporary staging and retention.
-
-## Test matrix
+## Current matrix
 
 | Boundary | Command | Prerequisites and meaning |
 | --- | --- | --- |
-| Offline code, contracts, fixtures, package resources | `just -- test -q -W error` | No Docker, Temporal, or provider request. Validates the selected offline boundary only. |
-| Native Docker observer | `just images` then `CORSAIR_TEST_TEMPORAL=1 just -- test-docker -q -W error` | A reachable reviewed daemon, `corsair-python:0.1`, and the local Temporal test server. `test-docker` sets `CORSAIR_TEST_DOCKER=1`, so a missing daemon/image fails rather than silently skips. |
-| Long Docker probe deadline | `CORSAIR_TEST_LONG_PROBE=1 just -- test-docker -q -W error tests/integration/test_docker.py::test_real_docker_probe_deadline_can_exceed_120_seconds` | Explicit real-Docker opt-in only. The one-role regression sleeps 121 seconds, then must complete and clean up before its 180-second `probe_timeout_seconds` budget. Without this environment variable it skips and is not a passing native gate. Rebuild the trusted image with `just images` after changing the driver. |
-| Durable workflows and replay | `just -- test-temporal -q -W error` | `test-temporal` sets `CORSAIR_TEST_TEMPORAL=1`; the fixture starts a real local Temporal test environment and runs ordinary typed activities. It does not run Docker target execution or a live model. |
-| All native gates | `CORSAIR_LIVE_CONFIG=/operator/settings.json just -- test-all -q -W error` | `test-all` enables Docker and Temporal and installs the optional provider dependency. A real-provider smoke still requires the explicit operator settings path; without it, that test skips. |
-| Isolated producer/auditor diagnostic | `just -- eval-agent AGENT DATASET --settings /operator/settings.json --repeats N` | Requires an operator-configured provider. Runs the production role factory against frozen inputs without target execution; it is not a whole-system result. |
+| Offline code, contracts, fixtures, and package resources | `just -- test -q -W error` | No Docker, Temporal, or provider request. |
+| Reviewed observer images | `just images` | Aggregates `images-python`, `images-node`, and `images-java`; target source is not part of these builds. |
+| One image with a literal tag | `just images-python TAG`, `just images-node TAG`, or `just images-java TAG` | Optional literal tag is forwarded to that observer image task. |
+| Node native observer | `CORSAIR_TEST_NODE=1 just -- test-docker -q -W error tests/integration/test_node.py` | Reviewed Docker daemon and selected Node image; exercises the fixed `.mjs` ESM/JSON observer and its native JUnit/LCOV receipt projection. |
+| Java native observer | `CORSAIR_TEST_JAVA=1 just -- test-docker -q -W error tests/integration/test_java.py` | Reviewed Docker daemon and selected Java image; exercises the fixed static `String`/`String` observer, JUnit Platform, and JaCoCo receipt projection. |
+| Shared language consumers | `CORSAIR_TEST_NODE=1 CORSAIR_TEST_JAVA=1 just -- test-docker -q -W error tests/integration/test_language_chain.py` | Reviewed Docker daemon, both selected images, and local Temporal test support where selected. |
+| Durable workflows and replay | `just -- test-temporal -q -W error` | Real local Temporal activities and replay; it does not execute a target or call a provider. |
+| All local native selections | `CORSAIR_LIVE_CONFIG=/operator/settings.json just -- test-all -q -W error` | Enables Docker/Temporal and provider extras. Node/Java selection still requires their explicit environment gates. |
+| Isolated producer/auditor diagnostic | `just -- eval-agent AGENT DATASET --settings /operator/settings.json --repeats N` | Explicit provider configuration; no target execution. |
 
-`test-docker` also selects tests marked `temporal`; set `CORSAIR_TEST_TEMPORAL=1` as shown so those fixture-backed durable tests execute instead of skip. `test-live` selects only the live marker and installs the provider extra, but it neither creates credentials nor sets `CORSAIR_LIVE_CONFIG`.
+`test-docker` sets `CORSAIR_TEST_DOCKER=1`. CI's native-conformance job builds the default three observer images and sets `CORSAIR_TEST_TEMPORAL=1`, `CORSAIR_TEST_LONG_PROBE=1`, `CORSAIR_TEST_NODE=1`, and `CORSAIR_TEST_JAVA=1` before `just test-docker`. This is a selected CI boundary, not a substitute for the result record or final qualification.
 
-The CI workflow uses the locked Nix shell. Linux amd64 covers offline/package, Docker/Temporal native conformance, and durable workflow jobs; macOS arm64 covers offline/package and Temporal. Hosted macOS does not stand in for physical Docker Desktop/Colima nested virtualization. See [platforms](../reference/platforms.md) for the support and host-qualification boundary.
+`corsair doctor --settings PATH` is a baseline Python infrastructure check. It does not select a recipe image, test a provider, execute a target, validate receipts/coverage/cleanup, or qualify a selected recipe.
 
-## Frozen inputs and evaluation discipline
+## Frozen inputs, outcomes, and replay
 
-Treat `evals/fixtures` and dataset declarations as test inputs, not formatting targets or convenient examples. Fixture source hashes and line numbers bind a result to the observed target. Ruff excludes that directory so automatic formatting cannot rewrite it; `ty` and conformance tests still apply. Change a fixture, oracle, budget, prompt, source digest, or dataset only as a deliberate evaluated change, not to turn a failed run green.
+Treat `evals/fixtures` and dataset declarations as frozen test inputs, not formatting targets. Their declared source/oracle hashes and line numbers bind a result to the observed target. The formal pre-outcome fixture files and their hashes remain unchanged; legacy result/1 inputs and oracles remain separate from version-2 assessment cohorts.
 
-The isolated evaluator reads each declared input and oracle once, verifies the exact bytes against its dataset digest, and keeps the oracle outside the agent packet. Preserve that separation in new evaluators. Test doubles may exercise a labelled unit/integration boundary, but they cannot create a Docker, Temporal, provider, or population-accuracy claim.
+The two genuine marker-absent histories in `tests/replay/histories/` cover preserved pre-assessment completion forms. Their earlier replay result does not stand in for the current full requalification; retain that status in [PLAN-0127](../plans/archive/plans/PLAN-0127-outcomes-node-java.md).
 
-Use separate results for separate questions:
+`corsair.result/2` outcome completion requires `COMPLETED` execution, a healthy control, a valid actually executed adversarial held/disclosure result as applicable, accepted audit, validated native receipt/coverage, and confirmed cleanup. `NOT_DEMONSTRATED` additionally requires the full diverse finite protocol to complete. Errors, audit rejection, repeated candidates, unavailable services, missing evidence, and uncertain cleanup remain unresolved.
 
-- Scripted ADK plus real Docker/Temporal tests validate composition, not live-model accuracy.
-- Isolated live producer/auditor fixtures assess their stated frozen prompts and cases, not target execution or a population.
-- A full live batch requires real worker, provider, Docker, Temporal, immutable evidence, and external scoring; retain operational errors and unavailable rows.
+## Reporting
 
-Current evidence is intentionally narrow: the earlier physical-Mac suite recorded134 passing tests; the unchanged producer diagnostic was 3/3 and auditor diagnostic 6/6. A distinct actual live model/native batch was 2/3 because the safe case's second round had a native execution error. It remains [ISSUE-0010](../plans/active/ISSUE-0010-live-safe-case-probe.md), not a negative-clearance result. Linux amd64 has not been rerun for this current local revision. These figures are historical qualification records, not a substitute for rerunning the affected gates. The later consolidation passed150 tests before and after cleanup; its final expanded candidate diagnostics scored producer5/9 and auditor12/12. Current counts, unresolved limits and cohort identities are in the [consolidation handoff](../plans/archive/handoffs/HANDOFF-0147-boundaries-and-local-state.md).
-
-## Choosing and reporting checks
-
-Start with the smallest meaningful test for the changed ownership boundary, then run affected consumers. Shared contracts, policy, source admission, evidence, runtime, workflow, package-resource, or configuration changes need broader checks. Docker/Temporal/live gates require the explicit host/service/provider prerequisites; do not replace a blocked gate with a mock and call it equivalent.
-
-Record the exact command, environment gates (without secrets), result, elapsed time when material, skips/deselections, warnings, and unrun prerequisites in the active plan. Preserve failed attempts, immutable receipts, and unknown accounting. Never infer that zero reported tokens/cost means free execution when telemetry is missing.
-
-
-## Directory ownership
-
-`tests/` has only unit, integration, workflow, replay and security category directories. Root `conftest.py` and `__init__.py` are standard discovery/package files. Shared ADK test doubles live in [unit/adk.py](../../tests/unit/adk.py); real Temporal fixture registration and typed workflow doubles live in [workflow/temporal.py](../../tests/workflow/temporal.py). Integration/replay consumers import those single implementations; there is no separate tests/fixtures compatibility package.
-
-`evals/` has datasets, evaluators, experiments, fixtures and baselines. The [evaluator guide](../../evals/evaluators/README.md) points to installed canonical evaluator/scorer code rather than duplicating it. Dataset/fixture/oracle/baseline bytes must survive organization-only changes unchanged. Ignored bytecode and obsolete cache-only folders are not components and are excluded from delivery.
-
-
-A test belongs in the category of its primary behavior; markers declare dependencies. A sandbox security regression may therefore live in integration with the docker marker. Shared helpers stay in their owning category rather than being duplicated to make categories self-contained. Qualification receipts and candidate/promotion baselines are distinct under evals/baselines.
+Start with the smallest meaningful test and affected consumers. Docker, Temporal, and provider checks require explicit prerequisites; do not replace an unavailable boundary with a mock and call it equivalent. Record exact command, environment gates without secrets, image/configuration identity, outcome, skips/deselections, warnings, and unrun prerequisites in [PLAN-0127](../plans/archive/plans/PLAN-0127-outcomes-node-java.md). Preserve failures and historical records exactly.

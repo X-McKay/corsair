@@ -56,6 +56,10 @@ class SandboxStub:
     def image_id(self) -> str:
         raise AssertionError("unexpected image lookup")
 
+    def image_id_for(self, recipe):
+        del recipe
+        return self.image_id
+
     def has_unknown_operation(self, operation_id: str) -> bool:
         raise AssertionError(f"unexpected operation lookup: {operation_id}")
 

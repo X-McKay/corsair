@@ -25,23 +25,23 @@ def build_producer(
     model: str | BaseLlm,
     tools: Sequence[Callable[..., Any] | SkillToolset],
 ) -> LlmAgent:
-    """Build the producer from its two bound source tools and native skill loader."""
+    """Build the producer from its bound readers/helpers and native skill loader."""
 
     selected_tools = list(tools)
     spec = load_agent_spec("producer")
-    source_count = len(spec.source_tools)
-    source_candidates = selected_tools[:source_count]
-    loader_tools = selected_tools[source_count:]
+    expected_names = [*spec.source_tools, *spec.mechanical_tools]
+    function_candidates = selected_tools[: len(expected_names)]
+    loader_tools = selected_tools[len(expected_names) :]
     if len(loader_tools) != 1 or not isinstance(loader_tools[0], SkillToolset):
         raise ValueError("producer must receive exactly one native SkillToolset")
-    if any(not callable(tool) for tool in source_candidates):
-        raise ValueError("producer source tools must be native callables")
-    source_tools = [cast(Callable[..., Any], tool) for tool in source_candidates]
-    names = [_tool_name(tool) for tool in source_tools]
-    if names != spec.source_tools:
+    if any(not callable(tool) for tool in function_candidates):
+        raise ValueError("producer function tools must be native callables")
+    function_tools = [cast(Callable[..., Any], tool) for tool in function_candidates]
+    names = [_tool_name(tool) for tool in function_tools]
+    if names != expected_names:
         raise ValueError(
-            "producer source tools must exactly match approved metadata "
-            f"{spec.source_tools!r}; received {names!r}"
+            "producer function tools must exactly match approved metadata "
+            f"{expected_names!r}; received {names!r}"
         )
     loader = loader_tools[0]
     if [skill.name for skill in loader.skills] != spec.runtime_skills:

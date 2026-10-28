@@ -1,0 +1,93 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/1",
+    "input": {
+      "kind": "json",
+      "payload": {
+        "title": "Path traversal in read_file",
+        "description": "The read_file(root, path) function joins an untrusted path to root without containment and may disclose private files. Inspect reader.py.",
+        "locations": [
+          {
+            "path": "reader.py",
+            "symbol": "read_file"
+          }
+        ]
+      }
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "d12e301c6dde6b130d4d254bccbe5178374e3941e6eb0ad45af48f220984c62b"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    },
+    "bindings": {
+      "request": {
+        "case": {
+          "schema_version": "corsair.case/1",
+          "case_id": "intake-bound",
+          "finding": {
+            "title": "Path traversal in read_file",
+            "description": "The read_file(root, path) function joins an untrusted path to root without containment and may disclose private files. Inspect reader.py.",
+            "file": "reader.py",
+            "line": null,
+            "claim_scope": "component"
+          },
+          "source": {
+            "path": "repository",
+            "expected_digest": "d12e301c6dde6b130d4d254bccbe5178374e3941e6eb0ad45af48f220984c62b"
+          },
+          "recipe": {
+            "kind": "python.secret_disclosure/1",
+            "module_file": "reader.py",
+            "function": "read_file",
+            "payload_parameter": "path",
+            "fixed_kwargs": {
+              "root": "/fixtures/allowed"
+            },
+            "public_files": {
+              "hello.txt": "hello"
+            },
+            "expected_control": "hello",
+            "allowed_exceptions": [
+              "builtins.ValueError"
+            ]
+          },
+          "fixed_source": null
+        },
+        "budget": {
+          "max_rounds": 3,
+          "max_llm_calls": 16,
+          "episode_llm_calls": 4,
+          "max_tool_calls": 24,
+          "max_output_tokens": 4096,
+          "max_elapsed_seconds": 900,
+          "probe_timeout_seconds": 30,
+          "tool_output_bytes": 32768
+        }
+      },
+      "issue_digest": "a04f19e5a665f6f51616aca19c9aa92b6a743fb7f18321ef44d3a8768265cb53",
+      "request_digest": "37b29cd17a38ed278ffb3716c63cc1e4384309c220224dbfda9e7175f36f137d"
+    }
+  },
+  "inventory": {
+    "images": [
+      {
+        "reference": "corsair-python:0.1",
+        "language": "python",
+        "execution_mode": "callable",
+        "requirements": [],
+        "recipe_kind": "python.secret_disclosure/1",
+        "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "source_digest": "d12e301c6dde6b130d4d254bccbe5178374e3941e6eb0ad45af48f220984c62b"
+}

@@ -57,7 +57,9 @@ class Activities:
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
         try:
-            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id)
+            image_id = await asyncio.to_thread(
+                lambda: self.sandbox.image_id_for(request.case.recipe)
+            )
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",

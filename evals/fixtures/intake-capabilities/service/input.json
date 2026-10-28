@@ -1,0 +1,35 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/2",
+    "input": {
+      "kind": "json",
+      "payload": {
+        "title": "HTTP file disclosure",
+        "description": "The Express HTTP /read endpoint accepts an untrusted path and returns its contents. Inspect server.mjs.",
+        "locations": [
+          {
+            "path": "server.mjs"
+          }
+        ]
+      }
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "9a244e81abcf93b20984f9a5984d3d01d200d58d37eace62c679b05d2f54c94b"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    }
+  },
+  "inventory": {
+    "images": []
+  },
+  "source_digest": "9a244e81abcf93b20984f9a5984d3d01d200d58d37eace62c679b05d2f54c94b"
+}

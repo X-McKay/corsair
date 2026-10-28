@@ -4,7 +4,7 @@ import json
 from importlib.resources import files
 
 from corsair import __version__
-from corsair.agents.resources import runtime_skill_digest
+from corsair.agents.resources import mechanical_tools_digest, runtime_skill_digest
 from corsair.contracts import (
     AuditResult,
     InvestigationRequest,
@@ -33,7 +33,10 @@ def build_manifest(request: InvestigationRequest, settings: Settings, image_id: 
             "governance_tier": spec["governance_tier"],
             "tools": spec["tools"],
             "budget_policy_digest": digest(request.budget),
+            "recipe_schema_digest": digest(type(request.case.recipe).model_json_schema()),
         }
+        if role == "producer":
+            capabilities[role]["mechanical_tools_digest"] = mechanical_tools_digest()
     return RunManifest(
         package_version=__version__,
         request_digest=digest(request),

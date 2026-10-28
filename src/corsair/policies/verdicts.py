@@ -1,13 +1,14 @@
-"""Deterministic policy for evidence observations.
+"""Deterministic policy for evidence observations and assessment conclusions.
 
-A passing adversarial probe is not a clearance. The only affirmative result is a
-trusted, complete secret-disclosure demonstration with a healthy control and an
-accepted audit; all negative or incomplete evidence remains inconclusive.
+A passing adversarial probe is not a clearance. Legacy dispositions retain their
+existing evidence meaning; versioned result records may additionally expose a
+completed assessment conclusion when a trusted paired protocol is satisfied.
 """
 
 from __future__ import annotations
 
 from corsair.contracts import (
+    AssessmentOutcome,
     AuditDecision,
     AuditOutput,
     Disposition,
@@ -38,6 +39,17 @@ def _native_role_valid(role: RoleObservation, expected: RoleOutcome) -> bool:
     return False
 
 
+def _has_required_coverage(prepared: PreparedCase, role: RoleObservation) -> bool:
+    """Require the configured finding line when the recipe declares one."""
+    return prepared.finding.line is None or prepared.finding.line in role.covered_lines
+
+
+def _assessment_role_valid(
+    prepared: PreparedCase, role: RoleObservation, expected: RoleOutcome
+) -> bool:
+    return _native_role_valid(role, expected) and _has_required_coverage(prepared, role)
+
+
 def _roles_are_executable(observation: Observation) -> bool:
     return bool(
         observation.control is not None
@@ -49,6 +61,40 @@ def _roles_are_executable(observation: Observation) -> bool:
         and type(observation.adversarial.native_exit_code) is int
         and observation.adversarial.native_exit_code >= 0
     )
+
+
+def assessment_outcome(
+    prepared: PreparedCase, observation: Observation, audit: AuditOutput
+) -> AssessmentOutcome | None:
+    """Return a completed conclusion for one independently audited paired observation.
+
+    This policy checks the result-level gate ledger. The evaluator additionally
+    revalidates the immutable evidence receipt before counting either conclusion.
+    ``None`` is an incomplete assessment, not a third security label.
+    """
+    if (
+        observation.feedback is not None
+        or observation.artifact is None
+        or observation.source_digest != prepared.source.sha256
+        or not observation.cleanup_confirmed
+        or observation.control is None
+        or observation.adversarial is None
+        or audit.feedback is not None
+        or audit.review is None
+        or audit.review.decision is not AuditDecision.ACCEPT
+    ):
+        return None
+    control = observation.control
+    adversarial = observation.adversarial
+    if _assessment_role_valid(prepared, control, RoleOutcome.HELD) and _assessment_role_valid(
+        prepared, adversarial, RoleOutcome.VIOLATION
+    ):
+        return AssessmentOutcome.DEMONSTRATED
+    if _assessment_role_valid(prepared, control, RoleOutcome.HELD) and _assessment_role_valid(
+        prepared, adversarial, RoleOutcome.HELD
+    ):
+        return AssessmentOutcome.NOT_DEMONSTRATED
+    return None
 
 
 def fix_status(observation: Observation | None) -> FixStatus:
@@ -77,7 +123,7 @@ def fix_status(observation: Observation | None) -> FixStatus:
 def decide(
     prepared: PreparedCase, observation: Observation, audit: AuditOutput
 ) -> tuple[Disposition, ExecutionStatus, str]:
-    """Return a conservative disposition and execution status for one observation."""
+    """Return a conservative legacy disposition and execution status for one observation."""
     if _blocked(observation):
         assert observation.feedback is not None
         return Disposition.INCONCLUSIVE, ExecutionStatus.BLOCKED, observation.feedback.reason

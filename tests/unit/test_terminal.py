@@ -50,6 +50,42 @@ def test_human_terminal_displays_colors_without_interpreting_data(capsys, monkey
     assert "unknown" in output
 
 
+def test_human_terminal_prioritizes_assessment_outcome_and_keeps_disposition(capsys):
+    from corsair.contracts import (
+        AssessmentOutcome,
+        Disposition,
+        ExecutionStatus,
+        InvestigationResult,
+    )
+
+    terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
+    terminal.emit(
+        InvestigationResult(
+            run_id="outcome",
+            case_id="case",
+            disposition=Disposition.INCONCLUSIVE,
+            execution_status=ExecutionStatus.COMPLETED,
+            reason="completed bounded protocol",
+            assessment_outcome=AssessmentOutcome.NOT_DEMONSTRATED,
+        )
+    )
+
+    output = capsys.readouterr().out
+    assert "Exploit not demonstrated" in output
+    assert "Disposition" in output and "INCONCLUSIVE" in output
+
+    terminal.emit(
+        InvestigationResult(
+            run_id="incomplete",
+            case_id="case",
+            disposition=Disposition.INCONCLUSIVE,
+            execution_status=ExecutionStatus.ERROR,
+            reason="evidence step unavailable",
+        )
+    )
+    assert "Assessment incomplete" in capsys.readouterr().out
+
+
 def test_no_color_and_no_animation_disable_control_codes(capsys, monkeypatch):
     monkeypatch.setenv("FORCE_COLOR", "1")
     terminal = Terminal(

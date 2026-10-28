@@ -39,6 +39,7 @@ _FIELDS = frozenset(
         "error_type",
         "execution_status",
         "disposition",
+        "assessment_outcome",
         "cleanup_confirmed",
         "artifact",
         "task_queue",
@@ -223,6 +224,7 @@ class _ActivityLogging(ActivityInboundInterceptor):
             usage_complete=getattr(result, "usage_complete", None),
             execution_status=getattr(result, "execution_status", None),
             disposition=getattr(result, "disposition", None),
+            assessment_outcome=getattr(result, "assessment_outcome", None),
         )
         return result
 

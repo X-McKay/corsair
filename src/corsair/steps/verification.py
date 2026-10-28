@@ -11,6 +11,7 @@ from corsair.contracts import (
     ArtifactRef,
     EvidenceInput,
     Feedback,
+    JavaRecipe,
     Observation,
     PreparedCase,
     RoleObservation,
@@ -250,7 +251,7 @@ class EvidenceVerifier:
                 outcome=outcome,
                 target_executed=target_executed,
                 covered_lines=lines,
-                reason="validated native pytest/coverage evidence",
+                reason="validated native test/coverage evidence",
                 native_exit_code=exit_code,
             ),
             True,
@@ -351,6 +352,20 @@ class EvidenceVerifier:
             return self._blocked(
                 input, input.prepared, "source-admission", "fixed source is not configured"
             )
+        if isinstance(prepared.recipe, JavaRecipe) and (
+            not isinstance(input.submission.control_payload, str)
+            or not isinstance(input.submission.exploit_payload, str)
+        ):
+            return Observation(
+                operation_id=input.operation_id,
+                source_digest=prepared.source.sha256,
+                submission_digest=digest(input.submission),
+                feedback=Feedback(
+                    gate="payload-schema",
+                    reason="the admitted Java method requires String payload values",
+                    operational=False,
+                ),
+            )
         submission_digest = digest(input.submission)
         intent_ref = self._intent_ref(input, prepared, submission_digest)
         try:
@@ -373,7 +388,11 @@ class EvidenceVerifier:
                 )
             # Ensure image availability before starting the first role. There is no
             # fake/non-Docker success path.
-            _ = self.sandbox.image_id
+            actual_image = self.sandbox.image_id_for(prepared.recipe)
+            if actual_image != prepared.manifest.image_id:
+                return self._blocked(
+                    input, prepared, "sandbox", "configured image changed after preparation"
+                )
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:

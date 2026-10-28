@@ -1,8 +1,8 @@
 """Validated role metadata and packaged runtime resources.
 
 Role factories own concrete ADK construction. This module supplies immutable
-prompt text, validates declared role capabilities, and admits only the two
-small packaged procedural skills before native ADK receives them.
+prompt text, validates declared role capabilities, and admits only the finite
+role-local packaged procedural skills before native ADK receives them.
 """
 
 from __future__ import annotations
@@ -20,11 +20,12 @@ from corsair.contracts import Contract
 if TYPE_CHECKING:
     from google.adk.skills import Skill
 
-RoleName = Literal["producer", "auditor"]
+RoleName = Literal["producer", "auditor", "intake"]
 
 _RESOURCE_PACKAGES: dict[RoleName, str] = {
     "producer": "corsair.agents.producer",
     "auditor": "corsair.agents.auditor",
+    "intake": "corsair.agents.intake",
 }
 _LOADER_TOOLS = ("load_skill", "load_skill_resource")
 _MAX_LOADER_CALLS = 4
@@ -42,6 +43,8 @@ def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
             return ("source-grounding",)
         case "auditor":
             return ("semantic-review",)
+        case "intake":
+            return ("image-selection",)
 
 
 class AgentSpec(Contract):
@@ -54,6 +57,7 @@ class AgentSpec(Contract):
     risk_path: str = Field(min_length=1, max_length=240)
     tools: list[str]
     source_tools: list[str]
+    mechanical_tools: list[str] = Field(default_factory=list)
     loader_tools: list[str]
     runtime_skills: list[str]
     loader_call_limit: int = Field(ge=1, le=_MAX_LOADER_CALLS)
@@ -61,7 +65,7 @@ class AgentSpec(Contract):
     instruction_resource: str = Field(min_length=1, max_length=240)
     schema_ref: str = Field(min_length=1, max_length=240)
 
-    @field_validator("tools", "source_tools", "loader_tools", "runtime_skills")
+    @field_validator("tools", "source_tools", "mechanical_tools", "loader_tools", "runtime_skills")
     @classmethod
     def unique_names(cls, value: list[str]) -> list[str]:
         if len(value) != len(set(value)) or any(not item for item in value):
@@ -74,15 +78,24 @@ class AgentSpec(Contract):
             raise ValueError(f"loader_tools must exactly equal {list(_LOADER_TOOLS)!r}")
         if tuple(self.runtime_skills) != _admitted_skill_slugs(self.name):
             raise ValueError("runtime_skills must exactly equal the role-local admitted skill")
-        if self.tools != [*self.source_tools, *self.loader_tools]:
-            raise ValueError("tools must preserve source_tools followed by loader_tools")
+        if self.tools != [*self.source_tools, *self.mechanical_tools, *self.loader_tools]:
+            raise ValueError("tools must preserve source, mechanical and loader tool order")
         if self.name == "producer":
             if self.source_tools != ["read_file", "list_files"]:
                 raise ValueError("producer source_tools must exactly expose source reads")
+            if self.mechanical_tools != ["preview_invocation", "relative_path"]:
+                raise ValueError("producer mechanical_tools must exactly expose the pure helpers")
             if self.llm_call_limit is not None:
                 raise ValueError("producer LLM calls are bounded by the input and budget")
-        elif self.source_tools:
-            raise ValueError("auditor must not expose source tools")
+        elif self.name == "intake":
+            if (
+                self.source_tools != ["read_file", "list_files"]
+                or self.mechanical_tools != ["compare_images"]
+                or self.llm_call_limit is None
+            ):
+                raise ValueError("intake must expose bounded source and inventory tools")
+        elif self.source_tools or self.mechanical_tools:
+            raise ValueError("auditor must not expose source or mechanical tools")
         elif self.llm_call_limit is None:
             raise ValueError("auditor must declare its finite native LLM-call limit")
         return self
@@ -120,6 +133,17 @@ def prompt_text(role: str) -> str:
         .joinpath("system.md")
         .read_text(encoding="utf-8")
     )
+
+
+def mechanical_tools_digest() -> str:
+    """Identify the two implemented producer helpers, not a discovery registry."""
+
+    package = resources.files("corsair.agents.producer.tools")
+    digest = hashlib.sha256()
+    for filename in ("preview_invocation.py", "relative_path.py"):
+        digest.update(filename.encode("utf-8") + b"\x00")
+        digest.update(package.joinpath(filename).read_bytes() + b"\x00")
+    return digest.hexdigest()
 
 
 def _read_utf8(path: Path, *, byte_limit: int) -> bytes:
@@ -249,3 +273,30 @@ def runtime_skill_digest(role: str) -> str:
             digest.update(content)
             digest.update(b"\x00")
     return digest.hexdigest()
+
+
+def intake_resources_digest() -> str:
+    """Identify the finite implemented intake role and canonical schema."""
+    from corsair.contracts import digest
+    from corsair.contracts.intake import IntakeProposal
+
+    package = resources.files("corsair.agents.intake")
+    content = {
+        name: package.joinpath(name).read_text(encoding="utf-8")
+        for name in (
+            "agent.json",
+            "factory.py",
+            "toolsets.py",
+            "instructions/system.md",
+            "tools/read_file.py",
+            "tools/list_files.py",
+            "tools/compare_images.py",
+        )
+    }
+    return digest(
+        {
+            "resources": content,
+            "schema": IntakeProposal.model_json_schema(),
+            "skills": runtime_skill_digest("intake"),
+        }
+    )

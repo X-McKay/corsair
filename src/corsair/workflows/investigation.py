@@ -1,6 +1,7 @@
 """Plan 1: Temporal owns rounds; normal activities own complete ADK episodes and I/O."""
 
 import asyncio
+import json
 import math
 from datetime import datetime, timedelta
 from typing import Any
@@ -11,6 +12,7 @@ from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
+        AssessmentOutcome,
         AuditInput,
         AuditOutput,
         Disposition,
@@ -26,13 +28,44 @@ with workflow.unsafe.imports_passed_through():
         ProducerInput,
         ProducerOutput,
         RoundResult,
+        Submission,
+        digest,
         format_terminal_result,
     )
-    from corsair.policies.verdicts import decide, fix_status
+    from corsair.policies.verdicts import assessment_outcome, decide, fix_status
 
 
 class BudgetExhausted(Exception):
     """No action time remains before the investigation admission deadline."""
+
+
+def _mechanical_follow_up(gate: str) -> Feedback:
+    """Return finite producer feedback without exposing a prior security outcome."""
+    new_candidate = (
+        "Generate a new source-grounded payload candidate within the remaining admitted budget."
+    )
+    reasons = {
+        "producer-grounding": new_candidate,
+        "candidate-distinctness": (
+            "Generate a candidate with an adversarial payload different from every prior "
+            "admitted candidate."
+        ),
+        "evidence-retry": new_candidate,
+        "audit-retry": new_candidate,
+        "assessment-continue": (
+            "Generate a meaningfully different source-grounded payload candidate within the "
+            "remaining admitted budget."
+        ),
+    }
+    return Feedback(gate=gate, reason=reasons[gate])
+
+
+def _adversarial_payload_digest(submission: Submission) -> str:
+    """Return the canonical identity for an adversarial payload attempt only."""
+    payload = json.dumps(
+        submission.exploit_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return digest(payload)
 
 
 @workflow.defn(name="corsair.investigation")
@@ -100,7 +133,9 @@ class InvestigationWorkflow:
         budget = request.budget
         started = workflow.now()
         self.deadline = started + timedelta(seconds=budget.max_elapsed_seconds)
+        outcomes_enabled = workflow.patched("assessment-outcomes-v1")
         result = InvestigationResult(
+            schema_version="corsair.result/2" if outcomes_enabled else "corsair.result/1",
             run_id=run_id,
             case_id=request.case.case_id,
             disposition=Disposition.INCONCLUSIVE,
@@ -111,6 +146,9 @@ class InvestigationWorkflow:
             ),
         )
         rounds: list[RoundResult] = []
+        protocol_complete = False
+        protocol_unresolved = False
+        retained_held_pair = False
         try:
             self.phase = "prepare"
             prepared = await self._execute_bounded_activity(
@@ -119,11 +157,14 @@ class InvestigationWorkflow:
             result = result.model_copy(update={"manifest": prepared.manifest})
             calls_left, tools_left = budget.max_llm_calls, budget.max_tool_calls
             previous, feedback = None, None
+            admitted_adversarial_payloads: set[str] = set()
             for index in range(1, budget.max_rounds + 1):
                 self.round_index = index
                 elapsed = (workflow.now() - started).total_seconds()
                 if calls_left < 2 or tools_left < 1 or elapsed >= budget.max_elapsed_seconds:
                     result = result.model_copy(update={"reason": "Investigation budget exhausted."})
+                    if outcomes_enabled:
+                        protocol_complete = True
                     break
                 self.phase = "producer"
                 call_limit = min(budget.episode_llm_calls, calls_left - 1)
@@ -150,6 +191,13 @@ class InvestigationWorkflow:
                 rounds.append(round_result)
                 decision = producer.decision
                 if decision is not None and isinstance(decision.root, NoGroundedCandidate):
+                    if outcomes_enabled:
+                        protocol_unresolved = True
+                        feedback = _mechanical_follow_up("producer-grounding")
+                        result = result.model_copy(
+                            update={"reason": f"Producer abstained: {decision.root.reason}"}
+                        )
+                        continue
                     if workflow.patched("producer-abstention-v1"):
                         result = result.model_copy(
                             update={"reason": f"Producer abstained: {decision.root.reason}"}
@@ -164,12 +212,30 @@ class InvestigationWorkflow:
                         gate="producer", reason="No submission"
                     )
                     result = result.model_copy(update={"reason": feedback.reason})
+                    if outcomes_enabled:
+                        protocol_unresolved = True
+                        if feedback.operational:
+                            result = result.model_copy(
+                                update={"execution_status": ExecutionStatus.ERROR}
+                            )
+                            break
+                        feedback = _mechanical_follow_up("producer-grounding")
+                        continue
                     if feedback.operational:
                         result = result.model_copy(
                             update={"execution_status": ExecutionStatus.ERROR}
                         )
                         break
                     continue
+                payload_digest = _adversarial_payload_digest(submission)
+                if outcomes_enabled and payload_digest in admitted_adversarial_payloads:
+                    protocol_unresolved = True
+                    feedback = _mechanical_follow_up("candidate-distinctness")
+                    result = result.model_copy(
+                        update={"reason": "Producer repeated an admitted adversarial payload."}
+                    )
+                    continue
+                admitted_adversarial_payloads.add(payload_digest)
                 previous = submission
                 self.phase = "evidence"
                 observation = await self._execute_bounded_activity(
@@ -189,6 +255,15 @@ class InvestigationWorkflow:
                 if observation.feedback is not None:
                     feedback = observation.feedback
                     result = result.model_copy(update={"reason": feedback.reason})
+                    if outcomes_enabled:
+                        protocol_unresolved = True
+                        if feedback.operational:
+                            result = result.model_copy(
+                                update={"execution_status": ExecutionStatus.ERROR}
+                            )
+                            break
+                        feedback = _mechanical_follow_up("evidence-retry")
+                        continue
                     if feedback.operational:
                         result = result.model_copy(
                             update={"execution_status": ExecutionStatus.ERROR}
@@ -197,6 +272,8 @@ class InvestigationWorkflow:
                     continue
                 if calls_left < 1:
                     result = result.model_copy(update={"reason": "No budget remains for review."})
+                    if outcomes_enabled:
+                        protocol_unresolved = True
                     break
                 self.phase = "audit"
                 audit_llm_call_limit, audit_tool_call_limit = 1, 0
@@ -243,6 +320,37 @@ class InvestigationWorkflow:
                 result = result.model_copy(
                     update={"disposition": label, "execution_status": status, "reason": reason}
                 )
+                if outcomes_enabled:
+                    outcome = assessment_outcome(prepared, observation, audit)
+                    if outcome is AssessmentOutcome.DEMONSTRATED:
+                        result = result.model_copy(update={"assessment_outcome": outcome})
+                        if prepared.fixed_source is not None:
+                            self.phase = "fix"
+                            fixed = await self._execute_bounded_activity(
+                                "corsair.evidence",
+                                EvidenceInput(
+                                    run_id=run_id,
+                                    operation_id=f"{run_id}.fix{index}",
+                                    prepared=prepared,
+                                    submission=previous,
+                                    budget=budget,
+                                    fixed=True,
+                                ),
+                                Observation,
+                                2 * budget.probe_timeout_seconds + 45,
+                            )
+                            result = result.model_copy(
+                                update={"fix_status": fix_status(fixed), "fix_observation": fixed}
+                            )
+                        break
+                    if outcome is AssessmentOutcome.NOT_DEMONSTRATED:
+                        retained_held_pair = True
+                    else:
+                        protocol_unresolved = True
+                    if status != ExecutionStatus.COMPLETED:
+                        break
+                    feedback = _mechanical_follow_up("assessment-continue")
+                    continue
                 if label in {Disposition.SUPPORTED, Disposition.CONDITIONAL}:
                     if prepared.fixed_source is not None:
                         self.phase = "fix"
@@ -266,6 +374,25 @@ class InvestigationWorkflow:
                 if status != ExecutionStatus.COMPLETED:
                     break
                 feedback = Feedback(gate="review_or_reproduction", reason=reason)
+            else:
+                if outcomes_enabled:
+                    protocol_complete = True
+            if (
+                outcomes_enabled
+                and protocol_complete
+                and not protocol_unresolved
+                and retained_held_pair
+                and result.assessment_outcome is None
+            ):
+                result = result.model_copy(
+                    update={
+                        "assessment_outcome": AssessmentOutcome.NOT_DEMONSTRATED,
+                        "reason": (
+                            "Completed the bounded assessment protocol without demonstrating "
+                            "exploitability within the assessed scope."
+                        ),
+                    }
+                )
         except ActivityError as exc:
             cause_type = getattr(exc.cause, "type", "")
             # Operational failures must not erase a previously admitted source observation.
@@ -284,7 +411,10 @@ class InvestigationWorkflow:
             )
         except BudgetExhausted:
             result = result.model_copy(
-                update={"reason": "Investigation elapsed-time budget exhausted."}
+                update={
+                    "execution_status": ExecutionStatus.ERROR,
+                    "reason": "Investigation elapsed-time budget exhausted.",
+                }
             )
         except ValueError as exc:
             result = result.model_copy(
@@ -300,6 +430,8 @@ class InvestigationWorkflow:
             )
             raise
         finally:
+            if outcomes_enabled and result.execution_status is not ExecutionStatus.COMPLETED:
+                result = result.model_copy(update={"assessment_outcome": None})
             result = result.model_copy(update={"rounds": rounds})
             result = await self._record_result(result)
         return result

@@ -1,0 +1,16 @@
+{
+  "schema_version": "corsair.submission/1",
+  "hypothesis": "The exported read method resolves the caller-controlled payload, then checks whether the resolved candidate leaves the fixed baseRoot. The parent traversal should take that guard branch and return blocked rather than asserting a bypass; hello.txt is the public control.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Propose a positional payload pair for the configured returned-file reader",
+    "next_steps": [
+      "Inspect reader.mjs at the declared finding line",
+      "Submit hello.txt and the declared parent-traversal payload"
+    ],
+    "reason": "The recipe fixes baseRoot and permits only the positional payload at index 1 to vary"
+  },
+  "control_payload": "hello.txt",
+  "exploit_payload": "../private/secret.txt"
+}

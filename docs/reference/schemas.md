@@ -1,27 +1,32 @@
 # Domain schemas
 
-Canonical domain contracts are SDK-free, frozen Pydantic models under [`src/corsair/contracts/`](../../src/corsair/contracts/). Import their public names from `corsair.contracts`; the focused source modules are the single authority. This page explains their relationships and intentionally does **not** commit a parallel JSON Schema or copied configuration schema.
+## Current investigation schemas
+
+Normal investigations use `IssueInvestigationRequest` and `IssueInvestigationResult` from `corsair.contracts`, defined in [`contracts/pipeline.py`](../../src/corsair/contracts/pipeline.py). The request nests intake input/source/budget; the parent derives its execution image from a supported committed intake result. `start_investigation` and `load_issue_investigation_request` use this v4 boundary. Explicit `start_execution`/`--direct` retains v3 `ExecutionRequest` diagnostics. [The guide](../guides/investigations.md) explains the categorical gates and result meanings.
+
+`TestPlan` is the producer's native output schema; `PlanAudit` is the auditor's. Trusted `ProcessObservation` records actual command exits/output and cleanup, with `UNRESOLVED` security assessment in the result. Canonical contracts are defined once; role-local contracts re-export those same objects.
+
+## Historical v1/v2 reference
+
+The remaining material describes retained fixed-observer diagnostics, immutable old results and frozen evaluation inputs. Normal CLI investigations use the v4 intake-gated models above.
+
+Canonical domain contracts are SDK-free, frozen Pydantic models under [`src/corsair/contracts/`](../../src/corsair/contracts/). Import public names from `corsair.contracts`; this page explains relationships rather than maintaining a parallel schema.
 
 ```python
-from corsair.contracts import InvestigationRequest, Submission
+from corsair.contracts import InvestigationRequest, JavaRecipe, JavaScriptRecipe, PythonRecipe
 ```
 
-Every `Contract` rejects extra fields, is immutable after validation, and disallows non-finite floating-point values. An `Identifier` is 1–80 characters matching `[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}`. A `Digest` is a 64-character lowercase SHA-256 hexadecimal value. Fields validated as safe source paths are normalized relative POSIX paths, not host-absolute paths.
+Every `Contract` rejects extra fields, is immutable after validation, and disallows non-finite floating-point values. `Identifier` is 1–80 characters matching `[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}`. `Digest` is a 64-character lowercase SHA-256 value. Safe source paths are normalized relative POSIX paths, never host-absolute paths.
 
 ## Generate the current JSON Schema
 
-Generate schemas from the installed models whenever a machine consumer needs them. Do not check the output into a second source-of-truth file.
+Generate machine-consumable schema from installed models; do not check generated output in as another source of truth.
 
 ```bash
 uv run --locked python - <<'PY'
 import json
 
-from corsair.contracts import (
-    AuditResult,
-    InvestigationRequest,
-    InvestigationResult,
-    ProducerDecision,
-)
+from corsair.contracts import AuditResult, InvestigationRequest, InvestigationResult, ProducerDecision
 
 for model in (InvestigationRequest, ProducerDecision, AuditResult, InvestigationResult):
     print(f"# {model.__name__}")
@@ -29,11 +34,7 @@ for model in (InvestigationRequest, ProducerDecision, AuditResult, Investigation
 PY
 ```
 
-Use `Model.model_validate_json(...)` or `Model.model_validate(...)` to validate input, rather than treating the generated schema as an independent validation implementation.
-
 ## Source, case, and request
-
-[`sources.py`](../../src/corsair/contracts/sources.py) defines the operator/request-side model lineage:
 
 ```text
 InvestigationRequest
@@ -41,69 +42,45 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: PythonRecipe (python.secret_disclosure/1)
+│   └── recipe: PythonRecipe | JavaScriptRecipe | JavaRecipe
 └── budget: Budget
 ```
 
-- A **finding** is the reported title, description, source file, optional line, and requested claim scope. It is not trusted evidence.
-- A **source** names a local source-tree path and may pin its expected snapshot digest. It is a proposed local input, not an admitted archive or a remote checkout.
-- A **recipe** is the operator-owned test shape. The initial recipe binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable. The recipe must bind to the finding's file.
-- A **case** combines that finding, source, recipe, optional fixed source, and stable `case_id`. A case describes what to investigate; it has no run budget and no workflow identity.
-- An **investigation request** is a case plus a bounded `Budget`. The default budget is bounded in rounds, model/tool calls, output tokens, elapsed time, probe time, tool output, and source handling. It is the typed Temporal input for one investigation.
+A finding is a claim, source is a proposed local tree, and recipe is the operator-owned test shape. `Case` binds `recipe.module_file` to `finding.file`; request validation does not admit or run the tree. `Budget` bounds rounds, agent/tool calls, output, elapsed/probe time, and source handling.
 
-`load_investigation_request()` validates request JSON and converts source paths to absolute paths relative to the request file. That is not admission. The local admission adapter later accepts only a non-symlink directory beneath configured `source_root`, snapshots its admitted bytes, and exposes only that immutable snapshot. Current source admission is local; remote SCM checkout is not a present schema or adapter.
+| Class / kind | Recipe-specific fields and boundary |
+| --- | --- |
+| `PythonRecipe` / `python.secret_disclosure/1` | `.py` module, public function, public payload parameter, JSON fixed kwargs, fixtures, expected control, and qualified exception names. Missing `kind` is accepted only for legacy Python input. |
+| `JavaScriptRecipe` / `javascript.secret_disclosure/1` | Explicit `.mjs` ESM module, public ASCII export, JSON `fixed_args`, inserted JSON payload, fixtures, and JSON expected control. `allowed_exceptions` contains only the Pydantic literals `Error`, `TypeError`, and `RangeError`. |
+| `JavaRecipe` / `java.secret_disclosure/1` | `.java` module matching the final segment of qualified `class_name`, public ASCII method, string `fixed_args`, inserted string payload, string expected control, fixtures, and qualified Java exception names. The method ABI is public static `String` with `String` arguments. |
+
+The common positional fields permit at most 16 fixed values. `payload_index` inserts without replacing fixed arguments. Target dependency resolution, target build scripts, and annotation processing are not recipe fields or behaviors. `load_investigation_request()` resolves source paths relative to request JSON, after which local source admission makes the immutable snapshot.
 
 ## Prepared case, manifest, and artifacts
 
-A **prepared case** is worker-derived after source admission. `PreparedCase` holds the case identity, finding, recipe, source artifact reference, optional fixed-source artifact reference, a bounded source excerpt, and a manifest. It is not an alternate request format.
+A `PreparedCase` is worker-derived after admission. It carries the discriminated recipe, admitted source artifact, bounded source excerpt, optional fixed-source artifact, and manifest. `RunManifest` binds request/configuration digests, producer/auditor prompt digests, resolved immutable image ID, model names, and capabilities. `Settings.image_for_recipe()` selects the configured tag; the manifest records its resolved local ID.
 
-A **run manifest** (`corsair.manifest/1`) binds a run to its request and configuration digests, producer/auditor prompt digests, immutable image ID, chosen model names, and recorded capabilities. It records run provenance; it is not a mutable settings document and does not carry credentials.
+An `ArtifactRef` has `sha256`, `size`, and `media_type`; it names immutable artifact-store bytes, not a host path or evidence conclusion.
 
-An **artifact reference** has only `sha256`, `size`, and `media_type`. It names immutable bytes in the artifact store; it is not a host path, container handle, or assertion that the referenced bytes prove a security outcome. The store verifies digest and size on reads. Source snapshots, native receipts, operation records, and completed-result references use this mechanism.
+## Agent proposals and observations
 
-## Agent proposals and audit
+`ProducerDecision` is the producer's native ADK output: either a proposal carrying one `Submission` or a bounded abstention. `AuditResult` is outcome-blind semantic review. The producer declares `ProducerDecision` and the auditor `AuditResult` directly as native schemas. Neither model output is evidence.
 
-[`agents.py`](../../src/corsair/contracts/agents.py) is the canonical definition of the native ADK structured outputs:
+`Observation` binds an operation/source/submission digest to control/adversarial `RoleObservation`s, feedback, evidence artifact, and independent cleanup confirmation. Roles report `PROPERTY_HELD`, `VIOLATION`, `INVALID`, or `ERROR`, plus execution, coverage, diagnostic, and native-exit facts. `SandboxPort` returns the immutable raw receipt; trusted verifier and policy code process it outside the proposal boundary.
 
-- A **plan revision** gives a positive `revision`, optional parent revision, objective, up to eight next steps, and a bounded reason. It is a proposal-local revision record, not a Temporal workflow plan or an execution log.
-- A **submission** (`corsair.submission/1`) contains a hypothesis, one `PlanRevision`, and exact control/exploit values for the recipe's `payload_parameter`. Each payload can be any JSON value through an explicit union; it is a value for the parameter, not a keyword-argument wrapper unless that parameter itself expects an object. The combined payload encoding is capped at 32 KiB.
-- A **producer decision** (`corsair.producer-decision/1`) is the producer's direct native ADK output schema. Its `kind` discriminator selects either `proposal`, which contains one unchanged `Submission`, or `no_grounded_candidate`, which contains a bounded explanation for abstaining. Only the proposal variant reaches trusted evidence collection.
-- An **audit result** is the auditor's structured, outcome-blind semantic review: `ACCEPT`, `REJECT`, or `INSUFFICIENT_CONTEXT`, plus a rule and reason. It cannot create native evidence or itself determine the final disposition.
+## Results status disposition and fix
 
-The producer declares `ProducerDecision` directly as its ADK `output_schema`; the auditor similarly declares `AuditResult`. The producer retains `read_file` and `list_files` against an already admitted snapshot. Both roles may load only their own packaged procedure/reference text through native `load_skill` and `load_skill_resource`; neither receives skill-script execution, and the auditor has no source or external tools. A valid structured object is therefore neither a successful target execution nor proof of a vulnerability.
+`InvestigationResult` permits `corsair.result/1` and `corsair.result/2`:
 
-## Observation and evidence
+- `ExecutionStatus` is operational: `COMPLETED`, `BLOCKED`, `ERROR`, or `CANCELLED`.
+- Legacy `Disposition` is `SUPPORTED`, `REFUTED`, `CONDITIONAL`, or `INCONCLUSIVE`. Result/2 rejects `REFUTED`; preserved result/1 bytes keep their original wire shape.
+- `AssessmentOutcome` is optional only on result/2: `DEMONSTRATED` or `NOT_DEMONSTRATED`. A non-null assessment outcome requires `COMPLETED` execution.
+- `FixStatus` concerns a separately observed fixed source.
 
-[`evidence.py`](../../src/corsair/contracts/evidence.py) separates raw trusted observations from proposals and conclusions.
+`DEMONSTRATED` requires a healthy control and valid actually executed adversarial disclosure. `NOT_DEMONSTRATED` requires the entire diverse finite protocol to complete with healthy controls and valid actually executed held adversarial attempts. Both also require accepted audit, receipt/coverage validation, and confirmed cleanup. Errors, audit rejection, repeated candidates, missing evidence, unavailable services, and uncertain cleanup leave the outcome `null`.
 
-An `EvidenceInput` binds one operation to a prepared case, submission, budget, and whether it is the separately requested fixed-source run. Its resulting `Observation` records the operation, source and submission digests, optional control/adversarial `RoleObservation`s, feedback, a raw receipt artifact reference, and independently confirmed cleanup.
+The external scorer revalidates the exact immutable final result committed as `result.{run_id}`. For the negative outcome it requires each retained round to validate as the expected held pair with its expected operation identity. Legacy and assessment oracles use distinct datasets, and frozen historical records are not relabelled. See [evaluations](../agents/evaluations.md), [language recipes](../guides/languages.md), and [PLAN-0127](../plans/archive/plans/PLAN-0127-outcomes-node-java.md) for the current evidence status.
 
-A role observation reports one of these **execution outcomes**:
+## Intake-gated aggregate
 
-- `PROPERTY_HELD`
-- `VIOLATION`
-- `INVALID`
-- `ERROR`
-
-It also states whether the target actually executed, optional covered lines, reason, and optional native exit code. These are verifier-level facts about one role execution. They are not the final verdict, and an absent/invalid/error observation cannot be converted into a negative security conclusion.
-
-The narrow ports preserve this separation: `SourceSnapshotPort` produces a prepared case from local admission; `InferencePort` produces/audits typed models; `SandboxPort` returns an immutable raw receipt `ArtifactRef`, not a trusted verdict. Docker SDK execution and receipt verification occur outside the agent proposal boundary.
-
-## Results, status, disposition, and fix
-
-[`results.py`](../../src/corsair/contracts/results.py) collects durable results without conflating their meanings:
-
-- A **round result** groups the producer decision/output with its optional native observation and audit output for one numbered round. An explicit no-grounded-candidate abstention ends a newly recorded workflow `INCONCLUSIVE` with no target execution or audit; it does not create negative clearance.
-- An **execution status** is operational: `COMPLETED`, `BLOCKED`, `ERROR`, or `CANCELLED`. `COMPLETED` means the workflow reached its result path; it does not mean that a finding was supported.
-- A **disposition** is the evidence-policy conclusion: `SUPPORTED`, `REFUTED`, `CONDITIONAL`, or `INCONCLUSIVE`. In the current policy, a held adversarial probe or incomplete evidence remains `INCONCLUSIVE`; it is not used to establish non-exploitability. A component demonstration against an application-scope finding becomes `CONDITIONAL`, not an application-wide claim.
-- A **fix status** concerns the separately observed `fixed_source`: `NOT_REQUESTED`, `DEMONSTRATION_BLOCKED`, `NOT_BLOCKED`, or `UNVERIFIED`. `DEMONSTRATION_BLOCKED` means the particular admitted demonstration was blocked while its control held; it is not universal patch correctness. Missing evidence, operational feedback, failed cleanup, or invalid roles leave the fix `UNVERIFIED`.
-
-`InvestigationResult` (`corsair.result/1`) brings these values together with the run and case IDs, reason, scope, optional manifest, rounds, usage-completeness flag, optional fixed observation, and final result artifact reference. A returned result must be read as both a disposition and an execution status.
-
-For batch evaluation, [`evaluation.py`](../../src/corsair/contracts/evaluation.py) defines `BatchRequest` (bounded requests, repeats, concurrency, and batch ID) and `BatchItem` (case/run identity plus artifact or error). Evaluation labels and scores are owned outside this workflow-input contract.
-
-The [Python API reference](api.md) shows how these models enter and leave a Temporal workflow. For concise terminology, see the [glossary](glossary.md); for current schema-related work, see [current plans](../plans/README.md).
-
-## Execution intent compatibility
-
-New executions bind the complete capability manifest digest in `corsair.evidence-intent/2`. A completed or unknown v1 operation is not blindly migrated or re-executed under the changed policy: its immutable claim is retained and a mismatched reconciliation is explicit. The packaged risk assessment contributes to the declared capability identity; configuration settings alone are not the complete runtime identity.
+[`IssueInvestigationRequest` and `IssueInvestigationResult`](../../src/corsair/contracts/pipeline.py) are the canonical v4 normal investigation boundary. The request nests one `IntakeRequest` and optional fixed source; the selected image is derived from supported intake. The result retains categorical stops, the intake result, committed execution artifact reference/outcome and aggregate usage completeness. See [the investigation guide](../guides/investigations.md).

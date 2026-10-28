@@ -156,7 +156,7 @@ class FakeActivities:
         previous_revision = request.previous.plan.revision if request.previous else None
         submission = Submission(
             control_payload="hello.txt",
-            exploit_payload="../private/secret.txt",
+            exploit_payload=f"../private/secret-{request.round_index}.txt",
             hypothesis="The configured target returns an attacker-controlled payload.",
             plan=PlanRevision(
                 revision=request.round_index,

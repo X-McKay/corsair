@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, JsonValue, field_validator, model_validator
 
@@ -99,13 +99,128 @@ class PythonRecipe(Contract):
         return self
 
 
+class _PositionalDisclosureRecipe(Contract):
+    """Shared operator-owned positional invocation for the two concrete JVM/Node ABIs."""
+
+    module_file: str
+    function: str
+    fixed_args: tuple[JsonValue, ...] = Field(default_factory=tuple, max_length=16)
+    payload_index: int = Field(default=0, ge=0, le=16)
+    public_files: dict[str, str] = Field(default_factory=lambda: {"hello.txt": "hello"})
+    expected_control: JsonValue = "hello"
+    private_fixture_path: Literal["/fixtures/private/secret.txt"] = Field(
+        default="/fixtures/private/secret.txt",
+        description="Public observer fixture location; its random content is never disclosed.",
+    )
+
+    _safe_module = field_validator("module_file")(safe_path)
+
+    @field_validator("function")
+    @classmethod
+    def public_callable(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_$]*", value):
+            raise ValueError("expected a public ASCII callable identifier")
+        return value
+
+    @field_validator("fixed_args")
+    @classmethod
+    def bounded_arguments(cls, value: tuple[JsonValue, ...]) -> tuple[JsonValue, ...]:
+        if len(json.dumps(value).encode()) > 16000:
+            raise ValueError("fixed arguments exceed the recipe limit")
+        return value
+
+    @field_validator("public_files")
+    @classmethod
+    def bounded_fixtures(cls, value: dict[str, str]) -> dict[str, str]:
+        return PythonRecipe.fixtures(value)
+
+    @model_validator(mode="after")
+    def inserted_payload(self):
+        if self.payload_index > len(self.fixed_args):
+            raise ValueError("payload_index must insert without replacing fixed arguments")
+        return self
+
+
+class JavaScriptRecipe(_PositionalDisclosureRecipe):
+    """Dependency-free Node ESM named export, with one inserted JSON payload value."""
+
+    kind: Literal["javascript.secret_disclosure/1"] = "javascript.secret_disclosure/1"
+
+    @field_validator("module_file")
+    @classmethod
+    def esm_file(cls, value: str) -> str:
+        if not value.endswith(".mjs"):
+            raise ValueError("the Node recipe requires an explicit ESM .mjs source file")
+        return value
+
+    allowed_exceptions: list[Literal["Error", "TypeError", "RangeError"]] = Field(
+        default_factory=list, max_length=3
+    )
+
+    @field_validator("allowed_exceptions")
+    @classmethod
+    def distinct_errors(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("allowed exceptions must be distinct")
+        return value
+
+
+class JavaRecipe(_PositionalDisclosureRecipe):
+    """JDK-only public static String method with String arguments; no target build scripts."""
+
+    kind: Literal["java.secret_disclosure/1"] = "java.secret_disclosure/1"
+    class_name: str = Field(min_length=1, max_length=500)
+    allowed_exceptions: list[str] = Field(default_factory=list, max_length=16)
+    fixed_args: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
+    expected_control: str = "hello"
+
+    @field_validator("module_file")
+    @classmethod
+    def java_file(cls, value: str) -> str:
+        if not value.endswith(".java"):
+            raise ValueError("the Java recipe requires a .java source file")
+        return value
+
+    @field_validator("class_name")
+    @classmethod
+    def qualified_class(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*", value):
+            raise ValueError("expected a qualified public Java class name")
+        return value
+
+    @field_validator("allowed_exceptions")
+    @classmethod
+    def qualified_exceptions(cls, value: list[str]) -> list[str]:
+        return PythonRecipe.exceptions(value)
+
+    @model_validator(mode="after")
+    def bind_public_class(self):
+        if self.module_file.rsplit("/", 1)[-1] != self.class_name.rsplit(".", 1)[-1] + ".java":
+            raise ValueError("the public class must match its source file name")
+        return self
+
+
+Recipe = Annotated[PythonRecipe | JavaScriptRecipe | JavaRecipe, Field(discriminator="kind")]
+
+
+def legacy_python_recipe(value: object) -> object:
+    """Accept existing operator inputs that omitted the sole historical Python kind."""
+    if isinstance(value, dict) and "kind" not in value:
+        module_file = value.get("module_file")
+        if isinstance(module_file, str) and module_file.endswith(".py"):
+            return {**value, "kind": "python.secret_disclosure/1"}
+    return value
+
+
 class Case(Contract):
     schema_version: Literal["corsair.case/1"] = "corsair.case/1"
     case_id: Identifier
     finding: Finding
     source: Source
-    recipe: PythonRecipe
+    recipe: Recipe
     fixed_source: Source | None = None
+
+    _legacy_recipe = field_validator("recipe", mode="before")(legacy_python_recipe)
 
     @model_validator(mode="after")
     def bind_recipe(self):
@@ -145,8 +260,10 @@ class RunManifest(Contract):
 class PreparedCase(Contract):
     case_id: Identifier
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source: ArtifactRef
     fixed_source: ArtifactRef | None = None
     source_excerpt: str
     manifest: RunManifest
+
+    _legacy_recipe = field_validator("recipe", mode="before")(legacy_python_recipe)

@@ -6,13 +6,15 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator
 
-from corsair.contracts import Contract, digest
+from corsair.contracts import Contract, JavaRecipe, JavaScriptRecipe, Recipe, digest
+from corsair.contracts.intake import ImageCandidate
 
 
 class ModelSettings(Contract):
     connector: Literal["gemini", "litellm"] = "gemini"
     producer: str = "gemini-2.5-flash"
     auditor: str = "gemini-2.5-flash"
+    intake: str = "gemini-2.5-flash"
     api_base: str | None = None
     request_timeout_seconds: int = Field(default=120, ge=1, le=300)
     extra_body: dict = Field(default_factory=dict)
@@ -46,6 +48,8 @@ class Settings(Contract):
     temporal_namespace: str = "default"
     task_queue: str = "corsair"
     image: str = "corsair-python:0.1"
+    node_image: str = "corsair-node:0.1"
+    java_image: str = "corsair-java:0.1"
     runtime: str = "runc"
     memory_limit: str = "512m"
     nano_cpus: int = Field(default=1_000_000_000, ge=100_000_000)
@@ -53,6 +57,17 @@ class Settings(Contract):
     source_limit_bytes: int = Field(default=8_388_608, ge=1024, le=33_554_432)
     source_limit_files: int = Field(default=1000, ge=1, le=10000)
     models: ModelSettings = Field(default_factory=ModelSettings)
+    intake_image: str = "corsair-intake:0.1"
+    intake_images: list[ImageCandidate] = Field(default_factory=list, max_length=29)
+    intake_github_repositories: list[str] = Field(default_factory=list, max_length=32)
+
+    def image_for_recipe(self, recipe: Recipe) -> str:
+        """Select only one of the three implemented operator-owned recipe images."""
+        if isinstance(recipe, JavaScriptRecipe):
+            return self.node_image
+        if isinstance(recipe, JavaRecipe):
+            return self.java_image
+        return self.image
 
     @property
     def identity(self) -> str:

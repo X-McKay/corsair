@@ -5,6 +5,7 @@ from corsair.contracts import (
     DIAGNOSTIC_TRUNCATION_MARKER,
     MAX_DIAGNOSTIC_TEXT_CHARS,
     ArtifactRef,
+    AssessmentOutcome,
     Disposition,
     ExecutionStatus,
     InvestigationResult,
@@ -138,3 +139,55 @@ def test_terminal_formatter_preserves_valid_empty_observation_diagnostics():
     formatted = format_terminal_result(altered).rounds[0].observation
     assert formatted is not None and formatted.control is not None
     assert formatted.control.reason == ""
+
+
+def test_assessment_outcome_versions_new_results_and_preserves_legacy_wire_shape():
+    legacy = InvestigationResult(
+        schema_version="corsair.result/1",
+        run_id="legacy",
+        case_id="case",
+        disposition=Disposition.REFUTED,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="historical result remains readable",
+    )
+
+    assert "assessment_outcome" not in legacy.model_dump()
+    restored = InvestigationResult.model_validate_json(legacy.model_dump_json())
+    assert restored.schema_version == "corsair.result/1"
+    assert restored.assessment_outcome is None
+    assert restored.disposition is Disposition.REFUTED
+
+    current = InvestigationResult(
+        run_id="current",
+        case_id="case",
+        disposition=Disposition.INCONCLUSIVE,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="bounded protocol completed",
+        assessment_outcome=AssessmentOutcome.NOT_DEMONSTRATED,
+    )
+    assert current.schema_version == "corsair.result/2"
+    assert current.model_dump()["assessment_outcome"] == AssessmentOutcome.NOT_DEMONSTRATED
+    with pytest.raises(ValidationError, match="REFUTED"):
+        InvestigationResult(
+            run_id="new",
+            case_id="case",
+            disposition=Disposition.REFUTED,
+            execution_status=ExecutionStatus.COMPLETED,
+            reason="new results reject the retired label",
+        )
+
+
+@pytest.mark.parametrize(
+    "status",
+    [ExecutionStatus.ERROR, ExecutionStatus.BLOCKED, ExecutionStatus.CANCELLED],
+)
+def test_completed_assessment_outcome_rejects_operational_execution(status):
+    with pytest.raises(ValidationError, match="completed assessment outcomes"):
+        InvestigationResult(
+            run_id=f"outcome-{status.value.lower()}",
+            case_id="case",
+            disposition=Disposition.INCONCLUSIVE,
+            execution_status=status,
+            reason="operational failure remains incomplete",
+            assessment_outcome=AssessmentOutcome.NOT_DEMONSTRATED,
+        )

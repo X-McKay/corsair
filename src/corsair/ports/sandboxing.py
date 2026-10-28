@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import Literal, Protocol
 
-from corsair.contracts import ArtifactRef, Budget, PreparedCase, Submission
+from corsair.contracts import ArtifactRef, Budget, PreparedCase, Recipe, Submission
 
 SandboxRole = Literal["control", "adversarial"]
 
@@ -15,6 +15,8 @@ class SandboxUnavailable(RuntimeError):
 class SandboxPort(Protocol):
     @property
     def image_id(self) -> str: ...
+
+    def image_id_for(self, recipe: Recipe) -> str: ...
 
     def has_unknown_operation(self, operation_id: str) -> bool: ...
 

@@ -33,9 +33,28 @@ test *args:
 
 alias test-offline := test
 
-# Build the reviewed native observer image.
-images:
-    docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
+# Build all three reviewed native observer images; no target code is part of these builds.
+images: images-python images-node images-java
+
+# Build the separate reviewed inspection reader; never includes target source.
+images-intake image="corsair-intake:0.1":
+    docker build -f deploy/intake/Dockerfile -t "$1" .
+
+# Run a frozen intake live-role diagnostic with explicit settings and output.
+eval-intake dataset *args:
+    uv run --locked python -m corsair.evaluation.intake "$@"
+
+# Build only the reviewed Python observer; an optional image tag is forwarded literally.
+images-python image="corsair-python:0.1":
+    docker build -f deploy/python/Dockerfile -t "$1" .
+
+# Build only the reviewed dependency-free Node observer.
+images-node image="corsair-node:0.1":
+    docker build -f deploy/node/Dockerfile -t "$1" .
+
+# Build only the reviewed JDK-only Java observer.
+images-java image="corsair-java:0.1":
+    docker build -f deploy/java/Dockerfile -t "$1" .
 
 # Run real Docker tests; set CORSAIR_TEST_TEMPORAL=1 for integrated durable tests.
 test-docker *args:

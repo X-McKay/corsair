@@ -1,14 +1,16 @@
 # Corsair
 
-Corsair investigates a reported security finding against a pinned source snapshot. **Google ADK** runs bounded producer and outcome-blind auditor episodes; **Temporal** coordinates durable rounds, budgets, cancellation and immutable results. Trusted native evidence—not either model—determines the scoped disposition.
+Corsair investigates a reported security finding against a pinned source snapshot. **Google ADK** runs bounded producer and outcome-blind auditor episodes; **Temporal** coordinates durable rounds, budgets, cancellation, and immutable results. Trusted code records process evidence; model proposals do not establish security conclusions.
 
-This is a personal-use pilot for `python.secret_disclosure/1`, not a general-purpose autonomous penetration tester. It currently admits standard-library Python callables and data-only JSON proposals, executed by a trusted observer in offline Docker containers. `SUPPORTED` is component evidence; an application-level claim with only component evidence is `CONDITIONAL`. A failed reproduction stays `INCONCLUSIVE`, never a negative security clearance.
+New investigations are [recipe-free](docs/guides/investigations.md): intake normalizes an issue, stops unsupported/out-of-scope inputs and selects a currently available image; producer and auditor episodes create and review bounded test plans; accepted code and commands run only in the configured Docker sandbox. Process results and semantic audit are separate. Security assessment remains `UNRESOLVED` without independent property evidence.
+
+This is a personal-use pilot. Historical Python, Node and Java fixed-observer schemas and frozen evaluations remain for explicit diagnostics and replay. Current qualification and failures are recorded in [active work](docs/plans/README.md); native conformance does not establish model reliability or production readiness.
 
 ## Start here
 
-Use the locked Nix tool shell on **Linux amd64 or macOS arm64**. You also need a reviewed Docker daemon or Linux VM; Nix does not provision either Docker or Temporal persistence.
+Use the locked Nix tool shell on **Linux amd64 or macOS arm64**. You also need a reviewed Docker daemon or Linux VM; Nix does not provision Docker or Temporal persistence.
 
-1. Follow [installation](docs/getting-started/installation.md) and the [quickstart](docs/getting-started/quickstart.md).
+1. Follow [installation](docs/getting-started/installation.md) and [quickstart](docs/getting-started/quickstart.md).
 2. Establish the native, no-model reference path before starting a worker.
 3. Run your [first durable investigation](docs/getting-started/first-project.md) with an explicitly configured model provider.
 
@@ -16,18 +18,18 @@ Do not admit untrusted repositories on a machine containing production workloads
 
 ## Documentation
 
-The [documentation index](docs/index.md) is the main navigation page.
+The [documentation index](docs/index.md) is the navigation hub.
 
 | Need | Read |
 | --- | --- |
 | Understand the design | [Architecture overview](docs/architecture/overview.md), [components](docs/architecture/components.md), [decisions](docs/architecture/decisions/0001-sdk-owned-durable-rounds.md) |
 | Develop or contribute | [Setup](docs/development/setup.md), [conventions](docs/development/conventions.md), [testing](docs/development/testing.md), [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Configure or integrate | [Configuration guide](docs/guides/configuration.md), [Python integration](docs/guides/integration.md), [API reference](docs/reference/api.md) |
+| Configure or integrate | [Configuration](docs/guides/configuration.md), [language recipes](docs/guides/languages.md), [Python integration](docs/guides/integration.md), [API reference](docs/reference/api.md) |
 | Operate the pilot | [Operations](docs/operations/overview.md), [deployment guide](docs/guides/deployment.md), [pilot runbook](docs/operations/runbooks/pilot.md) |
 | Use the CLI | [CLI reference](docs/reference/cli.md), [monitoring](docs/operations/monitoring.md), [troubleshooting](docs/operations/troubleshooting.md) |
-| Extend support | [Extension guide](docs/guides/extensions.md), [coding-agent workflows](docs/development/coding-agent-workflows.md) |
+| Extend support | [Extension guide](docs/guides/extensions.md), [language recipe gates](docs/guides/languages.md), [coding-agent workflows](docs/development/coding-agent-workflows.md) |
 | Improve agents | [Agent development](docs/agents/development.md), [evaluations](docs/agents/evaluations.md), [safety](docs/agents/safety.md) |
-| Inspect contracts or status | [Schemas](docs/reference/schemas.md), [active work and evidence](docs/plans/README.md), [changelog](CHANGELOG.md) |
+| Inspect contracts or status | [Schemas](docs/reference/schemas.md), [configuration](docs/reference/configuration.md), [active work and evidence](docs/plans/README.md), [changelog](CHANGELOG.md) |
 
 ## Code map
 
@@ -45,7 +47,7 @@ src/corsair/
   evaluation/      isolated-agent evaluation and external scoring
 ```
 
-Remote forge adapters, a separate HTTP API, additional languages and a general repair framework are not hidden behind this layout. The Python API and CLI share the same native workflow submission functions.
+Remote forge adapters, a separate HTTP API, a generic language/framework runtime, and a general repair framework are not hidden behind this layout.
 
 ## Development checks
 
@@ -55,16 +57,14 @@ After [development setup](docs/development/setup.md):
 nix develop
 just sync
 just check
-just test
+just -- test -q -W error
 ```
 
-`just check` runs pinned Ruff lint/format, Just formatting, ty and local documentation checks; type warnings fail the gate. Native execution and live-provider tests have separate real prerequisites—see [testing](docs/development/testing.md). Use `just -- RECIPE ...` when forwarding command flags.
+`just check` runs pinned Ruff lint/format, Just formatting, ty, and local documentation checks. The aggregate `just images` task builds all three reviewed observers. Per-language candidate task syntax is documented in [language recipes](docs/guides/languages.md): `just images-node 'TAG'` and `just images-java 'TAG'`; those tasks do not themselves establish native qualification. Native execution and live-provider checks have separate prerequisites—see [testing](docs/development/testing.md).
 
 ## Qualification and limits
 
-`manus/just` includes all eight latest recommendation heads and the role-local agent layout. Each role owns its native factory, typed metadata, canonical contract views, instructions, toolsets and private procedural skills. The producer's source tools have one file each; the auditor has no source/external tools. Final physical-Mac native qualification passed **209 tests before and after cleanup**, including real Docker, Temporal, replay, CLI, live-auditor and installed-wheel checks. See [current evidence](docs/plans/README.md).
-
-Required core procedures are native-ADK-loaded into instructions before generation, with honest preload versus model-requested tool-use logs. Context loading is not model compliance: the current frozen expanded producer scored **3/9**, auditor **6/12**, and the fresh full-live batch scored **2/3** with zero operational failures. No live-model baseline was promoted; [ISSUE-0013](docs/plans/active/ISSUE-0013-runtime-procedure-live-quality.md) and [ISSUE-0012](docs/plans/active/ISSUE-0012-producer-decision-live-quality.md) retain the misses. Earlier3/3 composition and12/12 auditor results remain revision-specific evidence, not current accuracy. Failed reproduction never becomes negative security clearance.
+Historical qualification records remain revision-specific evidence; [current plans](docs/plans/README.md) retain passing, failed and unrun gates. V3 success means expected process exits in the admitted environment, not demonstrated exploitability. Fixed-source results are process comparisons. Legacy paired outcomes keep their original finite-protocol interpretation.
 
 Local artifacts do not survive artifact-host loss without backups or shared storage. The pilot does not establish hostile-interpreter observation integrity or production readiness. See [disaster recovery](docs/operations/disaster-recovery.md) and the [packaged risk assessment](src/corsair/policies/risk.md).
 

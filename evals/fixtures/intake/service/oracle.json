@@ -1,0 +1,40 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "component",
+    "function",
+    "application"
+  ],
+  "languages": [
+    "python"
+  ],
+  "execution_modes": [
+    "http_service"
+  ],
+  "required_requirements": [
+    "dependency_install",
+    "service_start",
+    "http_client"
+  ],
+  "permitted_requirements": [
+    "dependency_install",
+    "service_start",
+    "http_client"
+  ],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "reader.py"
+  ]
+}

@@ -30,6 +30,11 @@ def test_default_just_lists_recipes_without_running_side_effects():
     "recipe,arguments,prefix",
     [
         (
+            "eval-intake",
+            ["dataset $(touch SHOULD_NOT_EXIST).json", "--settings", "settings path.json"],
+            ["run", "--locked", "python", "-m", "corsair.evaluation.intake"],
+        ),
+        (
             "verify",
             [
                 "request with space's.json",
@@ -84,3 +89,41 @@ def test_verify_requires_both_paths_before_executing():
     result = subprocess.run([just_binary(), "verify"], cwd=ROOT, capture_output=True, text=True)
     assert result.returncode != 0
     assert "argument" in result.stderr.lower()
+
+
+def test_aggregate_images_includes_all_three_concrete_builds():
+    result = subprocess.run(
+        [just_binary(), "--dry-run", "images"], cwd=ROOT, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    commands = result.stderr + result.stdout
+    for language in ("python", "node", "java"):
+        assert f"deploy/{language}/Dockerfile" in commands
+
+
+@pytest.mark.parametrize("language", ["python", "node", "java"])
+def test_runtime_image_tag_is_forwarded_literally(tmp_path, language):
+    (tmp_path / "justfile").write_bytes((ROOT / "justfile").read_bytes())
+    bin_path = tmp_path / "bin"
+    bin_path.mkdir()
+    recorder = bin_path / "docker"
+    recorder.write_text(f"#!{sys.executable}\nimport sys,json\nprint(json.dumps(sys.argv[1:]))\n")
+    recorder.chmod(0o755)
+    tag = "candidate:tag$(touch SHOULD_NOT_EXIST)"
+    result = subprocess.run(
+        [just_binary(), "--", f"images-{language}", tag],
+        cwd=tmp_path,
+        env=dict(os.environ, PATH=f"{bin_path}:{os.environ['PATH']}"),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [
+        "build",
+        "-f",
+        f"deploy/{language}/Dockerfile",
+        "-t",
+        tag,
+        ".",
+    ]
+    assert not (tmp_path / "SHOULD_NOT_EXIST").exists()

@@ -13,6 +13,7 @@ from corsair.contracts import (
     DIAGNOSTIC_TRUNCATION_MARKER,
     MAX_DIAGNOSTIC_TEXT_CHARS,
     TERMINAL_RESULT_MAX_BYTES,
+    AssessmentOutcome,
     AuditInput,
     AuditOutput,
     BatchItem,
@@ -29,6 +30,7 @@ from corsair.contracts import (
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
+    ProducerProposal,
     RoleOutcome,
     Submission,
     Usage,
@@ -162,6 +164,8 @@ async def test_supported_paired_observation_records_bound_result(
     assert result.disposition is Disposition.SUPPORTED
     assert result.execution_status is ExecutionStatus.COMPLETED
     assert result.result_artifact is not None
+    assert result.schema_version == "corsair.result/2"
+    assert result.assessment_outcome is AssessmentOutcome.DEMONSTRATED
     persisted = InvestigationResult.model_validate(
         temporal_artifact_store.get_json(result.result_artifact)
     )
@@ -261,6 +265,7 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
     assert result.disposition is Disposition.INCONCLUSIVE
     assert result.disposition is not Disposition.REFUTED
     assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.assessment_outcome is AssessmentOutcome.NOT_DEMONSTRATED
     assert [_producer_submission(round_.producer).plan.revision for round_ in result.rounds] == [
         1,
         2,
@@ -278,6 +283,14 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
         item.previous.plan.revision if item.previous else None
         for item in activities.producer_inputs
     ] == [None, 1, 2]
+    assert activities.producer_inputs[0].feedback is None
+    for producer_input in activities.producer_inputs[1:]:
+        assert producer_input.feedback is not None
+        assert producer_input.feedback.gate == "assessment-continue"
+        feedback_text = producer_input.feedback.reason.lower()
+        assert "held" not in feedback_text
+        assert "disclosure" not in feedback_text
+        assert "supported" not in feedback_text
 
 
 async def test_maximum_round_result_stays_within_terminal_wire_budget(
@@ -304,6 +317,143 @@ async def test_maximum_round_result_stays_within_terminal_wire_budget(
         temporal_artifact_store.get_json(result.result_artifact)
     )
     assert len(persisted.rounds) == 16
+
+
+async def test_rejected_audit_leaves_assessment_incomplete_after_bounded_attempts(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    from corsair.contracts import AuditDecision, AuditResult
+
+    class RejectingAuditActivities(FakeActivities):
+        @activity.defn(name="corsair.audit")
+        async def audit(self, request: AuditInput) -> AuditOutput:
+            self.call_counts["corsair.audit"] += 1
+            self.audit_inputs.append(request)
+            return AuditOutput(
+                review=AuditResult(
+                    decision=AuditDecision.REJECT,
+                    rule="fixture-rejection",
+                    reason="fixture semantic review did not accept the candidate",
+                ),
+                usage=Usage(llm_calls=1),
+            )
+
+    activities = RejectingAuditActivities(
+        temporal_artifact_store,
+        ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 3),
+    )
+    identity, queue = temporal_id("rejected-audit"), temporal_id("rejected-audit-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("rejected-audit", budget=_three_round_budget()),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.assessment_outcome is None
+    assert len(activities.evidence_inputs) == len(activities.audit_inputs) == 3
+
+
+async def test_cycled_structurally_equal_adversarial_payload_stays_incomplete(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    class CycledCandidateActivities(FakeActivities):
+        @activity.defn(name="corsair.produce")
+        async def produce(self, request: ProducerInput) -> ProducerOutput:
+            output = await super().produce(request)
+            submission = _producer_submission(output)
+            payloads = (
+                {"paths": ["..", "private", "repeated.txt"], "options": {"mode": "read"}},
+                {"paths": ["..", "private", "other.txt"], "options": {"mode": "read"}},
+                {"options": {"mode": "read"}, "paths": ["..", "private", "repeated.txt"]},
+            )
+            repeated = submission.model_copy(
+                update={"exploit_payload": payloads[request.round_index - 1]}
+            )
+            return output.model_copy(
+                update={"decision": ProducerDecision(root=ProducerProposal(submission=repeated))}
+            )
+
+    activities = CycledCandidateActivities(
+        temporal_artifact_store,
+        ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 3),
+    )
+    identity, queue = temporal_id("cycled"), temporal_id("cycled-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("cycled", budget=_three_round_budget()),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.assessment_outcome is None
+    assert len(activities.producer_inputs) == 3
+    assert len(activities.evidence_inputs) == len(activities.audit_inputs) == 2
+    assert [item.operation_id for item in activities.evidence_inputs] == [
+        f"{identity}.r1",
+        f"{identity}.r2",
+    ]
+    feedback = activities.producer_inputs[2].feedback
+    assert feedback is not None and feedback.gate == "assessment-continue"
+    assert "held" not in feedback.reason.lower()
+    assert "disclosure" not in feedback.reason.lower()
+
+
+async def test_fixed_source_failure_clears_new_outcome_and_retains_original_round(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+    from temporalio.exceptions import ApplicationError
+
+    class FailingFixedEvidenceActivities(FakeActivities):
+        @activity.defn(name="corsair.evidence")
+        async def evidence(self, request: EvidenceInput) -> Observation:
+            if request.fixed:
+                raise ApplicationError("fixed source operation failed", non_retryable=True)
+            return await super().evidence(request)
+
+    activities = FailingFixedEvidenceActivities(temporal_artifact_store)
+    identity, queue = temporal_id("fixed-failure"), temporal_id("fixed-failure-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("fixed-failure", fixed=True),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.assessment_outcome is None
+    assert len(result.rounds) == 1
+    assert result.rounds[0].observation is not None
+    assert result.rounds[0].audit is not None
+    assert result.result_artifact is not None
 
 
 async def test_oversized_activity_error_reason_is_compacted_before_record(

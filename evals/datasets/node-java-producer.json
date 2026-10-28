@@ -1,0 +1,33 @@
+{
+  "schema_version": "corsair.agent-dataset/1",
+  "entries": [
+    {
+      "case_id": "node01",
+      "input": "fixtures/node01/request.json",
+      "oracle": "fixtures/node01/producer-oracle.json",
+      "input_digest": "5998039d1b3a6975892fa57213d31a9af1332aca988636163e33a6e9e1abf9d1",
+      "oracle_digest": "760e3b393196edb8d511905dc7668a4b054853d189481155824b7a472915ab27"
+    },
+    {
+      "case_id": "node02",
+      "input": "fixtures/node02/request.json",
+      "oracle": "fixtures/node02/producer-oracle.json",
+      "input_digest": "ca8cc95d52d073031f8b03a9bff870bd06a875bac3470dca005eb3c005d8ae59",
+      "oracle_digest": "760e3b393196edb8d511905dc7668a4b054853d189481155824b7a472915ab27"
+    },
+    {
+      "case_id": "java01",
+      "input": "fixtures/java01/request.json",
+      "oracle": "fixtures/java01/producer-oracle.json",
+      "input_digest": "3fe0ebb87ee86796b71ff73f0f3e7eefbbfe48155ddd6a0be352393a8fd81d3b",
+      "oracle_digest": "760e3b393196edb8d511905dc7668a4b054853d189481155824b7a472915ab27"
+    },
+    {
+      "case_id": "java02",
+      "input": "fixtures/java02/request.json",
+      "oracle": "fixtures/java02/producer-oracle.json",
+      "input_digest": "87a18763b21e97705f52a329233ccdcc990a0daee840066f13b707967c89b823",
+      "oracle_digest": "760e3b393196edb8d511905dc7668a4b054853d189481155824b7a472915ab27"
+    }
+  ]
+}

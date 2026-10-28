@@ -106,6 +106,8 @@ def test_role_local_agent_layout_has_only_concrete_source_tools_and_native_tools
     assert not (producer / "tools.py").exists()
     assert (producer / "tools/read_file.py").is_file()
     assert (producer / "tools/list_files.py").is_file()
+    assert (producer / "tools/preview_invocation.py").is_file()
+    assert (producer / "tools/relative_path.py").is_file()
     assert (producer / "toolsets.py").is_file()
     assert (auditor / "toolsets.py").is_file()
     assert (producer / "contracts.py").is_file()

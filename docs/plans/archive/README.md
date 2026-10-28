@@ -25,3 +25,7 @@ The former [CURRENT page](CURRENT-before-doc-reorganization.md) is retained only
 [PLAN-0112](plans/PLAN-0112-documentation-layout.md) records the completed documentation migration and packaging checks.
 
 [PLAN-0113](plans/PLAN-0113-eval-test-layout.md) records the completed evaluation/test directory cleanup and unchanged frozen/discovery identities.
+
+[PLAN-0128](plans/PLAN-0128-probe-auditor-consistency.md) records the bounded Java probe attribution and Node/Java auditor-consistency follow-up, including retained producer failures and the first complete four-case live repeat. Broader model quality remains an [open issue](../active/ISSUE-0014-node-java-assessment-live-quality.md).
+
+[PLAN-0129](plans/PLAN-0129-producer-skills-and-tools.md) records implemented pure producer helpers, general grounding guidance, native proposal validation and mixed live-chain results. Its passing component conformance does not promote model reliability or runtime speed.

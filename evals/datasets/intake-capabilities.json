@@ -1,0 +1,70 @@
+{
+  "schema_version": "corsair.intake-dataset/1",
+  "status": "candidate-pending-human-review",
+  "entries": [
+    {
+      "case_id": "python-present",
+      "family": "intake-python",
+      "input": "fixtures/intake-capabilities/python-present/input.json",
+      "oracle": "fixtures/intake-capabilities/python-present/oracle.json",
+      "input_digest": "3cb74b9241d045199f3ad43249d27d29d873fb0daa3ea0415e21a19bc1baa300",
+      "oracle_digest": "27e846d4c634e4b8ba41123aebd1432827761175ae17aa5d25082851fedbd3df"
+    },
+    {
+      "case_id": "python-located",
+      "family": "intake-python",
+      "input": "fixtures/intake-capabilities/python-located/input.json",
+      "oracle": "fixtures/intake-capabilities/python-located/oracle.json",
+      "input_digest": "7e722a7d236ee8a63bd295f88b12c7bf0a47a6a934363ec8c8032e5f1a74571c",
+      "oracle_digest": "27e846d4c634e4b8ba41123aebd1432827761175ae17aa5d25082851fedbd3df"
+    },
+    {
+      "case_id": "python-absent",
+      "family": "intake-python",
+      "input": "fixtures/intake-capabilities/python-absent/input.json",
+      "oracle": "fixtures/intake-capabilities/python-absent/oracle.json",
+      "input_digest": "2b19db7723bc1f0471a331b0de2dfaac9e1a26bf652e294405c40180c76435bf",
+      "oracle_digest": "f09d1d1ab0bd69af8a4e7aaa88891fc371ccb63b991c70a3e254b2144ec78cac"
+    },
+    {
+      "case_id": "python-empty",
+      "family": "intake-python",
+      "input": "fixtures/intake-capabilities/python-empty/input.json",
+      "oracle": "fixtures/intake-capabilities/python-empty/oracle.json",
+      "input_digest": "6bf2bb81ceb52034bdca1f1e2165dbd46b399efae71aa64bec22fcff98359fc3",
+      "oracle_digest": "f09d1d1ab0bd69af8a4e7aaa88891fc371ccb63b991c70a3e254b2144ec78cac"
+    },
+    {
+      "case_id": "python-raw",
+      "family": "intake-python",
+      "input": "fixtures/intake-capabilities/python-raw/input.json",
+      "oracle": "fixtures/intake-capabilities/python-raw/oracle.json",
+      "input_digest": "9c8d663ccd1f0bae71bb0a3ed8a176da2e567d25fdb43d785aa80ce8f1fc88a7",
+      "oracle_digest": "27e846d4c634e4b8ba41123aebd1432827761175ae17aa5d25082851fedbd3df"
+    },
+    {
+      "case_id": "service",
+      "family": "service",
+      "input": "fixtures/intake-capabilities/service/input.json",
+      "oracle": "fixtures/intake-capabilities/service/oracle.json",
+      "input_digest": "6185e5fe0daf833d3bf1919d007bf8e88a71d09405c8b3a4816a62804dde354d",
+      "oracle_digest": "ce3984c09a54128620fc04429410233ebefcf030c44b4b0a98362cceba3a5c81"
+    },
+    {
+      "case_id": "missing-context",
+      "family": "missing-context",
+      "input": "fixtures/intake-capabilities/missing-context/input.json",
+      "oracle": "fixtures/intake-capabilities/missing-context/oracle.json",
+      "input_digest": "c5dcdedaab429f0e042f9bf070891ad9cbde98d362dbe9e17fb87b30494b0545",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "out-of-scope",
+      "family": "out-of-scope",
+      "input": "fixtures/intake-capabilities/out-of-scope/input.json",
+      "oracle": "fixtures/intake-capabilities/out-of-scope/oracle.json",
+      "input_digest": "cb24c967f6890a03b85f9833d3554bd1a1ff235e42c434a73e2b9cd36bf47b06",
+      "oracle_digest": "20d2efae1103ca745569c5022b6950bc4e519ed3801ea700ed1f1917d9b5b190"
+    }
+  ]
+}

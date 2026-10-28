@@ -1,0 +1,17 @@
+{
+  "role": "producer",
+  "issue": {
+    "title": "Path traversal in read_file",
+    "description": "The function joins an untrusted path without checking containment.",
+    "locations": [
+      {
+        "path": "reader.py",
+        "symbol": "read_file"
+      }
+    ]
+  },
+  "source": {
+    "reader.py": "from pathlib import Path\ndef read_file(root, path):\n    return (Path(root) / path).read_text()\n"
+  },
+  "plan": null
+}

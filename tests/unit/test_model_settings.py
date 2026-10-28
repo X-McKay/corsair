@@ -58,9 +58,15 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     auditor = load_agent_spec("auditor")
 
     assert producer.source_tools == ["read_file", "list_files"]
+    assert producer.mechanical_tools == ["preview_invocation", "relative_path"]
     assert producer.loader_tools == ["load_skill", "load_skill_resource"]
-    assert producer.tools == [*producer.source_tools, *producer.loader_tools]
+    assert producer.tools == [
+        *producer.source_tools,
+        *producer.mechanical_tools,
+        *producer.loader_tools,
+    ]
     assert auditor.source_tools == []
+    assert auditor.mechanical_tools == []
     assert auditor.loader_tools == ["load_skill", "load_skill_resource"]
     assert auditor.tools == auditor.loader_tools
     assert producer.runtime_skills == ["source-grounding"]
@@ -73,6 +79,15 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
     assert "Return one structured ProducerDecision" in prompt_text("producer")
     assert "outcome-blind" in prompt_text("auditor")
+
+
+@pytest.mark.parametrize("role", ["producer", "auditor"])
+def test_agent_spec_rejects_unapproved_mechanical_capabilities(role):
+    data = load_agent_spec(role).model_dump()
+    data["mechanical_tools"] = ["execute_target"]
+    data["tools"] = [*data["source_tools"], "execute_target", *data["loader_tools"]]
+    with pytest.raises(ValueError, match="mechanical_tools|must not expose"):
+        AgentSpec.model_validate(data)
 
 
 def test_agent_spec_rejects_unknown_metadata_fields():

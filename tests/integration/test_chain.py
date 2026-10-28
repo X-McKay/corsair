@@ -57,7 +57,7 @@ class ReferenceModel(BaseLlm):
                         "kind": "proposal",
                         "submission": {
                             "control_payload": "hello.txt",
-                            "exploit_payload": "../private/secret.txt",
+                            "exploit_payload": "../" + "./" * (revision - 1) + "private/secret.txt",
                             "hypothesis": (
                                 "Caller-controlled path joins the root without containment."
                             ),
@@ -127,6 +127,8 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.manifest.capabilities["producer"]["tools"] == [
         "read_file",
         "list_files",
+        "preview_invocation",
+        "relative_path",
         "load_skill",
         "load_skill_resource",
     ]

@@ -1,5 +1,17 @@
 # Python API reference
 
+## Current intake-gated API
+
+`start_investigation(client, request, settings, run_id=...)` accepts `IssueInvestigationRequest` and returns a handle to `corsair.issue-investigation.v4`, whose result is `IssueInvestigationResult`. `start_issue_investigation` is the explicit equivalent. Canonical request/result definitions are in [`contracts/pipeline.py`](../../src/corsair/contracts/pipeline.py). `load_issue_investigation_request` loads bounded v4 JSON and anchors source paths to its file. [The guide](../guides/investigations.md) describes the categorical gates, shared budget, pinned image handoff and incomplete outcomes.
+
+`start_execution` and `load_execution_request` retain explicit v3 diagnostics using `ExecutionRequest`/`ExecutionResult`; passing that request to `start_investigation` raises an error. Standalone `start_intake` does not schedule execution. Explicit legacy `InvestigationRequest` objects retain the historical diagnostic path below.
+
+`TestPlan` is the producer's native output schema; `PlanAudit` is the auditor's. Trusted `ProcessObservation` records actual command exits/output and cleanup, with `UNRESOLVED` security assessment in the result. Canonical contracts are defined once; role-local contracts re-export those same objects.
+
+## Historical v1/v2 reference
+
+The remaining material describes retained fixed-observer diagnostics, immutable old results and frozen evaluation inputs. Normal CLI investigations use the v4 intake-gated models above.
+
 Corsair exposes a small, typed **asynchronous Python API** for submitting and observing native Temporal workflows. It is not an HTTP service, web API, or an alternate agent/workflow implementation. The CLI uses the same submission functions. For the data models passed here, see the [domain schemas](schemas.md); for operator-owned connection and worker configuration, see [configuration](configuration.md).
 
 ## Public functions

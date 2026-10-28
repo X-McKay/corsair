@@ -7,3 +7,4 @@ from corsair.contracts import ProducerInput as ProducerInput
 from corsair.contracts import ProducerOutput as ProducerOutput
 from corsair.contracts import ProducerProposal as ProducerProposal
 from corsair.contracts import Submission as Submission
+from corsair.contracts.execution import TestPlan as TestPlan

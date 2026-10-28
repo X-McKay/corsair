@@ -36,7 +36,10 @@ def _docker(settings: Settings) -> str:
         runtimes = client.info().get("Runtimes", {})
         if settings.runtime not in runtimes:
             raise ValueError(f"configured runtime {settings.runtime} is not registered")
-        return f"Daemon reachable; runtime={settings.runtime}; image={image.id}"
+        return (
+            f"Daemon reachable; runtime={settings.runtime}; image={image.id}; "
+            "baseline Python image only"
+        )
 
 
 async def diagnose(settings: Settings) -> dict:
@@ -110,5 +113,6 @@ async def diagnose(settings: Settings) -> dict:
             name: version(name) for name in ("google-adk", "temporalio", "docker", "rich")
         },
         "qualification": "Infrastructure checks only. Poller presence is not an execution test. "
+        "Node/Java images are resolved per admitted recipe, not by this baseline check. "
         "Model credentials, provider policy, native evidence and accuracy were not tested.",
     }

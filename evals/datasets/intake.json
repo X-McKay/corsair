@@ -1,0 +1,70 @@
+{
+  "schema_version": "corsair.intake-dataset/1",
+  "status": "candidate-pending-human-review",
+  "entries": [
+    {
+      "case_id": "python-present",
+      "family": "intake-python",
+      "input": "fixtures/intake/python-present/input.json",
+      "oracle": "fixtures/intake/python-present/oracle.json",
+      "input_digest": "a27fa21632955036e22272a0809818ad861e3db65957fa67a0ee7f2a79cf8d1e",
+      "oracle_digest": "ed33128e23523eaca294ce2f96612117d10f1b6fe7c068b674c2eb9680cb7bca"
+    },
+    {
+      "case_id": "python-bound",
+      "family": "intake-python",
+      "input": "fixtures/intake/python-bound/input.json",
+      "oracle": "fixtures/intake/python-bound/oracle.json",
+      "input_digest": "0ed2c768551da19335b5227f592470b252278f3d7336fca1708b7324a4b5d67c",
+      "oracle_digest": "27e846d4c634e4b8ba41123aebd1432827761175ae17aa5d25082851fedbd3df"
+    },
+    {
+      "case_id": "python-absent",
+      "family": "intake-python",
+      "input": "fixtures/intake/python-absent/input.json",
+      "oracle": "fixtures/intake/python-absent/oracle.json",
+      "input_digest": "c1d3d5625c76662bd27ac55268aec1e9e3bc47069e94c42f5a6b7fd7229ded01",
+      "oracle_digest": "1618a2c4470344782edb218b1bd54e75b3f08fd101b2d9f59411d8613875b98b"
+    },
+    {
+      "case_id": "python-empty",
+      "family": "intake-python",
+      "input": "fixtures/intake/python-empty/input.json",
+      "oracle": "fixtures/intake/python-empty/oracle.json",
+      "input_digest": "006e47d0ceb6f851bad8bb7d2e8b5aa74f80c590791c2c6469134d94d6b47150",
+      "oracle_digest": "1618a2c4470344782edb218b1bd54e75b3f08fd101b2d9f59411d8613875b98b"
+    },
+    {
+      "case_id": "python-raw",
+      "family": "intake-python",
+      "input": "fixtures/intake/python-raw/input.json",
+      "oracle": "fixtures/intake/python-raw/oracle.json",
+      "input_digest": "2188ea1b7e2dcd3e77a1d2a54bc6355f26147a3db3267937484639061bc59e88",
+      "oracle_digest": "ed33128e23523eaca294ce2f96612117d10f1b6fe7c068b674c2eb9680cb7bca"
+    },
+    {
+      "case_id": "service",
+      "family": "service",
+      "input": "fixtures/intake/service/input.json",
+      "oracle": "fixtures/intake/service/oracle.json",
+      "input_digest": "e833c905d0e0197889248773806cd4322c68d039f1573ded0e71c0e0732ae5b0",
+      "oracle_digest": "8944fd017855a57c664b0bda942fc8c06d51c339862dd96746b11c759b7df793"
+    },
+    {
+      "case_id": "missing-context",
+      "family": "missing-context",
+      "input": "fixtures/intake/missing-context/input.json",
+      "oracle": "fixtures/intake/missing-context/oracle.json",
+      "input_digest": "226b6f29343effdb7fad7b896eca0b6affabf0ab10e4d3cca9ec620e2f852a62",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "out-of-scope",
+      "family": "out-of-scope",
+      "input": "fixtures/intake/out-of-scope/input.json",
+      "oracle": "fixtures/intake/out-of-scope/oracle.json",
+      "input_digest": "6e87df599f8fccf041461431ccf7f56f47d1e2510a5786a3d220673bd546b31b",
+      "oracle_digest": "20d2efae1103ca745569c5022b6950bc4e519ed3801ea700ed1f1917d9b5b190"
+    }
+  ]
+}

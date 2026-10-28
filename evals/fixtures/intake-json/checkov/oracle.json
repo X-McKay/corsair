@@ -1,0 +1,39 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "configuration"
+  ],
+  "languages": [
+    "other"
+  ],
+  "execution_modes": [
+    "static_configuration"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIREMENTS_UNRESOLVED"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIREMENTS_UNRESOLVED"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "main.tf"
+  ],
+  "issue_titles": [
+    "Public asset bucket access is not blocked"
+  ],
+  "description_fragments": [
+    "main.tf",
+    "public",
+    "private",
+    "false"
+  ]
+}

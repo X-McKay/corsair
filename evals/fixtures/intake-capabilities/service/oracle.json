@@ -1,0 +1,38 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "component",
+    "function",
+    "application"
+  ],
+  "languages": [
+    "javascript"
+  ],
+  "execution_modes": [
+    "http_service"
+  ],
+  "required_requirements": [
+    "dependency_install",
+    "service_start",
+    "http_client"
+  ],
+  "permitted_requirements": [
+    "dependency_install",
+    "service_start",
+    "http_client"
+  ],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "server.mjs"
+  ]
+}

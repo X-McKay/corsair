@@ -6,10 +6,10 @@ import json
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
+from pydantic import ConfigDict, Field, JsonValue, RootModel, field_validator, model_validator
 
 from .common import Contract, Feedback, Identifier, Usage
-from .sources import Budget, Finding, PreparedCase, PythonRecipe
+from .sources import Budget, Finding, PreparedCase, Recipe, legacy_python_recipe
 
 # Explicit JSON shapes keep native output schemas informative; JsonValue alone emits {}.
 JsonPayload = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
@@ -28,11 +28,11 @@ class Submission(Contract):
     hypothesis: str = Field(min_length=1, max_length=4000)
     plan: PlanRevision
     control_payload: JsonPayload = Field(
-        description="Exact JSON value assigned to the recipe's payload_parameter for benign input; "
+        description="Exact JSON value supplied to the declared payload slot for benign input; "
         "not a keyword-argument mapping unless the parameter itself expects a mapping."
     )
     exploit_payload: JsonPayload = Field(
-        description="Exact JSON value assigned to the payload_parameter for adversarial input; "
+        description="Exact JSON value assigned to the declared payload slot for adversarial input; "
         "not a keyword-argument mapping unless the parameter itself expects a mapping."
     )
 
@@ -119,12 +119,14 @@ class AuditResult(Contract):
 
 class AuditInput(Contract):
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source_excerpt: str
     submission: Submission
     max_output_tokens: int = Field(ge=256, le=16384)
     llm_call_limit: int = Field(default=2, ge=0, le=2)
     tool_call_limit: int = Field(default=4, ge=0, le=4)
+
+    _legacy_recipe = field_validator("recipe", mode="before")(legacy_python_recipe)
 
 
 class AuditOutput(Contract):

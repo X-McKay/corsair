@@ -14,8 +14,14 @@ from corsair.adapters.temporal.client import connect
 from corsair.observability.logging import LifecycleLoggingInterceptor, event
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
+from corsair.steps.execution import ExecutionActivities
+from corsair.steps.intake import IntakeActivities
+from corsair.steps.pipeline import PipelineActivities
 from corsair.workflows.evaluation import EvaluationWorkflow
+from corsair.workflows.execution import ExecutionWorkflow
+from corsair.workflows.intake import IntakeWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
+from corsair.workflows.pipeline import IssueInvestigationWorkflow
 
 
 def compose_worker_activities(settings: Settings) -> Activities:
@@ -49,8 +55,19 @@ async def run_worker(settings: Settings) -> None:
         async with Worker(
             client,
             task_queue=settings.task_queue,
-            workflows=[InvestigationWorkflow, EvaluationWorkflow],
-            activities=activities.registered(),
+            workflows=[
+                InvestigationWorkflow,
+                EvaluationWorkflow,
+                IntakeWorkflow,
+                ExecutionWorkflow,
+                IssueInvestigationWorkflow,
+            ],
+            activities=[
+                *activities.registered(),
+                *PipelineActivities(ArtifactStore(settings.artifact_root)).registered(),
+                *IntakeActivities(settings, ArtifactStore(settings.artifact_root)).registered(),
+                *ExecutionActivities(settings, ArtifactStore(settings.artifact_root)).registered(),
+            ],
             max_concurrent_activities=4,
             interceptors=[LifecycleLoggingInterceptor()],
             graceful_shutdown_timeout=timedelta(seconds=45),

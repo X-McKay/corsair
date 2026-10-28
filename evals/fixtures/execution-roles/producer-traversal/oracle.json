@@ -1,0 +1,5 @@
+{
+  "role": "producer",
+  "path": "reader.py",
+  "source_reference": "/source"
+}

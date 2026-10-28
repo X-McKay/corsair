@@ -25,7 +25,7 @@ Google ADK owns each fresh producer or auditor episode. Its factories use the ca
 
 Temporal owns durable rounds, deadlines, cancellation, activity retries, and recording. Workflows coordinate deterministic state only; ordinary activities perform ADK, source, Docker, and storage work. Do not substitute an upstream Google ADK Temporal integration for the implemented ordinary-activity model, or claim that an interrupted model call resumes mid-episode.
 
-The producer receives only the episode-local, read-only `read_file` and `list_files` tools over an admitted immutable snapshot. The auditor is private-guidance-only and outcome-blind. Models propose JSON data only; trusted native code executes the configured observer and policy code evaluates its validated receipts. Oracles remain evaluator-owned and outside agent, tool, and workflow packets.
+The producer receives episode-local, read-only `read_file` and `list_files` tools over an admitted immutable snapshot, plus the bounded pure `preview_invocation` and `relative_path` helpers. Helpers perform no filesystem or target access and cannot create evidence. The auditor is private-guidance-only and outcome-blind. Models propose JSON data only; trusted native code executes the configured observer and policy code evaluates its validated receipts. Oracles remain evaluator-owned and outside agent, tool, and workflow packets.
 
 ## Treat identity, evidence, and cleanup as part of behavior
 

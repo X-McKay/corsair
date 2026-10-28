@@ -2,8 +2,22 @@ import json
 
 import pytest
 
-from corsair.contracts import Disposition, ExecutionStatus, InvestigationResult, digest
-from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score, summarize
+from corsair.contracts import (
+    AssessmentOutcome,
+    Disposition,
+    ExecutionStatus,
+    InvestigationResult,
+    digest,
+    format_terminal_result,
+)
+from corsair.evaluation.scoring import (
+    AssessmentOracle,
+    Oracle,
+    load_dataset,
+    save_report,
+    score,
+    summarize,
+)
 
 
 def result(label=Disposition.INCONCLUSIVE):
@@ -27,6 +41,236 @@ def test_negative_abstention_is_not_counted_as_resolution():
     assert row["status"] == "pass"
     assert row["correctly_resolved"] is False
     assert row["input_tokens"] is None
+
+
+def test_retired_refuted_legacy_row_is_never_counted_as_resolution():
+    historical = InvestigationResult(
+        schema_version="corsair.result/1",
+        run_id="legacy",
+        case_id="case01",
+        disposition=Disposition.REFUTED,
+        execution_status=ExecutionStatus.COMPLETED,
+        reason="historical row",
+    )
+
+    row = score(historical, Oracle(acceptable=[Disposition.REFUTED]))
+
+    assert row["status"] == "pass"
+    assert row["correctly_resolved"] is False
+
+
+def _record_unit_evidence_final_result(store, result: InvestigationResult) -> InvestigationResult:
+    """Write a unit-only stand-in for the trusted record activity.
+
+    This helper exercises the scorer's immutable-record boundary with synthetic
+    native evidence. It is not a workflow, Docker, Temporal, or production
+    qualification path; ``Activities.record`` owns production final recording.
+    """
+    normalized = format_terminal_result(result.model_copy(update={"result_artifact": None}))
+    ref = store.put_json(normalized)
+    store.commit(f"result.{normalized.run_id}", ref)
+    return format_terminal_result(normalized.model_copy(update={"result_artifact": ref}))
+
+
+def _assessment_unit_evidence_result(store, outcome: AssessmentOutcome) -> InvestigationResult:
+    """Build valid saved native pairs solely for deterministic scorer unit tests."""
+    from corsair.contracts import (
+        AuditDecision,
+        AuditOutput,
+        AuditResult,
+        PlanRevision,
+        ProducerDecision,
+        ProducerOutput,
+        ProducerProposal,
+        RoleOutcome,
+        RoundResult,
+    )
+    from corsair.policies.verdicts import assessment_outcome
+    from corsair.settings import Settings
+    from corsair.steps.verification import EvidenceVerifier
+    from tests.unit.test_evidence import _FakeSandbox, _input, _prepared, _submission
+
+    admitted_source = store.put(b"admitted source", "application/x-tar")
+    prepared = _prepared().model_copy(update={"source": admitted_source})
+    run_id = (
+        "assessment-held" if outcome is AssessmentOutcome.NOT_DEMONSTRATED else "assessment-demo"
+    )
+    role_outcome = (
+        RoleOutcome.HELD if outcome is AssessmentOutcome.NOT_DEMONSTRATED else RoleOutcome.VIOLATION
+    )
+    rounds = []
+    for index in range(1, 4 if outcome is AssessmentOutcome.NOT_DEMONSTRATED else 2):
+        base_submission = _submission()
+        submission = base_submission.model_copy(
+            update={
+                "exploit_payload": {"segments": ["..", "private", f"secret-{index}.txt"]},
+                "plan": PlanRevision(
+                    revision=index,
+                    objective=base_submission.plan.objective,
+                    next_steps=base_submission.plan.next_steps,
+                    reason=base_submission.plan.reason,
+                ),
+            }
+        )
+        evidence_input = _input(f"{run_id}.r{index}").model_copy(
+            update={"run_id": run_id, "prepared": prepared, "submission": submission}
+        )
+        observation = EvidenceVerifier(
+            Settings(), store, _FakeSandbox(store, adversarial_outcome=role_outcome)
+        ).evaluate(evidence_input)
+        audit = AuditOutput(
+            review=AuditResult(
+                decision=AuditDecision.ACCEPT,
+                rule="evidence",
+                reason="reviewed without execution outcome input",
+            )
+        )
+        assert assessment_outcome(prepared, observation, audit) is outcome
+        rounds.append(
+            RoundResult(
+                index=index,
+                producer=ProducerOutput(
+                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                ),
+                observation=observation,
+                audit=audit,
+            )
+        )
+    return _record_unit_evidence_final_result(
+        store,
+        InvestigationResult(
+            run_id=run_id,
+            case_id="case",
+            disposition=(
+                Disposition.INCONCLUSIVE
+                if outcome is AssessmentOutcome.NOT_DEMONSTRATED
+                else Disposition.SUPPORTED
+            ),
+            execution_status=ExecutionStatus.COMPLETED,
+            reason="bounded protocol completed",
+            assessment_outcome=outcome,
+            manifest=prepared.manifest,
+            rounds=rounds,
+        ),
+    )
+
+
+def test_assessment_oracle_requires_trusted_complete_negative_protocol(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    assessed = _assessment_unit_evidence_result(store, AssessmentOutcome.NOT_DEMONSTRATED)
+    oracle = AssessmentOracle(
+        schema_version="corsair.assessment-oracle/1",
+        acceptable=[AssessmentOutcome.NOT_DEMONSTRATED],
+    )
+    row = score(assessed, oracle, store)
+
+    assert row["status"] == "pass"
+    assert row["evidence_valid"] is True
+    assert row["assessment_outcome"] == "NOT_DEMONSTRATED"
+    assert row["correctly_resolved"] is True
+    summary = summarize([row])
+    assert summary["assessment_completed"] == 1
+    assert summary["assessment_incomplete"] == 0
+    assert summary["not_demonstrated"] == 1
+
+    truncated = assessed.model_copy(update={"rounds": assessed.rounds[:1]})
+    rejected = score(truncated, oracle, store)
+    assert rejected["status"] == "fail"
+    assert rejected["evidence_valid"] is False
+
+
+def test_assessment_oracle_requires_matching_trusted_final_record(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts import AuditOutput
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    assessed = _assessment_unit_evidence_result(store, AssessmentOutcome.NOT_DEMONSTRATED)
+    oracle = AssessmentOracle(
+        schema_version="corsair.assessment-oracle/1",
+        acceptable=[AssessmentOutcome.NOT_DEMONSTRATED],
+    )
+    first = assessed.rounds[0]
+    assert first.audit is not None and first.audit.review is not None
+    copied_audit = AuditOutput(
+        review=first.audit.review.model_copy(update={"reason": "copied accepted audit"})
+    )
+    copied_round = first.model_copy(update={"audit": copied_audit})
+    altered_audit = assessed.model_copy(update={"rounds": [copied_round, *assessed.rounds[1:]]})
+
+    for forged in (
+        assessed.model_copy(update={"run_id": "assessment-copy"}),
+        altered_audit,
+    ):
+        row = score(forged, oracle, store)
+        assert row["status"] == "fail"
+        assert row["evidence_valid"] is False
+
+
+def test_assessment_oracle_rejects_copied_operation_in_complete_looking_record(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    assessed = _assessment_unit_evidence_result(store, AssessmentOutcome.NOT_DEMONSTRATED)
+    copied_operation = _record_unit_evidence_final_result(
+        store,
+        assessed.model_copy(update={"run_id": "assessment-copy", "result_artifact": None}),
+    )
+    row = score(
+        copied_operation,
+        AssessmentOracle(
+            schema_version="corsair.assessment-oracle/1",
+            acceptable=[AssessmentOutcome.NOT_DEMONSTRATED],
+        ),
+        store,
+    )
+
+    assert row["status"] == "fail"
+    assert row["evidence_valid"] is False
+
+
+@pytest.mark.parametrize(
+    "status",
+    [ExecutionStatus.ERROR, ExecutionStatus.BLOCKED, ExecutionStatus.CANCELLED],
+)
+def test_assessment_oracle_never_resolves_operational_negative_even_if_bypassed(status, tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    assessed = _assessment_unit_evidence_result(store, AssessmentOutcome.NOT_DEMONSTRATED)
+    bypassed_contract = assessed.model_copy(update={"execution_status": status})
+    row = score(
+        bypassed_contract,
+        AssessmentOracle(
+            schema_version="corsair.assessment-oracle/1",
+            acceptable=[AssessmentOutcome.NOT_DEMONSTRATED],
+            expected_execution=status,
+        ),
+        store,
+    )
+
+    assert row["status"] == "fail"
+    assert row["evidence_valid"] is False
+    assert row["correctly_resolved"] is False
+
+
+def test_assessment_oracle_accepts_demonstrated_selected_round_in_matching_record(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    assessed = _assessment_unit_evidence_result(store, AssessmentOutcome.DEMONSTRATED)
+    row = score(
+        assessed,
+        AssessmentOracle(
+            schema_version="corsair.assessment-oracle/1",
+            acceptable=[AssessmentOutcome.DEMONSTRATED],
+        ),
+        store,
+    )
+
+    assert row["status"] == "pass"
+    assert row["evidence_valid"] is True
 
 
 def test_unavailable_cases_remain_in_denominator():

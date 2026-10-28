@@ -3,12 +3,14 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 
 from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    AssessmentOutcome,
     Contract,
     Digest,
     Disposition,
@@ -16,18 +18,35 @@ from corsair.contracts import (
     FixStatus,
     InvestigationRequest,
     InvestigationResult,
+    RoundResult,
     digest,
+    format_terminal_result,
 )
-from corsair.policies.verdicts import decide, fix_status
+from corsair.policies.verdicts import assessment_outcome, decide, fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
 
 
 class Oracle(Contract):
+    """Legacy disposition expectations for frozen pre-outcome cohorts."""
+
     acceptable: list[Disposition] = Field(min_length=1)
     forbidden: list[Disposition] = Field(default_factory=list)
     expected_execution: ExecutionStatus = ExecutionStatus.COMPLETED
     expected_fix: FixStatus | None = None
+
+
+class AssessmentOracle(Contract):
+    """Assessment-outcome expectations for separately frozen version-2 cohorts."""
+
+    schema_version: Literal["corsair.assessment-oracle/1"]
+    acceptable: list[AssessmentOutcome] = Field(min_length=1)
+    expected_execution: ExecutionStatus = ExecutionStatus.COMPLETED
+    expected_fix: FixStatus | None = None
+
+
+type ScoringOracle = Oracle | AssessmentOracle
+_ORACLE_ADAPTER = TypeAdapter(ScoringOracle)
 
 
 class DatasetEntry(Contract):
@@ -62,12 +81,15 @@ def _read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) ->
     return path, content
 
 
-def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
+def load_dataset(
+    path: Path,
+) -> tuple[Dataset, list[InvestigationRequest], dict[str, ScoringOracle]]:
     """Verify the frozen files first. Return oracle data only to the evaluator caller."""
     dataset = Dataset.model_validate_json(path.read_bytes())
     root = dataset_root(path)
     requests, oracles = [], {}
     family_splits: dict[str, str] = {}
+    oracle_kind: type[Oracle] | type[AssessmentOracle] | None = None
     for entry in dataset.entries:
         if entry.case_id in oracles:
             raise ValueError("duplicate case identity")
@@ -82,7 +104,11 @@ def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[
         if request.case.case_id != entry.case_id:
             raise ValueError("dataset and request case identities disagree")
         requests.append(normalize_request_sources(request, request_path))
-        oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
+        oracle = _ORACLE_ADAPTER.validate_json(oracle_bytes)
+        if oracle_kind is not None and type(oracle) is not oracle_kind:
+            raise ValueError("legacy and assessment outcome oracles must use separate datasets")
+        oracle_kind = type(oracle)
+        oracles[entry.case_id] = oracle
     return dataset, requests, oracles
 
 
@@ -105,11 +131,98 @@ def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | 
     return False
 
 
-def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | None = None) -> dict:
+def _committed_assessment_result(
+    result: InvestigationResult, store: ArtifactStore
+) -> InvestigationResult | None:
+    """Return only the exact trusted final record committed for this workflow run.
+
+    The record activity is the trust boundary: it writes the complete result once
+    to ``result.{run_id}``. The model-originated producer/audit data in that
+    document are therefore evaluated only as part of the immutable workflow result,
+    not as a free-standing attestation supplied to the scorer.
+    """
+    if result.result_artifact is None:
+        return None
+    try:
+        committed = store.reconcile(f"result.{result.run_id}")
+        if committed != result.result_artifact:
+            return None
+        saved = InvestigationResult.model_validate(store.get_json(committed))
+        if saved.result_artifact is not None:
+            return None
+        normalized = format_terminal_result(result.model_copy(update={"result_artifact": None}))
+        return saved if saved == normalized else None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def _valid_assessment_round(
+    result: InvestigationResult,
+    item: RoundResult,
+    verifier: EvidenceVerifier,
+    expected: AssessmentOutcome,
+) -> bool:
+    """Validate one saved pair against its run/index operation identity."""
+    observation, audit = item.observation, item.audit
+    submission = item.producer.submission_for_verification()
+    if (
+        observation is None
+        or submission is None
+        or audit is None
+        or observation.operation_id != f"{result.run_id}.r{item.index}"
+        or result.manifest is None
+    ):
+        return False
+    manifest = result.manifest
+    prepared = verifier.validate_saved(observation, submission, manifest)
+    return bool(
+        prepared is not None
+        and prepared.case_id == result.case_id
+        and assessment_outcome(prepared, observation, audit) is expected
+    )
+
+
+def valid_assessment_evidence(result: InvestigationResult, store: ArtifactStore | None) -> bool:
+    """Require a matching trusted full result and its outcome-specific saved evidence."""
+    if (
+        result.schema_version != "corsair.result/2"
+        or result.assessment_outcome is None
+        or result.execution_status is not ExecutionStatus.COMPLETED
+        or result.manifest is None
+        or store is None
+        or _committed_assessment_result(result, store) is None
+    ):
+        return False
+    verifier = EvidenceVerifier(Settings(), store)
+    if result.assessment_outcome is AssessmentOutcome.NOT_DEMONSTRATED:
+        return bool(result.rounds) and all(
+            item.index == index
+            and _valid_assessment_round(result, item, verifier, AssessmentOutcome.NOT_DEMONSTRATED)
+            for index, item in enumerate(result.rounds, start=1)
+        )
+    return any(
+        _valid_assessment_round(result, item, verifier, AssessmentOutcome.DEMONSTRATED)
+        for item in result.rounds
+    )
+
+
+def score(
+    result: InvestigationResult, oracle: ScoringOracle, store: ArtifactStore | None = None
+) -> dict:
     """One final-policy result, including invalid evidence and operational failures."""
-    positive = result.disposition in {Disposition.SUPPORTED, Disposition.CONDITIONAL}
-    evidence_valid = valid_positive_evidence(result, store) if positive else True
-    allowed = result.disposition in oracle.acceptable and result.disposition not in oracle.forbidden
+    assessment_oracle = isinstance(oracle, AssessmentOracle)
+    if assessment_oracle:
+        evidence_valid = valid_assessment_evidence(result, store)
+        allowed = (
+            result.schema_version == "corsair.result/2"
+            and result.assessment_outcome in oracle.acceptable
+        )
+    else:
+        positive = result.disposition in {Disposition.SUPPORTED, Disposition.CONDITIONAL}
+        evidence_valid = valid_positive_evidence(result, store) if positive else True
+        allowed = (
+            result.disposition in oracle.acceptable and result.disposition not in oracle.forbidden
+        )
     fix_correct = oracle.expected_fix is None or result.fix_status == oracle.expected_fix
     if result.fix_status in {FixStatus.DEMONSTRATION_BLOCKED, FixStatus.NOT_BLOCKED}:
         fixed = result.fix_observation
@@ -132,9 +245,10 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         allowed
         and evidence_valid
         and fix_correct
+        and (not assessment_oracle or result.execution_status is ExecutionStatus.COMPLETED)
         and result.execution_status == oracle.expected_execution
     )
-    return {
+    row = {
         "run_id": result.run_id,
         "case_id": result.case_id,
         "status": "pass" if passed else "fail",
@@ -142,12 +256,24 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         "execution_status": result.execution_status.value,
         "evidence_valid": evidence_valid,
         "fix_correct": fix_correct,
-        "forbidden_label": result.disposition in oracle.forbidden,
-        "correctly_resolved": passed and result.disposition != Disposition.INCONCLUSIVE,
+        "forbidden_label": (
+            result.disposition in oracle.forbidden if isinstance(oracle, Oracle) else False
+        ),
+        "correctly_resolved": (
+            passed and result.assessment_outcome is not None
+            if assessment_oracle
+            else passed
+            and result.disposition not in {Disposition.INCONCLUSIVE, Disposition.REFUTED}
+        ),
         **usage_metrics(result),
         "config_digest": result.manifest.config_digest if result.manifest else None,
         "reason": result.reason,
     }
+    if assessment_oracle:
+        row["assessment_outcome"] = (
+            result.assessment_outcome.value if result.assessment_outcome is not None else None
+        )
+    return row
 
 
 def usage_metrics(result: InvestigationResult) -> dict:
@@ -183,7 +309,7 @@ def _sum_known_counts(values: Iterable[int | None]) -> int | None:
 def summarize(rows: list[dict]) -> dict:
     total = len(rows)
     passed = sum(row.get("status") == "pass" for row in rows)
-    return {
+    summary = {
         "attempts": total,
         "passed": passed,
         "failed": total - passed,
@@ -202,6 +328,34 @@ def summarize(rows: list[dict]) -> dict:
         "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
     }
+    if any("assessment_outcome" in row for row in rows):
+        summary.update(
+            {
+                "assessment_completed": sum(
+                    row.get("assessment_outcome")
+                    in {
+                        AssessmentOutcome.DEMONSTRATED.value,
+                        AssessmentOutcome.NOT_DEMONSTRATED.value,
+                    }
+                    for row in rows
+                ),
+                "assessment_incomplete": sum(
+                    "assessment_outcome" in row
+                    and row.get("assessment_outcome") is None
+                    and row.get("status") != "unavailable"
+                    for row in rows
+                ),
+                "demonstrated": sum(
+                    row.get("assessment_outcome") == AssessmentOutcome.DEMONSTRATED.value
+                    for row in rows
+                ),
+                "not_demonstrated": sum(
+                    row.get("assessment_outcome") == AssessmentOutcome.NOT_DEMONSTRATED.value
+                    for row in rows
+                ),
+            }
+        )
+    return summary
 
 
 def save_report(path: Path, rows: list[dict], dataset_digest: Digest | None = None) -> dict:

@@ -6,7 +6,7 @@ import pytest
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 
-from corsair.contracts import InvestigationResult
+from corsair.contracts import AssessmentOutcome, InvestigationResult
 from corsair.workflows.investigation import InvestigationWorkflow
 from tests.workflow.temporal import investigation_request, temporal_id
 
@@ -40,6 +40,8 @@ async def test_fetched_history_replays_without_repeating_completed_activities(
         calls_before_replay = dict(activities.call_counts)
 
     assert result.result_artifact is not None
+    assert result.schema_version == "corsair.result/2"
+    assert result.assessment_outcome is AssessmentOutcome.DEMONSTRATED
     assert completed == [
         "corsair.prepare",
         "corsair.produce",

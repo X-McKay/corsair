@@ -26,3 +26,17 @@ def test_manifest_binds_procedure_resources_and_changes_when_skill_content_chang
     assert digest(before.capabilities) != digest(after.capabilities)
     assert before.request_digest == after.request_digest
     assert before.config_digest == after.config_digest
+
+
+def test_manifest_binds_helper_implementation_without_changing_auditor(tmp_path, monkeypatch):
+    request = InvestigationRequest.model_validate_json(
+        Path("evals/fixtures/java01/request.json").read_bytes()
+    )
+    settings = Settings(artifact_root=str(tmp_path))
+    before = manifest.build_manifest(request, settings, "sha256:" + "a" * 64)
+    monkeypatch.setattr(manifest, "mechanical_tools_digest", lambda: "b" * 64)
+    after = manifest.build_manifest(request, settings, "sha256:" + "a" * 64)
+    assert before.capabilities["producer"] != after.capabilities["producer"]
+    assert before.capabilities["auditor"] == after.capabilities["auditor"]
+    assert before.request_digest == after.request_digest
+    assert before.config_digest == after.config_digest

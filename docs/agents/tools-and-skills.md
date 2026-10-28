@@ -1,15 +1,19 @@
 # Tools and runtime instructions
 
-Agent capabilities are deliberately smaller than the surrounding runtime. The producer receives two episode-private native ADK source tools and both roles receive only private native procedural-guidance loaders. The auditor has no source, execution, network, or external tools. Factory metadata and construction reject a surface outside these approved capabilities.
+Agent capabilities are deliberately smaller than the surrounding runtime. The producer receives two episode-private native ADK source readers and two pure mechanical helpers; both roles receive private native procedural-guidance loaders. The auditor has no source, mechanical, execution, network, or external tools. Factory metadata and construction reject a surface outside these approved capabilities.
 
 | Role | Capability | Permitted operation | Boundary |
 | --- | --- | --- | --- |
 | Producer | `read_file(path)` | Read one bounded, normalized relative text file from the already admitted immutable source snapshot. | No arbitrary host path, write, execution, or new source admission. |
 | Producer | `list_files()` | List bounded regular relative files in that same validated snapshot. | No archive mutation, shell, or target invocation. |
+| Producer | `preview_invocation(payload)` | Show declared Python kwargs or Node/Java positional arguments after inserting one JSON payload; enforce Java String and byte limits. | No source import/execution, fixed-argument overrides, control validation or submission repair. |
+| Producer | `relative_path(base_root, target_path)` | Calculate a bounded lexical POSIX relative path from supplied public absolute paths. | No filesystem access, symlink resolution, source-semantics inference, reachability or bypass claim. |
 | Producer and auditor | `load_skill(name)` | Load an explicitly admitted role-local `SKILL.md` procedure from the installed package. | Role-filtered private catalog only; no dynamic directory, remote, or user-supplied skill loading. |
 | Producer and auditor | `load_skill_resource(skill, resource)` | Load an explicitly admitted packaged resource for an admitted role-local procedure. | No scripts, code execution, asset execution, environment injection, or state transfer. |
 
 The producer receives a read capability created for one `ProducerInput`; it cannot choose a host directory or obtain the broader source-admission capability. Tool output is bounded by the configured tool-output budget. Source content is untrusted data, so embedded instructions do not override the packaged role instruction. The auditor reads only its supplied packet and cannot obtain additional source context.
+
+The mechanical helpers are ordinary role-local Python functions wrapped by native ADK, not scripts exposed by a skill. They perform in-memory calculations only and always report `target_executed: false`. Their names and packaged implementation digest participate in producer capability identity. Calls consume existing tool/LLM episode limits; availability does not prove the model used them. Trusted validation and Docker evidence requirements remain mandatory even when optional tools are skipped.
 
 ## Private procedural skill loading
 

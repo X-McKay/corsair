@@ -21,6 +21,9 @@ from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_text
 
 _STYLES: dict[str, str] = {
+    "DEMONSTRATED": "green",
+    "NOT_DEMONSTRATED": "yellow",
+    "INCOMPLETE": "yellow",
     "SUPPORTED": "green",
     "CONDITIONAL": "yellow",
     "INCONCLUSIVE": "yellow",
@@ -112,9 +115,24 @@ class Terminal:
     def _result(self, value: dict[str, Any]) -> None:
         """Render a validated investigation result without exposing model content."""
         table = Table.grid(padding=(0, 2), expand=True)
-        label = value["disposition"]
+        disposition = value["disposition"]
+        if "assessment_outcome" in value:
+            outcome = value.get("assessment_outcome")
+            assessment_label = (
+                "Exploit demonstrated"
+                if outcome == "DEMONSTRATED"
+                else "Exploit not demonstrated"
+                if outcome == "NOT_DEMONSTRATED"
+                else "Assessment incomplete"
+            )
+            assessment_style = outcome if isinstance(outcome, str) else "INCOMPLETE"
+            table.add_row(
+                Text("Assessment", style="cyan"),
+                Text(assessment_label, style=_STYLES.get(assessment_style, "cyan")),
+            )
         table.add_row(
-            Text("Disposition", style="cyan"), Text(label, style=_STYLES.get(label, "cyan"))
+            Text("Disposition", style="cyan"),
+            Text(disposition, style=_STYLES.get(disposition, "cyan")),
         )
         for key in ("run_id", "case_id", "execution_status", "scope", "reason", "fix_status"):
             table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(value.get(key)))
@@ -149,7 +167,11 @@ class Terminal:
         artifact = value.get("result_artifact") or {}
         table.add_row(Text("Result SHA-256", style="cyan"), _text(artifact.get("sha256")))
         self.out.print(
-            Panel(table, title="Corsair · Investigation", border_style=_STYLES.get(label, "cyan"))
+            Panel(
+                table,
+                title="Corsair · Investigation",
+                border_style=_STYLES.get(disposition, "cyan"),
+            )
         )
 
     async def wait(

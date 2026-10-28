@@ -1,0 +1,11 @@
+{
+  "name": "producer",
+  "contract_version": "corsair.execution-agent/3",
+  "schema_ref": "corsair.contracts.TestPlan",
+  "tools": [
+    "read_file",
+    "list_files"
+  ],
+  "llm_call_limit": 4,
+  "instruction_resource": "corsair.agents.producer.instructions:execution.md"
+}

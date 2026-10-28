@@ -1,0 +1,28 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "function"
+  ],
+  "languages": [
+    "python"
+  ],
+  "execution_modes": [
+    "callable"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [],
+  "required_reasons": [
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "permitted_reasons": [
+    "REQUIRED_INPUT_MISSING"
+  ],
+  "images": [
+    "corsair-python:0.1"
+  ],
+  "paths": [
+    "reader.py"
+  ]
+}

@@ -2,8 +2,17 @@
 !deploy/
 !deploy/python/
 !deploy/python/Dockerfile
+!deploy/node/
+!deploy/node/Dockerfile
+!deploy/java/
+!deploy/java/Dockerfile
 !src/
 !src/corsair/
 !src/corsair/adapters/
 !src/corsair/adapters/sandboxing/
 !src/corsair/adapters/sandboxing/driver.py
+!src/corsair/adapters/sandboxing/node/
+!src/corsair/adapters/sandboxing/node/*.mjs
+!src/corsair/adapters/sandboxing/java/
+!src/corsair/adapters/sandboxing/java/*.java
+!src/corsair/adapters/sandboxing/java/*.sh

@@ -1,0 +1,38 @@
+{
+  "case": {
+    "case_id": "java02",
+    "finding": {
+      "title": "Java guarded path traversal reader",
+      "description": "The public Gate.read API must not disclose a file outside its configured public root. Investigate only the caller-controlled payload argument. The private fixture is at /fixtures/private/secret.txt; its value is unavailable.",
+      "file": "Gate.java",
+      "line": 9,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "847dcaded911888c432c4950c7bd136a0f3a7f007be366c87f3b77a8710d2ead"
+    },
+    "recipe": {
+      "kind": "java.secret_disclosure/1",
+      "module_file": "Gate.java",
+      "class_name": "Gate",
+      "function": "read",
+      "fixed_args": [
+        "/fixtures/allowed"
+      ],
+      "payload_index": 1,
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "expected_control": "hello",
+      "allowed_exceptions": []
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 8,
+    "episode_llm_calls": 3,
+    "max_tool_calls": 12,
+    "max_elapsed_seconds": 300
+  }
+}

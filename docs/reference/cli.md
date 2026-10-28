@@ -1,5 +1,7 @@
 # CLI reference
 
+Normal `investigate --json PATH --source PATH --wait` or `--issue OWNER/REPO#N` runs intake first. `investigate REQUEST --wait` accepts `corsair.issue-investigation-request/4`. Unsupported/out-of-scope/needs-input/error intake stops before production; supported intake selects the exact available image for execution. `--direct` explicitly accepts a v3 execution request for diagnostics. See [investigations](../guides/investigations.md). Standalone `intake` does not start execution. `inspect` supports v4 aggregates, v3 and historical results. `verify`, `eval` and `rescore` below retain their historical formats.
+
 Corsair has one CLI for native reference replay, Temporal-backed investigations, inspection, evaluation, and operational checks. The CLI is deliberately a thin adapter over the Docker and Temporal SDK paths; it does not introduce a second scheduler, agent loop, retry layer, or synthetic progress model.
 
 ## Invocation and global switches
@@ -90,15 +92,15 @@ Runs the trusted native reference observer directly against an admitted request/
 
 `--run-id ID` optionally supplies the operation identity. A healthy control/adversarial execution exits `0`, whether it demonstrates a violation or not; an invalid or operational native observation exits `1`.
 
-### `investigate REQUEST`
+### `investigate [REQUEST]`
 
 ```bash
 RUN_ID="case01-$(date +%s)"
-corsair investigate evals/fixtures/case01/request.json \
+corsair investigate --json /operator/issue.json --source /operator/repository \
   --run-id "$RUN_ID" --wait --settings .state/settings.json
 ```
 
-Starts a `corsair.investigation` Temporal workflow under a unique run ID. The workflow uses the configured task queue and writes immutable result/evidence artifacts to the shared artifact root.
+Starts an intake-gated `corsair.issue-investigation.v4` Temporal workflow under a unique run ID. A v4 request file can replace the raw input flags; explicit `--direct` accepts a v3 execution request file. The workflow uses the configured task queue and writes immutable result/evidence artifacts to the shared artifact root.
 
 Without `--wait`, the command returns submission identity after Temporal accepts the workflow. With `--wait`, it waits for the actual workflow result and displays the completed panel or JSON result. Ctrl-C while waiting detaches the local client; it does **not** cancel the remote workflow. Use `corsair cancel` if cancellation is intended.
 

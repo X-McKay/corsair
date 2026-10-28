@@ -1,0 +1,8 @@
+{
+  "name": "auditor",
+  "contract_version": "corsair.execution-agent/3",
+  "schema_ref": "corsair.contracts.PlanAudit",
+  "tools": [],
+  "llm_call_limit": 4,
+  "instruction_resource": "corsair.agents.auditor.instructions:execution.md"
+}

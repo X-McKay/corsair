@@ -216,13 +216,13 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
 
     assert producer.name == "producer"
     tool_names = []
-    for tool in producer.tools[:2]:
+    for tool in producer.tools[:-1]:
         assert callable(tool)
         name = getattr(tool, "__name__", None)
         assert isinstance(name, str)
         tool_names.append(name)
-    assert tool_names == ["read_file", "list_files"]
-    producer_loader = producer.tools[2]
+    assert tool_names == ["read_file", "list_files", "preview_invocation", "relative_path"]
+    producer_loader = producer.tools[-1]
     auditor_loader = auditor.tools[0]
     assert isinstance(producer_loader, SkillToolset)
     assert isinstance(auditor_loader, SkillToolset)
@@ -372,7 +372,15 @@ async def test_source_inspection_then_structured_completion_share_one_native_epi
     assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
     assert all(request.config.response_schema is ProducerDecision for request in model.requests)
     assert all(
-        set(request.tools_dict) == {"read_file", "list_files", "load_skill", "load_skill_resource"}
+        set(request.tools_dict)
+        == {
+            "read_file",
+            "list_files",
+            "preview_invocation",
+            "relative_path",
+            "load_skill",
+            "load_skill_resource",
+        }
         for request in model.requests
     )
 
@@ -415,5 +423,8 @@ async def test_core_procedure_reaches_first_model_request_without_inventing_tool
     assert audited.usage.skills_loaded == []
     assert audited.usage.tool_calls == 0
     assert "Runtime procedure: semantic-review" in str(
+        audit_model.requests[0].config.system_instruction
+    )
+    assert "Python, Node ESM, or Java recipe" in str(
         audit_model.requests[0].config.system_instruction
     )

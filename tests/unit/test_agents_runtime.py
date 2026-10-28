@@ -52,9 +52,9 @@ def test_role_contract_re_exports_are_the_canonical_models(tmp_path: Path):
     assert RoleProducerDecision is ProducerDecision
     assert RoleAuditResult is AuditResult
     producer_tools = build_producer_toolset(_producer_input(store), StoredSourceReader(store))
-    producer_names = [getattr(tool, "__name__", None) for tool in producer_tools[:2]]
-    assert producer_names == ["read_file", "list_files"]
-    producer_loader = producer_tools[2]
+    producer_names = [getattr(tool, "__name__", None) for tool in producer_tools[:-1]]
+    assert producer_names == ["read_file", "list_files", "preview_invocation", "relative_path"]
+    producer_loader = producer_tools[-1]
     assert isinstance(producer_loader, SkillToolset)
     assert [skill.name for skill in producer_loader.skills] == ["source-grounding"]
     auditor_tools = build_auditor_toolset()

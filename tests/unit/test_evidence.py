@@ -81,10 +81,15 @@ class _FakeSandbox:
     forged: bool = False
     unknown: bool = False
     cleanup_confirmed: bool = True
+    adversarial_outcome: RoleOutcome = RoleOutcome.VIOLATION
     calls: int = 0
     image_id: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
     omit_raw_image_id: bool = False
+
+    def image_id_for(self, recipe):
+        del recipe
+        return self.image_id
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
@@ -94,7 +99,8 @@ class _FakeSandbox:
         store = self.store
         del budget, heartbeat
         self.calls += 1
-        violation = role == "adversarial"
+        outcome = self.adversarial_outcome if role == "adversarial" else RoleOutcome.HELD
+        violation = outcome is RoleOutcome.VIOLATION
         driver = {
             "schema_version": "corsair.driver/1",
             "operation_id": operation_id,
@@ -109,7 +115,7 @@ class _FakeSandbox:
                 "errors": 0,
                 "skipped": 0,
             },
-            "outcome": "VIOLATION" if violation else "PROPERTY_HELD",
+            "outcome": outcome.value,
             "observation_kind": "disclosure" if violation else "held",
             "target_executed": True,
             "covered_lines": [4],
@@ -300,6 +306,12 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert disposition.value == "INCONCLUSIVE"
     assert status.value == "COMPLETED"
     assert fix_status(observation).value == "DEMONSTRATION_BLOCKED"
+    from corsair.contracts import AssessmentOutcome
+    from corsair.policies.verdicts import assessment_outcome
+
+    assert (
+        assessment_outcome(_prepared(), observation, _audit()) is AssessmentOutcome.NOT_DEMONSTRATED
+    )
 
     assert observation.adversarial is not None
     demonstrated = observation.model_copy(
@@ -318,6 +330,13 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert disposition.value == "CONDITIONAL"
     assert status.value == "COMPLETED"
     assert fix_status(demonstrated).value == "NOT_BLOCKED"
+    assert assessment_outcome(_prepared(), demonstrated, _audit()) is AssessmentOutcome.DEMONSTRATED
+    assert assessment_outcome(_prepared(), demonstrated, _audit(AuditDecision.REJECT)) is None
+    assert demonstrated.control is not None
+    missing_coverage = demonstrated.model_copy(
+        update={"control": demonstrated.control.model_copy(update={"covered_lines": []})}
+    )
+    assert assessment_outcome(_prepared(), missing_coverage, _audit()) is None
 
 
 @pytest.mark.parametrize("boundary", ["recipe", "image", "budget", "capabilities"])

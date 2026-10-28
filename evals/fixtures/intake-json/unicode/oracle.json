@@ -1,0 +1,43 @@
+{
+  "classifications": [
+    "in_scope_supported"
+  ],
+  "surfaces": [
+    "function"
+  ],
+  "languages": [
+    "python"
+  ],
+  "execution_modes": [
+    "callable"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [],
+  "required_reasons": [],
+  "permitted_reasons": [],
+  "images": [
+    "corsair-python:0.1"
+  ],
+  "paths": [
+    "resolver.py"
+  ],
+  "locations": [
+    {
+      "path": "resolver.py",
+      "symbol": "resolve_asset"
+    }
+  ],
+  "symbols": [
+    "resolve_asset"
+  ],
+  "issue_titles": [
+    "Asset traversal – private disclosure 🧭"
+  ],
+  "description_fragments": [
+    "resolver.py",
+    "resolve_asset",
+    "untrusted",
+    "outside",
+    "disclosure"
+  ]
+}

@@ -2,7 +2,41 @@
 
 This is the current work index. Current user guides start at the [documentation index](../index.md); historical records in [archive](archive/README.md) are evidence, not executable instructions for the current tree.
 
-## Latest consolidated role-local implementation
+## Proposed intake agent
+
+[PLAN-0130](active/PLAN-0130-intake-agent-design.md) specifies the approved structured intake role for issue references or JSON, sandboxed repository inspection, recommendations restricted to available images, trusted capability admission, and deterministic frozen evaluation. [PLAN-0131](active/PLAN-0131-intake-implementation.md) tracks implementation and actual qualification gates; model accuracy is not promoted. [PLAN-0132](active/PLAN-0132-recipe-free-investigations.md) specifies the user-requested expansion to sandboxed agent-authored test plans throughout investigations, approved by the user on 2026-10-27. [PLAN-0133](active/PLAN-0133-recipe-free-implementation.md) tracks inline implementation and its separate qualification gates.
+
+## Intake quality follow-up
+
+[PLAN-0134](active/PLAN-0134-intake-quality.md) tracks the bounded intake improvement: complete-read grounding, content-free schema diagnostics, native JSON completion and clearer issue/capability categories. The final unchanged cohort scored **14/16 exact and 16/16 correct decisions** across two repeats (6/8 and 8/8 exact), versus **0/8 exact and 3/8 correct decisions** in the fresh control. No final invalid outputs or false-supported cases occurred. These authored candidate diagnostics remain separate from held-out or promoted baselines; v3 producer/full-chain failures remain open.
+
+[PLAN-0135](active/PLAN-0135-intake-json-robustness.md) adds a separate scanner/JSON robustness cohort, normalization-detail assertions and hard JSON admission boundaries. The original eight cases remain frozen; scanner-shaped candidates and repeated related reports are not held-out families.
+
+[PLAN-0136](active/PLAN-0136-intake-image-tool.md) adds the user-requested image-selection tool and native procedural skill. [PLAN-0137](active/PLAN-0137-intake-investigation-handoff.md) records the implemented intake-gated workflow and immutable image/source handoff, with separate native and live stopping results. Model accuracy and full live execution remain unqualified; see [the diagnostic](../../evals/experiments/2026-10-28-intake-pipeline.md).
+
+## Recipe-free v3 implementation
+
+The new default investigation path uses canonical test plans, categorical outcome-blind audit and generic sandbox execution. The reviewed changes preserve unresolved security assessment and versioned historical diagnostics. Latest recorded native gates include **317 offline tests** and **11 Docker/Temporal/replay checks**; qualification details and retained failures are in [PLAN-0133](active/PLAN-0133-recipe-free-implementation.md). The approved continuation scored **1/8 exact intake cases** (2/8 classification), **3/4 exact independent role cases**, and an **INCOMPLETE** full-chain attempt caused by invalid producer output before audit/execution. Earlier **2/4** role reports remain retained. [ISSUE-0015](active/ISSUE-0015-intake-v3-live-quality.md) records the open qualification gap; model reliability remains unqualified.
+
+## Current scoped outcomes and language recipes
+
+[PLAN-0127](archive/plans/PLAN-0127-outcomes-node-java.md) and [HANDOFF-0150](archive/handoffs/HANDOFF-0150-outcomes-node-java.md) record local implementation of versioned paired outcomes and concrete Node ESM/Java static-String recipes. The final physical-Mac suite passed **285 tests, zero skips**, including actual Docker, Temporal/replay, CLI/rescore, installed-wheel and live-auditor checks. [Sanitized qualification](../../evals/baselines/qualifications/qualification-outcomes-node-java-2026-10-25.json) separates native, isolated-role and full-live cohorts.
+
+Model reliability remains unpromoted: the final live candidate batch resolved **1/4** assessments (`DEMONSTRATED`), with three incomplete and one operational failure. [ISSUE-0014](active/ISSUE-0014-node-java-assessment-live-quality.md) retains audit, control/probe and finite-protocol quality gaps. `NOT_DEMONSTRATED` is never a fallback for missing execution, rejected audit or abstention. Current-revision Linux/CI is unrun; this evolution remains local and uncommitted/unpushed pending publication authorization.
+
+## Probe attribution and auditor-consistency follow-up
+
+[PLAN-0128](archive/plans/PLAN-0128-probe-auditor-consistency.md) and the [sanitized experiment](../../evals/experiments/2026-10-26-probe-auditor-consistency.md) record the next, distinct resource identity. The Java error was a malformed model-proposed relative path, not an observer defect. A native regression preserves the wrong path as `ERROR` and validates the corrected path. Revised auditor diagnostics matched **20/20** unchanged Node/Java decisions (baseline **15/20**, including one provider failure), while preserved Python safety remained **12/12**.
+
+One new real ADK/Docker/Temporal batch completed **4/4** assessments: two `DEMONSTRATED`, two `NOT_DEMONSTRATED` after the unchanged two-round guarded-case protocol. The final physical-Mac suite passed **289 tests, zero skips**. These results do not close [ISSUE-0014](active/ISSUE-0014-node-java-assessment-live-quality.md): final producer exact matching was only **5/20**, including two provider failures, and java01 reached the declared fixture in only **2/5** proposals. Earlier failures remain preserved; repeated reliability, human-reviewed held-out cohorts and current-working-tree Linux/CI remain outstanding. Nothing in this follow-up was committed or pushed.
+
+## Producer skills and pure mechanical helpers
+
+[PLAN-0129](archive/plans/PLAN-0129-producer-skills-and-tools.md) and its [sanitized experiment](../../evals/experiments/2026-10-26-producer-skills-and-tools.md) record implemented native ADK `preview_invocation` and `relative_path` helpers plus revised source-grounding guidance. The final physical-Mac suite passed **321 tests, zero skips**. All frozen inputs and auditor resources remain unchanged; canonical contracts, trusted evidence and the finite protocol were not relaxed.
+
+The helper-surface diagnostic produced **16/20 valid native pairs** and 12/20 exact matches, versus 8/20 valid pairs and 4/20 exact matches with the same revised skill alone. However, neither arm called a tool, median helper-surface episode latency was slower, and the distinct full live batch resolved only **2/4** (both Java cases; Node cases remained incomplete). [ISSUE-0014](active/ISSUE-0014-node-java-assessment-live-quality.md) stays open: no causal tool benefit, speedup, majority reliability or Python non-regression is promoted. Earlier failures/results and the stale-assertion first native sweep remain retained. Current-tree Linux/CI remains unrun; no changes were committed or pushed.
+
+## Previous consolidated role-local implementation
 
 [PLAN-0126](archive/plans/PLAN-0126-agent-layout-and-runtime-skills.md) and [HANDOFF-0149](archive/handoffs/HANDOFF-0149-agent-runtime-layout-and-consolidation.md) record the role-local layout, native mandatory procedure preload, optional role-filtered loaders and transparent usage provenance. Real physical-Mac native gates passed209 tests before and after final cleanup; the fresh wheel loaded role skills and canonical identity views outside the checkout. [Qualification receipt](../../evals/baselines/qualifications/qualification-agent-runtime-layout-2026-10-25.json) separates all cohorts and retained failures.
 
