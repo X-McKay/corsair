@@ -10,6 +10,7 @@ from typing import Any
 
 from corsair.contracts import (
     CaseStability,
+    EpisodeRate,
     FlipNoise,
     GateDecision,
     GateReason,
@@ -34,13 +35,18 @@ REASON_TEXT: dict[GateReason, str] = {
     GateReason.TOKENS_UNKNOWN: "Effective token usage is unknown for a run.",
     GateReason.LANGUAGE_REGRESSED: "A language's majority verified accuracy fell.",
     GateReason.OBJECTIVE_BELOW_THRESHOLD: "The objective J gained less than the required margin.",
-    GateReason.TOKENS_ABOVE_CEILING: "Effective tokens rose above the allowed ratio.",
+    GateReason.TOKENS_ABOVE_CEILING: (
+        "Effective tokens rose above the allowed ratio (to the noise band's mean when a band "
+        "was read)."
+    ),
     GateReason.OPERATIONALLY_CONFOUNDED: (
         "A regressed language would not regress had its operational stops verified; "
         "re-run cleanly before reading it."
     ),
     GateReason.ACCURACY_NOT_IMPROVED: (
-        "Neither macro nor the target language's verified accuracy rose by one case's majority."
+        "Neither macro nor the target language's verified accuracy rose by one case's "
+        "majority beyond noise (the band's spread, or an exact test on the language's "
+        "episodes)."
     ),
     GateReason.ACCURACY_BELOW_BASELINE: "Macro verified accuracy fell below the baseline's.",
     GateReason.EFFICIENCY_NOT_IMPROVED: (
@@ -54,7 +60,8 @@ REASON_TEXT: dict[GateReason, str] = {
         "The noise band scored a different dataset, budgets or repeat count than the runs."
     ),
     GateReason.WITHIN_NOISE: (
-        "Every regression lies within the measured noise band: run the candidate once more "
+        "Every regression lies within the measured noise (the band's spread, or an exact "
+        "test on episodes that does not separate the rates): run the candidate once more "
         "(a confirmation run) and gate that run before deciding."
     ),
     GateReason.PAIRED_REGRESSION: (
@@ -66,10 +73,10 @@ REASON_TEXT: dict[GateReason, str] = {
         "is sliced to other cases."
     ),
     GateReason.SLICE_REGRESSED: (
-        "A slice case went from a majority pass to a majority fail outside the noise band."
+        "A slice case went from a majority pass to a majority fail outside noise."
     ),
     GateReason.SLICE_NOT_IMPROVED: (
-        "No slice case went from a majority fail to a majority pass outside the noise band."
+        "No slice case went from a majority fail to a majority pass outside noise."
     ),
     GateReason.IDENTITY_MISMATCH: (
         "The runs recorded different, or unknown, configuration identities."
@@ -106,19 +113,49 @@ SINGLE_CASE_TEXT = (
 )
 
 NOISE_CASES_TEXT = (
-    "A case is stable when its majority outcome was the same in every run and unstable "
-    "otherwise; a gate reads a flip of an unstable case as noise."
+    "Each case's episodes are pooled over the runs. A case is stable pass when a run of the "
+    "band's repeats at its pooled rate fails its majority with probability at most 0.05, "
+    "stable fail when it passes its majority with probability at most 0.05, and unstable "
+    "otherwise. A gate reads a flip, and a deciding language, by Fisher's exact test on the "
+    "candidate's episodes against these pooled episodes."
+)
+
+LEGACY_CASES_TEXT = (
+    "The band carries no pooled counts (it was written before them): a case is stable when "
+    "its majority outcome was the same in every run and unstable otherwise, and a gate reads "
+    "a flip of an unstable case, or in a language whose band is a whole case, as noise."
 )
 
 # Why a flip is within noise, as the paired view names it.
 FLIP_NOISE_TEXT: dict[FlipNoise, str] = {
     "language_band": "language band",
     "unstable_case": "unstable case",
+    "episode_rate": "episode rate",
 }
 
 NOISE_TEXT = (
     "A delta inside the band is noise; an improvement must exceed it, and a regression "
-    "inside it is inconclusive."
+    "inside it is inconclusive. Token and p50 seconds ratios are to the band's mean and "
+    "within noise between its runs' min / mean and max / mean."
+)
+
+POOLED_GATE_TEXT = (
+    "The band carries pooled per-case counts: a flip, and a deciding language read by its "
+    "episodes, is outside noise only when Fisher's exact test (two-sided) on the candidate's "
+    "episodes against the band's pooled episodes gives p below 0.05 in its direction. The "
+    "half-ranges below are information."
+)
+
+LEGACY_GATE_TEXT = (
+    "The band carries no pooled per-case counts: flips and languages are read against its "
+    "spreads and its per-run majority classification, as before pooled counts."
+)
+
+RATES_TEXT = (
+    "Deciding languages by episode rate (the candidate's episodes against the band's pooled "
+    "episodes of the language's cases; Fisher's exact test, two-sided). A language regresses "
+    "only when its rate is lower with p below 0.05 and improves only when it is higher with p "
+    "below 0.05."
 )
 
 DECIDING_TEXT = (
@@ -136,8 +173,10 @@ SLICE_TEXT = (
 )
 
 SLICE_NOISE_TEXT = (
-    "A slice gate reads the band per case only: a flip in a language whose band is a whole "
-    "case, or of a case the band classifies unstable, is within noise and counts neither way."
+    "A slice gate reads the band per case only: with pooled counts, a flip the exact test on "
+    "the candidate's episodes against the band's pooled episodes does not separate (p at "
+    "least 0.05) is within noise and counts neither way; without them, so is a flip in a "
+    "language whose band is a whole case or of a case the band classifies unstable."
 )
 
 SLICE_UNSTABLE_TEXT = (
@@ -151,8 +190,7 @@ SLICE_PAIRED_TEXT = (
 
 PAIRED_TEXT = (
     "Each case scored on both sides, by whether the majority of its repeats verified. "
-    "Only flips in deciding languages outside the noise band count toward a paired "
-    "regression."
+    "Only flips in deciding languages outside noise count toward a paired regression."
 )
 
 
@@ -280,8 +318,13 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         if metric is not None
     )
     rows.append(["Repeats", str(baseline.repeats), str(candidate.repeats), ""])
-    rows.append(["Token ratio", "", _number(verdict.token_ratio), ""])
-    rows.append(["p50 seconds ratio", "", _number(verdict.seconds_ratio), ""])
+    rows.append(["Token ratio (installed reference)", "", _number(verdict.token_ratio), ""])
+    rows.append(["p50 seconds ratio (installed reference)", "", _number(verdict.seconds_ratio), ""])
+    if verdict.noise is not None and not verdict.slice:
+        rows.append(["Token ratio (band mean)", "", _number(verdict.token_ratio_to_band), ""])
+        rows.append(
+            ["p50 seconds ratio (band mean)", "", _number(verdict.seconds_ratio_to_band), ""]
+        )
     lines.extend(_table(["Metric", "Baseline", "Candidate", "Delta"], rows))
     lines.append("")
     language_rows = []
@@ -365,10 +408,20 @@ def _regressed(verdict: GateVerdict, language: str, baseline: Scorecard) -> str:
     return "yes (single case)" if language in verdict.single_case_languages else "yes"
 
 
+def _episodes(rate: EpisodeRate) -> str:
+    """``candidate v/n vs reference v/n episodes, p <p>``."""
+    return (
+        f"{rate.candidate_verified}/{rate.candidate_episodes} vs "
+        f"{rate.reference_verified}/{rate.reference_episodes} episodes, p {rate.p_value:.3f}"
+    )
+
+
 def _flip(case: PairedCase) -> str:
     notes = [case.language]
     if not case.deciding:
         notes.append("reported only")
+    if case.rate is not None:
+        notes.append(_episodes(case.rate))
     if case.within_noise:
         reason = None if case.noise_reason is None else FLIP_NOISE_TEXT[case.noise_reason]
         notes.append(f"within noise: {reason}" if reason else "within noise")
@@ -393,7 +446,8 @@ def _band_stability_lines(noise: NoiseBand | None) -> list[str]:
         return []
     if noise.cases is None:
         return ["- Noise band per-case stability: unknown (the band recorded none)."]
-    lines = [f"- Noise band per-case stability: {_stability_counts(noise.cases)}."]
+    rule = "by pooled episodes" if noise.pooled else "by per-run majority, no pooled counts"
+    lines = [f"- Noise band per-case stability ({rule}): {_stability_counts(noise.cases)}."]
     for label, stability in (("Unstable", "unstable"), ("Stable fail", "stable_fail")):
         named = _case_ids(noise.cases, stability)
         if named:
@@ -468,10 +522,37 @@ def _difference_band(spread: NoiseSpread | None) -> str:
     return "unknown" if spread is None else f"±{spread.band:.3f}"
 
 
-def _ratio_band(spread: NoiseSpread | None, suffix: str = "") -> str:
-    if spread is None or spread.max_ratio is None:
+def _mean_ratio_band(spread: NoiseSpread | None, suffix: str = "") -> str:
+    """The band's runs as ratios to its mean: min / mean to max / mean."""
+    if spread is None or spread.mean <= 0:
         return "unknown"
-    return f"{1 / spread.max_ratio:.3f}{suffix} to {spread.max_ratio:.3f}{suffix}"
+    low, high = min(spread.values) / spread.mean, max(spread.values) / spread.mean
+    return f"{low:.3f}{suffix} to {high:.3f}{suffix}"
+
+
+def _rate(verified: int, episodes: int) -> str:
+    return f"{verified}/{episodes} ({verified / episodes:.3f})"
+
+
+def _rate_lines(verdict: GateVerdict) -> list[str]:
+    """Each deciding language's episodes against the band's pooled episodes, and the test."""
+    if not verdict.language_rates:
+        return []
+    rows = [
+        [
+            language,
+            _rate(rate.reference_verified, rate.reference_episodes),
+            _rate(rate.candidate_verified, rate.candidate_episodes),
+            f"{rate.p_value:.3f}",
+            "yes" if language in verdict.languages_within_noise else "no",
+        ]
+        for language, rate in verdict.language_rates.items()
+    ]
+    lines = [RATES_TEXT, ""]
+    lines.extend(
+        _table(["Language", "Reference episodes", "Candidate episodes", "p", "Within noise"], rows)
+    )
+    return [*lines, ""]
 
 
 def _noise_lines(verdict: GateVerdict) -> list[str]:
@@ -480,9 +561,10 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     if noise is None:
         return []
     runs = ", ".join(f"`{run}`" for run in noise.runs)
+    pooled = POOLED_GATE_TEXT if noise.pooled else LEGACY_GATE_TEXT
     if verdict.slice:
-        return [f"Noise band from {noise.n_runs} runs: {runs}. {SLICE_NOISE_TEXT}", ""]
-    lines = [f"Noise band from {noise.n_runs} runs: {runs}. {NOISE_TEXT}", ""]
+        return [f"Noise band from {noise.n_runs} runs: {runs}. {SLICE_NOISE_TEXT}", "", pooled, ""]
+    lines = [f"Noise band from {noise.n_runs} runs: {runs}. {NOISE_TEXT}", "", pooled, ""]
     if verdict.decision is GateDecision.INCOMPARABLE:
         # Nothing was compared, so no delta was read against the band.
         return lines
@@ -505,15 +587,15 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
             within("macro_verified_accuracy" in metrics),
         ],
         [
-            "Token ratio",
-            _number(verdict.token_ratio),
-            _ratio_band(noise.macro_effective_tokens),
+            "Token ratio to band mean",
+            _number(verdict.token_ratio_to_band),
+            _mean_ratio_band(noise.macro_effective_tokens),
             within("macro_effective_tokens" in metrics),
         ],
         [
-            "p50 seconds ratio",
-            _number(verdict.seconds_ratio),
-            _ratio_band(noise.macro_p50_seconds),
+            "p50 seconds ratio to band mean",
+            _number(verdict.seconds_ratio_to_band),
+            _mean_ratio_band(noise.macro_p50_seconds),
             within("macro_p50_seconds" in metrics),
         ],
     ]
@@ -534,14 +616,17 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
             f"{language} verified accuracy",
             _signed(delta),
             _difference_band(noise.languages.get(language)),
-            within(language in verdict.languages_within_noise),
+            within(language in verdict.languages_within_noise)
+            + (" (episode rate)" if language in verdict.language_rates else ""),
         ]
         for language, delta in verdict.language_deltas.items()
     )
     lines.extend(_table(["Metric", "Delta", "Noise band", "Within noise"], rows))
+    lines.append("")
+    lines.extend(_rate_lines(verdict))
     named = ", ".join(verdict.within_noise) or "none"
     languages = ", ".join(verdict.languages_within_noise) or "none"
-    lines.extend(["", f"Within noise: {named}; languages: {languages}.", ""])
+    lines.extend([f"Within noise: {named}; languages: {languages}.", ""])
     return lines
 
 
@@ -585,7 +670,7 @@ def render_noise(band: NoiseBand) -> str:
                 _number(spread.mean, digits),
                 _number(spread.half_range, digits),
                 _number(spread.stdev, digits),
-                _ratio_band(spread, "x") if ratio else _difference_band(spread),
+                _mean_ratio_band(spread, "x") if ratio else _difference_band(spread),
             ]
         )
     lines.extend(_table(["Metric", *runs, "Mean", "Half-range", "Stdev", "Gate band"], rows))
@@ -594,18 +679,40 @@ def render_noise(band: NoiseBand) -> str:
 
 
 def _noise_case_lines(band: NoiseBand) -> list[str]:
-    """The band's per-case classification: counts, then the unstable and failing cases."""
+    """The band's per-case classification: counts, the unstable and failing cases, and
+    with pooled counts each case's episodes and majority-pass probability."""
     if band.cases is None:
         if not band.cases_unknown_runs:
-            return ["Per-case stability: not recorded (a band written before per-case stability)."]
+            return [
+                "Per-case stability: not recorded (a band written before per-case stability); "
+                "the band carries no pooled counts."
+            ]
         runs = ", ".join(f"`{run}`" for run in band.cases_unknown_runs)
-        return [f"Per-case stability: unknown; no trajectories reproducing run {runs}."]
-    lines = [f"Per-case stability: {_stability_counts(band.cases)}. {NOISE_CASES_TEXT}", ""]
-    for label, stability in (
-        ("Unstable (a flip counts neither way)", "unstable"),
-        ("Stable fail", "stable_fail"),
-    ):
+        return [
+            f"Per-case stability: unknown; no trajectories reproducing run {runs}; "
+            "the band carries no pooled counts."
+        ]
+    text = NOISE_CASES_TEXT if band.pooled else LEGACY_CASES_TEXT
+    lines = [f"Per-case stability: {_stability_counts(band.cases)}. {text}", ""]
+    unstable = "Unstable" if band.pooled else "Unstable (a flip counts neither way)"
+    for label, stability in ((unstable, "unstable"), ("Stable fail", "stable_fail")):
         lines.append(f"- {label}: {_case_ids(band.cases, stability) or 'none'}")
+    if not band.pooled:
+        return lines
+    rows = [
+        [
+            f"`{case.case_id}`",
+            case.language,
+            *(str(count) for count in case.verified_episodes),
+            _rate(case.verified or 0, case.episodes or 1),
+            _number(case.majority_pass_probability),
+            case.stability.replace("_", " "),
+        ]
+        for case in band.cases
+    ]
+    runs = [f"`{run}` verified" for run in band.runs]
+    header = ["Case", "Language", *runs, "Pooled verified", "Majority-pass probability"]
+    lines.extend(["", *_table([*header, "Stability"], rows)])
     return lines
 
 

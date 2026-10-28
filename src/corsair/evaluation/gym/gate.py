@@ -30,9 +30,12 @@ conditions; its verdict says ``smoke`` so its ACCEPTED is never read as an accep
 
 A gate given a noise band (``noise``, from ``corsair gym noise``: two or more runs of one
 configuration) reads each metric's delta against it. A difference lies within noise when
-its magnitude is at most the band (max - min across those runs); a token or seconds ratio
-when it lies between 1 / max_ratio and max_ratio. An improvement criterion is then met only
-beyond the band. When every deciding reason is a regression (``language_regressed``,
+its magnitude is at most the band (max - min across those runs). Token and p50 seconds
+ratios are then taken against the mean of the band's runs (``token_ratio_to_band``,
+``seconds_ratio_to_band``; the ratios to the installed baseline are still reported): the
+token ceiling and the efficiency ratios read them, and a ratio lies within noise between
+the band's min / mean and max / mean. An improvement criterion is then met only beyond the
+band. When every deciding reason is a regression (``language_regressed``,
 ``objective_below_threshold``, ``accuracy_below_baseline``, ``tokens_above_ceiling``) whose
 metric lies within noise, the verdict is INCONCLUSIVE (with ``within_noise``) instead of
 REJECTED, and a confirmation run decides; one regression outside the band, or an unmet
@@ -52,11 +55,23 @@ Paired outcomes: given both runs' trajectories, every case scored on both sides 
 compared by its majority outcome (``pass_to_fail``, ``fail_to_pass``, ``stable_pass``,
 ``stable_fail``). On the accuracy or objective track a gate that would otherwise accept
 rejects with ``paired_regression`` when, among the deciding languages, more cases went
-from pass to fail than from fail to pass. With a band, a flip in a language whose band is
-a whole case (±1.0) is noise and never counts (``language_band``), and so is a flip of a
-case the band classifies ``unstable``: its majority outcome already differed between runs
-of the reference configuration (``unstable_case``). A flip of a ``stable_pass`` or
-``stable_fail`` case stays a flip; a band without per-case stability reads languages only.
+from pass to fail than from fail to pass.
+
+With a band carrying pooled per-case counts (``NoiseBand.pooled``), a flip is outside
+noise only when Fisher's exact test, two-sided, on the candidate's episodes of the case
+(verified or not) against the band's pooled episodes of it gives p below
+``SIGNIFICANCE_LEVEL`` and the candidate's rate moved in the flip's direction; otherwise it
+is noise (``episode_rate``) and never counts. A case the band did not record falls back to
+its language band. Deciding languages (given the candidate's trajectories) use the same
+test on the candidate's episodes pooled over the language's cases against the band's
+pooled episodes of its cases (``language_rates``): a language whose majority accuracy fell
+is a regression outside noise only when its rate is lower with p below the level, and the
+accuracy track's language criterion holds only when the rate is higher with p below it.
+
+With a band without pooled counts (written before them) the earlier rules hold: a flip in
+a language whose band is a whole case (±1.0) is noise (``language_band``), and so is a flip
+of a case the band classifies ``unstable`` (``unstable_case``); deciding languages are read
+against their spreads.
 
 Slice screens (``slice=True``): a sliced candidate (``gym run --case``) is gated against
 an unsliced baseline, or one sliced to exactly the same cases, on the candidate's cases
@@ -78,6 +93,7 @@ from statistics import mean
 
 from corsair.contracts import (
     DecidingMetric,
+    EpisodeRate,
     FlipNoise,
     GateDecision,
     GateReason,
@@ -93,6 +109,7 @@ from corsair.contracts import (
     Scorecard,
     Trajectory,
 )
+from corsair.evaluation.gym.exact import fisher_exact
 from corsair.evaluation.gym.scoring import build_scorecard, case_outcomes, objective_terms
 
 MIN_REPEATS = 3
@@ -250,6 +267,13 @@ def seconds_ratio(baseline: Scorecard, candidate: Scorecard) -> float | None:
     return after / before
 
 
+def band_ratio(value: float | None, spread: NoiseSpread | None) -> float | None:
+    """``value`` over the mean of the band's runs; unknown when either is."""
+    if value is None or spread is None or spread.mean <= 0:
+        return None
+    return value / spread.mean
+
+
 def latency_comparable(baseline: Scorecard, candidate: Scorecard) -> bool:
     """Seconds compare only at one recorded concurrency and with no operational episode."""
     return (
@@ -327,13 +351,81 @@ def unstable_cases(noise: NoiseBand | None) -> set[str]:
     return {case.case_id for case in noise.cases if case.stability == "unstable"}
 
 
+def episode_rate(
+    reference_verified: int,
+    reference_episodes: int,
+    candidate_verified: int,
+    candidate_episodes: int,
+) -> EpisodeRate:
+    """The candidate's episodes against the reference's, with Fisher's exact p-value."""
+    return EpisodeRate(
+        reference_verified=reference_verified,
+        reference_episodes=reference_episodes,
+        candidate_verified=candidate_verified,
+        candidate_episodes=candidate_episodes,
+        p_value=fisher_exact(
+            candidate_verified, candidate_episodes, reference_verified, reference_episodes
+        ),
+    )
+
+
+def _pooled_cases(noise: NoiseBand | None) -> dict[str, tuple[int, int]]:
+    """Per case the band pooled: (verified, episodes); none without pooled counts."""
+    if noise is None or not noise.pooled:
+        return {}
+    return {
+        case.case_id: (case.verified or 0, case.episodes or 0)
+        for case in noise.cases or []
+        if case.episodes
+    }
+
+
+def _episode_counts(trajectories: Sequence[Trajectory]) -> dict[str, tuple[int, int]]:
+    """Per case id: (verified episodes, episodes)."""
+    verified = Counter(item.case_id for item in trajectories if item.verified)
+    episodes = Counter(item.case_id for item in trajectories)
+    return {case: (verified[case], count) for case, count in episodes.items()}
+
+
+def language_rates(
+    noise: NoiseBand | None, candidate: Sequence[Trajectory], languages: Collection[str]
+) -> dict[str, EpisodeRate]:
+    """Per language in ``languages``: the candidate's episodes of its cases against the
+    band's pooled episodes of its cases. Empty without pooled counts; a language either
+    side has no episodes of is left out (it is read against its spread)."""
+    if noise is None or not noise.pooled:
+        return {}
+    rates = {}
+    for language in sorted(languages):
+        reference = [case for case in noise.cases or [] if case.language == language]
+        rows = [item for item in candidate if item.language == language]
+        if not reference or not rows:
+            continue
+        rates[language] = episode_rate(
+            sum(case.verified or 0 for case in reference),
+            sum(case.episodes or 0 for case in reference),
+            sum(item.verified for item in rows),
+            len(rows),
+        )
+    return rates
+
+
 def _flip_noise(
-    noise: NoiseBand | None, case: str, language: str, unstable: Collection[str]
+    noise: NoiseBand | None,
+    case: str,
+    language: str,
+    unstable: Collection[str],
+    rate: EpisodeRate | None,
+    direction: int,
 ) -> FlipNoise | None:
-    """Why a flip is within ``noise``: the case is a coin-flip, or its language's band is
-    a whole case; ``None`` when it is a real flip."""
+    """Why a flip in ``direction`` (+1 fail to pass, -1 pass to fail) is within ``noise``;
+    ``None`` when it is a real flip. With the case's pooled counts (``rate``) only the
+    exact test decides; otherwise the case is a coin-flip, or its language's band is a
+    whole case."""
     if noise is None:
         return None
+    if rate is not None:
+        return None if rate.separates(direction) else "episode_rate"
     if case in unstable:
         return "unstable_case"
     return "language_band" if _whole_case(noise.languages.get(language)) else None
@@ -345,6 +437,7 @@ _PAIRING = {
     (False, True): "fail_to_pass",
     (False, False): "stable_fail",
 }
+_FLIP_DIRECTION = {"pass_to_fail": -1, "fail_to_pass": 1}
 
 
 def paired_outcomes(
@@ -357,11 +450,14 @@ def paired_outcomes(
     """Every case scored on both sides by its baseline and candidate majority outcome.
 
     A flip in a language outside ``deciding`` is listed but never counted in
-    ``deciding_pass_to_fail``/``deciding_fail_to_pass``; with ``noise`` neither is a flip in
-    a language whose band is a whole case or of a case the band classifies ``unstable``.
+    ``deciding_pass_to_fail``/``deciding_fail_to_pass``; with ``noise`` neither is a flip
+    within noise (module docstring): by Fisher's exact test on the case's episodes when the
+    band pooled them, else by its language band or ``unstable`` classification.
     """
     before, after = case_outcomes(baseline), case_outcomes(candidate)
     unstable = unstable_cases(noise)
+    pooled = _pooled_cases(noise)
+    episodes = _episode_counts(candidate)
     totals: Counter[str] = Counter()
     languages: dict[str, Counter[str]] = {}
     flips: dict[str, list[PairedCase]] = {"pass_to_fail": [], "fail_to_pass": []}
@@ -373,13 +469,17 @@ def paired_outcomes(
         languages.setdefault(language, Counter())[outcome] += 1
         if outcome not in flips:
             continue
-        reason = _flip_noise(noise, case, language, unstable)
+        rate = None
+        if case in pooled:
+            rate = episode_rate(*pooled[case], *episodes[case])
+        reason = _flip_noise(noise, case, language, unstable, rate, _FLIP_DIRECTION[outcome])
         flip = PairedCase(
             case_id=case,
             language=language,
             deciding=language in deciding,
             within_noise=reason is not None,
             noise_reason=reason,
+            **({} if rate is None else rate.model_dump()),
         )
         flips[outcome].append(flip)
         if flip.deciding and not flip.within_noise:
@@ -437,10 +537,11 @@ def inside_band(delta: float | None, spread: NoiseSpread | None) -> bool:
 
 
 def _inside_ratio(ratio: float | None, spread: NoiseSpread | None) -> bool:
-    """A ratio between the band's runs' smallest and largest ratio."""
-    if ratio is None or spread is None or spread.max_ratio is None:
+    """A ratio to the band's mean between its runs' min / mean and max / mean."""
+    if ratio is None or spread is None or spread.mean <= 0:
         return False
-    return 1 / spread.max_ratio - _EPSILON <= ratio <= spread.max_ratio + _EPSILON
+    low, high = min(spread.values) / spread.mean, max(spread.values) / spread.mean
+    return low - _EPSILON <= ratio <= high + _EPSILON
 
 
 def _beyond(delta: float | None, noise: NoiseBand | None, spread: NoiseSpread | None) -> bool:
@@ -453,12 +554,13 @@ def _beyond(delta: float | None, noise: NoiseBand | None, spread: NoiseSpread | 
 def _saving_beyond(
     ratio: float | None, noise: NoiseBand | None, spread: NoiseSpread | None
 ) -> bool:
-    """A ratio saving counts below the band's smallest ratio; without a band every one does."""
+    """A saving (a ratio to the band's mean) counts below the band's min / mean; without a
+    band every one does."""
     if noise is None:
         return True
-    if ratio is None or spread is None or spread.max_ratio is None:
+    if ratio is None or spread is None or spread.mean <= 0:
         return False
-    return ratio < 1 / spread.max_ratio - _EPSILON
+    return ratio < min(spread.values) / spread.mean - _EPSILON
 
 
 def within_noise(
@@ -470,7 +572,9 @@ def within_noise(
     tokens: float | None,
     seconds: float | None,
 ) -> tuple[list[NoiseMetric], list[str]]:
-    """The headline metrics and the languages whose delta lies inside the band."""
+    """The headline metrics and the languages whose delta lies inside the band.
+
+    ``tokens`` and ``seconds`` are ratios to the band's mean."""
     inside: dict[NoiseMetric, bool] = {
         "objective_j": inside_band(delta_j, noise.objective_j),
         "macro_verified_accuracy": inside_band(accuracy, noise.macro_verified_accuracy),
@@ -489,16 +593,31 @@ def _regression_within_noise(
     reason: GateReason,
     *,
     within: list[NoiseMetric],
-    languages: list[str],
+    languages: Collection[str],
     regressed: list[str],
     accuracy_within: bool,
 ) -> bool:
+    """Whether a deciding regression lies within noise; ``languages`` are the regressed
+    languages within it."""
     if reason is GateReason.LANGUAGE_REGRESSED:
         return all(language in languages for language in regressed)
     if reason is GateReason.ACCURACY_BELOW_BASELINE:
         return accuracy_within
     metric = _REGRESSION_METRIC.get(reason)
     return metric is not None and metric in within
+
+
+def _language_beyond(
+    language: str,
+    delta: float | None,
+    noise: NoiseBand | None,
+    rates: dict[str, EpisodeRate],
+) -> bool:
+    """A language's gain counts: by the exact test when its rate was read, else beyond its
+    spread in the band (every gain without a band)."""
+    if language in rates:
+        return rates[language].separates(1)
+    return _beyond(delta, noise, None if noise is None else noise.languages.get(language))
 
 
 def _track_reasons(
@@ -515,14 +634,19 @@ def _track_reasons(
     tokens: float | None,
     seconds: float | None,
     noise: NoiseBand | None = None,
+    rates: dict[str, EpisodeRate] | None = None,
 ) -> list[GateReason]:
     """The track's own reasons, after the shared language-regression check.
 
     ``accuracy`` is the macro verified accuracy delta the gate decides on (over the
     deciding languages), ``accuracy_step`` its minimum gain and ``accuracy_band`` its
     spread in the band. With a band, each improvement criterion also needs its delta
-    beyond the band.
+    beyond the band; with ``rates`` (deciding languages read by the exact test) the macro
+    criterion instead needs a deciding language that rose with its rate higher at p below
+    the level, and the target language needs its own. ``tokens`` and ``seconds`` are the
+    ratios decided on: to the band's mean with a band, else to the baseline.
     """
+    rates = rates or {}
     if track == "objective":
         reasons = []
         if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON or not _beyond(
@@ -535,17 +659,18 @@ def _track_reasons(
     if track == "accuracy":
         reasons = []
         target = None if target_language is None else deltas.get(target_language)
-        target_band = (
-            None
-            if noise is None or target_language is None
-            else noise.languages.get(target_language)
+        macro_beyond = (
+            any(
+                (deltas.get(language) or 0.0) > _EPSILON and rate.separates(1)
+                for language, rate in rates.items()
+            )
+            if rates
+            else _beyond(accuracy, noise, accuracy_band)
         )
-        improved = (
-            _at_least(accuracy, accuracy_step) and _beyond(accuracy, noise, accuracy_band)
-        ) or (
+        improved = (_at_least(accuracy, accuracy_step) and macro_beyond) or (
             target_language is not None
             and _at_least(target, language_step(baseline, target_language))
-            and _beyond(target, noise, target_band)
+            and _language_beyond(target_language, target, noise, rates)
         )
         if not improved:
             reasons.append(GateReason.ACCURACY_NOT_IMPROVED)
@@ -774,6 +899,13 @@ def gate(
     accuracy = candidate.macro_verified_accuracy - baseline.macro_verified_accuracy
     tokens = token_ratio(baseline, candidate)
     seconds = seconds_ratio(baseline, candidate)
+    # With a band, the ratios decided on are to the mean of the band's runs.
+    tokens_to_band = seconds_to_band = None
+    if noise is not None:
+        tokens_to_band = band_ratio(candidate.macro_effective_tokens, noise.macro_effective_tokens)
+        seconds_to_band = band_ratio(candidate.macro_p50_seconds, noise.macro_p50_seconds)
+    decided_tokens = tokens if noise is None else tokens_to_band
+    decided_seconds = seconds if noise is None else seconds_to_band
     regressed = [
         language
         for language, delta in deltas.items()
@@ -797,7 +929,10 @@ def gate(
     within: list[NoiseMetric] = []
     languages_within: list[str] = []
     paired: PairedOutcomes | None = None
+    rates: dict[str, EpisodeRate] = {}
     if not reasons:
+        if candidate_trajectories is not None:
+            rates = language_rates(noise, candidate_trajectories, deciders)
         if regressed:
             reasons.append(GateReason.LANGUAGE_REGRESSED)
             confounded = operationally_confounded(baseline, candidate, regressed)
@@ -814,9 +949,10 @@ def gate(
                 accuracy=decided_accuracy,
                 accuracy_step=accuracy_step,
                 accuracy_band=accuracy_band,
-                tokens=tokens,
-                seconds=seconds,
+                tokens=decided_tokens,
+                seconds=decided_seconds,
                 noise=noise,
+                rates=rates,
             )
         )
         if noise is not None:
@@ -825,8 +961,18 @@ def gate(
                 deltas=deltas,
                 delta_j=delta_j,
                 accuracy=accuracy,
-                tokens=tokens,
-                seconds=seconds,
+                tokens=tokens_to_band,
+                seconds=seconds_to_band,
+            )
+            # A language read by the exact test is within noise when the test does not
+            # separate its rate from the band's.
+            languages_within = sorted(
+                {language for language in languages_within if language not in rates}
+                | {
+                    language
+                    for language, rate in rates.items()
+                    if not rate.separates(rate.direction)
+                }
             )
         if baseline_trajectories is not None and candidate_trajectories is not None:
             paired = paired_outcomes(
@@ -846,6 +992,17 @@ def gate(
             if narrowed
             else "macro_verified_accuracy" in within
         )
+        # A regressed language read by the exact test is outside noise only when its rate
+        # is lower with p below the level.
+        regressions_within = [
+            language
+            for language in regressed
+            if (
+                not rates[language].separates(-1)
+                if language in rates
+                else language in languages_within
+            )
+        ]
         if (
             deciding
             and noise is not None
@@ -853,7 +1010,7 @@ def gate(
                 _regression_within_noise(
                     reason,
                     within=within,
-                    languages=languages_within,
+                    languages=regressions_within,
                     regressed=regressed,
                     accuracy_within=accuracy_within,
                 )
@@ -873,7 +1030,10 @@ def gate(
         delta_macro_verified_accuracy=accuracy,
         token_ratio=tokens,
         seconds_ratio=seconds,
+        token_ratio_to_band=tokens_to_band,
+        seconds_ratio_to_band=seconds_to_band,
         language_deltas=deltas,
+        language_rates=rates,
         regressed_languages=regressed,
         operationally_confounded_languages=confounded,
         identity_changes=identity_changes(baseline, candidate),

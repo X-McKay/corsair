@@ -64,7 +64,7 @@ def test_the_gate_view_names_its_track_and_rule():
     assert text.startswith("## Gate (accuracy track): ACCEPTED\n")
     assert TRACK_TEXT["accuracy"] in text
     assert "Target language: ruby." in text
-    assert "| Token ratio |  | 1.000 |  |" in text
+    assert "| Token ratio (installed reference) |  | 1.000 |  |" in text
     smoke = gate(baseline, baseline, track="efficiency", smoke=True)
     view = render_gate(smoke, baseline, baseline)
     assert view.startswith("## Gate (smoke, efficiency track): ACCEPTED\n")

@@ -25,6 +25,7 @@ from tests.unit.evaluation.test_gym_paired import (
     NONE,
     _rows,
     _side,
+    legacy_band,
 )
 
 FIVE = [True] * 5
@@ -185,8 +186,9 @@ def _case_band(again: dict[str, list[bool]], *, cases: bool = True):
 
 
 def test_a_slice_verdict_names_the_slice_cases_the_band_classifies_unstable():
-    # py-a lost its majority in the band's second run: a coin-flip sentinel.
-    band = _case_band({**BASELINE, "py-a": [True, False, False]})
+    # A band without pooled counts: py-a lost its majority in the band's second run, a
+    # coin-flip sentinel by the earlier per-run rule.
+    band = legacy_band(_case_band({**BASELINE, "py-a": [True, False, False]}))
     verdict = _screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}, noise=band)
     assert verdict.decision is GateDecision.ACCEPTED
     assert verdict.slice_unstable_cases == ["py-a"]
@@ -203,7 +205,7 @@ def test_a_slice_verdict_names_the_slice_cases_the_band_classifies_unstable():
     stable = _screen({"py-a": FIVE, "py-b": FIVE_NONE, "py-c": FIVE}, noise=band)
     assert stable.reasons == [GateReason.SLICE_REGRESSED]
     # A coin-flip target rising is no improvement.
-    target = _case_band({**BASELINE, "py-c": [True, True, False]})
+    target = legacy_band(_case_band({**BASELINE, "py-c": [True, True, False]}))
     risen = _screen({"py-a": FIVE, "py-b": FIVE, "py-c": FIVE}, noise=target)
     assert risen.reasons == [GateReason.SLICE_NOT_IMPROVED]
     assert risen.slice_unstable_cases == ["py-c"]
@@ -212,6 +214,36 @@ def test_a_slice_verdict_names_the_slice_cases_the_band_classifies_unstable():
         plain = _screen({"py-a": FIVE_NONE, "py-b": FIVE, "py-c": FIVE}, noise=other)
         assert plain.slice_unstable_cases == []
         assert plain.reasons == [GateReason.SLICE_REGRESSED]
+
+
+def test_with_pooled_counts_a_slice_reads_each_flip_by_fishers_exact_test():
+    # The band pools py-a at 4/6 (unstable), py-b at 6/6 and py-c at 0/6.
+    band = _case_band({**BASELINE, "py-a": [True, False, False]})
+    assert band.pooled
+    # py-a 0/5 against 4/6: p = 20/330 (terms 15, 100, 150, 60, 5 / 330), not separated;
+    # py-c 5/5 against 0/6: p = 1/462, separated.
+    fallen = _screen({"py-a": FIVE_NONE, "py-b": FIVE, "py-c": FIVE}, noise=band)
+    assert fallen.decision is GateDecision.ACCEPTED
+    assert fallen.paired is not None
+    (py_a,) = fallen.paired.pass_to_fail_cases
+    assert (py_a.noise_reason, py_a.p_value) == ("episode_rate", pytest.approx(20 / 330))
+    assert (py_a.candidate_verified, py_a.candidate_episodes) == (0, 5)
+    assert (py_a.reference_verified, py_a.reference_episodes) == (4, 6)
+    (py_c,) = fallen.paired.fail_to_pass_cases
+    assert (py_c.within_noise, py_c.p_value) == (False, pytest.approx(1 / 462))
+    assert fallen.slice_unstable_cases == ["py-a"]
+    # py-b 0/5 against 6/6: p = 1/462, a slice regression outside noise.
+    stable = _screen({"py-a": FIVE, "py-b": FIVE_NONE, "py-c": FIVE}, noise=band)
+    assert stable.reasons == [GateReason.SLICE_REGRESSED]
+    # A target verifying 3 of 5 against 0/6: k 3, C(11,3) = 165; P(0..3) = 20, 75, 60,
+    # 10 / 165 (C(5,x) C(6,3-x)); only P(3) is at most 10, so p = 10/165 (about 0.061):
+    # its majority rose, but the test does not separate it.
+    partial = _screen(
+        {"py-a": FIVE, "py-b": FIVE, "py-c": [True, True, True, False, False]}, noise=band
+    )
+    assert partial.reasons == [GateReason.SLICE_NOT_IMPROVED]
+    assert partial.paired is not None
+    assert partial.paired.fail_to_pass_cases[0].p_value == pytest.approx(10 / 165)
 
 
 def test_the_slice_view_names_its_unstable_cases_or_says_they_are_unknown():

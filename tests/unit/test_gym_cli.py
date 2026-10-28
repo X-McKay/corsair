@@ -898,7 +898,8 @@ async def test_noise_reads_per_case_stability_from_the_trajectories_beside_each_
     _identified(second / SCORECARD_FILE, NOISY, run_id=second.name, trajectories=True)
     complete = _arguments(*args, "--out", str(tmp_path / "band.json"), format="markdown")
     assert await _run(complete) == 0
-    assert "- Unstable (a flip counts neither way): `rb-a`" in capsys.readouterr().out
+    # rb-a pools 3 of 6 episodes: a majority pass in half of the runs.
+    assert "- Unstable: `rb-a`" in capsys.readouterr().out
     band = read_noise(tmp_path / "band.json")
     assert band.cases is not None
     unstable = [case.case_id for case in band.cases if case.stability == "unstable"]
@@ -1043,6 +1044,11 @@ async def test_gate_min_cases_decides_on_deciding_languages_with_paired_outcomes
             "deciding": False,
             "within_noise": False,
             "noise_reason": None,
+            "reference_verified": None,
+            "reference_episodes": None,
+            "candidate_verified": None,
+            "candidate_episodes": None,
+            "p_value": None,
         }
     ]
     assert (paired["deciding_pass_to_fail"], paired["deciding_fail_to_pass"]) == (0, 1)
