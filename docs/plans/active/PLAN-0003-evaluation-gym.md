@@ -828,4 +828,18 @@ content-addressed tags and cannot contaminate parallel runs.
   outside noise only through a multi-case effect at the episode level or a high-repeat slice on named cases;
   J's worst-language term over the single-case languages is a coin flip (ruby and c intervals span 0 to 1), so
   the objective track should decide on the deciding-language J once an owner agrees (decision 6, below).
+- 2026-10-28 owner review of an external gym blueprint (turn-level MDP, hierarchical scorer, statistical Pareto
+  gate, negative-memory ledger): most of it already exists here under other names, the turn-level MDP and
+  per-turn milestone rewards are rejected because agents never execute commands and rewards come only from
+  trusted evidence, and four bounded packages were authorised: s26 (one retry of an operational episode inside a
+  run), s27 (targeted confirmation in `gym verify`), s28 (touched files and a do-not-repeat block in the ledger),
+  s29 (sandbox CPU seconds beside p50 as information).
+- 2026-10-28 s28 merged (902aecce; branch `gym/s28-ledger-files` at 3400ca0c; ledger `s28`): `LedgerRow.touched_files`
+  filled from git at append (merge base of the commit with HEAD, or with the merge commit's first parent),
+  `--touched-files` to set it by hand, `gym ledger constraints --files …` rendering the newest rejected or
+  inconclusive experiments on those files with id, gate reasons, files and lesson, and `gym ledger backfill
+  [--write]`. Offline: `just check`, 1744 unit tests. Backfill wrote 40 of 42 experiment rows; h4 stays empty
+  because its recorded commit 0b1b600f is a PLAN commit and the candidate branch no longer exists, g1 because the
+  greedy pair changed only settings. The rendered ledger gains a Files column. Briefs now paste the constraints
+  block for the files they will touch (skill updated).
 
