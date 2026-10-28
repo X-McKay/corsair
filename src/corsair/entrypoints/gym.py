@@ -3,8 +3,11 @@
 ``run_gym`` composes the existing worker (``compose_worker``) in-process on a per-branch
 task queue in the dedicated ``corsair-gym`` Temporal namespace, submits the existing
 ``EvaluationWorkflow`` through the typed API and scores the saved report with the gym
-scorer. Nothing here schedules, retries or decides a label: Temporal, the workflow and the
-kernel do that exactly as in production. Trusted images are tagged by the content of their
+scorer. Nothing here schedules work or decides a label: Temporal, the workflow and the
+kernel do that exactly as in production. The one addition is the run's own retry: an
+episode the gym scorer names operational (a fault of the run, not behaviour) is submitted
+once more, after the others, as one more batch of the same workflow, and its retry is
+scored in its place. Trusted images are tagged by the content of their
 build inputs, so two worktrees never overwrite each other's tags and an uncommitted driver
 edit gets a new tag (and so a new configuration identity).
 
@@ -70,6 +73,7 @@ from corsair.contracts import (
     InvestigationRequest,
     InvestigationResult,
     NoiseBand,
+    OperationalReason,
     RunContext,
     Scorecard,
     SkipReason,
@@ -78,6 +82,7 @@ from corsair.contracts import (
     VerifyRecord,
     digest,
 )
+from corsair.contracts.evaluation import MAX_BATCH_REQUESTS
 from corsair.entrypoints.api import start_evaluation
 from corsair.entrypoints.worker import compose_worker, compose_worker_activities
 from corsair.evaluation.datasets import LoadedDataset, dataset_root, parse_dataset
@@ -93,8 +98,11 @@ from corsair.evaluation.gym.gate import (
 from corsair.evaluation.gym.ledger import candidate_identity
 from corsair.evaluation.gym.noise import assign_bands
 from corsair.evaluation.gym.scoring import (
+    ATTEMPT_KEY,
     REPORT_FILE,
+    RETRIED_REASON_KEY,
     SCORECARD_FILE,
+    SUPERSEDES_KEY,
     TRAJECTORIES_FILE,
     language_of,
     load_results,
@@ -122,6 +130,11 @@ BUDGETS_FILE = "budgets.json"
 # The exact manifest bytes a run was admitted with, beside run.json.
 DATASET_FILE = "dataset.json"
 VERDICT_FILE = "verdict.json"
+# The first attempts a run retried, beside its scored trajectories.
+SUPERSEDED_FILE = "superseded.jsonl"
+# A retry batch's identity: ``<run id>.a2`` (attempt 2), then ``.a2.1``, ``.a2.2`` … when
+# more episodes need a retry than one batch holds.
+RETRY_SUFFIX = ".a2"
 VERIFY_TIERS = ("tier0", "tier1")
 # The tiers ``verify --min-cases`` narrows; tier0 has one case per language, so every
 # language keeps deciding its smoke gate.
@@ -1325,6 +1338,9 @@ class GymOptions:
     # The shared-root run lock; off only for scripted tests (``--no-lock``).
     lock: bool = True
     lock_timeout: float = DEFAULT_LOCK_TIMEOUT
+    # Retry each operationally stopped episode once after the run's other episodes;
+    # off with ``--no-retry``.
+    retry: bool = True
 
 
 @dataclass(frozen=True)
@@ -1357,31 +1373,173 @@ async def execute_batch(
         return await observe(handle)
 
 
-def write_run_records(
-    run_dir: Path,
+def score_items(
+    pinned: PinnedDataset, items: Sequence[BatchItem], store: ArtifactStore
+) -> list[dict[str, Any]]:
+    """Each batch receipt's report row as ``corsair eval`` scores it, in receipt order.
+
+    Scores against the dataset pinned at admission, never the manifest on disk now.
+    """
+    dataset, _, oracles = pinned.loaded
+    return label_rows(score_batch(items, store, oracles), dataset)
+
+
+def score_rows(
     pinned: PinnedDataset,
-    items: Sequence[BatchItem],
+    rows: Sequence[Mapping[str, Any]],
     store: ArtifactStore,
     *,
     run: RunContext,
     budgets: Budgets | None,
     sliced: bool,
 ) -> tuple[list[Trajectory], Scorecard]:
-    """Write ``report.json`` as ``corsair eval`` would, then the trajectories and scorecard.
-
-    Scores against the dataset pinned at admission, never the manifest on disk now.
-    """
-    dataset, _, oracles = pinned.loaded
-    report = save_report(
-        run_dir / REPORT_FILE,
-        label_rows(score_batch(items, store, oracles), dataset),
-        dataset_digest=pinned.dataset_digest,
-    )
-    run_ids = [str(row.get("run_id")) for row in report["rows"]]
-    trajectories, scorecard = score_loaded_report(
+    """The gym scorer over report rows, one trajectory per row in row order."""
+    report = {"rows": list(rows), "dataset_digest": pinned.dataset_digest}
+    run_ids = [str(row.get("run_id")) for row in rows]
+    return score_loaded_report(
         report, pinned.loaded, load_results(store, run_ids), run=run, budgets=budgets, sliced=sliced
     )
+
+
+@dataclass(frozen=True)
+class RetriedAttempt:
+    """An operational first attempt and the retry receipt that replaces it when scored.
+
+    ``position`` is the episode's place in the run's batch (``case index x repeats +
+    repeat``), the order of its receipts, report rows and trajectories.
+    """
+
+    position: int
+    first: Trajectory
+    retry: BatchItem
+
+    @property
+    def reason(self) -> OperationalReason:
+        if self.first.operational_reason is None:
+            raise ValueError("only an operational first attempt is retried")
+        return self.first.operational_reason
+
+
+def retry_batch_id(run_id: str, chunk: int = 0) -> str:
+    """``<run id>.a2`` for the first retry batch, ``<run id>.a2.<n>`` for later ones."""
+    return f"{run_id}{RETRY_SUFFIX}" + (f".{chunk}" if chunk else "")
+
+
+def retry_batches(batch: BatchRequest, positions: Sequence[int]) -> list[BatchRequest]:
+    """The same requests for the episodes at ``positions``, one repeat each, in order.
+
+    Each retry has a fresh child run id (so a fresh operation id) under the run's retry
+    batch; the request, its identity and its budgets are the first attempt's own, and the
+    batch keeps the run's concurrency, so no work waits for a slot it was not given.
+    """
+    requests = [batch.requests[position // batch.repeats] for position in positions]
+    return [
+        BatchRequest(
+            batch_id=retry_batch_id(batch.batch_id, chunk),
+            requests=requests[start : start + MAX_BATCH_REQUESTS],
+            repeats=1,
+            concurrency=batch.concurrency,
+        )
+        for chunk, start in enumerate(range(0, len(requests), MAX_BATCH_REQUESTS))
+    ]
+
+
+async def retry_operational(
+    settings: Settings,
+    batch: BatchRequest,
+    first: Sequence[Trajectory],
+    compose_activities: ActivityComposer,
+    observe: BatchObserver,
+) -> list[RetriedAttempt]:
+    """Run once more every first attempt the gym scorer named operational.
+
+    The classification is ``operational_stop``'s, read from the first attempts' scored
+    trajectories; nothing here reads model text or decides a label. A retry is never
+    retried again: whatever it returns is scored.
+    """
+    positions = [position for position, item in enumerate(first) if item.operational]
+    if not positions:
+        return []
+    event(
+        "gym.retrying",
+        run_id=batch.batch_id,
+        total=len(positions),
+        reasons=",".join(
+            sorted({str(first[position].operational_reason) for position in positions})
+        ),
+    )
+    receipts: list[BatchItem] = []
+    for retry in retry_batches(batch, positions):
+        receipts.extend(await execute_batch(settings, retry, compose_activities, observe))
+    retried = [
+        RetriedAttempt(position, first[position], receipt)
+        for position, receipt in zip(positions, receipts, strict=True)
+    ]
+    if any(item.retry.case_id != item.first.case_id for item in retried):
+        raise ValueError("a retry receipt names another case than the attempt it replaces")
+    return retried
+
+
+def retried_rows(
+    pinned: PinnedDataset,
+    rows: Sequence[Mapping[str, Any]],
+    retried: Sequence[RetriedAttempt],
+    store: ArtifactStore,
+) -> list[dict[str, Any]]:
+    """The first attempts' rows with each retried episode replaced by its retry's row.
+
+    A retry row keeps its place (so its case and repeat) and records ``attempt`` 2, the
+    first attempt's operational reason and its run id.
+    """
+    merged = [dict(row) for row in rows]
+    retry_rows = score_items(pinned, [item.retry for item in retried], store)
+    for item, row in zip(retried, retry_rows, strict=True):
+        merged[item.position] = {
+            **row,
+            ATTEMPT_KEY: 2,
+            RETRIED_REASON_KEY: item.reason.value,
+            SUPERSEDES_KEY: item.first.run_id,
+        }
+    return merged
+
+
+def superseded_trajectories(retried: Sequence[RetriedAttempt]) -> list[Trajectory]:
+    """Each retried first attempt as scored, marked ``superseded_by`` its retry's run id."""
+    return [
+        Trajectory.model_validate(
+            {**item.first.model_dump(mode="json"), "superseded_by": item.retry.run_id}
+        )
+        for item in retried
+    ]
+
+
+def write_run_records(
+    run_dir: Path,
+    pinned: PinnedDataset,
+    rows: Sequence[Mapping[str, Any]],
+    store: ArtifactStore,
+    *,
+    run: RunContext,
+    budgets: Budgets | None,
+    sliced: bool,
+    retried: Sequence[RetriedAttempt] = (),
+) -> tuple[list[Trajectory], Scorecard]:
+    """Write ``report.json`` as ``corsair eval`` would, then the trajectories and scorecard.
+
+    ``rows`` are the first attempts' report rows; each retried episode's row is replaced by
+    its retry's, and the superseded first attempts are written to ``superseded.jsonl``.
+    """
+    report = save_report(
+        run_dir / REPORT_FILE,
+        retried_rows(pinned, rows, retried, store),
+        dataset_digest=pinned.dataset_digest,
+    )
+    trajectories, scorecard = score_rows(
+        pinned, report["rows"], store, run=run, budgets=budgets, sliced=sliced
+    )
     write_trajectories(run_dir / TRAJECTORIES_FILE, trajectories)
+    if retried:
+        write_trajectories(run_dir / SUPERSEDED_FILE, superseded_trajectories(retried))
     write_scorecard(run_dir / SCORECARD_FILE, scorecard)
     return trajectories, scorecard
 
@@ -1454,6 +1612,7 @@ def run_record(
         "budgets": None if budgets is None else dict(budgets),
         "temporal": {"existing": options.temporal_address is not None},
         "lock": None if lock is None else dict(lock),
+        "retry": options.retry,
         "started_at": _now(),
     }
 
@@ -1472,7 +1631,7 @@ def finish_run(
     run_dir: Path,
     record: Mapping[str, Any],
     pinned: PinnedDataset,
-    items: Sequence[BatchItem],
+    rows: Sequence[Mapping[str, Any]],
     store: ArtifactStore,
     *,
     root: Path,
@@ -1480,14 +1639,17 @@ def finish_run(
     budgets: Budgets | None,
     sliced: bool,
     started: float,
+    retried: Sequence[RetriedAttempt] = (),
 ) -> tuple[list[Trajectory], Scorecard, float]:
     """Score the finished batch against the pinned dataset and complete ``run.json``.
 
-    Reads no manifest and imports nothing that admission did not; the checkout's commit
-    and dirty flag at this point are recorded beside the ones the run started from.
+    ``rows`` are the first attempts' report rows and ``retried`` the retries that replace
+    the operational ones. Reads no manifest and imports nothing that admission did not;
+    the checkout's commit and dirty flag at this point are recorded beside the ones the
+    run started from.
     """
     trajectories, scorecard = write_run_records(
-        run_dir, pinned, items, store, run=run, budgets=budgets, sliced=sliced
+        run_dir, pinned, rows, store, run=run, budgets=budgets, sliced=sliced, retried=retried
     )
     wall = time.monotonic() - started
     _write_json(
@@ -1496,7 +1658,8 @@ def finish_run(
             **record,
             "completed_at": _now(),
             "wall_seconds": round(wall, 1),
-            "episodes": len(items),
+            "episodes": len(rows),
+            "retried_episodes": len(retried),
             **git_at_finish(root),
             # The scorecard's run context, so a rescore of this run recovers it.
             "run": run.model_dump(mode="json"),
@@ -1521,6 +1684,10 @@ async def run_gym(
     (``verify``) already holds for this run. Admission reads the manifest once (``pinned``
     when the caller already read it) and imports what the finish needs; the run directory
     keeps the manifest bytes as ``dataset.json``.
+
+    With ``options.retry`` every episode the gym scorer names operational is run once more
+    after the run's other episodes, on the same worker composition and concurrency, and its
+    retry is the episode that is scored (``RetriedAttempt``).
     """
     pinned = pinned or pin_dataset(options.dataset)
     selected = select_requests(pinned.loaded[1], cases=options.cases, languages=options.languages)
@@ -1577,27 +1744,36 @@ async def run_gym(
                 images=images,
                 store=paths.store,
             )
+            run = RunContext(
+                run_id=run_id,
+                git_branch=branch,
+                git_commit=commit,
+                temporal_namespace=settings.temporal_namespace,
+                task_queue=settings.task_queue,
+                concurrency=options.concurrency,
+                image_ids=image_ids,
+            )
+            store = ArtifactStore(settings.artifact_root)
             items = await execute_batch(settings, batch, compose_activities, observe)
-        run = RunContext(
-            run_id=run_id,
-            git_branch=branch,
-            git_commit=commit,
-            temporal_namespace=settings.temporal_namespace,
-            task_queue=settings.task_queue,
-            concurrency=options.concurrency,
-            image_ids=image_ids,
-        )
+            rows = score_items(pinned, items, store)
+            retried: list[RetriedAttempt] = []
+            if options.retry:
+                first, _ = score_rows(pinned, rows, store, run=run, budgets=budgets, sliced=sliced)
+                retried = await retry_operational(
+                    settings, batch, first, compose_activities, observe
+                )
         trajectories, scorecard, wall = finish_run(
             run_dir,
             record,
             pinned,
-            items,
-            ArtifactStore(settings.artifact_root),
+            rows,
+            store,
             root=root,
             run=run,
             budgets=budgets,
             sliced=sliced,
             started=started,
+            retried=retried,
         )
     event("gym.completed", run_id=run_id, seconds=round(wall, 1), total=len(trajectories))
     return GymRun(
@@ -1976,19 +2152,34 @@ def _replay_repeat(
         "agent_seconds": item.agent_seconds,
         "seconds": item.seconds,
         "usage_known": item.usage_known,
+        "attempt": item.attempt,
+        "retried_reason": item.retried_reason,
+        "supersedes": item.supersedes,
+        "superseded_by": item.superseded_by,
         "result": "present" if result is not None else "unavailable",
         "rounds": rounds,
         "statements": [] if result is None else explain_run(store, result)["statements"],
     }
 
 
-def replay_case(run_dir: Path, case_id: str, store: ArtifactStore) -> dict[str, Any]:
-    """Each repeat's round timeline, per-call usage and failure stop; never payload text."""
+def replay_case(
+    run_dir: Path, case_id: str, store: ArtifactStore, *, superseded: bool = False
+) -> dict[str, Any]:
+    """Each repeat's round timeline, per-call usage and failure stop; never payload text.
+
+    The scored attempt of each repeat comes first; a retried repeat names its attempt, the
+    first attempt's operational reason and run id. With ``superseded`` the run's superseded
+    first attempts (``superseded.jsonl``) follow, each marked with its retry's run id.
+    """
     repeats = [
         item for item in read_trajectories(run_dir / TRAJECTORIES_FILE) if item.case_id == case_id
     ]
     if not repeats:
         raise ValueError(f"{case_id} has no trajectory in {run_dir}")
+    if superseded and (run_dir / SUPERSEDED_FILE).is_file():
+        repeats += [
+            item for item in read_trajectories(run_dir / SUPERSEDED_FILE) if item.case_id == case_id
+        ]
     results = load_results(store, [item.run_id for item in repeats])
     return {
         "run_dir": str(run_dir),
@@ -2050,13 +2241,25 @@ def _call_rows(rounds: Sequence[Mapping[str, Any]]) -> list[list[str]]:
     ]
 
 
+def _attempt_text(repeat: Mapping[str, Any]) -> str:
+    """The attempt marker of a retried repeat's scored or superseded attempt; else nothing."""
+    if repeat.get("superseded_by"):
+        return f" · attempt 1, superseded by `{repeat['superseded_by']}`"
+    if repeat.get("attempt") == 2:
+        return (
+            f" · attempt 2, retried after {repeat['retried_reason']} "
+            f"(first attempt `{repeat['supersedes']}`)"
+        )
+    return ""
+
+
 def render_replay(view: Mapping[str, Any]) -> str:
     """Code-owned Markdown: enums, counts, digests, gate names and fixed statements only."""
     lines = [f"## Replay `{view['case_id']}`", "", f"Run directory `{view['run_dir']}`.", ""]
     for repeat in view["repeats"]:
         lines.extend(
             [
-                f"### Repeat {repeat['repeat']} · run `{repeat['run_id']}`",
+                f"### Repeat {repeat['repeat']} · run `{repeat['run_id']}`{_attempt_text(repeat)}",
                 "",
                 f"- Verdict {_cell(repeat['verdict'])}; execution "
                 f"{_cell(repeat['execution_status'])}; status {repeat['status']}; verified "

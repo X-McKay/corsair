@@ -130,6 +130,22 @@ class OperationalEpisode(Contract):
     reason: OperationalReason
 
 
+class RetriedEpisode(Contract):
+    """One operational first attempt a gym run retried: which case and repeat, why, the
+    retry's run id (the scored attempt) and the superseded first attempt's run id.
+
+    The reason is the first attempt's ``operational_stop``; whether the retry was itself
+    operational is the scored trajectory's own ``operational_reason``.
+    """
+
+    case_id: Identifier
+    repeat: int = Field(ge=0)
+    language: str = Field(min_length=1, max_length=64)
+    reason: OperationalReason
+    run_id: str = Field(min_length=1, max_length=128)
+    superseded_run_id: str = Field(min_length=1, max_length=128)
+
+
 class TargetExceptionEpisode(Contract):
     """One target-side exception episode on a scorecard: which case and repeat.
 
@@ -205,6 +221,14 @@ class Trajectory(Contract):
     # Visibility only: an operational stop keeps its reward and counts against accuracy.
     operational: bool = False
     operational_reason: OperationalReason | None = None
+    # The gym run's retry of an operational first attempt (see ``RetriedEpisode``): the
+    # scored row of a retried episode is ``attempt`` 2 with the first attempt's reason in
+    # ``retried_reason`` and its run id in ``supersedes``; the superseded first attempt,
+    # kept beside the run, is ``attempt`` 1 with the retry's run id in ``superseded_by``.
+    attempt: int = Field(default=1, ge=1, le=2)
+    retried_reason: OperationalReason | None = None
+    supersedes: str | None = Field(default=None, min_length=1, max_length=128)
+    superseded_by: str | None = Field(default=None, min_length=1, max_length=128)
     # A terminal ``ERROR`` whose errored roles' raw receipts each show a completed native
     # run with ``observation_kind=execution_error``, the bound finding line covered,
     # cleanup confirmed and no ``error`` or ``driver_error``: an exception the target
@@ -219,6 +243,11 @@ class Trajectory(Contract):
             raise ValueError("an operational episode needs its reason, and only it has one")
         if self.operational and self.target_exception:
             raise ValueError("a target-side exception episode is never operational")
+        retried = self.attempt == 2
+        if retried != (self.retried_reason is not None) or retried != (self.supersedes is not None):
+            raise ValueError("a retried attempt names its reason and superseded run, only it")
+        if self.superseded_by is not None and (retried or not self.operational):
+            raise ValueError("only an operational first attempt is superseded")
         return self
 
 
@@ -289,6 +318,10 @@ class Scorecard(Contract):
     # Operational stops: the total, unknown on older scorecards, and each episode.
     operational_episodes: int | None = Field(default=None, ge=0)
     operational_stops: list[OperationalEpisode] = Field(default_factory=list)
+    # Operational first attempts the run retried (the retry is scored): the total, unknown
+    # on older scorecards, and each retry.
+    retried_episodes: int | None = Field(default=None, ge=0)
+    retries: list[RetriedEpisode] = Field(default_factory=list)
     # Target-side exception episodes: the total, unknown on older scorecards, and each one.
     target_exception_episodes: int | None = Field(default=None, ge=0)
     target_exceptions: list[TargetExceptionEpisode] = Field(default_factory=list)

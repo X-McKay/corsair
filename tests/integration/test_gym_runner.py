@@ -27,6 +27,7 @@ from corsair.adapters.temporal.client import wait_for_result
 from corsair.contracts import (
     GateDecision,
     GroupSummary,
+    OperationalReason,
     RunContext,
     Scorecard,
     VerifyRecord,
@@ -435,7 +436,8 @@ async def test_a_second_gym_run_waits_for_the_first_and_then_proceeds(
     first_run = await asyncio.wait_for(first, 180)
     second_run = await asyncio.wait_for(second, 180)
 
-    assert [item and item.run_id for item in second_holder] == [second_id]
+    # Its episode stops operationally (no Docker), so its retry batch runs under the same lock.
+    assert [item and item.run_id for item in second_holder] == [second_id, second_id]
     assert gym.read_lock(shared) is None, "both runs released the lock"
     first_record, second_record = _record(first_run), _record(second_run)
     assert first_record["lock"]["waited"] is False
@@ -533,3 +535,64 @@ async def test_verify_holds_the_lock_across_both_tiers(tmp_path, monkeypatch):
     ]
     assert _record(other_run)["started_at"] >= tier1["completed_at"]
     assert gym.read_lock(shared) is None
+
+
+@pytest.mark.temporal
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retry", [True, False])
+async def test_an_operational_episode_is_retried_once_on_a_real_server(
+    tmp_path, monkeypatch, retry
+):
+    _require_temporal()
+    dataset, shared, settings = _lock_case(tmp_path, monkeypatch)
+    run_id = "gym-retry-20261028t020826-1c30ba"
+    submitted: list[str] = []
+
+    async def observe(handle):
+        submitted.append(handle.id)
+        return await wait_for_result(handle)
+
+    run = await gym.run_gym(
+        gym.GymOptions(
+            dataset=dataset, settings=settings, run_id=run_id, concurrency=1, retry=retry
+        ),
+        root=ROOT,
+        compose_activities=_composer_without_docker,
+        observe=observe,
+    )
+
+    # Every role reports the sandbox unavailable, so each attempt is a sandbox fault; the
+    # retry is the same request under a fresh child id and, operational again, is scored.
+    (scored,) = run.trajectories
+    assert scored.operational_reason is OperationalReason.SANDBOX_FAULT
+    record = _record(run)
+    assert (record["retry"], record["episodes"]) == (retry, 1)
+    assert gym.read_lock(shared) is None
+    if not retry:
+        assert submitted == [run_id]
+        assert (scored.run_id, scored.attempt) == (f"{run_id}.c0.r0", 1)
+        assert (run.scorecard.retried_episodes, record["retried_episodes"]) == (0, 0)
+        assert not (run.run_dir / gym.SUPERSEDED_FILE).exists()
+        return
+    assert submitted == [run_id, f"{run_id}.a2"]
+    assert (scored.run_id, scored.attempt, scored.supersedes) == (
+        f"{run_id}.a2.c0.r0",
+        2,
+        f"{run_id}.c0.r0",
+    )
+    assert scored.retried_reason is OperationalReason.SANDBOX_FAULT
+    (first,) = read_trajectories(run.run_dir / gym.SUPERSEDED_FILE)
+    assert (first.run_id, first.superseded_by) == (f"{run_id}.c0.r0", scored.run_id)
+    assert (run.scorecard.retried_episodes, run.scorecard.operational_episodes) == (1, 1)
+    assert [(item.repeat, item.reason) for item in run.scorecard.retries] == [
+        (0, OperationalReason.SANDBOX_FAULT)
+    ]
+    assert record["retried_episodes"] == 1
+    # Both attempts' results are in the store; replay shows the scored one, then on request
+    # the superseded one.
+    store = ArtifactStore(record["store"])
+    view = gym.replay_case(run.run_dir, CASE, store, superseded=True)
+    assert [(item["run_id"], item["attempt"], item["result"]) for item in view["repeats"]] == [
+        (f"{run_id}.a2.c0.r0", 2, "present"),
+        (f"{run_id}.c0.r0", 1, "present"),
+    ]

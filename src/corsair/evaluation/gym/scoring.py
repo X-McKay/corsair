@@ -30,6 +30,7 @@ from corsair.contracts import (
     OperationalReason,
     Oracle,
     PreparedCase,
+    RetriedEpisode,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -557,6 +558,26 @@ def _float_or_none(value: object) -> float | None:
     return float(value)
 
 
+# A gym run's retried row (``entrypoints.gym``) carries these code-owned keys: the attempt,
+# the first attempt's operational reason and its run id.
+ATTEMPT_KEY = "attempt"
+RETRIED_REASON_KEY = "retried_reason"
+SUPERSEDES_KEY = "supersedes"
+
+
+def _retry_marks(row: Mapping[str, Any]) -> dict[str, Any]:
+    """A retried row's attempt, reason and superseded run id; nothing for a first attempt.
+
+    Only the gym runner writes these keys, never a model; a partial or unknown marking
+    keeps the first-attempt defaults rather than guessing.
+    """
+    reason, supersedes = row.get(RETRIED_REASON_KEY), row.get(SUPERSEDES_KEY)
+    known = {item.value for item in OperationalReason}
+    if row.get(ATTEMPT_KEY) != 2 or reason not in known or not isinstance(supersedes, str):
+        return {}
+    return {"attempt": 2, "retried_reason": OperationalReason(reason), "supersedes": supersedes}
+
+
 def _qualified_row(row: Mapping[str, Any], result: InvestigationResult | None) -> Mapping[str, Any]:
     """The row with its stored ``evidence_unverified`` round stops named from the stored
     result (``ledger.qualify_unverified``), so a report saved before qualified labels
@@ -683,6 +704,7 @@ def trajectory(
         operational=operational is not None,
         operational_reason=operational,
         target_exception=target,
+        **_retry_marks(row),
     )
 
 
@@ -821,6 +843,23 @@ def _operational_stops(trajectories: Sequence[Trajectory]) -> list[OperationalEp
     ]
 
 
+def _retries(trajectories: Sequence[Trajectory]) -> list[RetriedEpisode]:
+    return [
+        RetriedEpisode(
+            case_id=item.case_id,
+            repeat=item.repeat,
+            language=item.language,
+            reason=item.retried_reason,
+            run_id=item.run_id,
+            superseded_run_id=item.supersedes,
+        )
+        for item in sorted(
+            trajectories, key=lambda item: (item.language, item.case_id, item.repeat)
+        )
+        if item.retried_reason is not None and item.supersedes is not None
+    ]
+
+
 def _target_exceptions(trajectories: Sequence[Trajectory]) -> list[TargetExceptionEpisode]:
     return [
         TargetExceptionEpisode(case_id=item.case_id, repeat=item.repeat, language=item.language)
@@ -916,6 +955,8 @@ def build_scorecard(
         run_identity=_identity_components(trajectories),
         operational_episodes=sum(item.operational for item in trajectories),
         operational_stops=_operational_stops(trajectories),
+        retried_episodes=sum(item.attempt == 2 for item in trajectories),
+        retries=_retries(trajectories),
         target_exception_episodes=sum(item.target_exception for item in trajectories),
         target_exceptions=_target_exceptions(trajectories),
     )

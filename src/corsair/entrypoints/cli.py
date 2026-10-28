@@ -144,6 +144,8 @@ class CliArguments(argparse.Namespace):
     lock_command: Literal["status", "release"]
     force: bool
     no_lock: bool
+    no_retry: bool
+    superseded: bool
     lock_timeout: float
     noise: list[str] | None
     noise_first: str
@@ -787,6 +789,7 @@ async def _handle_gym_run(args: CliArguments, ui: Terminal) -> int:
         invocation=safe_invocation(sys.argv),
         lock=not args.no_lock,
         lock_timeout=args.lock_timeout,
+        retry=not args.no_retry,
     )
     run = await run_gym(options, root=root, observe=_gym_observer(ui))
     _emit_view(
@@ -816,10 +819,15 @@ def _gym_run_lines(run: GymRun, scorecard_text: str) -> list[str]:
     from corsair.entrypoints.gym import read_run_record
 
     card = run.scorecard
+    record = read_run_record(run.run_dir)
+    retry = record.get("retry")
     return [
         scorecard_text,
         f"- Run directory: `{run.run_dir}`",
-        f"- Store: `{read_run_record(run.run_dir).get('store', 'unknown')}`",
+        f"- Store: `{record.get('store', 'unknown')}`",
+        "- Retry of operational episodes: "
+        + ("unknown" if retry is None else "on" if retry else "off (--no-retry)")
+        + f"; retried {record.get('retried_episodes', 'unknown')}",
         f"- Temporal: {'ephemeral' if run.ephemeral else 'existing'} `{run.temporal_address}`, "
         f"namespace `{card.run.temporal_namespace}`, task queue `{card.run.task_queue}`",
         f"- Commit: `{card.run.git_branch}` `{card.run.git_commit}`",
@@ -1022,7 +1030,9 @@ async def _handle_gym_replay(args: CliArguments, ui: Terminal) -> int:
     from corsair.entrypoints.gym import render_replay, replay_case
 
     run_dir = Path(args.run_dir)
-    view = replay_case(run_dir, args.case or "", _gym_store(args, run_dir))
+    view = replay_case(
+        run_dir, args.case or "", _gym_store(args, run_dir), superseded=args.superseded
+    )
     _emit_view(ui, render_replay(view), view)
     return 0
 
@@ -1870,6 +1880,12 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     )
     run.add_argument("--out", help="Run directory (default <shared gym root>/runs/<run-id>)")
     run.add_argument("--run-id", help="Batch identity (default gym-<tier>-<time>-<hex>)")
+    run.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="Score every episode's first attempt; by default an operationally stopped episode "
+        "is retried once after the others and its retry is scored",
+    )
     _lock_options(run)
     score_cmd = command("score", "Score a saved report into trajectories and a scorecard")
     score_cmd.add_argument(
@@ -1941,6 +1957,12 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     )
     replay_cmd.add_argument("run_dir", metavar="RUN-DIR")
     replay_cmd.add_argument("--case", required=True)
+    replay_cmd.add_argument(
+        "--superseded",
+        action="store_true",
+        help="Also show the first attempts the run retried (superseded.jsonl), after the "
+        "scored ones",
+    )
     capture_cmd = command(
         "capture", "Freeze a case's failed repeats as evals/ fixtures and tests/replay/kernel cases"
     )
