@@ -842,4 +842,12 @@ content-addressed tags and cannot contaminate parallel runs.
   because its recorded commit 0b1b600f is a PLAN commit and the candidate branch no longer exists, g1 because the
   greedy pair changed only settings. The rendered ledger gains a Files column. Briefs now paste the constraints
   block for the files they will touch (skill updated).
+- 2026-10-28 s29 merged (1bd64d22; branch `gym/s29-sandbox-cpu` at 0dec1f07; ledger `s29`): scorecards, groups and
+  bands carry macro sandbox CPU seconds (mean per case, macro over languages, unknown when any episode lacks the
+  receipt figure, with the lacking count) and the views print it beside p50, labelled information; no decision
+  reads it. Offline: `just check`, 1752 unit tests. Re-scoring the four reference runs: per language the figure is
+  steady (python 0.38 to 0.40 s across runs while javascript p50 spans 90 to 293 s), the macro is not (java
+  6.7 s with a second round against 4.0 s; unknown in two runs because one C episode lacked a receipt), and
+  sandbox time is under 1 s of a 40 to 470 s episode. It measures sandbox cost, not agent latency, so p50 stays
+  the latency figure and this one stays information.
 
