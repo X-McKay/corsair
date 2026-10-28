@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: cachix/install-nix-action@31.11.3
-      - run: nix develop --no-update-lock-file --command just sync images
+      - run: nix develop --no-update-lock-file --command just sync images images-gym
       - run: nix develop --no-update-lock-file --command env CORSAIR_TEST_TEMPORAL=1 CORSAIR_TEST_LONG_PROBE=1 just -- test-docker -q -W error
 
   # Tier 3: real Temporal test server, typed fake activities, no Docker target, no model.
