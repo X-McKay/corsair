@@ -131,6 +131,9 @@ class CliArguments(argparse.Namespace):
     ledger_decision: Literal["accepted", "rejected", "inconclusive", "merged"] | None
     ledger_merge_commit: str | None
     ledger_slice: str | None
+    touched_files: list[str] | None
+    constraint_files: list[str]
+    write: bool
     gym_dataset: str | None
     gym_root: str | None
     git_commit: str | None
@@ -727,6 +730,8 @@ async def _handle_agent(args: CliArguments, ui: Terminal) -> int:
 
 GYM_LEDGER = "evals/experiments/ledger.jsonl"
 GYM_LEDGER_MARKDOWN = "evals/experiments/LEDGER.md"
+# ``gym ledger constraints`` lists at most this many experiments unless --limit says otherwise.
+LEDGER_CONSTRAINTS = 5
 
 
 def _gym_settings(args: CliArguments) -> Settings:
@@ -1157,8 +1162,100 @@ def _noise_bands(paths: Sequence[str] | None) -> dict[str, NoiseBand]:
     return {path: read_noise(Path(path)) for path in paths or ()}
 
 
+def _ledger_constraints(args: CliArguments, ui: Terminal) -> int:
+    """Print the prior rejected or inconclusive experiments that touched ``--files``."""
+    from corsair.evaluation.gym.ledger import (
+        checkout_toplevel,
+        prior_rejections,
+        read_ledger,
+        render_constraints,
+        repository_path,
+        unrecorded_rejections,
+    )
+
+    rows = read_ledger(Path(args.ledger))
+    toplevel = checkout_toplevel(Path.cwd())
+    paths = [repository_path(path, toplevel) for path in args.constraint_files]
+    matched = prior_rejections(rows, paths, args.limit or LEDGER_CONSTRAINTS)
+    text = render_constraints(matched, paths, unrecorded=unrecorded_rejections(rows))
+    _emit_view(ui, text, matched)
+    return 0
+
+
+def _first_paths(files: Sequence[str], shown: int = 3) -> str:
+    """The first ``shown`` paths, then ``+N`` for the rest."""
+    rest = len(files) - shown
+    return ", ".join(files[:shown]) + (f" +{rest}" if rest > 0 else "")
+
+
+def _ledger_backfill(args: CliArguments, ui: Terminal) -> int:
+    """Show, and with ``--write`` record, the touched files of rows recorded without them."""
+    from corsair.evaluation.gym.ledger import (
+        backfill_touched_files,
+        changed_files,
+        read_ledger,
+        render_ledger_file,
+        rewrite_ledger,
+    )
+
+    ledger = Path(args.ledger)
+    rows, found = backfill_touched_files(
+        read_ledger(ledger),
+        lambda row: changed_files(Path.cwd(), row.commit, row.merge_commit),
+    )
+    changed = {key: files for key, files in found.items() if files}
+    if args.write and changed:
+        rewrite_ledger(ledger, rows)
+        render_ledger_file(ledger, Path(args.ledger_markdown))
+    commits = {row.id: row.commit for row in rows}
+    lines = [
+        f"{key} `{commits[key][:7]}`: "
+        + (
+            "commit not resolvable in this checkout"
+            if files is None
+            else f"{len(files)} files" + (f" ({_first_paths(files)})" if files else "")
+        )
+        for key, files in found.items()
+    ]
+    unresolved = sum(files is None for files in found.values())
+    action = "rewrote" if args.write and changed else "would change"
+    lines.append(
+        f"{action} {len(changed)} of {len(found)} experiment rows without touched files; "
+        f"{unresolved} unresolved"
+        + ("" if args.write else "; pass --write to rewrite the ledger and LEDGER.md")
+    )
+    record = {
+        "ledger": args.ledger,
+        "written": bool(args.write and changed),
+        "rows": [{"id": key, "touched_files": files} for key, files in found.items()],
+    }
+    _emit_view(ui, "\n".join(lines) + "\n", record)
+    return 0
+
+
+def _append_touched_files(args: CliArguments, entry: str, commit: str) -> list[str]:
+    """``--touched-files`` when given, else an experiment's files from git, else none."""
+    from corsair.evaluation.gym.ledger import changed_files, checkout_toplevel, repository_path
+
+    if args.touched_files is not None:
+        toplevel = checkout_toplevel(Path.cwd())
+        return [repository_path(path, toplevel) for path in args.touched_files]
+    if entry != "experiment":
+        return []
+    files = changed_files(Path.cwd(), commit, args.ledger_merge_commit)
+    if files is None:
+        event(
+            "gym.ledger_files_unresolved",
+            level=logging.WARNING,
+            message=f"commit {commit[:12]} is not resolvable in this checkout; "
+            "the row records no touched files",
+        )
+        return []
+    return files
+
+
 async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
-    """Append one ledger row, or render LEDGER.md from the JSONL ledger."""
+    """Append one ledger row, render LEDGER.md, list a brief's constraints or backfill."""
     from corsair.evaluation.gym.ledger import (
         append_ledger,
         build_ledger_row,
@@ -1173,6 +1270,10 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
         render_ledger_file(Path(args.ledger), Path(args.ledger_markdown))
         ui.emit({"ledger": args.ledger, "markdown": args.ledger_markdown})
         return 0
+    if args.ledger_command == "constraints":
+        return _ledger_constraints(args, ui)
+    if args.ledger_command == "backfill":
+        return _ledger_backfill(args, ui)
     from datetime import date
 
     from corsair.evaluation.gym.gate import gate
@@ -1224,6 +1325,7 @@ async def _handle_gym_ledger(args: CliArguments, ui: Terminal) -> int:
         scorecard_path=args.scorecard,
         noise=noise_files,
         slice=gates.get("slice"),
+        touched_files=[] if commit is None else _append_touched_files(args, args.entry, commit),
     )
     append_ledger(Path(args.ledger), row)
     ui.emit(row)
@@ -2024,7 +2126,9 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
                 action="store_true",
                 help="Release it even though a run may still hold it; prints that holder",
             )
-    ledger = command("ledger", "Append to or render the experiment ledger")
+    ledger = command(
+        "ledger", "Append to, render, backfill or list a brief's constraints from the ledger"
+    )
     ledger_commands = ledger.add_subparsers(
         dest="ledger_command", required=True, title="ledger commands"
     )
@@ -2088,6 +2192,13 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
         choices=("accepted", "rejected", "inconclusive", "merged"),
     )
     append.add_argument("--merge-commit", dest="ledger_merge_commit", help="Required if merged")
+    append.add_argument(
+        "--touched-files",
+        nargs="+",
+        metavar="PATH",
+        help="The candidate's changed files, repository-relative (default: an experiment's "
+        "git diff from its merge base with HEAD, or its merge commit's first parent)",
+    )
     _noise_option(append, repeatable=True)
     append.add_argument("--lesson", default="")
     append.add_argument("--ledger", default=GYM_LEDGER)
@@ -2096,6 +2207,40 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     _presentation_options(render)
     render.add_argument("--ledger", default=GYM_LEDGER)
     render.add_argument("--markdown", dest="ledger_markdown", default=GYM_LEDGER_MARKDOWN)
+    constraints_help = (
+        "Print the most recent rejected or inconclusive experiments whose touched files "
+        "intersect --files, as Markdown for a brief"
+    )
+    constraints = ledger_commands.add_parser(
+        "constraints", help=constraints_help, description=constraints_help
+    )
+    _presentation_options(constraints)
+    constraints.add_argument(
+        "--files",
+        dest="constraint_files",
+        nargs="+",
+        required=True,
+        metavar="PATH",
+        help="Files or directories the brief will touch, repository-relative",
+    )
+    constraints.add_argument(
+        "--limit",
+        type=positive_limit,
+        default=LEDGER_CONSTRAINTS,
+        help=f"At most this many experiments, newest first (default {LEDGER_CONSTRAINTS})",
+    )
+    constraints.add_argument("--ledger", default=GYM_LEDGER)
+    backfill_help = (
+        "Show the touched files git resolves for rows recorded without them; --write "
+        "rewrites the ledger atomically and re-renders LEDGER.md"
+    )
+    backfill = ledger_commands.add_parser("backfill", help=backfill_help, description=backfill_help)
+    _presentation_options(backfill)
+    backfill.add_argument(
+        "--write", action="store_true", help="Rewrite the ledger and LEDGER.md (default: show)"
+    )
+    backfill.add_argument("--ledger", default=GYM_LEDGER)
+    backfill.add_argument("--markdown", dest="ledger_markdown", default=GYM_LEDGER_MARKDOWN)
 
 
 def main() -> None:
