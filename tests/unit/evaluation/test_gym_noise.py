@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from corsair.contracts import (
     GateDecision,
     GateReason,
+    GateVerdict,
     NoiseBand,
     NoiseCase,
     NoiseSpread,
@@ -22,7 +23,12 @@ from corsair.evaluation.gym.noise import (
     spread,
     write_noise,
 )
-from corsair.evaluation.gym.render import REASON_TEXT, render_gate, render_noise
+from corsair.evaluation.gym.render import (
+    BAND_REASON_TEXT,
+    REASON_TEXT,
+    render_gate,
+    render_noise,
+)
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, NONE, _card
 from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED
 from tests.unit.evaluation.test_gym_paired import _side, legacy_band
@@ -244,9 +250,11 @@ def test_an_improvement_beyond_the_band_is_accepted():
 
 
 def test_an_accuracy_gain_inside_the_band_does_not_meet_the_accuracy_criterion():
+    # Measured from the band's means (macro 0.5 within ±0.5, ruby 0.5 within ±1.0): macro
+    # rises by one step (+0.25) and ruby by one case (+0.5), both inside the band.
     better = _card({**BASELINE, "py-b": ALL}, run_id="cand")
     assert gate(_card(BASELINE), better, track="accuracy").decision is GateDecision.ACCEPTED
-    verdict = gate(_card(BASELINE), better, track="accuracy", noise=_noise())
+    verdict = gate(_card(BASELINE), better, track="accuracy", noise=_three_band())
     # Not a regression: the improvement criterion is unmet, as without a band.
     assert verdict.decision is GateDecision.REJECTED
     assert verdict.reasons == [GateReason.ACCURACY_NOT_IMPROVED]
@@ -255,7 +263,7 @@ def test_an_accuracy_gain_inside_the_band_does_not_meet_the_accuracy_criterion()
         _card({**BASELINE, "rb-b": ALL}, run_id="cand"),
         track="accuracy",
         target_language="ruby",
-        noise=_noise(),
+        noise=_three_band(),
     )
     assert GateReason.ACCURACY_NOT_IMPROVED in target.reasons
 
@@ -335,14 +343,15 @@ def test_the_gate_view_prints_the_band_and_what_lies_within_it():
     verdict = gate(baseline, candidate, noise=_noise())
     text = render_gate(verdict, baseline, candidate)
     assert text.startswith("## Gate: INCONCLUSIVE\n")
-    assert REASON_TEXT[GateReason.WITHIN_NOISE] in text
+    assert BAND_REASON_TEXT[GateReason.WITHIN_NOISE] in text
     assert "Noise band from 2 runs: `ref`, `again`." in text
     assert "The band carries no pooled per-case counts" in text
     assert "| Metric | Delta | Noise band | Within noise |" in text
     assert "| Token ratio to band mean | 1.113 | 0.870 to 1.130 | yes |" in text
     assert "| Token ratio (installed reference) |  | 1.280 |  |" in text
     assert "| Token ratio (band mean) |  | 1.113 |  |" in text
-    assert "| ruby verified accuracy | -0.500 | ±0.500 | yes |" in text
+    # ruby at 0.5 and 0.0 across the band: the candidate's 0.0 is 0.25 below its mean.
+    assert "| ruby verified accuracy | -0.250 | ±0.500 | yes |" in text
     assert "Within noise: objective_j, macro_verified_accuracy" in text
     plain = render_gate(gate(baseline, candidate), baseline, candidate)
     assert "Noise band" not in plain and "Within noise" not in plain
@@ -517,3 +526,223 @@ def test_the_noise_view_counts_the_classification_and_names_unstable_and_failing
     assert "- Unstable (a flip counts neither way): `py-a`" in legacy
     missing = render_noise(noise_band(cards, [rows[0], None]))
     assert "Per-case stability: unknown; no trajectories reproducing run `again`;" in missing
+
+
+# Deltas from the band's mean: every rule reads them; the installed reference's are kept
+
+RICH = {**BASELINE, "rb-b": ALL}
+
+
+def _three_band() -> NoiseBand:
+    """Three runs of one configuration: ruby at 1.0, 0.5 and 0.0 (mean 0.5), python at 0.5
+    in each; J 1.0, 0.75 and 0.25 (mean 0.667, band 0.75)."""
+    return _band(_run(RICH, "best"), _run(BASELINE, "middle"), _run(NOISY, "worst"))
+
+
+def _quiet_band(**metrics: list[float]) -> NoiseBand:
+    """Three identical runs of BASELINE with the named spreads (``objective_j``,
+    ``macro_verified_accuracy`` or a language) set by hand, so one rule is isolated."""
+    band = _band(*(_run(BASELINE, run_id) for run_id in ("one", "two", "three")))
+    record = band.model_dump()
+    for name, values in metrics.items():
+        target = record["languages"] if name in record["languages"] else record
+        target[name] = spread(values).model_dump()
+    return NoiseBand.model_validate(record)
+
+
+def test_a_fall_only_against_the_bands_best_run_is_not_a_language_regression():
+    # The installed reference is the band's best ruby run (1.0); the candidate's 0.5 is the
+    # band's mean.
+    baseline, candidate = _card(RICH), _card(BASELINE, run_id="cand")
+    assert gate(baseline, candidate).reasons == [
+        GateReason.LANGUAGE_REGRESSED,
+        GateReason.OBJECTIVE_BELOW_THRESHOLD,
+    ]
+    verdict = gate(baseline, candidate, noise=_three_band())
+    assert verdict.regressed_languages == []
+    assert verdict.reasons == [GateReason.OBJECTIVE_BELOW_THRESHOLD, GateReason.WITHIN_NOISE]
+    assert verdict.decision is GateDecision.INCONCLUSIVE
+    # The installed reference's deltas stay in their fields; the band's beside them.
+    assert verdict.language_deltas == {"python": 0.0, "ruby": -0.5}
+    assert verdict.language_deltas_to_band == {"python": 0.0, "ruby": pytest.approx(0.0)}
+    assert verdict.delta_j == pytest.approx(-0.25)
+    assert verdict.delta_j_to_band == pytest.approx(0.75 - 2 / 3)
+    assert verdict.delta_macro_verified_accuracy == pytest.approx(-0.25)
+    assert verdict.delta_macro_verified_accuracy_to_band == pytest.approx(0.0)
+    assert verdict.delta_worst_language_verified_accuracy_to_band == pytest.approx(0.5 - 1 / 3)
+    assert verdict.languages_within_noise == ["python", "ruby"]
+
+
+def test_a_band_run_gated_against_another_reads_as_noise():
+    band = _three_band()
+    for baseline, candidate in [(RICH, NOISY), (NOISY, RICH), (BASELINE, RICH)]:
+        verdict = gate(_card(baseline), _card(candidate, run_id="cand"), noise=band)
+        assert verdict.decision is GateDecision.INCONCLUSIVE
+        assert verdict.within_noise[:2] == ["objective_j", "macro_verified_accuracy"]
+
+
+def test_the_objective_gain_is_measured_from_the_bands_mean():
+    # J 0.75 to 1.0 (+0.25) clears a band of 0.1875 from the installed reference, but only
+    # +0.125 from the band's mean of 0.875.
+    baseline, candidate = _card(BASELINE), _card({**BASELINE, "py-b": ALL}, run_id="cand")
+    band = _quiet_band(objective_j=[0.75, 0.9375, 0.9375])
+    verdict = gate(baseline, candidate, noise=band)
+    assert verdict.delta_j == pytest.approx(0.25)
+    assert verdict.delta_j_to_band == pytest.approx(0.125)
+    assert verdict.reasons == [GateReason.OBJECTIVE_BELOW_THRESHOLD, GateReason.WITHIN_NOISE]
+    assert verdict.decision is GateDecision.INCONCLUSIVE
+    assert gate(baseline, candidate, noise=_quiet_band()).decision is GateDecision.ACCEPTED
+
+
+def test_the_accuracy_steps_are_measured_from_the_bands_mean():
+    # Macro 0.5 to 0.75 is one step (0.25) from the installed reference and beyond its band
+    # of 0.05, but 0.217 from the band's mean; python's +0.5 is one step (0.5) from the
+    # installed reference, 0.333 from the band's mean.
+    baseline, candidate = _card(BASELINE), _card({**BASELINE, "py-b": ALL}, run_id="cand")
+    band = _quiet_band(macro_verified_accuracy=[0.5, 0.55, 0.55], python=[0.5, 0.75, 0.75])
+    assert gate(baseline, candidate, track="accuracy").decision is GateDecision.ACCEPTED
+    for target in (None, "python"):
+        verdict = gate(baseline, candidate, track="accuracy", target_language=target, noise=band)
+        assert verdict.reasons == [GateReason.ACCURACY_NOT_IMPROVED]
+        assert verdict.decision is GateDecision.REJECTED
+        assert verdict.delta_macro_verified_accuracy == pytest.approx(0.25)
+        assert verdict.delta_macro_verified_accuracy_to_band == pytest.approx(0.75 - 1.6 / 3)
+        assert verdict.language_deltas["python"] == pytest.approx(0.5)
+        assert verdict.language_deltas_to_band["python"] == pytest.approx(1 - 2 / 3)
+
+
+def test_the_efficiency_accuracy_floor_is_the_bands_mean():
+    noise = _noise(80.0)
+    record = noise.model_dump()
+    record["macro_verified_accuracy"] = spread([0.5, 0.7]).model_dump()
+    shaped = NoiseBand.model_validate(record)
+    candidate = _card(BASELINE, run_id="cand", tokens=78.0)
+    accepted = gate(_card(BASELINE), candidate, track="efficiency", noise=noise)
+    assert accepted.decision is GateDecision.ACCEPTED
+    verdict = gate(_card(BASELINE), candidate, track="efficiency", noise=shaped)
+    assert verdict.delta_macro_verified_accuracy == 0.0
+    assert verdict.delta_macro_verified_accuracy_to_band == pytest.approx(-0.1)
+    assert verdict.reasons == [GateReason.ACCURACY_BELOW_BASELINE, GateReason.WITHIN_NOISE]
+
+
+def test_a_language_the_band_lacks_keeps_its_installed_reference_delta():
+    record = _quiet_band().model_dump()
+    record["languages"] = {"python": record["languages"]["python"]}
+    partial = NoiseBand.model_validate(record)
+    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand")
+    verdict = gate(baseline, candidate, noise=partial)
+    assert verdict.language_deltas_to_band == {"python": 0.0, "ruby": -0.5}
+    assert verdict.regressed_languages == ["ruby"]
+    assert verdict.decision is GateDecision.REJECTED
+    text = render_gate(verdict, baseline, candidate)
+    assert "Not in the noise band (read against the installed reference): ruby." in text
+    assert "| ruby | not in band | 0.000 | -0.500 (installed reference) | yes |" in text
+    assert "| ruby verified accuracy | -0.500 (installed reference) | unknown | no |" in text
+
+
+def test_band_deltas_are_empty_without_a_band_and_absent_from_older_records():
+    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand")
+    plain = gate(baseline, candidate)
+    assert plain.delta_j_to_band is None and plain.delta_macro_verified_accuracy_to_band is None
+    assert plain.delta_worst_language_verified_accuracy_to_band is None
+    assert plain.language_deltas_to_band == {}
+    assert plain.deciding_macro_verified_accuracy_to_band is None
+    assert plain.deciding_worst_language_to_band is None
+    record = gate(baseline, candidate, noise=_three_band()).model_dump(mode="json")
+    for field in (
+        "delta_j_to_band",
+        "delta_macro_verified_accuracy_to_band",
+        "delta_worst_language_verified_accuracy_to_band",
+        "language_deltas_to_band",
+        "deciding_macro_verified_accuracy_to_band",
+        "deciding_worst_language_to_band",
+    ):
+        record.pop(field)
+    old = GateVerdict.model_validate(record)
+    assert old.delta_j_to_band is None and old.language_deltas_to_band == {}
+    # A band of another repeat count anchors nothing.
+    mismatched = gate(baseline, candidate, noise=_three_band().model_copy(update={"repeats": 5}))
+    assert mismatched.decision is GateDecision.INCOMPARABLE
+    assert mismatched.delta_j_to_band is None and mismatched.language_deltas_to_band == {}
+
+
+def test_deciding_figures_and_languages_are_measured_from_the_bands_mean():
+    # Python decides (three cases) at 1.0, 2/3 and 1/3 across the band (mean 2/3); the
+    # installed reference is the band's 1.0 run and the candidate verifies 2/3.
+    runs = [
+        _side({**PAIRED, "py-c": ALL}, "high"),
+        _side(PAIRED, "mid"),
+        _side({**PAIRED, "py-b": NONE}, "low"),
+    ]
+    band = noise_band([card for card, _ in runs], [rows for _, rows in runs])
+    (baseline, baseline_rows), (candidate, candidate_rows) = runs[0], _side(PAIRED, "cand")
+
+    def gated(noise: NoiseBand | None) -> GateVerdict:
+        return gate(
+            baseline,
+            candidate,
+            noise=noise,
+            min_cases=3,
+            baseline_trajectories=baseline_rows,
+            candidate_trajectories=candidate_rows,
+        )
+
+    assert gated(None).regressed_languages == ["python"]
+    verdict = gated(band)
+    assert verdict.regressed_languages == []
+    assert GateReason.LANGUAGE_REGRESSED not in verdict.reasons
+    assert verdict.deciding_macro_verified_accuracy is not None
+    assert verdict.deciding_macro_verified_accuracy.delta == pytest.approx(-1 / 3)
+    for metric in (
+        verdict.deciding_macro_verified_accuracy_to_band,
+        verdict.deciding_worst_language_to_band,
+    ):
+        assert metric is not None
+        assert (metric.baseline, metric.candidate, metric.delta) == (
+            pytest.approx(2 / 3),
+            pytest.approx(2 / 3),
+            pytest.approx(0.0),
+        )
+
+
+def test_the_gate_view_leads_with_the_band_mean_deltas():
+    baseline, candidate = _card(RICH), _card(BASELINE, run_id="cand")
+    verdict = gate(baseline, candidate, noise=_three_band())
+    text = render_gate(verdict, baseline, candidate)
+    assert (
+        "Deltas are measured from the mean of the noise band's 3 runs, which the gate "
+        "decides on; the installed reference's deltas follow, labelled (installed reference)."
+    ) in text
+    band_row = "| Objective J (band mean) | 0.667 | 0.750 | +0.083 |"
+    installed_row = "| Objective J (installed reference) | 1.000 | 0.750 | -0.250 |"
+    assert band_row in text and installed_row in text
+    assert text.index(band_row) < text.index(installed_row)
+    assert "| Macro verified accuracy (band mean) | 0.500 | 0.500 | +0.000 |" in text
+    assert "| Worst language verified accuracy (band mean) | 0.333 | 0.500 | +0.167 |" in text
+    assert "| Macro reward (installed reference) |" in text
+    header = (
+        "| Language | Band mean verified | Candidate verified | Delta (band mean) | Regressed "
+        "| Installed reference verified | Delta (installed reference) |"
+    )
+    assert header in text
+    assert "| ruby | 0.500 | 0.500 | +0.000 | no | 1.000 | -0.500 |" in text
+    assert "| ruby verified accuracy | +0.000 | ±1.000 | yes |" in text
+    assert "| Objective J | +0.083 | ±0.750 | yes |" in text
+    for reason in verdict.reasons:
+        assert f"- {BAND_REASON_TEXT[reason]}" in text
+    plain = render_gate(gate(baseline, candidate), baseline, candidate)
+    assert "band mean" not in plain and "Objective J (installed reference)" not in plain
+    assert f"- {REASON_TEXT[GateReason.LANGUAGE_REGRESSED]}" in plain
+
+
+def test_band_reason_texts_name_the_bands_mean():
+    assert set(BAND_REASON_TEXT) == {
+        GateReason.LANGUAGE_REGRESSED,
+        GateReason.ACCURACY_NOT_IMPROVED,
+        GateReason.OBJECTIVE_BELOW_THRESHOLD,
+        GateReason.ACCURACY_BELOW_BASELINE,
+        GateReason.WITHIN_NOISE,
+    }
+    for reason, text in BAND_REASON_TEXT.items():
+        assert "band's mean" in text
+        assert "band's mean" not in REASON_TEXT[reason]
