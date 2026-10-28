@@ -108,3 +108,7 @@ Pydantic validation errors from settings, request loading, or run-ID validation 
 Cancelling a task that is awaiting `wait_for_result()` cancels that local await, not the remote workflow. Request durable cancellation explicitly through the supported operational path, then inspect the final workflow state and immutable artifacts. A completed result can still contain an operational `ExecutionStatus` such as `BLOCKED`, `ERROR`, or `CANCELLED`; successful receipt of a Python value is not a security verdict. The distinctions are defined in the [schema reference](schemas.md#results-status-disposition-and-fix).
 
 For current documented limitations and planned work, see [current plans](../plans/README.md).
+
+## Optional agentic intake
+
+`start_intake` and `start_intake_investigation` in `entrypoints.api` use canonical `IntakeRequest` and `IntakeInvestigationRequest`/`IntakeInvestigationResult`. The latter gates the existing investigation with a committed issue/source/image binding. Existing API signatures remain compatible. See [agentic intake](../guides/intake-agent.md).

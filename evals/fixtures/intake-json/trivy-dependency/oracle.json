@@ -1,0 +1,49 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "dependency"
+  ],
+  "languages": [
+    "python",
+    "other",
+    "unknown"
+  ],
+  "execution_modes": [
+    "application",
+    "static_configuration",
+    "unknown"
+  ],
+  "required_requirements": [
+    "dependency_install"
+  ],
+  "permitted_requirements": [
+    "dependency_install",
+    "unknown"
+  ],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE",
+    "REQUIREMENTS_UNRESOLVED",
+    "TARGET_DEPENDENCIES_UNSUPPORTED",
+    "REQUIREMENT_UNSUPPORTED"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "requirements.txt"
+  ],
+  "issue_titles": [
+    "Synthetic vulnerable samplelib release"
+  ],
+  "description_fragments": [
+    "requirements.txt",
+    "samplelib",
+    "1.0.0",
+    "TEST-DEPENDENCY-001"
+  ]
+}

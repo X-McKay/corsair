@@ -16,3 +16,5 @@ The architecture decisions in [`docs/architecture/decisions/`](../architecture/d
 Put a bounded plan in `active/` with its goal, scope, decisions, commands, actual results and blockers. Keep failed and unrun checks. Move completed plans to `archive/plans/`; handoffs to `archive/handoffs/`; resolved issues to `archive/issues/`; historical reviews to `archive/reviews/`. Update this index and relative links in the same change. Work state must distinguish proposed, implemented and qualified behavior.
 
 Do not commit raw `.runs/`, `.state/`, private diagnostics, credentials, model reasoning or unredacted evidence. A sanitized receipt must preserve unknown metrics as unknown and must not turn skipped discovery, denied execution or mocked dependencies into qualification. Publishing, deployment and issue closure remain subject to the user's current authorization.
+
+- [PLAN-0003: intake-agent integration](archive/plans/PLAN-0003-intake-agent-integration.md) preserves current main while adding bounded agentic normalization, image selection and categorical workflow gates; provider-route and live-quality limits remain explicit.

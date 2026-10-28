@@ -81,10 +81,10 @@ class Usage(Contract):
     llm_calls: int = Field(default=0, ge=0)
     tool_calls: int = Field(default=0, ge=0)
     skills_loaded: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
-        default_factory=list, max_length=2
+        default_factory=list, max_length=3
     )
     skills_preloaded: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
-        default_factory=list, max_length=2
+        default_factory=list, max_length=3
     )
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)

@@ -85,3 +85,5 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 [Current work](plans/README.md) links the project plan, its open decisions and the latest evidence.
 
 See [SECURITY.md](../SECURITY.md) for reporting and safe operation, [CHANGELOG.md](../CHANGELOG.md) for unreleased changes, and [LICENSE](../LICENSE) for the current absence of a project-wide license grant. The [packaged risk assessment](../src/corsair/policies/risk.md) remains part of the implementation's capability identity.
+
+- [Agentic issue intake](guides/intake-agent.md): optional scanner JSON normalization, available-image selection and gating into the existing evidence runner.

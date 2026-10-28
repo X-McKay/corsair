@@ -1,0 +1,36 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/1",
+    "input": {
+      "kind": "json",
+      "payload": {
+        "title": "HTTP file disclosure",
+        "description": "The Flask HTTP /read endpoint accepts an untrusted path and returns its contents. Inspect reader.py.",
+        "locations": [
+          {
+            "path": "reader.py"
+          }
+        ]
+      }
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "3574ac170afb615a11da914d22e50f907c2523fc7abd72e3ce89fd78956a5f46"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    },
+    "bindings": null
+  },
+  "inventory": {
+    "images": []
+  },
+  "source_digest": "3574ac170afb615a11da914d22e50f907c2523fc7abd72e3ce89fd78956a5f46"
+}

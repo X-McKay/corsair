@@ -1,0 +1,295 @@
+{
+  "schema_version": "corsair.intake-agent-dataset/1",
+  "status": "candidate-pending-human-review",
+  "entries": [
+    {
+      "case_id": "canonical",
+      "family": "asset-disclosure",
+      "format": "canonical",
+      "input": "fixtures/intake-json/canonical/input.json",
+      "oracle": "fixtures/intake-json/canonical/oracle.json",
+      "input_digest": "f66091de8e471aa13e330186a0cfcb7e3189ddb737fbd9cc975925895a261ee2",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "github",
+      "family": "asset-disclosure",
+      "format": "github",
+      "input": "fixtures/intake-json/github/input.json",
+      "oracle": "fixtures/intake-json/github/oracle.json",
+      "input_digest": "9aaf9f53f9729b2c82fe3810ca136a4e453c86049dca0fda400a6b6c548c9d56",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "jira",
+      "family": "asset-disclosure",
+      "format": "jira",
+      "input": "fixtures/intake-json/jira/input.json",
+      "oracle": "fixtures/intake-json/jira/oracle.json",
+      "input_digest": "7d283f42dafd8bb8bcc6c1a5462d25f0370ff66584a7dfcc13fef01c48f14b96",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "jira-rich-text",
+      "family": "asset-disclosure",
+      "format": "jira-rich-text",
+      "input": "fixtures/intake-json/jira-rich-text/input.json",
+      "oracle": "fixtures/intake-json/jira-rich-text/oracle.json",
+      "input_digest": "de11b907484e2db96f0dd2e8bdbaca83141012da9b7ffe8bde592e7981404084",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "nested-envelope",
+      "family": "asset-disclosure",
+      "format": "nested-envelope",
+      "input": "fixtures/intake-json/nested-envelope/input.json",
+      "oracle": "fixtures/intake-json/nested-envelope/oracle.json",
+      "input_digest": "c69c89b24cc4c9e749246f10983994637032cca6dc4129235bae631c42f97fcf",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "singleton-array",
+      "family": "asset-disclosure",
+      "format": "singleton-array",
+      "input": "fixtures/intake-json/singleton-array/input.json",
+      "oracle": "fixtures/intake-json/singleton-array/oracle.json",
+      "input_digest": "ac89ac31cf74f68c7bb70f92047d8ee75144d4a8122826b6caf1dd252117861c",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "findings-array",
+      "family": "asset-disclosure",
+      "format": "findings-array",
+      "input": "fixtures/intake-json/findings-array/input.json",
+      "oracle": "fixtures/intake-json/findings-array/oracle.json",
+      "input_digest": "7e5ad270b0caae69a0c726743f1882f1a6e295b49e305dc1ccba2e2da4ddacbd",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "sarif",
+      "family": "asset-disclosure",
+      "format": "sarif",
+      "input": "fixtures/intake-json/sarif/input.json",
+      "oracle": "fixtures/intake-json/sarif/oracle.json",
+      "input_digest": "9eecc10b1594e6284936cae7c9be43042305fa99a6f219c5160f86ab5d5eedd1",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "key-value-array",
+      "family": "asset-disclosure",
+      "format": "key-value-array",
+      "input": "fixtures/intake-json/key-value-array/input.json",
+      "oracle": "fixtures/intake-json/key-value-array/oracle.json",
+      "input_digest": "4c2346e3f151ad4a7f28653630d5ee271f8c26b6c7e508ece7602a6ba6d5db01",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "section-array",
+      "family": "asset-disclosure",
+      "format": "section-array",
+      "input": "fixtures/intake-json/section-array/input.json",
+      "oracle": "fixtures/intake-json/section-array/oracle.json",
+      "input_digest": "3970c50a788abc969ac3b2d1a96cf91578c449e1a4ca77b3a52a765959c04211",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "text-string",
+      "family": "asset-disclosure",
+      "format": "text-string",
+      "input": "fixtures/intake-json/text-string/input.json",
+      "oracle": "fixtures/intake-json/text-string/oracle.json",
+      "input_digest": "4459b8bf8d1cfa09bce8fe0eafa9951633861f90e73e6ba9c5965ffdf4879bde",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "encoded-object-string",
+      "family": "asset-disclosure",
+      "format": "encoded-object-string",
+      "input": "fixtures/intake-json/encoded-object-string/input.json",
+      "oracle": "fixtures/intake-json/encoded-object-string/oracle.json",
+      "input_digest": "bd0bc53c3bcbe4a45b9f79cf9594f8200c556e989d0fc71a373d79e8ac14631c",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "unicode",
+      "family": "asset-disclosure",
+      "format": "unicode",
+      "input": "fixtures/intake-json/unicode/input.json",
+      "oracle": "fixtures/intake-json/unicode/oracle.json",
+      "input_digest": "4f668feb1f8e1c151c0f568c19de4a206b5422a4ef1b1559cacd06a60a9eb905",
+      "oracle_digest": "53c2219be63c8ed2e30b51755c9bba66ff5c617c3b8dbd7e61ccc84589fb0d01"
+    },
+    {
+      "case_id": "noisy-metadata",
+      "family": "asset-disclosure",
+      "format": "noisy-metadata",
+      "input": "fixtures/intake-json/noisy-metadata/input.json",
+      "oracle": "fixtures/intake-json/noisy-metadata/oracle.json",
+      "input_digest": "ffa3069676160e12e141eba758cbffd45b8e2f7c8b7a3d238db6b33832b0ae7a",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "instruction-injection",
+      "family": "asset-disclosure",
+      "format": "instruction-injection",
+      "input": "fixtures/intake-json/instruction-injection/input.json",
+      "oracle": "fixtures/intake-json/instruction-injection/oracle.json",
+      "input_digest": "a1c4d19b972027f225d51a371c3bba0423b59a208925b9966d05ba4204a7d946",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "repeated-equivalent",
+      "family": "asset-disclosure",
+      "format": "repeated-equivalent",
+      "input": "fixtures/intake-json/repeated-equivalent/input.json",
+      "oracle": "fixtures/intake-json/repeated-equivalent/oracle.json",
+      "input_digest": "ae2e16e404b9f9f36b0838ebf26013f110abed130b721094da786eb857e54e38",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "multiple-distinct",
+      "family": "asset-disclosure",
+      "format": "multiple-distinct",
+      "input": "fixtures/intake-json/multiple-distinct/input.json",
+      "oracle": "fixtures/intake-json/multiple-distinct/oracle.json",
+      "input_digest": "948bc04b918e6224ca1e1f4aed6fab3921edbd8b542ed9d7890acc2a877aaeca",
+      "oracle_digest": "d0072678e9615ac992b37d5585a1ce07eb7b9a132222373392c3c11f29bb1c5c"
+    },
+    {
+      "case_id": "conflicting-reports",
+      "family": "asset-disclosure",
+      "format": "conflicting-reports",
+      "input": "fixtures/intake-json/conflicting-reports/input.json",
+      "oracle": "fixtures/intake-json/conflicting-reports/oracle.json",
+      "input_digest": "4c390e4245ca809989bfa7a15ef1ea28ae0681d74e218e60cb20614050732914",
+      "oracle_digest": "7b7aee97723e0538b13b018d8b10ea7e301ff43b30a9cde053c9c1958135ee33"
+    },
+    {
+      "case_id": "null-report",
+      "family": "asset-disclosure",
+      "format": "null-report",
+      "input": "fixtures/intake-json/null-report/input.json",
+      "oracle": "fixtures/intake-json/null-report/oracle.json",
+      "input_digest": "8234981e0601acb09fbb24ce201fab6a540a6b77e7ccb7f1d35d411ce272c158",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "empty-array",
+      "family": "asset-disclosure",
+      "format": "empty-array",
+      "input": "fixtures/intake-json/empty-array/input.json",
+      "oracle": "fixtures/intake-json/empty-array/oracle.json",
+      "input_digest": "afbd6ac93573e8a70efe1c17d77cd92ae89edaa28ce803e6d789b910a48cb0af",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "numeric-scalar",
+      "family": "asset-disclosure",
+      "format": "numeric-scalar",
+      "input": "fixtures/intake-json/numeric-scalar/input.json",
+      "oracle": "fixtures/intake-json/numeric-scalar/oracle.json",
+      "input_digest": "4575aec396812a0579e1c4c29c6346c6c7adf86c13753eab9f5eeaa0081ffe4f",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "title-only",
+      "family": "asset-disclosure",
+      "format": "title-only",
+      "input": "fixtures/intake-json/title-only/input.json",
+      "oracle": "fixtures/intake-json/title-only/oracle.json",
+      "input_digest": "b20d3be5e049a4b4989105d4a4b5eaa558e51b1144cd5c800c1c6d5d6b563d76",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "absent-image",
+      "family": "asset-disclosure",
+      "format": "absent-image",
+      "input": "fixtures/intake-json/absent-image/input.json",
+      "oracle": "fixtures/intake-json/absent-image/oracle.json",
+      "input_digest": "144c56378ea1650611abacfa8542850c4f34e11f59f215fcb285bc10e2fbaa0f",
+      "oracle_digest": "125129d090be348f43d8ea03a67da8c51d07653a1e853b5d8480a81f7bf0514c"
+    },
+    {
+      "case_id": "deep-envelope",
+      "family": "asset-disclosure",
+      "format": "deep-envelope",
+      "input": "fixtures/intake-json/deep-envelope/input.json",
+      "oracle": "fixtures/intake-json/deep-envelope/oracle.json",
+      "input_digest": "d235000186f8eb4b4e030912044624065d8cda73c51578b14256c2406e4275b8",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "semgrep",
+      "family": "asset-disclosure",
+      "format": "semgrep",
+      "input": "fixtures/intake-json/semgrep/input.json",
+      "oracle": "fixtures/intake-json/semgrep/oracle.json",
+      "input_digest": "e71b8242741dce47eaff9fddcc57281037719c45e69046cf5f4403f1ea4933e0",
+      "oracle_digest": "7a1da7739d7de75cae4582fd9768cf7e8904de6f8fcc4cfca2713057b2c0cdaa"
+    },
+    {
+      "case_id": "bandit",
+      "family": "asset-disclosure",
+      "format": "bandit",
+      "input": "fixtures/intake-json/bandit/input.json",
+      "oracle": "fixtures/intake-json/bandit/oracle.json",
+      "input_digest": "c73876495ff16a24cc32b3fb961d60612250156bea6a7ecf8644e7d0d0f5e213",
+      "oracle_digest": "7a1da7739d7de75cae4582fd9768cf7e8904de6f8fcc4cfca2713057b2c0cdaa"
+    },
+    {
+      "case_id": "gitlab-sast",
+      "family": "asset-disclosure",
+      "format": "gitlab-sast",
+      "input": "fixtures/intake-json/gitlab-sast/input.json",
+      "oracle": "fixtures/intake-json/gitlab-sast/oracle.json",
+      "input_digest": "119ea25ebf0769877b0d0cc18f069c3db8aa7c389026d10fdaa828bd11f79901",
+      "oracle_digest": "a9e327cb7ed45689da5ce56b20ba742b26101bd186cf4b34f6403375ce0df730"
+    },
+    {
+      "case_id": "checkov",
+      "family": "configuration",
+      "format": "checkov",
+      "input": "fixtures/intake-json/checkov/input.json",
+      "oracle": "fixtures/intake-json/checkov/oracle.json",
+      "input_digest": "d3d9cde779cbc21009482079df8566790519d8d5be39b893b69b06081d8c9daf",
+      "oracle_digest": "e792981cffb9b2b4c1bfe06e9bcdbb7d7baf8451da771981539054012a9c1d9a"
+    },
+    {
+      "case_id": "trivy-dependency",
+      "family": "dependency",
+      "format": "trivy-dependency",
+      "input": "fixtures/intake-json/trivy-dependency/input.json",
+      "oracle": "fixtures/intake-json/trivy-dependency/oracle.json",
+      "input_digest": "e1f12184cba498c807846216c9a9c998dac2098133a87fdbabc3d19e856abecb",
+      "oracle_digest": "38bf88b3470029fd9e23d1fda3df0e74c1ce7f43cd4e9744127308daaaa15e51"
+    },
+    {
+      "case_id": "scanner-empty-results",
+      "family": "asset-disclosure",
+      "format": "scanner-empty-results",
+      "input": "fixtures/intake-json/scanner-empty-results/input.json",
+      "oracle": "fixtures/intake-json/scanner-empty-results/oracle.json",
+      "input_digest": "a6a44002549ad0ecedcec1447f85836e8bd9e47c59d58d3015e3e4b9a3f955a2",
+      "oracle_digest": "d17d09f58786398798e74c6e69333093f1bebc12bd749ee01481abe4a41a5254"
+    },
+    {
+      "case_id": "sarif-two-results",
+      "family": "asset-disclosure",
+      "format": "sarif-two-results",
+      "input": "fixtures/intake-json/sarif-two-results/input.json",
+      "oracle": "fixtures/intake-json/sarif-two-results/oracle.json",
+      "input_digest": "5b00b28bb72634ee8d055bb031460092ae007c4d5dc002cf383aadb31d8d1760",
+      "oracle_digest": "d0072678e9615ac992b37d5585a1ce07eb7b9a132222373392c3c11f29bb1c5c"
+    },
+    {
+      "case_id": "scanner-noise-envelope",
+      "family": "asset-disclosure",
+      "format": "scanner-noise-envelope",
+      "input": "fixtures/intake-json/scanner-noise-envelope/input.json",
+      "oracle": "fixtures/intake-json/scanner-noise-envelope/oracle.json",
+      "input_digest": "0b0f8086b454ecdd7a2e040daee772f19067983f1fdde908c9a7c32a53f8cbd0",
+      "oracle_digest": "7a1da7739d7de75cae4582fd9768cf7e8904de6f8fcc4cfca2713057b2c0cdaa"
+    }
+  ],
+  "revision": 2
+}

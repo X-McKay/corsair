@@ -86,6 +86,7 @@ class Budget(Contract):
 
 
 class InvestigationRequest(Contract):
+    intake_result: ArtifactRef | None = None
     case: Case
     budget: Budget = Field(default_factory=Budget)
 
@@ -98,6 +99,7 @@ class RunManifest(Contract):
     producer_prompt_digest: Digest
     auditor_prompt_digest: Digest
     image_id: str
+    image_reference: str | None = None
     models: dict[str, str]
     capabilities: dict[str, dict] = Field(default_factory=dict)
     # The admitted evidence policy, fixed when the case is prepared and replayed

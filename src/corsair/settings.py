@@ -7,12 +7,14 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator, model_validator
 
 from corsair.contracts import Contract, digest
+from corsair.contracts.intake_agent import ImageCandidate
 
 
 class ModelSettings(Contract):
     connector: Literal["gemini", "litellm"] = "gemini"
     producer: str = "gemini-2.5-flash"
     auditor: str = "gemini-2.5-flash"
+    intake: str = "gemini-2.5-flash"
     api_base: str | None = None
     request_timeout_seconds: int = Field(default=120, ge=1, le=300)
     extra_body: dict = Field(default_factory=dict)
@@ -103,6 +105,9 @@ class Settings(Contract):
     max_concurrent_activities: int = Field(default=4, ge=1, le=64)
     max_concurrent_workflow_tasks: int = Field(default=100, ge=2, le=1000)
     models: ModelSettings = Field(default_factory=ModelSettings)
+    intake_image: str = "corsair-intake:0.1"
+    intake_images: list[ImageCandidate] = Field(default_factory=list, max_length=24)
+    intake_github_repositories: list[str] = Field(default_factory=list, max_length=32)
 
     @model_validator(mode="before")
     @classmethod

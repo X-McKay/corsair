@@ -66,10 +66,23 @@ from corsair.entrypoints.requests import load_investigation_request
 from corsair.ports.inference import InferencePort
 from corsair.contracts.agents import Submission
 assert Path(corsair.__file__).is_relative_to(Path('installed').resolve()), corsair.__file__
-for role in ('producer', 'auditor'):
+for role in ('producer', 'auditor', 'intake'):
     assert load_agent_spec(role).name == role
     assert len(prompt_text(role)) > 100
     assert len(runtime_skill_digest(role)) == 64
+from corsair.agents.resources import intake_resources_digest
+from corsair.agents.intake.factory import build_intake
+from corsair.contracts import IntakeProposal
+from corsair.agents.intake.contracts import IntakeProposal as RoleIntakeProposal
+from corsair.contracts.intake_pipeline import IntakeInvestigationRequest
+from corsair.entrypoints.api import start_intake_investigation
+assert RoleIntakeProposal is IntakeProposal
+assert [skill.name for skill in load_runtime_skills('intake')] == ['image-selection']
+assert len(intake_resources_digest()) == 64
+assert callable(start_intake_investigation)
+assert IntakeInvestigationRequest.model_fields['binding']
+assert files('corsair.agents.intake').joinpath('tools/compare_images.py').is_file()
+assert files('corsair.agents.intake').joinpath('skills/image-selection/SKILL.md').is_file()
 assert [skill.name for skill in load_runtime_skills('producer')] == ['source-grounding']
 assert [skill.name for skill in load_runtime_skills('auditor')] == ['semantic-review']
 from corsair.agents.auditor.factory import build_auditor

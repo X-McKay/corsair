@@ -282,7 +282,15 @@ class DockerSandbox:
 
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
-        image_id = self._ensure_image(self.settings.image_for(prepared.recipe.kind))
+        if prepared.manifest.image_reference is None:
+            image_id = self._ensure_image(self.settings.image_for(prepared.recipe.kind))
+        else:
+            if self._client is None:
+                raise SandboxUnavailable("Docker client unavailable for selected image")
+            current = self._client.images.get(prepared.manifest.image_reference)
+            if str(current.id) != prepared.manifest.image_id:
+                raise SandboxUnavailable("selected intake image changed before execution")
+            image_id = prepared.manifest.image_id
         client = self._client
         if client is None:
             raise SandboxUnavailable(

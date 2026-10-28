@@ -1,0 +1,9 @@
+# Intake integration on current main, 2026-10-28
+
+This is an integration receipt, not a promoted model-quality baseline. Main `12b1b14a` and intake `76dd3129` were integrated by preserving main's payload-pair observer, coverage kernel, six verdicts, scanner contracts and provider restrictions.
+
+Final gates: 1,161 offline tests passed (133 deselected); 32 real Docker/Temporal/replay tests passed (one live test deselected); pinned quality checks and wheel/sdist builds passed. Native ADK models were scripted. The selected image differs from the configured default and its immutable ID is asserted in the producer/evidence manifest. See the [complete integration record](../../docs/plans/archive/plans/PLAN-0003-intake-agent-integration.md) for commands, setup failures and limits.
+
+The requested LiteLLM `openai/Qwen3.6-35B-A3B-NVFP4` route at `https://llm.almckay.io/v1` is rejected by the retained main tool/schema restriction. Final original frozen cohort: eight planned/completed attempts, eight `MODEL_CONFIGURATION_UNSUPPORTED`, eight operational failures, zero scored attempts, zero model calls. Resource digest: `71a52143dbe2abe23542b61446afe74ae25051dfc779ebb1ba316cfc9d435477`; configuration digest: `25aafe5d5dca51b5ec0ad29b57a189d88aa64e1a4b56a3be983803f69409206b`. Cost and tokens remain unknown. Reports before summary corrections remain private alongside the final report.
+
+The 32-case JSON candidate cohort retains its source/input/oracle bytes and labels and is validated offline. No live rerun of that cohort, live accuracy qualification, full live provider chain, held-out promotion, cross-platform execution or general hostile-source guarantee is claimed. No provider was silently substituted. The [evaluator guide](../evaluators/intake-agent.md) describes the separate manifest namespace and failure denominators.

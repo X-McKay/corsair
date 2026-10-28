@@ -1,0 +1,78 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/2",
+    "input": {
+      "kind": "json",
+      "payload": {
+        "version": "2.1.0",
+        "runs": [
+          {
+            "tool": {
+              "driver": {
+                "name": "SyntheticScanner",
+                "rules": [
+                  {
+                    "id": "ASSET001",
+                    "shortDescription": {
+                      "text": "Asset path traversal in resolve_asset"
+                    }
+                  }
+                ]
+              }
+            },
+            "results": [
+              {
+                "ruleId": "ASSET001",
+                "message": {
+                  "text": "In resolver.py, resolve_asset(root, name) accepts an untrusted name and reads files outside the asset root. This security finding concerns private file disclosure through that function."
+                },
+                "locations": [
+                  {
+                    "physicalLocation": {
+                      "artifactLocation": {
+                        "uri": "resolver.py"
+                      }
+                    },
+                    "logicalLocations": [
+                      {
+                        "name": "resolve_asset"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "573c752d61f5855634bf1c23fa508cf25e57a6dd7c5ef16cf4f024db801063dc"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    }
+  },
+  "inventory": {
+    "images": [
+      {
+        "reference": "corsair-python:0.1",
+        "language": "python",
+        "execution_mode": "callable",
+        "requirements": [],
+        "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "source_digest": "573c752d61f5855634bf1c23fa508cf25e57a6dd7c5ef16cf4f024db801063dc",
+  "family": "asset-disclosure",
+  "format": "sarif"
+}

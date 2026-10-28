@@ -1,0 +1,32 @@
+{
+  "classifications": [
+    null
+  ],
+  "surfaces": [
+    "unknown"
+  ],
+  "languages": [
+    "unknown"
+  ],
+  "execution_modes": [
+    "unknown"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [
+    "unknown"
+  ],
+  "required_reasons": [
+    "INSUFFICIENT_ISSUE_INFORMATION"
+  ],
+  "permitted_reasons": [
+    "INSUFFICIENT_ISSUE_INFORMATION",
+    "SOURCE_LOCATION_UNRESOLVED",
+    "REQUIREMENTS_UNRESOLVED",
+    "IMAGE_UNDETERMINED",
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "images": [
+    null
+  ],
+  "paths": []
+}

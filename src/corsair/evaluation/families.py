@@ -89,6 +89,11 @@ def dataset_members(path: Path) -> list[Member]:
             Member(source, item["case_id"], None, None, chain_pair(item["input"]))
             for item in entries
         ]
+    if schema == "corsair.intake-agent-dataset/1":
+        from corsair.evaluation.intake_agent import IntakeAgentDataset
+
+        manifest = IntakeAgentDataset.model_validate(raw)
+        return [Member(source, e.case_id, e.family, None, None) for e in manifest.entries]
     if schema == INTAKE_SCHEMA:
         # Intake rows score scan-report findings; they carry no family or split.
         return [

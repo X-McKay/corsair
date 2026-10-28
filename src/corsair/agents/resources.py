@@ -22,10 +22,11 @@ from corsair.contracts import Contract, Finding
 if TYPE_CHECKING:
     from google.adk.skills import Skill
 
-RoleName = Literal["producer", "auditor"]
+RoleName = Literal["producer", "auditor", "intake"]
 
 _RESOURCE_PACKAGES: dict[RoleName, str] = {
     "producer": "corsair.agents.producer",
+    "intake": "corsair.agents.intake",
     "auditor": "corsair.agents.auditor",
 }
 _MAX_SKILL_BYTES = 12_000
@@ -85,6 +86,8 @@ def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
     """Return the finite role-local skill names; this is not a discovery registry."""
 
     match role:
+        case "intake":
+            return ("image-selection",)
         case "producer":
             return ("source-grounding",)
         case "auditor":
@@ -101,6 +104,7 @@ class AgentSpec(Contract):
     risk_path: str = Field(min_length=1, max_length=240)
     tools: list[str]
     source_tools: list[str]
+    mechanical_tools: list[str] = Field(default_factory=list)
     loader_tools: list[str]
     runtime_skills: list[str]
     loader_call_limit: int = Field(ge=0)
@@ -117,6 +121,20 @@ class AgentSpec(Contract):
 
     @model_validator(mode="after")
     def validated_runtime_layout(self) -> AgentSpec:
+        if self.name == "intake":
+            if (
+                self.source_tools != ["read_file", "list_files"]
+                or self.mechanical_tools != ["compare_images"]
+                or self.loader_tools != ["load_skill", "load_skill_resource"]
+                or self.tools != [*self.source_tools, *self.mechanical_tools, *self.loader_tools]
+                or self.runtime_skills != ["image-selection"]
+                or self.loader_call_limit != 1
+                or self.llm_call_limit != 4
+            ):
+                raise ValueError("intake metadata must match its reviewed concrete tools and skill")
+            return self
+        if self.mechanical_tools:
+            raise ValueError("existing producer/auditor roles have no mechanical tools")
         # Each procedure is preloaded into the instruction. A loader would only
         # re-offer that text and make ADK add its generic "load the skill first"
         # guidance and loader declarations to every request.
@@ -343,3 +361,33 @@ def runtime_skill_digest(role: str) -> str:
             digest.update(content)
             digest.update(b"\x00")
     return digest.hexdigest()
+
+
+def intake_resources_digest() -> str:
+    """Identify the finite implemented intake role and canonical schema."""
+    from corsair.contracts import digest
+    from corsair.contracts.intake_agent import IntakeProposal
+
+    package = resources.files("corsair.agents.intake")
+    content = {
+        name: package.joinpath(name).read_text(encoding="utf-8")
+        for name in (
+            "agent.json",
+            "factory.py",
+            "toolsets.py",
+            "instructions/system.md",
+            "tools/read_file.py",
+            "tools/list_files.py",
+            "tools/compare_images.py",
+        )
+    }
+    return digest(
+        {
+            "resources": content,
+            "native_adapter": resources.files("corsair.adapters.inference")
+            .joinpath("intake_agent.py")
+            .read_text(encoding="utf-8"),
+            "schema": IntakeProposal.model_json_schema(),
+            "skills": runtime_skill_digest("intake"),
+        }
+    )

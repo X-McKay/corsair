@@ -22,6 +22,7 @@ The [documentation index](docs/index.md) is the main navigation page.
 | --- | --- |
 | Understand the design | [Architecture overview](docs/architecture/overview.md), [components](docs/architecture/components.md), [data flow](docs/architecture/data-flow.md), [decisions](docs/architecture/decisions/0004-payload-pair-and-coverage-gated-verdict.md) |
 | Develop or contribute | [Setup](docs/development/setup.md), [conventions](docs/development/conventions.md), [testing](docs/development/testing.md), [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Normalize scanner findings and select an available image | [Intake agent](docs/guides/intake-agent.md) |
 | Configure or integrate | [Configuration guide](docs/guides/configuration.md), [Python integration](docs/guides/integration.md), [API reference](docs/reference/api.md) |
 | Operate the pilot | [Operations](docs/operations/overview.md), [deployment guide](docs/guides/deployment.md), [pilot runbook](docs/operations/runbooks/pilot.md) |
 | Use the CLI | [CLI reference](docs/reference/cli.md), [monitoring](docs/operations/monitoring.md), [troubleshooting](docs/operations/troubleshooting.md) |

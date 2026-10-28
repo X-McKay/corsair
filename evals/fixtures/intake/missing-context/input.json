@@ -1,0 +1,28 @@
+{
+  "request": {
+    "schema_version": "corsair.intake-request/1",
+    "input": {
+      "kind": "json",
+      "payload": {}
+    },
+    "source": {
+      "path": "repository",
+      "expected_digest": "d12e301c6dde6b130d4d254bccbe5178374e3941e6eb0ad45af48f220984c62b"
+    },
+    "budget": {
+      "max_rounds": 3,
+      "max_llm_calls": 16,
+      "episode_llm_calls": 4,
+      "max_tool_calls": 24,
+      "max_output_tokens": 4096,
+      "max_elapsed_seconds": 900,
+      "probe_timeout_seconds": 30,
+      "tool_output_bytes": 32768
+    },
+    "bindings": null
+  },
+  "inventory": {
+    "images": []
+  },
+  "source_digest": "d12e301c6dde6b130d4d254bccbe5178374e3941e6eb0ad45af48f220984c62b"
+}

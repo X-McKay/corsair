@@ -475,3 +475,7 @@ Ctrl-C detaches the CLI. Re-run online inspection to learn the live workflow sta
 `doctor` cannot verify provider credentials, provider policy, or live-model reliability. The original live security-producer request was blocked by provider policy; that block does not establish full live-chain accuracy. Scripted ADK models exist only in labelled tests and are never a production fallback. Do not evade a policy block or silently replace a provider.
 
 The pilot is limited to the supported standard-library Python recipe. Source admission and immutable evidence binding reduce configuration/path confusion; they do not attest arbitrary malicious target/interpreter behavior. The pilot does not provide arbitrary code probes, dependency installation, build repair, other languages, generic negative clearance, application-exposure proof, or hostile-interpreter attestation. See the [pilot runbook](../operations/runbooks/pilot.md) and the packaged [risk assessment](../../src/corsair/policies/risk.md) before use beyond a disposable personal sandbox.
+
+## Agentic intake inputs
+
+`intake-agent --json PATH --source PATH` (or `--issue OWNER/REPO#N`) performs bounded agentic inspection. `investigate [CASE_REQUEST] --json PATH` runs the intake gate before existing execution; without a trusted Case binding it stops `TARGET_BINDING_REQUIRED`. Standalone scanner `intake`, Case `investigate REQUEST` and other commands retain their existing semantics. See [agentic intake](../guides/intake-agent.md).

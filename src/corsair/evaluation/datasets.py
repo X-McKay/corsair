@@ -650,11 +650,59 @@ def _validate_intake_dataset(
         report.problems.append(f"manifest: {safe_error_detail(error)}")
 
 
+def _validate_intake_agent_dataset(
+    report: DatasetReport, document: dict[str, Any], validator: _Validator
+) -> None:
+    from corsair.contracts.intake_agent import ImageInventory, IntakeRequest
+    from corsair.evaluation.intake_agent import IntakeAgentDataset, IntakeOracle
+
+    report.kind = "intake_agent"
+    try:
+        manifest = IntakeAgentDataset.model_validate(document)
+    except ValueError as error:
+        report.problems.append(f"manifest: {safe_error_detail(error)}")
+        return
+    report.dataset_digest = digest(document)
+    for index, declared in enumerate(manifest.entries):
+        entry = EntryReport(
+            index=index, case_id=declared.case_id, kind="intake_agent", family=declared.family
+        )
+        report.entries.append(entry)
+        entry.passed("entry")
+        source = validator.read(entry, "input", declared.input, declared.input_digest)
+        oracle = validator.read(entry, "oracle", declared.oracle, declared.oracle_digest)
+        if oracle is not None:
+            try:
+                IntakeOracle.model_validate_json(oracle)
+                entry.passed("oracle")
+            except ValueError as error:
+                entry.fail("oracle", safe_error_detail(error))
+        if source is None:
+            continue
+        try:
+            fixture = json.loads(source)
+            request = IntakeRequest.model_validate(fixture["request"])
+            ImageInventory.model_validate(fixture["inventory"])
+            entry.passed("request")
+            path = resolve_frozen(validator.root, declared.input).parent / request.source.path
+            admitted = request.source.model_copy(
+                update={"path": str(path), "expected_digest": fixture["source_digest"]}
+            )
+            if validator.snapshot(entry, "source", admitted) is not None:
+                entry.passed("source")
+        except (ValueError, KeyError, TypeError) as error:
+            entry.fail("request", safe_error_detail(error))
+
+
 def _check_loader(report: DatasetReport, document: dict[str, Any], root: Path) -> None:
     """Run the consuming evaluator's own loader, so its rules cannot drift from these checks."""
     try:
         if report.schema_version == CASE_SCHEMA:
             load_dataset(report.path)
+        elif report.schema_version == "corsair.intake-agent-dataset/1":
+            from corsair.evaluation.intake_agent import load_frozen_cases
+
+            load_frozen_cases(report.path)
         elif report.schema_version == intake.INTAKE_SCHEMA:
             intake.score_dataset(report.path)
         else:
@@ -682,7 +730,12 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         return report
     schema = document.get("schema_version")
     report.schema_version = schema if isinstance(schema, str) else None
-    if schema not in {CASE_SCHEMA, AGENT_SCHEMA, intake.INTAKE_SCHEMA}:
+    if schema not in {
+        CASE_SCHEMA,
+        AGENT_SCHEMA,
+        intake.INTAKE_SCHEMA,
+        "corsair.intake-agent-dataset/1",
+    }:
         found = "no schema_version" if schema is None else f"schema_version {safe_text(schema)!r}"
         report.problems.append(
             f"not an evaluation dataset manifest ({found}); expected {CASE_SCHEMA}, "
@@ -695,6 +748,8 @@ def validate_dataset(path: Path, settings: Settings | None = None) -> DatasetRep
         validator = _Validator(root, admission, ArtifactStore(scratch))
         if schema == CASE_SCHEMA:
             _validate_case_dataset(report, document, validator)
+        elif schema == "corsair.intake-agent-dataset/1":
+            _validate_intake_agent_dataset(report, document, validator)
         elif schema == intake.INTAKE_SCHEMA:
             _validate_intake_dataset(report, document, validator)
         else:

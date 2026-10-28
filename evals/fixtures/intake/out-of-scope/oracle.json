@@ -1,0 +1,32 @@
+{
+  "classifications": [
+    "out_of_scope"
+  ],
+  "surfaces": [
+    "unknown",
+    "application",
+    "component"
+  ],
+  "languages": [
+    "unknown",
+    "python"
+  ],
+  "execution_modes": [
+    "unknown",
+    "application"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [
+    "unknown"
+  ],
+  "required_reasons": [
+    "OUTSIDE_SCOPE_POLICY"
+  ],
+  "permitted_reasons": [
+    "OUTSIDE_SCOPE_POLICY"
+  ],
+  "images": [
+    null
+  ],
+  "paths": []
+}

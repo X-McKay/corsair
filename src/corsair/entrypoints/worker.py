@@ -16,7 +16,11 @@ from corsair.observability.lifecycle import LifecycleLoggingInterceptor
 from corsair.observability.logging import event
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
+from corsair.steps.intake_agent import IntakeActivities
+from corsair.steps.intake_handoff import IntakePipelineActivities
 from corsair.workflows.evaluation import EvaluationWorkflow
+from corsair.workflows.intake import IntakeWorkflow
+from corsair.workflows.intake_pipeline import IntakeInvestigationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
 
 
@@ -39,8 +43,17 @@ def compose_worker(client: Client, settings: Settings, activities: Activities) -
     return Worker(
         client,
         task_queue=settings.task_queue,
-        workflows=[InvestigationWorkflow, EvaluationWorkflow],
-        activities=activities.registered(),
+        workflows=[
+            InvestigationWorkflow,
+            EvaluationWorkflow,
+            IntakeWorkflow,
+            IntakeInvestigationWorkflow,
+        ],
+        activities=[
+            *activities.registered(),
+            *IntakeActivities(settings, activities.store).registered(),
+            *IntakePipelineActivities(activities.store).registered(),
+        ],
         max_concurrent_activities=settings.max_concurrent_activities,
         max_concurrent_workflow_tasks=settings.max_concurrent_workflow_tasks,
         interceptors=[LifecycleLoggingInterceptor()],

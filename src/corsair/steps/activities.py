@@ -64,9 +64,24 @@ class Activities:
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         kind = request.case.recipe.kind
+        selection = None
+        if request.intake_result is not None:
+            from corsair.steps.intake_handoff import admit_intake_selection
+
+            try:
+                selection = await self._with_heartbeats(
+                    asyncio.to_thread(admit_intake_selection, request, self.settings, self.store),
+                    "admitting intake handoff",
+                )
+            except ValueError as exc:
+                raise self._activity_error(exc, "PREPARE_BLOCKED", non_retryable=True) from None
         try:
-            image_id = await self._with_heartbeats(
-                asyncio.to_thread(self.sandbox.image_id_for, kind), "preparing"
+            image_id = (
+                selection.image_id
+                if selection is not None
+                else await self._with_heartbeats(
+                    asyncio.to_thread(self.sandbox.image_id_for, kind), "preparing"
+                )
             )
         except Exception as exc:
             raise ApplicationError(
@@ -75,6 +90,8 @@ class Activities:
                 non_retryable=True,
             ) from exc
         manifest = build_manifest(request, self.settings, image_id)
+        if selection is not None:
+            manifest = manifest.model_copy(update={"image_reference": selection.reference})
         if request.budget.max_rounds * manifest.max_sessions > MAX_TERMINAL_ROUNDS:
             raise ApplicationError(
                 f"max_rounds {request.budget.max_rounds} x max_sessions {manifest.max_sessions} "
@@ -129,6 +146,13 @@ class Activities:
 
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
+        if request.prepared.manifest.image_reference is not None:
+            from corsair.steps.intake_handoff import validate_selected_image
+
+            await self._with_heartbeats(
+                asyncio.to_thread(validate_selected_image, request.prepared, self.settings),
+                "checking intake image",
+            )
         try:
             window = self._activity_window()
             return await self._with_heartbeats(

@@ -30,3 +30,5 @@ A syntactically valid proposal or audit does not prove a vulnerability. Only the
 The implementation supports admitted **local** source snapshots only. It does not implement remote SCM checkout, Bedrock integration, a general HTTP API, or a generic provider/agent framework. The Python workflow API is not an HTTP service. The current pilot also makes no production, hostile-target-integrity, or population-accuracy claim.
 
 For role-local capability details, see [tools and runtime instructions](tools-and-skills.md); for controlled changes, see [agent development](development.md); and for qualification interpretation, see [agent evaluations](evaluations.md). Current work and open limitations are indexed in the [plans](../plans/README.md).
+
+An optional [intake agent](../guides/intake-agent.md) normalizes varied scanner JSON or an issue reference, inspects source without execution and recommends a currently available configured image. Its gated parent feeds the existing producer/auditor evidence pipeline only after committed admission and a trusted target binding. Existing verdict and observer semantics remain unchanged.

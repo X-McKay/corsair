@@ -1,0 +1,47 @@
+{
+  "classifications": [
+    "in_scope_not_supported"
+  ],
+  "surfaces": [
+    "function"
+  ],
+  "languages": [
+    "python"
+  ],
+  "execution_modes": [
+    "callable"
+  ],
+  "required_requirements": [],
+  "permitted_requirements": [],
+  "required_reasons": [
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "permitted_reasons": [
+    "NO_COMPATIBLE_IMAGE"
+  ],
+  "images": [
+    null
+  ],
+  "paths": [
+    "resolver.py"
+  ],
+  "locations": [
+    {
+      "path": "resolver.py",
+      "symbol": "resolve_asset"
+    }
+  ],
+  "symbols": [
+    "resolve_asset"
+  ],
+  "issue_titles": [
+    "Asset path traversal in resolve_asset"
+  ],
+  "description_fragments": [
+    "resolver.py",
+    "resolve_asset",
+    "untrusted",
+    "outside",
+    "disclosure"
+  ]
+}
