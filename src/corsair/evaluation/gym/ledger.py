@@ -1,13 +1,18 @@
 """The append-only experiment ledger (``ledger.jsonl``) and its rendered ``LEDGER.md``.
 
 The JSONL file is the machine record: one ``LedgerRow`` per reference run or
-experiment, never rewritten. ``LEDGER.md`` keeps its hand-written header prose (everything
-before ``## Baselines``) and regenerates the tables below it from the JSONL rows.
+experiment, appended and never edited, except that ``backfill_touched_files`` may fill
+the touched files of rows recorded without them. ``LEDGER.md`` keeps its hand-written
+header prose (everything before ``## Baselines``) and regenerates the tables below it from
+the JSONL rows.
 """
 
+import os
+import subprocess
+import tempfile
 from collections.abc import Callable, Iterable, Sequence
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from corsair.contracts import (
@@ -27,6 +32,11 @@ GENERATED_HEADING = "## Baselines"
 # Shown for a value an experiment row does not record, such as a gate it never ran.
 ABSENT = "—"
 GATED_TIERS = ("tier0", "tier1")
+# A wave table's files cell names this many paths, then ``+N`` for the rest.
+SHOWN_FILES = 2
+# The decisions whose experiments constrain a new brief on the same files.
+CONSTRAINING_DECISIONS = ("rejected", "inconclusive")
+CONSTRAINTS_HEADING = "## Prior rejected experiments on these files"
 
 type Identity = tuple[str | None, str | None]
 # Finds the trajectories behind a scorecard file (for paired outcomes), else ``None``.
@@ -65,11 +75,12 @@ def build_ledger_row(
     scorecard_path: str | None = None,
     noise: Sequence[str] = (),
     slice: TierGate | None = None,
+    touched_files: Sequence[str] = (),
 ) -> LedgerRow:
     """One ledger row; scorecard metrics are recorded only when a scorecard is given.
 
     ``noise`` names the noise band files the row's gates read; ``slice`` is a signal-slice
-    screen of the candidate.
+    screen of the candidate; ``touched_files`` the files it changed, stored sorted.
     """
     sources: list[Identity] = [(branch, commit)]
     if scorecard is not None:
@@ -113,6 +124,7 @@ def build_ledger_row(
             "lesson": lesson,
             "noise": list(noise),
             "slice": slice,
+            "touched_files": sorted(set(touched_files)),
         }
     )
 
@@ -192,6 +204,146 @@ def append_ledger(path: Path, row: LedgerRow) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as stream:
         stream.write(row.model_dump_json() + "\n")
+
+
+def _git_output(root: Path, *arguments: str) -> str | None:
+    """A git command's standard output in ``root``; ``None`` when git fails or is absent."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *arguments], capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return None
+    return completed.stdout if completed.returncode == 0 else None
+
+
+def checkout_toplevel(root: Path) -> Path | None:
+    """The git top level of ``root``, else ``None`` outside a checkout."""
+    top = _git_output(root, "rev-parse", "--show-toplevel")
+    return None if top is None else Path(top.strip())
+
+
+def changed_files(root: Path, commit: str, merge_commit: str | None = None) -> list[str] | None:
+    """The repository-relative files a candidate commit changed, sorted.
+
+    The diff runs from the commit's merge base with the checkout's HEAD, or, for a merged
+    row, with its merge commit's first parent (HEAD already contains a merged candidate),
+    to the commit. A rename lists both paths. ``None`` when git cannot resolve either
+    commit in the checkout at ``root``.
+    """
+    side = "HEAD" if merge_commit is None else f"{merge_commit}^1"
+    base = _git_output(root, "merge-base", "--end-of-options", side, commit)
+    if base is None or not base.strip():
+        return None
+    listed = _git_output(
+        root,
+        "diff",
+        "--name-only",
+        "--no-relative",
+        "--no-renames",
+        "-z",
+        "--end-of-options",
+        base.strip(),
+        commit,
+    )
+    if listed is None:
+        return None
+    return sorted({name for name in listed.split("\0") if name})
+
+
+def backfill_touched_files(
+    rows: Sequence[LedgerRow], resolve: Callable[[LedgerRow], list[str] | None]
+) -> tuple[list[LedgerRow], dict[str, list[str] | None]]:
+    """Fill each experiment row recorded without touched files from ``resolve``.
+
+    Returns every row (a resolved one with its files) and, per experiment that had none,
+    what ``resolve`` found: a list, possibly empty, or ``None`` when it could not resolve
+    it. A baseline is a reference run of the integration branch and changes no files.
+    """
+    updated: list[LedgerRow] = []
+    found: dict[str, list[str] | None] = {}
+    for row in rows:
+        if row.touched_files or row.entry != "experiment":
+            updated.append(row)
+            continue
+        files = found[row.id] = resolve(row)
+        updated.append(row if not files else row.model_copy(update={"touched_files": files}))
+    return updated, found
+
+
+def rewrite_ledger(path: Path, rows: Sequence[LedgerRow]) -> None:
+    """Atomically replace the ledger's rows with ``rows`` that differ only in touched files.
+
+    A row equal to its stored one keeps its stored line byte for byte; a changed row is
+    re-serialised through the contract. The new file is verified to decode to ``rows``
+    before it replaces the old one, so a failure leaves the ledger as it was.
+    """
+    lines = [line for line in path.read_text().splitlines() if line]
+    stored = [LedgerRow.model_validate_json(line) for line in lines]
+    if [row.id for row in stored] != [row.id for row in rows]:
+        raise ValueError("a ledger rewrite must keep every row in its order")
+    for old, new in zip(stored, rows, strict=True):
+        if new.model_copy(update={"touched_files": old.touched_files}) != old:
+            raise ValueError(f"a ledger rewrite may change only {old.id}'s touched files")
+    text = "".join(
+        (line if old == new else new.model_dump_json()) + "\n"
+        for line, old, new in zip(lines, stored, rows, strict=True)
+    )
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if read_ledger(Path(temporary)) != list(rows):
+            raise ValueError("the rewritten ledger does not decode to the expected rows")
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def repository_path(path: str, toplevel: Path | None = None) -> str:
+    """A query path as a repository-relative POSIX path (``./`` and a trailing ``/`` dropped);
+    an absolute path under ``toplevel`` is made relative to it."""
+    candidate = Path(path)
+    if toplevel is not None and candidate.is_absolute() and candidate.is_relative_to(toplevel):
+        candidate = candidate.relative_to(toplevel)
+    return PurePosixPath(candidate.as_posix()).as_posix()
+
+
+def matching_files(row: LedgerRow, paths: Sequence[str]) -> list[str]:
+    """The row's touched files that are a given path or lie under a given directory."""
+    return [
+        name
+        for name in row.touched_files
+        if any(path == "." or name == path or name.startswith(path + "/") for path in paths)
+    ]
+
+
+def prior_rejections(
+    rows: Sequence[LedgerRow], paths: Sequence[str], limit: int
+) -> list[LedgerRow]:
+    """The most recent ``limit`` rejected or inconclusive experiments touching ``paths``,
+    newest first (the ledger is append-only, so its order is the order of record)."""
+    matched = [
+        row
+        for row in rows
+        if row.entry == "experiment"
+        and row.decision in CONSTRAINING_DECISIONS
+        and matching_files(row, paths)
+    ]
+    return matched[::-1][:limit]
+
+
+def unrecorded_rejections(rows: Sequence[LedgerRow]) -> int:
+    """How many rejected or inconclusive experiments record no touched files to match."""
+    return sum(
+        row.entry == "experiment"
+        and row.decision in CONSTRAINING_DECISIONS
+        and not row.touched_files
+        for row in rows
+    )
 
 
 def _cell(value: str | None) -> str:
@@ -291,12 +443,22 @@ def _baseline_rows(rows: Sequence[LedgerRow]) -> list[list[str]]:
     ]
 
 
-def _wave_rows(rows: Sequence[LedgerRow], wave: int) -> list[list[str]]:
+def files_cell(files: Sequence[str]) -> str:
+    """A short cell: the first ``SHOWN_FILES`` paths, then ``+N`` for the rest."""
+    if not files:
+        return ABSENT
+    shown = ", ".join(f"`{_cell(name)}`" for name in files[:SHOWN_FILES])
+    rest = len(files) - SHOWN_FILES
+    return f"{shown} +{rest}" if rest > 0 else shown
+
+
+def _wave_rows(rows: Sequence[LedgerRow], wave: int, *, files: bool) -> list[list[str]]:
     return [
         [
             _cell(row.id),
             _cell(row.track),
             f"`{_cell(row.branch)}@{_cell(row.commit[:7])}`",
+            *([files_cell(row.touched_files)] if files else []),
             *(_tier_cell(row, tier) for tier in GATED_TIERS),
             _per_tier(row, lambda verdict: _signed(verdict.delta_j)),
             _per_tier(row, lambda verdict: _number(verdict.token_ratio)),
@@ -326,6 +488,53 @@ def _rejected_rows(rows: Sequence[LedgerRow]) -> list[list[str]]:
         for row in rows
         if row.decision == "rejected"
     ]
+
+
+def _constraint_gate(row: LedgerRow) -> str:
+    """The row's tier1 cell (with any slice screen), else its tier0 gate."""
+    if row.slice is not None or tier_gate(row, "tier1") is not None:
+        return _tier_cell(row, "tier1")
+    verdict = tier_gate(row, "tier0")
+    return ABSENT if verdict is None else f"tier0 {gate_cell(verdict)}"
+
+
+def render_constraints(
+    matched: Sequence[LedgerRow], paths: Sequence[str], *, unrecorded: int
+) -> str:
+    """Code-owned Markdown for a brief: prior rejected or inconclusive experiments on
+    ``paths``, or one line saying there are none. Idea and lesson text is the
+    orchestrator's own ledger text, printed on one line."""
+    missing = (
+        f"; {unrecorded} rejected or inconclusive experiments record no touched files"
+        if unrecorded
+        else ""
+    )
+    if not matched:
+        return (
+            f"No rejected or inconclusive experiment in the ledger touched these files{missing}.\n"
+        )
+    named = ", ".join(f"`{path}`" for path in paths)
+    lines = [
+        CONSTRAINTS_HEADING,
+        "",
+        f"These rejected or inconclusive experiments touched {named}. Do not repeat one "
+        "unless the brief explains what differs.",
+    ]
+    if unrecorded:
+        lines += ["", f"Not matched: {unrecorded} such experiments record no touched files."]
+    for row in matched:
+        touched = matching_files(row, paths)
+        lines += [
+            "",
+            f"- **{_cell(row.id)}** (wave {row.wave}, {row.decision}): "
+            f"`{_cell(row.branch)}@{_cell(row.commit[:7])}`",
+            f"  - Idea: {_cell(row.idea) or ABSENT}",
+            f"  - Gate: {_constraint_gate(row)}",
+            f"  - Files: {files_cell(touched)} ({len(touched)} of {len(row.touched_files)} "
+            "touched)",
+            f"  - Lesson: {_cell(row.lesson) or ABSENT}",
+        ]
+    return "\n".join(lines) + "\n"
 
 
 def ledger_header(markdown: str) -> str:
@@ -359,6 +568,10 @@ def render_ledger(rows: Sequence[LedgerRow], header: str) -> str:
     )
     lines.extend(["", "## Waves"])
     for wave in sorted({row.wave for row in rows if row.entry == "experiment"}):
+        # A wave shows a Files column once one of its experiments records touched files.
+        files = any(
+            row.touched_files for row in rows if row.entry == "experiment" and row.wave == wave
+        )
         lines.extend(["", f"### Wave {wave}", ""])
         lines.extend(
             _table(
@@ -366,6 +579,7 @@ def render_ledger(rows: Sequence[LedgerRow], header: str) -> str:
                     "Experiment",
                     "Track",
                     "Branch@commit",
+                    *(["Files"] if files else []),
                     "Tier0 gate",
                     "Tier1 gate",
                     "ΔJ (t0 / t1)",
@@ -373,7 +587,7 @@ def render_ledger(rows: Sequence[LedgerRow], header: str) -> str:
                     "Decision",
                     "Lesson",
                 ],
-                _wave_rows(rows, wave),
+                _wave_rows(rows, wave, files=files),
             )
         )
     lines.extend(["", "## Rejected ideas (do not retry without new evidence)", ""])

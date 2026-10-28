@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
 
@@ -959,6 +959,9 @@ class VerifyRecord(Contract):
 
 
 LedgerDecision = Literal["accepted", "rejected", "inconclusive", "merged"]
+# A repository-relative path a ledger row's candidate changed.
+LedgerPath = Annotated[str, Field(min_length=1, max_length=400)]
+MAX_TOUCHED_FILES = 4096
 
 
 class LedgerRow(Contract):
@@ -1001,6 +1004,9 @@ class LedgerRow(Contract):
     # A signal-slice screen of the candidate against the tier1 reference (``--slice``):
     # a screen before the full tier1 run, never an acceptance by itself.
     slice: TierGate | None = None
+    # The repository-relative files the candidate changed (``git diff --name-only`` from
+    # its merge base), sorted; empty when unknown or recorded before the field existed.
+    touched_files: list[LedgerPath] = Field(default_factory=list, max_length=MAX_TOUCHED_FILES)
 
     @model_validator(mode="after")
     def coherent_entry(self):
