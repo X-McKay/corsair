@@ -741,4 +741,12 @@ content-addressed tags and cannot contaminate parallel runs.
   5 unstable (adversarial02, case02, case03, sbj-javascript-deep-override, mixin-deep); viking04-merge is a
   stable_pass at 2 of 3 in every run. A h9 flip on adversarial01 now counts outside noise; adversarial02 and
   case02 flips stay within it, so the full gate rests on the python language band and the paired counts.
+- 2026-10-28 s22 merged (8f73ffed; branch `gym/s22-lock-queue` at 0a7f69dd; ledger `s22`): the run lock is
+  first come (a blocked caller publishes `lock/queue/<token>.json`; a waiter takes the free lock only when no
+  live ticket joined earlier; dead-pid tickets are reclaimed with `gym.queue_reclaimed`; a waiter removes only
+  its own ticket, also on timeout or exception), the holder records `acquired_at` and every held-time view
+  counts from it (unknown, and printed so, for a holder file without it), `gym.lock_waiting` names the queue
+  position, run.json's `lock` entry gains `queue_position` and `waiters_ahead`, and `gym lock status` lists the
+  queue. Offline: `just check`, 1664 unit and 58 Temporal tests pass. A ticket from another host or a reused pid
+  keeps its place until `--lock-timeout`; removing its file is the only remedy.
 
