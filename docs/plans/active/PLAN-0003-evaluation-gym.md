@@ -850,4 +850,22 @@ content-addressed tags and cannot contaminate parallel runs.
   6.7 s with a second round against 4.0 s; unknown in two runs because one C episode lacked a receipt), and
   sandbox time is under 1 s of a 40 to 470 s episode. It measures sandbox cost, not agent latency, so p50 stays
   the latency figure and this one stays information.
+- 2026-10-28 s26 merged (c178f893; branch `gym/s26-operational-retry` at 3949a84d; ledger `s26`): an episode whose
+  scored trajectory is operational is retried once, after the first batch, as one more `EvaluationWorkflow`
+  batch `<run>.a2` (fresh operation ids, same request, so identity and budgets are unchanged); the retry's row
+  takes the case and repeat with `attempt: 2`, `retried_reason` and `supersedes`, the first attempt is kept in
+  `superseded.jsonl`, the scorecard lists `retries`, `run.json` records `retry`, `gym replay --superseded` shows
+  both, and `--no-retry` on `gym run` keeps the old behaviour. Gates: `just check`, 1763 unit, 60 Temporal tests
+  (the experimenter also ran the nine gym-runner tests under real Docker and built the wheel). Left: `gym verify`
+  retries but has no `--no-retry`; `gym runs` and the gate view do not show retries.
+- 2026-10-28 s27 merged (23538a23; branch `gym/s27-verify-confirmation` at 80685ca8; ledger `s27`): when the verify
+  chain is INCONCLUSIVE, each INCONCLUSIVE tier re-runs only its within-noise flipped deciding cases (plus the
+  flipped cases of a regressed language) at `--confirm-repeats` (3 to 8, default 5) under the same lock hold and
+  gates the re-run as a slice against the band's pooled episodes; a separated pass-to-fail rejects, a separated
+  fail-to-pass accepts when the improvement criterion was the open question, a token-ceiling question or an
+  unseparated improvement stays INCONCLUSIVE, and skips (no trajectories, no pooled band, no cases) are recorded
+  with a logged reason; `--no-confirm` keeps the old behaviour; `VerifyRecord.confirmation` holds the stage.
+  Gates after merge: `just check`, 1779 unit, 61 Temporal tests. Left: flips in reported-only languages are not
+  re-run; the slice count includes the candidate's operational episodes while the band excludes its own (s26's
+  retry makes those rarer, but a retry that is operational again still counts).
 
