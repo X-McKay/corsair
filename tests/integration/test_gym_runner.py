@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import socket
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ from corsair.contracts import (
     GroupSummary,
     RunContext,
     Scorecard,
+    Trajectory,
     VerifyRecord,
     digest,
 )
@@ -37,12 +39,16 @@ from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.comparison import read_report
 from corsair.evaluation.datasets import load_dataset
 from corsair.evaluation.gym.budgets import budgets_digest, load_budgets
+from corsair.evaluation.gym.noise import noise_band
 from corsair.evaluation.gym.scoring import (
     REPORT_FILE,
     SCORECARD_FILE,
     TRAJECTORIES_FILE,
+    build_scorecard,
     read_scorecard,
     read_trajectories,
+    write_scorecard,
+    write_trajectories,
 )
 from corsair.ports.sandboxing import SandboxUnavailable
 from corsair.settings import Settings
@@ -532,4 +538,120 @@ async def test_verify_holds_the_lock_across_both_tiers(tmp_path, monkeypatch):
         (verify_id, "tier0+tier1")
     ]
     assert _record(other_run)["started_at"] >= tier1["completed_at"]
+    assert gym.read_lock(shared) is None
+
+
+# The confirmation stage: real ephemeral Temporal servers, scripted inference, no Docker
+
+
+def _metered_without_docker(settings: Settings) -> Activities:
+    """The run-lock composition with token usage reported, so the gate can compare runs."""
+    store = ArtifactStore(settings.artifact_root)
+    return Activities(
+        settings,
+        store=store,
+        inference=AdkInference(settings, store, MeteredModel(model="scripted-gym")),
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=_UnavailableSandbox(),
+    )
+
+
+# A failing reference episode scores as the candidate's errored episodes do, so J's band
+# covers a candidate that fails every episode.
+ERRORED = -0.5
+
+
+def _reference_runs(
+    shared: Path, dataset: Path, records: Sequence[list[bool]]
+) -> tuple[list[Scorecard], list[list[Trajectory]]]:
+    """Reference runs of the one-case tier, one per record of verified repeats, each with
+    its trajectories under ``<shared>/runs/<run id>/``, as ``gym run`` leaves them."""
+    (request,) = load_dataset(dataset)[1]
+    kind = request.case.recipe.kind
+    dataset_digest = digest(load_dataset(dataset)[0])
+    cards, trajectories = [], []
+    for index, flags in enumerate(records):
+        run_id = f"gym-reference-{index}"
+        rows = [
+            Trajectory(
+                run_id=f"{run_id}-{repeat}",
+                case_id=CASE,
+                repeat=repeat,
+                kind=kind,
+                language="python",
+                status="pass" if flag else "fail",
+                passed=flag,
+                verified=flag,
+                false_label=False,
+                usage_known=True,
+                effective_tokens=1e9,
+                seconds=10.0,
+                reward_verdict=1.0 if flag else ERRORED,
+                reward=1.0 if flag else ERRORED,
+            )
+            for repeat, flag in enumerate(flags)
+        ]
+        card = build_scorecard(
+            rows,
+            run=RunContext(run_id=run_id, concurrency=1),
+            dataset_digest=dataset_digest,
+            cases={CASE: kind},
+            budgets=load_budgets(BUDGETS),
+        ).model_copy(update={"run_identity": {"config": ["c" * 64]}})
+        write_scorecard(shared / "runs" / run_id / SCORECARD_FILE, card)
+        write_trajectories(shared / "runs" / run_id / TRAJECTORIES_FILE, rows)
+        cards.append(card)
+        trajectories.append(rows)
+    return cards, trajectories
+
+
+@pytest.mark.temporal
+@pytest.mark.asyncio
+async def test_verify_confirms_an_inconclusive_tier_by_its_flipped_case_under_the_same_lock(
+    tmp_path, monkeypatch
+):
+    _require_temporal()
+    dataset, shared, settings = _lock_case(tmp_path, monkeypatch)
+    # The reference configuration verified the case 3, 2 and 1 times in three: pooled 6/9.
+    cards, trajectories = _reference_runs(
+        shared, dataset, ([True] * 3, [True, True, False], [True, False, False])
+    )
+    band = noise_band(cards, trajectories)
+    assert band.pooled
+    for tier in gym.VERIFY_TIERS:
+        write_scorecard(shared / "reference" / f"{tier}.json", cards[0])
+
+    # Every episode of the candidate errors (no sandbox): 0/3 against the pooled 6/9 is
+    # within noise (p = 2/11), so each tier is INCONCLUSIVE and its case is re-run.
+    result = await gym.verify_candidate(
+        gym.GymOptions(dataset=dataset, settings=settings, repeats=3, concurrency=1),
+        shared / "reference",
+        root=ROOT,
+        tiers={"tier0": dataset, "tier1": dataset},
+        compose_activities=_metered_without_docker,
+        noise={"noise-capture.json": band},
+    )
+
+    gates = [result.record.tier0, result.record.tier1]
+    assert [item and item.gate.decision for item in gates] == [GateDecision.INCONCLUSIVE] * 2
+    assert set(result.confirmation_runs) == {"tier0", "tier1"}
+    verify_id = result.verdict_path.parent.name
+    for tier, stage in result.record.confirmation.items():
+        rerun = result.confirmation_runs[tier]
+        assert (stage.cases, stage.repeats, stage.run_dir) == ([CASE], 5, str(rerun.run_dir))
+        assert rerun.run_dir.parent == shared / "runs"
+        # The re-run is a sliced run of the one case at five repeats, under verify's lock.
+        record = _record(rerun)
+        assert (record["repeats"], record["sliced"], record["cases"]) == (5, True, [CASE])
+        assert record["lock"]["holder_run_id"] == verify_id
+        assert record["lock"]["waited"] is False
+        # 0/5 against the pooled 6/9: p = 62/2002, a regression outside noise.
+        assert stage.screen is not None and stage.screen.paired is not None
+        (flip,) = stage.screen.paired.pass_to_fail_cases
+        assert (flip.candidate_verified, flip.candidate_episodes) == (0, 5)
+        assert flip.p_value == pytest.approx(62 / 2002)
+        assert (stage.decision, stage.basis) == (GateDecision.REJECTED, "regression_separated")
+    assert result.decision is GateDecision.REJECTED
+    verdict = VerifyRecord.model_validate_json(result.verdict_path.read_text())
+    assert verdict == result.record and verdict.decision is GateDecision.REJECTED
     assert gym.read_lock(shared) is None

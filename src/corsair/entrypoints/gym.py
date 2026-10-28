@@ -48,7 +48,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager, nullcontext
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -64,9 +64,12 @@ from corsair.contracts import (
     BatchItem,
     BatchRequest,
     Budgets,
+    Confirmation,
+    ConfirmationSkip,
     Dataset,
     GateDecision,
     GateTrack,
+    GateVerdict,
     InvestigationRequest,
     InvestigationResult,
     NoiseBand,
@@ -87,6 +90,8 @@ from corsair.evaluation.gym.gate import (
     admit_min_cases,
     admit_track,
     chain_decision,
+    confirmation_cases,
+    confirmation_decision,
     gate,
     trajectories_reproduce,
 )
@@ -123,6 +128,8 @@ BUDGETS_FILE = "budgets.json"
 DATASET_FILE = "dataset.json"
 VERDICT_FILE = "verdict.json"
 VERIFY_TIERS = ("tier0", "tier1")
+# Repeats of each case an INCONCLUSIVE tier's confirmation re-runs (``--confirm-repeats``).
+DEFAULT_CONFIRM_REPEATS = 5
 # The tiers ``verify --min-cases`` narrows; tier0 has one case per language, so every
 # language keeps deciding its smoke gate.
 MIN_CASES_TIERS = ("tier1",)
@@ -1624,6 +1631,8 @@ class Verification:
     record: VerifyRecord
     runs: dict[str, GymRun]
     verdict_path: Path
+    # Per confirmed tier, the run of its re-run cases.
+    confirmation_runs: dict[str, GymRun] = field(default_factory=dict)
 
 
 def new_verify_id() -> str:
@@ -1641,6 +1650,7 @@ def verify_record(
     invocation: Sequence[str],
     track: GateTrack = "objective",
     noise: Sequence[str] = (),
+    confirmation: Mapping[str, Confirmation] | None = None,
 ) -> VerifyRecord:
     """``verdict.json``: the candidate's identity, the chain decision and each tier's gate.
 
@@ -1663,6 +1673,7 @@ def verify_record(
         invocation=list(invocation) or None,
         recorded_at=datetime.now(UTC),
         noise=list(noise),
+        confirmation=dict(confirmation or {}),
     )
 
 
@@ -1680,6 +1691,7 @@ async def verify_candidate(
     target_language: str | None = None,
     noise: Mapping[str, NoiseBand] | None = None,
     min_cases: int | None = None,
+    confirm_repeats: int | None = DEFAULT_CONFIRM_REPEATS,
 ) -> Verification:
     """Run and gate tier0, then tier1 unless tier0 was rejected.
 
@@ -1689,9 +1701,18 @@ async def verify_candidate(
     each ``noise`` band (keyed by its file): it applies to the tier whose reference scored
     its dataset. ``min_cases`` narrows the deciding languages of the ``MIN_CASES_TIERS``
     gates (checked against their references first) and adds their paired per-case
-    outcomes, from the run's trajectories and the reference run's under the gym root. The
-    gym root's run lock is held once across every tier. The canonical ``VerifyRecord`` is
-    written to ``verdict.json`` under the gym root.
+    outcomes, from the run's trajectories and the reference run's under the gym root.
+
+    When the chain is INCONCLUSIVE (no gate rejected or incomparable), each INCONCLUSIVE
+    tier is confirmed unless ``confirm_repeats`` is ``None``: its deciding flips within
+    noise (and its regressed deciding languages' flips) are re-run ``confirm_repeats``
+    times each and gated as a slice screen against the same reference and band
+    (``evaluation.gym.gate.confirmation_decision``), and that tier then decides the chain
+    by its confirmation. A candidate run without trajectories, a band without pooled
+    counts, a reference run without trajectories or no such flip skips the confirmation,
+    recorded with its reason. The gym root's run lock is held once across every tier and
+    confirmation. The canonical ``VerifyRecord`` is written to ``verdict.json`` under the
+    gym root.
     """
     if tuple(tiers) != VERIFY_TIERS:
         raise ValueError(f"verify runs exactly {', '.join(VERIFY_TIERS)}, in that order")
@@ -1735,15 +1756,7 @@ async def verify_candidate(
                 pinned=manifests[name],
             )
             # Only the first tier waited; later tiers run under the lock already held.
-            if held is not None:
-                held = replace(
-                    held,
-                    seconds=0.0,
-                    waited_for=(),
-                    reclaimed=(),
-                    queue_position=None,
-                    waiters_ahead=0,
-                )
+            held = _already_held(held)
             runs[name] = run
             narrowed = min_cases is not None and name in MIN_CASES_TIERS
             reference_trajectories = None
@@ -1778,22 +1791,138 @@ async def verify_candidate(
             )
             if on_gate is not None:
                 on_gate(name, gates[name], baselines[name], run)
-    # REJECTED when any gate rejected, else INCOMPARABLE when any was, else INCONCLUSIVE
-    # when any was, else ACCEPTED.
-    decision = chain_decision([item.gate.decision for item in gates.values()])
+        confirmations: dict[str, Confirmation] = {}
+        confirmation_runs: dict[str, GymRun] = {}
+        # A tier is confirmed only when its INCONCLUSIVE gate decides the chain: no tier
+        # was rejected or incomparable.
+        chained = chain_decision([item.gate.decision for item in gates.values()])
+        if confirm_repeats is not None and chained is GateDecision.INCONCLUSIVE:
+            for name, gated in gates.items():
+                if gated.gate.decision is not GateDecision.INCONCLUSIVE:
+                    continue
+                selection = confirmation_selection(
+                    gated.gate, runs[name], references[name], baselines[name], gym_root / "runs"
+                )
+                if isinstance(selection, str):
+                    event("gym.confirmation_skipped", tier=name, reason=selection)
+                    confirmations[name] = Confirmation(skipped=selection)
+                    continue
+                cases, reference_trajectories = selection
+                rerun = await run_gym(
+                    replace(
+                        options,
+                        dataset=tiers[name],
+                        cases=tuple(cases),
+                        languages=(),
+                        repeats=confirm_repeats,
+                        out=None,
+                        run_id=None,
+                    ),
+                    root=root,
+                    compose_activities=compose_activities,
+                    observe=observe,
+                    held=held,
+                    pinned=manifests[name],
+                )
+                held = _already_held(held)
+                confirmation_runs[name] = rerun
+                confirmations[name] = confirm_tier(
+                    gated.gate,
+                    baselines[name],
+                    reference_trajectories,
+                    rerun,
+                    cases,
+                    confirm_repeats,
+                )
+    # REJECTED when any tier rejected, else INCOMPARABLE when any was, else INCONCLUSIVE
+    # when any was, else ACCEPTED; a confirmed tier decides by its confirmation.
+    decision = chain_decision(
+        [
+            confirmations[name].decision if name in confirmations else item.gate.decision
+            for name, item in gates.items()
+        ]
+    )
     record = verify_record(
         gates,
-        runs,
+        {**runs, **{f"{name}-confirmation": run for name, run in confirmation_runs.items()}},
         skipped,
         decision=decision,
         reference=reference,
         invocation=options.invocation,
         track=track,
         noise=list(noise or ()),
+        confirmation=confirmations,
     )
     verdict_path = gym_root / "verify" / verify_id / VERDICT_FILE
     _write_json(verdict_path, record.model_dump(mode="json"))
-    return Verification(decision, record, runs, verdict_path)
+    return Verification(decision, record, runs, verdict_path, confirmation_runs)
+
+
+def _already_held(held: LockWait | None) -> LockWait | None:
+    """The lock record of a later run under the hold: only the first run waited for it."""
+    if held is None:
+        return None
+    return replace(
+        held, seconds=0.0, waited_for=(), reclaimed=(), queue_position=None, waiters_ahead=0
+    )
+
+
+def confirmation_selection(
+    verdict: GateVerdict, run: GymRun, reference: Path, baseline: Scorecard, runs: Path
+) -> tuple[list[str], list[Trajectory]] | ConfirmationSkip:
+    """The cases an INCONCLUSIVE tier's confirmation re-runs and the reference trajectories
+    its screen reads, or why it is not run: the candidate's run has no trajectories
+    reproducing its scorecard, the gate's band has no pooled counts, the reference run's
+    trajectories are not beside ``reference`` or under ``runs``, or no case qualifies."""
+    if not run.trajectories or not trajectories_reproduce(run.scorecard, run.trajectories):
+        return "trajectories_missing"
+    if verdict.noise is None or not verdict.noise.pooled:
+        return "band_not_pooled"
+    reference_trajectories, _ = scorecard_trajectories(reference, baseline, runs)
+    if reference_trajectories is None:
+        return "reference_trajectories_missing"
+    cases = confirmation_cases(verdict, reference_trajectories, run.trajectories)
+    if not cases:
+        return "no_cases"
+    return cases, reference_trajectories
+
+
+def confirm_tier(
+    verdict: GateVerdict,
+    baseline: Scorecard,
+    reference_trajectories: Sequence[Trajectory],
+    rerun: GymRun,
+    cases: Sequence[str],
+    repeats: int,
+) -> Confirmation:
+    """The confirmation of an INCONCLUSIVE ``verdict`` by the re-run of ``cases``: that run
+    gated as a slice screen against the reference and the gate's band, and the tier's
+    decision from it."""
+    screen = gate(
+        baseline,
+        rerun.scorecard,
+        slice=True,
+        noise=verdict.noise,
+        baseline_trajectories=reference_trajectories,
+        candidate_trajectories=rerun.trajectories,
+    )
+    decision, basis = confirmation_decision(verdict, screen)
+    event(
+        "gym.confirmed",
+        run_id=rerun.scorecard.run.run_id,
+        cases=len(cases),
+        decision=decision.value,
+        basis=basis,
+    )
+    return Confirmation(
+        cases=list(cases),
+        repeats=repeats,
+        run_dir=str(rerun.run_dir),
+        scorecard=str(rerun.run_dir / SCORECARD_FILE),
+        screen=screen,
+        decision=decision,
+        basis=basis,
+    )
 
 
 # Stored runs
