@@ -796,4 +796,13 @@ content-addressed tags and cannot contaminate parallel runs.
   deviation near 0.09, so 0.818 is a two-sigma draw, not a 0.059-band event). s25: bands for the composites
   drawn from the pooled episodes (resampled synthetic runs), replacing the half-range for J, macro and language
   accuracies. h9 stays rejected (ledger `h9`); it is not re-run.
+- 2026-10-28 fourth same-identity reference run 1c30ba at 494f2523 (3 repeats, 02:08 to 03:12 UTC; ledger
+  `ref-w5-tier1-run4`): python 0.818 (9 of 11: adversarial01 2/3, case02 2/3, cmdi-a and ih-codeinjection-a
+  0/3), javascript 0.5, macro 0.72, tokens 40.8k, p50 71.0 s, and J 0.641 because the single C case lost all
+  three repeats to `heartbeat_timeout` (operational stops; the host was running two agents' full test suites and
+  `just check` beside the live run, and the C sanitizer build is the heaviest episode). Two readings: python's
+  majority accuracy under one identity now spans 0.455 to 0.818 over four runs, which is the whole "gain" h9
+  reported; and operational episodes must stay out of the pooled rates and the resampled intervals, else one
+  host stall would make the C case and J's worst-language term unreadable (added to s25's scope). Operational
+  note for the loop: no full test suite or `just check` on this host while a live run is on the lock.
 
