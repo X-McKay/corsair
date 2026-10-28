@@ -731,7 +731,8 @@ content-addressed tags and cannot contaminate parallel runs.
   chain-python-codeinjection-b 5/5; slice macro effective tokens 77.7k; identity `budget_policy` bc3340a4 ->
   ca58bffc plus the s19 skills digests). These corpus requests set `max_rounds` 2, so h9 carries only a round-1
   cap. Full tier1 (run 0c1a0c, 3 repeats) started at 00:51 UTC after a 76-minute lock wait behind the third
-  reference run; the lock is not FIFO. Third same-identity reference run 4adc6b at 494f2523: macro verified
+  reference run, which had queued first (the holder view counts "held" from process start, not acquisition, so
+  it overstated the hold; s22). Third same-identity reference run 4adc6b at 494f2523: macro verified
   accuracy 0.856, J 1.133, macro effective tokens 47.1k, p50 92.6 s, javascript 0.5, python 0.636, 10 cap-outs,
   no target exceptions. `reference/noise-tier1.json` rebuilt at n=3 (the n=2 band kept as `noise-tier1.n2.json`;
   ledger `ref-w5-tier1-run3`): J 1.074 / 1.124 / 1.133 (half-range 0.030), macro 0.874 +-0.014, tokens 1.115x,
