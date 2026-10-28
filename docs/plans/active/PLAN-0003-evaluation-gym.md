@@ -195,6 +195,11 @@ content-addressed tags and cannot contaminate parallel runs.
 5. Whether a session may end at its first qualified clean negative (auditor wave-5 H2). Not run: tier1 has no
    clean negative on a positive case, so the gym cannot measure the false-negative cost of stopping early, and the
    rule changes what a verdict's evidence scope means; it stays an owner decision, not an experiment.
+6. Whether the objective track should decide on the deciding-language J (the J over languages with at least
+   `--min-cases` cases, reported since s17) rather than the corpus J. Four same-identity reference runs put the
+   corpus J's resampled interval at 0.773 to 1.304 because its worst-language term is a single ruby or C case
+   whose majority is a coin flip; under that band no plausible candidate reads outside noise on the objective
+   track. The alternative is more cases per single-case language, which is an owner corpus decision.
 
 ## Record
 
@@ -805,4 +810,22 @@ content-addressed tags and cannot contaminate parallel runs.
   reported; and operational episodes must stay out of the pooled rates and the resampled intervals, else one
   host stall would make the C case and J's worst-language term unreadable (added to s25's scope). Operational
   note for the loop: no full test suite or `just check` on this host while a live run is on the lock.
+- 2026-10-28 s25 merged (12083088; branch `gym/s25-resampled-intervals` at 29a09225; ledger `s25`): the band
+  resamples 2000 synthetic runs (seed recorded, `--seed`) from each case's pooled non-operational episodes and
+  records 2.5/97.5 percentiles for J, macro, worst language, every language, tokens and p50, plus the deciding
+  language sets per `--min-cases`; the gate reads the composites by those intervals (within noise inside, a fall
+  counts below `low`, a gain must clear `high` and its step), keeps the s23 episode tests and the s23/s24 band-mean
+  ratios and deltas, records the rule per metric, and old bands keep the half-range rule. Operational episodes
+  (`heartbeat_timeout` and the like) are excluded from the pooled rates and the resampling with per-case
+  `operational_excluded` and per-run counts. Offline: `just check`, 1728 unit and 58 Temporal tests, wheel
+  built. `reference/noise-tier1.json` rebuilt from runs 1 to 4 (the three-run pooled band kept as
+  `noise-tier1.n3-pooled.json`): J 0.773 to 1.304 around a run mean of 0.993 (half-range 0.246 once run 4's
+  C stall is in the values), macro 0.732 to 0.927, python 0.455 to 0.818 (84/132 episodes), javascript 0.333
+  to 0.833 (41/72); 9 stable pass, 3 stable fail (cmdi-a, ih-codeinjection-a, aurelia-path), 9 unstable
+  (safety02 joins). h9's stored run re-gated: objective INCONCLUSIVE (J 1.283 inside the interval, every
+  regression within noise), accuracy REJECTED (adversarial01 2/3 vs 5/12 p 0.57, adversarial02 3/3 vs 7/12
+  p 0.51, case02 p 1.0; no deciding flip outside noise). Reading for the loop: on this corpus a candidate reads
+  outside noise only through a multi-case effect at the episode level or a high-repeat slice on named cases;
+  J's worst-language term over the single-case languages is a coin flip (ruby and c intervals span 0 to 1), so
+  the objective track should decide on the deciding-language J once an owner agrees (decision 6, below).
 
