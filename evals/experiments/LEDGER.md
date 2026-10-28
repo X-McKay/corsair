@@ -26,6 +26,7 @@ The tables below are rendered from `ledger.jsonl` by `corsair gym ledger render`
 | ref-w5-tier1 | `494f252` | tier1 | 3 | `27523a1a21d8` | 1.074 | 0.881 | 0.455 | 42260 | 71.7 | /home/al/git/corsair/.runs/gym/runs/gym-tier1-20261027t170748-e6b13d/scorecard.json |
 | ref-w5-tier2 | `494f252` | tier2 | 3 | `2080d5129ef4` | 0.540 | 0.500 | 0.500 | 138771 | 213.6 | /home/al/git/corsair/.runs/gym/runs/gym-tier2-20261027t203809-35e3a4/scorecard.json |
 | ref-w5-tier1-run3 | `494f252` | tier1 | 3 | `27523a1a21d8` | 1.133 | 0.856 | 0.500 | 47111 | 92.6 | /home/al/git/corsair/.runs/gym/runs/gym-tier1-20261027t225818-4adc6b/scorecard.json |
+| ref-w5-tier1-run4 | `494f252` | tier1 | 3 | `27523a1a21d8` | 0.641 | 0.720 | 0.000 | 40780 | 71.0 | /home/al/git/corsair/.runs/gym/runs/gym-tier1-20261028t020826-1c30ba/scorecard.json |
 
 ## Waves
 
