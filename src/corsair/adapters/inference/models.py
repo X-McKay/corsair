@@ -1,9 +1,24 @@
 """Native ADK model selection; credentials stay in the worker environment."""
 
 from google.adk.models import BaseLlm
+from google.genai import types
 
 from corsair.agents.resources import RoleName
-from corsair.settings import ModelSettings, Settings
+from corsair.settings import Decoding, ModelSettings, Settings
+
+
+def decoding_config(decoding: Decoding) -> types.GenerateContentConfig | None:
+    """A role's set sampling parameters as the SDK's native generation config.
+
+    ``None`` when every parameter is unset, so the server's defaults apply. An unset field
+    stays ``None`` on the config, which neither the Gemini SDK nor ADK's LiteLLM route sends.
+    """
+
+    if decoding.unset:
+        return None
+    return types.GenerateContentConfig(
+        temperature=decoding.temperature, top_p=decoding.top_p, seed=decoding.seed
+    )
 
 
 def model_for_role(

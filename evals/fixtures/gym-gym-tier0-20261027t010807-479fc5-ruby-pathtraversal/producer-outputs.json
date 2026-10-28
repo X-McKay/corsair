@@ -1,0 +1,11 @@
+[
+  {
+    "control_payload": "readme.txt",
+    "exploit_payload": "/fixtures/private/secret.txt",
+    "kind": "proposal",
+    "output_digest": "b947bc2d66ec31b7a57aab1d3af8efe8fc29fa98b2dca929fee1be55a4ed9700",
+    "round": 1,
+    "run_id": "gym-tier0-20261027t010807-479fc5.c2.r2",
+    "session": 1
+  }
+]

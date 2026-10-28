@@ -1,7 +1,9 @@
 """Family-grouped splits: manifest membership checks and per-family report views.
 
-The manifests here are synthetic and are never loaded as frozen requests: the split check
-reads membership only, so digests are placeholders and no request or oracle file exists.
+The manifests here are synthetic and are never loaded as frozen cases: the split check reads
+membership and each labelled entry's request (for its recipe kind and source trees), so the
+helpers write request files derived from checked-in requests; oracle digests stay
+placeholders and no oracle file exists.
 """
 
 import json
@@ -19,6 +21,7 @@ from corsair.evaluation.families import (
     check_family_splits,
     dataset_members,
     family_deltas,
+    family_stem,
     family_view,
     label_report,
     label_rows,
@@ -27,10 +30,22 @@ from corsair.evaluation.families import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PLACEHOLDER = "0" * 64
+PYTHON_REQUEST = ROOT / "evals/fixtures/case01/request.json"
+JAVA_REQUEST = ROOT / "evals/datasets/chain/java/xxe-b/v3/request.json"
 
 
-def entry(case_id: str, family: str, split: str, request: str | None = None) -> dict:
-    return {
+def entry(
+    case_id: str,
+    family: str,
+    split: str,
+    request: str | None = None,
+    *,
+    source: str = "source",
+    fixed: str | None = None,
+    template: Path = PYTHON_REQUEST,
+) -> dict:
+    """A manifest entry; ``manifest`` writes its request (template recipe, given trees)."""
+    item = {
         "case_id": case_id,
         "family": family,
         "split": split,
@@ -39,16 +54,42 @@ def entry(case_id: str, family: str, split: str, request: str | None = None) -> 
         "request_digest": PLACEHOLDER,
         "oracle_digest": PLACEHOLDER,
     }
+    if (source, fixed, template) != ("source", None, PYTHON_REQUEST):
+        item["_request"] = {"template": template, "source": source, "fixed": fixed}
+    return item
+
+
+def write_request(root: Path, item: dict) -> None:
+    spec = item.pop("_request", {"template": PYTHON_REQUEST, "source": "source", "fixed": None})
+    path = root / item["request"]
+    if not path.exists():
+        body = json.loads(spec["template"].read_bytes())
+        body["case"]["case_id"] = item["case_id"]
+        body["case"]["source"] = {"path": spec["source"]}
+        body["case"].pop("fixed_source", None)
+        if spec["fixed"] is not None:
+            body["case"]["fixed_source"] = {"path": spec["fixed"]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(body))
+    item["request_digest"] = digest(path.read_bytes())
 
 
 def manifest(path: Path, *entries: dict) -> Path:
+    for item in entries:
+        write_request(path.parent, item)
     path.write_text(json.dumps({"schema_version": "corsair.dataset/1", "entries": list(entries)}))
     return path
 
 
 def rules(result: dict) -> list[tuple[str, str]]:
     return [
-        (item["rule"], item.get("family") or item.get("pair") or item["case_id"])
+        (
+            item["rule"],
+            item.get("family")
+            or item.get("stem")
+            or item.get("pair")
+            or (item["trees"][0] if "trees" in item else item["case_id"]),
+        )
         for item in result["violations"]
     ]
 
@@ -108,7 +149,30 @@ def test_a_chain_pair_split_across_dev_and_held_out_fails_even_with_distinct_fam
     assert rules(result) == [
         ("pair_crosses_splits", "datasets/chain/python/cmdi"),
         ("pair_crosses_families", "datasets/chain/python/cmdi"),
+        ("source_tree_crosses_splits", "datasets/chain/python/cmdi"),
     ]
+
+
+@pytest.mark.parametrize(
+    "variant_a,variant_b",
+    [
+        (
+            "datasets/chain/java/xxe-a/v3/request.json",
+            "datasets/chain/java/xxe-b/v3/request.json",
+        ),
+        (
+            "datasets/chain/javascript/prototypepollution-a-v3/request.json",
+            "datasets/chain/javascript/prototypepollution-b-v3/request.json",
+        ),
+    ],
+)
+def test_a_v3_layout_pair_split_across_tiers_fails(tmp_path, variant_a, variant_b):
+    tier0 = manifest(tmp_path / "tier0.json", entry("one-a", "one", "chain", variant_a))
+    tier2 = manifest(tmp_path / "tier2.json", entry("one-b", "two", "held_out", variant_b))
+
+    found = {rule for rule, _ in rules(check_family_splits([tier0, tier2]))}
+
+    assert {"pair_crosses_splits", "pair_crosses_families"} <= found
 
 
 def test_a_case_in_two_splits_fails(tmp_path):
@@ -142,12 +206,132 @@ def test_unlabelled_members_are_counted_but_never_contradict_a_split():
             "datasets/chain/java/spring-security-b/request.json",
             "datasets/chain/java/spring-security",
         ),
+        ("datasets/chain/java/xxe-b/v3/request.json", "datasets/chain/java/xxe"),
+        (
+            "datasets/chain/javascript/prototypepollution-a-v3/request.json",
+            "datasets/chain/javascript/prototypepollution",
+        ),
+        (
+            "datasets/chain/common/c-intoverflow-a/v3/request.json",
+            "datasets/chain/common/c-intoverflow",
+        ),
         ("datasets/chain/python/ineffective-fix/request.json", None),
+        ("datasets/chain/python/ineffective-fix/v3/request.json", None),
         ("fixtures/case01/request.json", None),
     ],
 )
 def test_chain_pair_is_read_from_the_variant_directory(path, pair):
     assert chain_pair(path) == pair
+
+
+@pytest.mark.parametrize(
+    "family,kind,stem",
+    [
+        ("ih-perl-xss", "perl.html_injection/1", "perl/xss"),
+        ("ih-java-xxe", None, "java/xxe"),
+        ("chain-python-cmdi", "python.command_sentinel/1", "python/cmdi"),
+        (
+            "js-prototypepollution",
+            "javascript.prototype_pollution/1",
+            "javascript/prototypepollution",
+        ),
+        ("c-intoverflow", "c.integer_overflow/1", "c/intoverflow"),
+        ("xxe", "java.secret_disclosure/1", "java/xxe"),
+        ("pathtraversal", "ruby.secret_disclosure/1", "ruby/pathtraversal"),
+        ("ih-ruby-path-traversal", None, "ruby/pathtraversal"),
+        ("sbj-javascript-deep-extend", None, "javascript/deepextend"),
+        ("family01", "python.secret_disclosure/1", "python/family01"),
+        ("xxe", None, "xxe"),
+    ],
+)
+def test_family_stem_is_language_and_class(family, kind, stem):
+    assert family_stem(family, kind) == stem
+
+
+@pytest.mark.parametrize(
+    ("kind", "language"),
+    [("c.integer_overflow/1", "c"), ("javascript.prototype_pollution/1", "javascript")],
+)
+def test_kind_language_is_the_recipe_kind_prefix(kind, language):
+    assert families.kind_language(kind) == language
+
+
+def test_a_bare_family_and_its_prefixed_id_in_two_splits_fail_by_stem(tmp_path):
+    tier0 = manifest(
+        tmp_path / "tier0.json",
+        entry("xxe-tier0", "xxe", "chain", template=JAVA_REQUEST),
+    )
+    tier2 = manifest(
+        tmp_path / "tier2.json",
+        entry("xxe-tier2", "ih-java-xxe", "held_out", template=JAVA_REQUEST),
+    )
+
+    result = check_family_splits([tier0, tier2])
+
+    assert rules(result) == [("family_stem_crosses_splits", "java/xxe")]
+    (violation,) = result["violations"]
+    assert violation["families"] == ["ih-java-xxe", "xxe"]
+    assert violation["splits"] == {
+        "chain": ["tier0.json:xxe-tier0"],
+        "held_out": ["tier2.json:xxe-tier2"],
+    }
+    assert violation["message"] == (
+        "family stem java/xxe is shared by families ih-java-xxe, xxe in splits chain, held_out"
+    )
+
+
+def test_entries_in_two_splits_sharing_a_corpus_tree_or_stem_directory_fail(tmp_path):
+    corpus = "../../corpus/infosec-harness/perl/xss"
+    dev = manifest(
+        tmp_path / "dev.json",
+        entry("render", "perl-render", "dev", source=f"{corpus}/b", fixed=f"{corpus}/a"),
+    )
+    held = manifest(
+        tmp_path / "held.json",
+        entry("comment", "perl-comment", "held_out", source=f"{corpus}/a"),
+        entry("shared", "other", "held_out", source="../case01/source"),
+    )
+    other = manifest(tmp_path / "other.json", entry("case01", "family01", "dev"))
+
+    result = check_family_splits([dev, held, other])
+
+    assert rules(result) == [
+        ("source_tree_crosses_splits", "corpus/infosec-harness/perl/xss"),
+        ("source_tree_crosses_splits", "fixtures/case01/source"),
+    ]
+    assert result["violations"][0]["splits"] == {
+        "dev": ["dev.json:render"],
+        "held_out": ["held.json:comment"],
+    }
+
+
+def test_a_symlinked_source_resolves_to_its_tree(tmp_path):
+    (tmp_path / "trees/one").mkdir(parents=True)
+    (tmp_path / "fixtures/case02").mkdir(parents=True)
+    (tmp_path / "fixtures/case02/source").symlink_to(tmp_path / "trees/one")
+    dev = manifest(
+        tmp_path / "dev.json", entry("case01", "family01", "dev", source="../../trees/one")
+    )
+    held = manifest(tmp_path / "held.json", entry("case02", "family02", "held_out"))
+
+    assert rules(check_family_splits([dev, held])) == [("source_tree_crosses_splits", "trees/one")]
+
+
+def test_distinct_trees_in_distinct_splits_pass(tmp_path):
+    dev = manifest(tmp_path / "dev.json", entry("case01", "family01", "dev"))
+    held = manifest(tmp_path / "held.json", entry("case02", "family02", "held_out"))
+
+    assert check_family_splits([dev, held])["ok"] is True
+
+
+def test_an_unreadable_or_changed_request_is_an_explicit_violation(tmp_path):
+    path = manifest(tmp_path / "dev.json", entry("case01", "family01", "dev"))
+    (tmp_path / "fixtures/case01/request.json").write_text("{}")
+
+    result = check_family_splits([path])
+
+    assert rules(result) == [("request_unreadable", "case01")]
+    assert "digest changed" in result["violations"][0]["problem"]
 
 
 def test_agent_datasets_are_unlabelled_and_legacy_listings_take_their_file_stem(tmp_path):
@@ -165,7 +349,7 @@ def test_agent_datasets_are_unlabelled_and_legacy_listings_take_their_file_stem(
 
     assert dataset_members(agent) == [Member("producer.json", "case01", None, None, None)]
     assert dataset_members(listing) == [
-        Member("held_out.json", "ih-python-sqli", "ih-python-sqli", "held_out", None)
+        Member("held_out.json", "ih-python-sqli", "ih-python-sqli", "held_out", None, "python/sqli")
     ]
     assert check_family_splits([agent, listing])["unlabelled_entries"] == 1
 
@@ -195,6 +379,18 @@ def test_checked_in_dataset_families_keep_one_split():
     assert result["ok"] is True, result["violations"]
     splits = {split for item in result["datasets"] for split in item["splits"]}
     assert {"dev", "held_out", "safety", "adversarial"} <= splits
+
+
+def test_checked_in_gym_tiers_keep_one_split_per_family_stem_and_source_tree():
+    paths = [ROOT / f"evals/datasets/gym-tier{tier}.json" for tier in (0, 1, 2)]
+
+    result = check_family_splits(paths)
+
+    assert result["ok"] is True, result["violations"]
+    # 12 composed stems plus 9 SecBench.js package stems (5 in tier1, 4 held out in tier2).
+    assert result["family_stems"] == 21
+    tier2 = next(item for item in result["datasets"] if item["path"].endswith("gym-tier2.json"))
+    assert tier2["splits"] == ["held_out"]
 
 
 def test_the_module_entrypoint_exits_by_violation_and_names_a_remedy(tmp_path, monkeypatch, capsys):

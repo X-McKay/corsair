@@ -35,6 +35,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from pathlib import Path, PurePosixPath
 
 JOB_PATH = Path("/input/job.json")
@@ -42,6 +43,8 @@ WORK = Path("/work")
 HARNESS = WORK / "harness.c"
 PROG = WORK / "prog"
 RUN_LOG = WORK / "run.log"
+# The container's own cgroup v2 CPU accounting (Docker's private cgroup namespace).
+CPU_STAT = Path("/sys/fs/cgroup/cpu.stat")
 KIND = "c.integer_overflow/1"
 # AddressSanitizer exits with this code when it halts on the first error; the harness
 # itself returns 0 on a clean run. The driver maps both to its own record exit code.
@@ -295,6 +298,24 @@ def _adversarial_observation(sanitizer: str | None, run_exit: int) -> str:
     return "execution_error"
 
 
+def _cgroup_cpu_usec(path: Path = CPU_STAT) -> int | None:
+    """The cgroup v2 ``usage_usec`` CPU total, or None when the file or field is absent."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in text.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "usage_usec":
+            return int(value) if value.isdigit() else None
+    return None
+
+
+def _elapsed_usec(started: int) -> int:
+    """Microseconds since ``started``, a ``time.monotonic_ns()`` reading."""
+    return (time.monotonic_ns() - started) // 1000
+
+
 def _record(
     job: dict,
     *,
@@ -305,13 +326,14 @@ def _record(
     lines: list[int],
     module_file: str,
     target_executed: bool,
+    wall_usec: int,
 ) -> dict:
     counts = {"tests": 1, "failures": 0, "errors": 0, "skipped": 0}
     if status == "FAILURE":
         counts["failures"] = 1
     elif status == "ERROR":
         counts["errors"] = 1
-    return {
+    record: dict = {
         "schema_version": "corsair.driver/1",
         "operation_id": job["operation_id"],
         "role": job["role"],
@@ -325,6 +347,12 @@ def _record(
         "covered_lines": lines,
         "coverage_file": module_file,
     }
+    # Efficiency telemetry only: the verifier never admits an outcome from it.
+    record["wall_usec"] = wall_usec
+    cpu_usec = _cgroup_cpu_usec()
+    if cpu_usec is not None:
+        record["cpu_usec"] = cpu_usec
+    return record
 
 
 def main() -> int:
@@ -339,6 +367,8 @@ def main() -> int:
     if not isinstance(module_file, str) or not module_file.endswith(".c"):
         return _driver_error("invalid job")
 
+    # Wall time covers compiling the admitted source with the fixed harness and running it.
+    started = time.monotonic_ns()
     try:
         _write_harness(recipe, int(job["payload"]))
         compiled = _compile(module_file)
@@ -352,6 +382,7 @@ def main() -> int:
             lines=[],
             module_file=module_file,
             target_executed=False,
+            wall_usec=_elapsed_usec(started),
         )
         print(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
         return 2
@@ -365,6 +396,7 @@ def main() -> int:
             lines=[],
             module_file=module_file,
             target_executed=False,
+            wall_usec=_elapsed_usec(started),
         )
         print(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
         return 2
@@ -373,6 +405,7 @@ def main() -> int:
         run_exit = _run()
     except OSError:
         run_exit = -1
+    wall_usec = _elapsed_usec(started)
     sanitizer_class = recipe.get("sanitizer_class", "heap-buffer-overflow")
     sanitizer = _sanitizer_report(
         module_file, sanitizer_class if isinstance(sanitizer_class, str) else ""
@@ -402,6 +435,7 @@ def main() -> int:
         lines=lines,
         module_file=module_file,
         target_executed=observation in {"held", "sanitizer_report", "invalid_control"},
+        wall_usec=wall_usec,
     )
     print(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
     return native_exit

@@ -1,0 +1,11 @@
+[
+  {
+    "control_payload": "hello.txt",
+    "exploit_payload": "../../private/secret.txt",
+    "kind": "proposal",
+    "output_digest": "29844e45b96f38a99031cf9e5d6ecdfaba77dc91efa9e7be9c80ed83e1d8b866",
+    "round": 1,
+    "run_id": "gym-tier1-20261027t012146-ade22e.c0.r0",
+    "session": 1
+  }
+]

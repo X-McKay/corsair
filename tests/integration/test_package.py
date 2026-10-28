@@ -53,10 +53,12 @@ from corsair.adapters.temporal.client import connect, wait_for_result
 from corsair.agents.resources import (
     load_agent_spec,
     load_runtime_skills,
+    packet_probe_text,
     prompt_text,
     runtime_skill_digest,
     select_reference,
 )
+from corsair.adapters.inference.adk import probe_packet_digest, probe_packet_parts
 from corsair.contracts import Finding
 from corsair.entrypoints.terminal import Terminal
 from corsair.observability.lifecycle import LifecycleLoggingInterceptor
@@ -70,6 +72,13 @@ for role in ('producer', 'auditor'):
     assert load_agent_spec(role).name == role
     assert len(prompt_text(role)) > 100
     assert len(runtime_skill_digest(role)) == 64
+    assert files(f'corsair.agents.{role}').joinpath('packet-probe.json').is_file()
+    assert '"source_excerpt"' in packet_probe_text(role)
+    assert len(probe_packet_digest(role)) == 64
+assert [name for name, _ in probe_packet_parts('producer')] == [
+    'tool.read_file', 'tool.list_files', 'packet'
+]
+assert [name for name, _ in probe_packet_parts('auditor')] == ['packet']
 assert [skill.name for skill in load_runtime_skills('producer')] == ['source-grounding']
 assert [skill.name for skill in load_runtime_skills('auditor')] == ['semantic-review']
 from corsair.agents.auditor.factory import build_auditor

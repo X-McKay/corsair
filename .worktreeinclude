@@ -1,0 +1,7 @@
+# Untracked files copied into every Claude Code worktree spawned from this checkout.
+# Keep this to local environment/config only; never add credentials beyond .env files.
+.env
+.env.local
+.env.*.local
+.claude/settings.local.json
+.state/settings.json

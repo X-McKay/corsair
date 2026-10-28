@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-json-schema",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/json-schema/0.3.0",
+      "snapshot_digest": "5f41dc3946161cd0a064a0d17c2b63dc9dcb6b7c4f787212901e197954172021",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/json-schema/0.4.0",
+      "snapshot_digest": "c185697301823a2e0c76cb2c5e29eb1496a8eed9b9932aab5a6d0af50cf1970d",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

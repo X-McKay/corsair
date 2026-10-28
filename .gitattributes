@@ -1,0 +1,2 @@
+# Corpus trees are upstream bytes frozen by snapshot digest: never normalise their line endings.
+evals/datasets/corpus/** -text

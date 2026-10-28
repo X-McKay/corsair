@@ -44,6 +44,16 @@ def test_docs_checker_reports_missing_local_target(tmp_path: Path):
     assert "README.md: docs/missing.md: missing target" in result.stderr
 
 
+def test_docs_checker_reports_merge_conflict_markers(tmp_path: Path):
+    # A diff3 base marker survived one merge; a setext underline is not a marker.
+    (tmp_path / "CHANGELOG.md").write_text("Title\n=======\n\n- one\n||||||| ddbc0641\n- two\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 1
+    assert result.stderr == "CHANGELOG.md: line 5: merge conflict marker\n"
+
+
 def test_docs_checker_reports_missing_heading_anchor(tmp_path: Path):
     (tmp_path / "README.md").write_text("# Project\n\n[Guide](guide.md#not-here)\n")
     (tmp_path / "guide.md").write_text("# Guide\n")
@@ -78,6 +88,22 @@ def test_docs_checker_ignores_private_tool_configuration_markdown(tmp_path: Path
     assert result.returncode == 0, result.stderr
 
 
+def test_docs_checker_skips_imported_package_trees_beside_their_provenance(tmp_path: Path):
+    """An imported corpus case (``provenance.json`` beside its ``source``/``fixed`` trees)
+    holds upstream package bytes frozen by digest; its Markdown is not maintained docs."""
+    case = tmp_path / "evals/datasets/corpus/secbenchjs/sbj-javascript-demo"
+    (case / "source").mkdir(parents=True)
+    (case / "provenance.json").write_text("{}\n")
+    (case / "source/README.md").write_text("[Upstream](../../issues/new)\n")
+    (tmp_path / "evals/datasets/corpus/SOURCE.md").write_text("[Missing](absent.md)\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 1
+    assert "SOURCE.md: absent.md" in result.stderr + result.stdout
+    assert "issues/new" not in result.stderr + result.stdout
+
+
 def test_public_skills_have_unique_matching_frontmatter_and_checked_links():
     names: list[str] = []
     for skill_name in PUBLIC_SKILL_NAMES:
@@ -110,3 +136,19 @@ def test_coding_agent_workflow_guide_links_the_canonical_skills():
         "../guides/extensions.md",
     ):
         assert destination in content
+
+
+def test_docs_checker_accepts_links_into_the_dataset_review_records(tmp_path: Path):
+    records = tmp_path / "evals/datasets/reviews/gym-tier1"
+    records.mkdir(parents=True)
+    (records / "wave-chain.json").write_text("{}\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/guide.md").write_text(
+        "# Guide\n\n[Records](../evals/datasets/reviews/)\n"
+        "[One](../evals/datasets/reviews/gym-tier1/wave-chain.json)\n"
+    )
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (ROOT / "evals/datasets/reviews").is_dir()

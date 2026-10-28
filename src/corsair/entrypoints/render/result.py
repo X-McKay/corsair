@@ -190,7 +190,9 @@ def _stop_cell(entry: Mapping[str, Any] | None) -> Text:
     if entry is None:
         return Text("unknown", style="dim")
     gate = str(entry["gate"])
-    cell = Text(safe_text(gate), style=_STOP_STYLES.get(gate, "yellow"))
+    # A qualified unverified stop (``evidence_unverified:coverage_control``) keeps its style.
+    style = _STOP_STYLES.get(gate.partition(":")[0], "yellow")
+    cell = Text(safe_text(gate), style=style)
     cell.append(f"\n{safe_text(entry['stage'])}", style="dim")
     return cell
 
@@ -228,7 +230,9 @@ def _rounds_table(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> 
             _audit_cell(item.audit),
             _stop_cell(stops.get((item.session, item.index))),
         )
-    if any(entry["gate"] == "evidence_unverified" for entry in stops.values()):
+    if any(
+        str(entry["gate"]).partition(":")[0] == "evidence_unverified" for entry in stops.values()
+    ):
         table.caption = Text(
             "evidence_unverified: the round's receipts were not validated against the "
             "artifact store here, so no kernel gate is named; the verdict is the recorded one.",
@@ -375,8 +379,12 @@ def _identity(result: InvestigationResult) -> Panel:
             ("Config", manifest.config_digest),
             ("Producer prompt", manifest.producer_prompt_digest),
             ("Auditor prompt", manifest.auditor_prompt_digest),
+            ("Producer packet", manifest.producer_packet_digest),
+            ("Auditor packet", manifest.auditor_packet_digest),
         ):
-            table.add_row(field_label(key), as_text(short_digest(value)))
+            table.add_row(
+                field_label(key), as_text("unknown" if value is None else short_digest(value))
+            )
         for role, model in manifest.models.items():
             table.add_row(field_label(f"{role.title()} model"), as_text(model))
         table.add_row(

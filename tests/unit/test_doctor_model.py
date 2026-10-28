@@ -20,7 +20,7 @@ from pydantic import Field
 from corsair.entrypoints import cli, diagnostics
 from corsair.entrypoints.diagnostics import diagnose, diagnose_model
 from corsair.entrypoints.terminal import Terminal
-from corsair.settings import ModelSettings, Settings
+from corsair.settings import Decoding, ModelSettings, RoleDecoding, Settings
 from tests.unit.adk import text_response, tool_response, truncated_response
 
 ENDPOINT = "https://llm.example.test:8443/v1"
@@ -132,6 +132,52 @@ async def test_tool_probe_without_structured_tools_capability_sends_no_schema():
 
     assert "without a paired response schema" in checks["model_producer_tools"]["detail"]
     assert all(request.config.response_schema is None for request in producer.requests)
+
+
+def _sent_decoding(request: Any) -> dict[str, Any]:
+    config = request.config
+    return {
+        key: getattr(config, key)
+        for key in ("temperature", "top_p", "seed")
+        if getattr(config, key) is not None
+    }
+
+
+async def test_unset_decoding_is_reported_as_the_server_default_and_never_sent():
+    producer, auditor = ProbeLlm(model="producer"), ProbeLlm(model="auditor")
+
+    checks = _by_name(await diagnose_model(_settings(), resolve_model=_resolver(producer, auditor)))
+
+    config = checks["model_config"]["detail"]
+    assert "decoding producer=server default; decoding auditor=server default" in config
+    assert [_sent_decoding(request) for request in producer.requests + auditor.requests] == [
+        {},
+        {},
+        {},
+    ]
+
+
+async def test_each_role_probe_sends_and_reports_its_effective_decoding():
+    """The probes carry the role's configured decoding, so a route that rejects a
+    parameter (a seed, say) fails the doctor instead of the first live episode."""
+    producer, auditor = ProbeLlm(model="producer"), ProbeLlm(model="auditor")
+    decoding = RoleDecoding(producer=Decoding(temperature=0, seed=7), auditor=Decoding(top_p=0.5))
+
+    checks = _by_name(
+        await diagnose_model(
+            _settings(decoding=decoding), resolve_model=_resolver(producer, auditor)
+        )
+    )
+
+    assert [check["status"] for check in checks.values()] == ["pass"] * 5
+    config = checks["model_config"]["detail"]
+    assert "decoding producer=temperature=0.0, seed=7" in config
+    assert "decoding auditor=top_p=0.5" in config
+    assert len(producer.requests) == 2
+    assert all(
+        _sent_decoding(request) == {"temperature": 0.0, "seed": 7} for request in producer.requests
+    )
+    assert [_sent_decoding(request) for request in auditor.requests] == [{"top_p": 0.5}]
 
 
 async def test_text_answer_to_the_tool_probe_fails_with_the_route_remedy():

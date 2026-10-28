@@ -15,6 +15,7 @@ from corsair.evaluation.replay import replay_candidates
 from corsair.settings import Settings
 from tests.integration import test_docker
 from tests.integration.test_docker import _assert_cleanup, _docker_client
+from tests.integration.trusted_images import with_content_images
 from tests.unit.test_replay import DATASET, ROOT, UNLISTED, _report
 
 pytestmark = pytest.mark.docker
@@ -34,7 +35,9 @@ async def test_real_docker_replay_separates_demonstrating_from_non_demonstrating
     tmp_path: Path, session_operation: Callable[[str], str]
 ) -> None:
     client = _docker_client()
-    settings = Settings(source_root=str(ROOT), artifact_root=str(tmp_path / "artifacts"))
+    settings = with_content_images(
+        Settings(source_root=str(ROOT), artifact_root=str(tmp_path / "artifacts"))
+    )
     store = ArtifactStore(settings.artifact_root)
     report = _report(
         settings,

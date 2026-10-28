@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -23,9 +25,13 @@ class MatchKind(StrEnum):
     OPERATIONAL_FAILURE = "operational_failure"
 
 
+# The most requests one evaluation batch carries.
+MAX_BATCH_REQUESTS = 64
+
+
 class BatchRequest(Contract):
     batch_id: Identifier
-    requests: list[InvestigationRequest] = Field(min_length=1, max_length=64)
+    requests: list[InvestigationRequest] = Field(min_length=1, max_length=MAX_BATCH_REQUESTS)
     repeats: int = Field(default=1, ge=1, le=8)
     concurrency: int = Field(default=2, ge=1, le=8)
 
@@ -85,3 +91,82 @@ class DatasetEntry(Contract):
 class Dataset(Contract):
     schema_version: str = "corsair.dataset/1"
     entries: list[DatasetEntry] = Field(min_length=1, max_length=64)
+
+
+# A staged row's licence status: every drafted tree holds a licence or notice file, or not.
+ReviewLicence = Literal["retained", "NOASSERTION"]
+
+
+class ReviewDecision(StrEnum):
+    """A reviewer's decision on one drafted intake row."""
+
+    ACCEPT = "accept"
+    AMEND = "amend"
+    REJECT = "reject"
+
+
+class DatasetReviewEntry(Contract):
+    """One drafted row as the review decided it.
+
+    ``reviewer`` and ``reason`` are the reviewer's own text, kept for machine output only.
+    ``frozen_oracle_digest`` is the manifest's oracle digest for an accepted or amended row and
+    absent for a rejected one. ``licence`` and ``import_target`` describe a staged row: the
+    licence status of its drafted trees and, once imported, its directory below the corpus.
+    A field a reconstructed record cannot recover stays None.
+    """
+
+    case_id: str = Field(min_length=1, max_length=120)
+    family: str | None = None
+    kind: str | None = None
+    decision: ReviewDecision
+    reviewer: str | None = Field(default=None, max_length=400)
+    reviewed_oracle_digest: Digest | None = None
+    frozen_oracle_digest: Digest | None = None
+    reason: str | None = Field(default=None, max_length=400)
+    licence: ReviewLicence | None = None
+    import_target: str | None = None
+
+    @model_validator(mode="after")
+    def coherent_decision(self):
+        frozen = self.decision is not ReviewDecision.REJECT
+        if frozen != (self.frozen_oracle_digest is not None):
+            raise ValueError(
+                "an accepted or amended row records its frozen oracle digest; a rejected row none"
+            )
+        if not frozen and self.import_target is not None:
+            raise ValueError("a rejected row has no import target")
+        return self
+
+
+class DatasetReview(Contract):
+    """The tracked record of one ``dataset freeze``: which review decided which rows.
+
+    Paths are relative to the repository holding the manifest when they lie below it. The
+    manifest digests are ``corsair.dataset/1`` identities (None: no manifest before or after);
+    ``draft_digest`` and ``review_sheet_digest`` are SHA-256 of ``draft.json`` and the reviewed
+    sheet. A ``reconstructed`` record was rebuilt after the sheet was lost and names its source.
+    """
+
+    schema_version: Literal["corsair.dataset-review/1"] = "corsair.dataset-review/1"
+    manifest: str = Field(min_length=1)
+    old_manifest_digest: Digest | None = None
+    new_manifest_digest: Digest | None = None
+    draft_id: Identifier
+    draft_digest: Digest | None = None
+    review_sheet_digest: Digest | None = None
+    source_root: str | None = None
+    staged: bool = False
+    split: str = Field(min_length=1)
+    recorded_at: datetime | None = None
+    reconstructed: bool = False
+    reconstructed_from: str | None = Field(default=None, max_length=2000)
+    entries: list[DatasetReviewEntry] = Field(min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def coherent_record(self):
+        if self.reconstructed != (self.reconstructed_from is not None):
+            raise ValueError("a reconstructed record, and only one, names what it was rebuilt from")
+        case_ids = [entry.case_id for entry in self.entries]
+        if len(set(case_ids)) != len(case_ids):
+            raise ValueError("a review record lists each case once")
+        return self

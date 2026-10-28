@@ -1,0 +1,39 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "sbj-javascript-json-schema",
+    "finding": {
+      "title": "Prototype pollution (CWE-1321) in json-schema@0.3.0 checkObj",
+      "description": "validate in lib/validate.js at line 217; drafted by corsair dataset draft for owner review.",
+      "file": "lib/validate.js",
+      "line": 217,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "secbenchjs/sbj-javascript-json-schema/source",
+      "expected_digest": "5f41dc3946161cd0a064a0d17c2b63dc9dcb6b7c4f787212901e197954172021"
+    },
+    "recipe": {
+      "kind": "javascript.prototype_pollution/1",
+      "module_file": "lib/validate.js",
+      "function": "validate",
+      "fixed_arguments": [
+        {}
+      ]
+    },
+    "fixed_source": {
+      "path": "secbenchjs/sbj-javascript-json-schema/fixed",
+      "expected_digest": "c185697301823a2e0c76cb2c5e29eb1496a8eed9b9932aab5a6d0af50cf1970d"
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

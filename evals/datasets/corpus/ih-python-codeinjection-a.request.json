@@ -1,0 +1,41 @@
+{
+  "case": {
+    "schema_version": "corsair.case/1",
+    "case_id": "ih-python-codeinjection-a",
+    "finding": {
+      "title": "Code injection in compute_setting",
+      "description": "compute_setting in app.py at line 4; drafted by corsair dataset draft for owner review.",
+      "file": "app.py",
+      "line": 4,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "infosec-harness/python/codeinjection/a",
+      "expected_digest": "67f8574df8ae0694dafb241eb004f89c796ed626cacf6e847bfa582ad52ddf37"
+    },
+    "recipe": {
+      "kind": "python.command_sentinel/1",
+      "module_file": "app.py",
+      "function": "compute_setting",
+      "payload_parameter": "expr",
+      "fixed_kwargs": {},
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "sentinel_path": "/work/corsair-sentinel",
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 3,
+    "max_llm_calls": 48,
+    "episode_llm_calls": 12,
+    "max_tool_calls": 48,
+    "max_output_tokens": 12288,
+    "max_elapsed_seconds": 900,
+    "probe_timeout_seconds": 30,
+    "tool_output_bytes": 32768
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-mixin-deep",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/mixin-deep/2.0.0",
+      "snapshot_digest": "3791acd71c87e865066ce99e348c19723e0eb84573ba02edf9675e1ca8921b41",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/mixin-deep/2.0.1",
+      "snapshot_digest": "26c8ae1cfd642e7443fff4b76bbdb6bd7eb87abd841b3e123469f9c2f9a81392",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

@@ -54,6 +54,7 @@ def test_public_project_inputs_are_not_hidden():
         "src/corsair/settings.py",
         "deploy/settings.example.json",
         "evals/datasets/dev.json",
+        "evals/datasets/reviews/gym-tier1/sib-python-sentinel-expr-chain.json",
         "evals/fixtures/case01/request.json",
         "docs/operations/disaster-recovery.md",
         ".github/workflows/ci.yml",

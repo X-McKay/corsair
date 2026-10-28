@@ -1,0 +1,20 @@
+{
+  "case_id": "sbj-javascript-safe-flat",
+  "licence": "retained",
+  "trees": {
+    "source": {
+      "staged_tree": "external/secbenchjs/pkgs/safe-flat/2.0.0",
+      "snapshot_digest": "9c789c346a49dbd1e3b3a4f6a22f3cf505284ec3f481c1cde9439914d9b6d85b",
+      "licence_files": [
+        "LICENSE"
+      ]
+    },
+    "fixed": {
+      "staged_tree": "external/secbenchjs/pkgs/safe-flat/2.0.2",
+      "snapshot_digest": "bec82fbba9ba5aa2b1c3cf71f39b13abb98c69857017a1b0d39c8d94c7f19b0a",
+      "licence_files": [
+        "LICENSE"
+      ]
+    }
+  }
+}

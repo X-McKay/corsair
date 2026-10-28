@@ -97,6 +97,11 @@ class RunManifest(Contract):
     config_digest: Digest
     producer_prompt_digest: Digest
     auditor_prompt_digest: Digest
+    # Each role's packaged probe request rendered by the live packet builders (and the
+    # producer's tool declarations); see adapters.inference.adk.probe_packet_parts. A
+    # manifest recorded before these fields decodes them as None (unknown).
+    producer_packet_digest: Digest | None = None
+    auditor_packet_digest: Digest | None = None
     image_id: str
     models: dict[str, str]
     capabilities: dict[str, dict] = Field(default_factory=dict)

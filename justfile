@@ -48,6 +48,10 @@ images:
     docker build -f deploy/perl/Dockerfile -t corsair-perl:0.1 .
     docker build -f deploy/c/Dockerfile -t corsair-c:0.1 .
 
+# Build the same images tagged corsair-<lang>:<content tag> (sha256 of deploy/<lang>/ and its driver); gym runs use these.
+images-gym *args:
+    uv run --locked corsair gym images "$@"
+
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
 settings-init:
     uv run --locked python scripts/local_stack.py settings-init
@@ -102,6 +106,38 @@ verify request submission *args:
 eval dataset *args:
     uv run --locked --extra providers corsair eval "$@"
 
+# Run a gym tier (tier0, tier1, tier2 = holdout for orchestrator/auditor only, or a manifest path) in namespace corsair-gym; defaults to .state/settings.json.
+gym-run tier *args:
+    uv run --locked --extra providers corsair gym run "$@"
+
+# Gate a candidate gym scorecard against a baseline: exit 0 accepted, 1 rejected, 2 incomparable, 3 inconclusive (--noise).
+gym-gate baseline candidate *args:
+    uv run --locked --extra providers corsair gym gate --baseline "$1" --candidate "$2" "${@:3}"
+
+# Write the noise band of two or more runs of one configuration (default <gym root>/reference/noise-<tier>.json).
+gym-noise first second *args:
+    uv run --locked --extra providers corsair gym noise "$@"
+
+# Candidate protocol: tier0 run and gate, then tier1 unless rejected; prints VERDICT, exit 0/1/2/3.
+gym-verify reference *args:
+    uv run --locked --extra providers corsair gym verify --reference "$1" "${@:2}"
+
+# List stored gym runs (shared by every worktree), newest first; --tier, --limit, --root.
+gym-runs *args:
+    uv run --locked --extra providers corsair gym runs "$@"
+
+# Show one case's rounds, per-call usage and failure stop from a gym run directory; --superseded adds retried first attempts.
+gym-replay run case *args:
+    uv run --locked --extra providers corsair gym replay "$1" --case "$2" "${@:3}"
+
+# Freeze a gym case's failed repeats as evals/ fixtures and tests/replay/kernel cases.
+gym-capture run case *args:
+    uv run --locked --extra providers corsair gym capture "$1" --case "$2" "${@:3}"
+
+# Append to (ledger append ...) or render (ledger render) the experiment ledger.
+gym-ledger *args:
+    uv run --locked --extra providers corsair gym ledger "$@"
+
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
     uv run --locked --extra providers python -m corsair.evaluation.agents "$@"
@@ -121,3 +157,7 @@ live-chain dataset *args:
 # Check that dataset families, cases and chain pairs keep one split; default evals/datasets/*.json.
 dataset-families *datasets:
     uv run --locked python -m corsair.evaluation.families "$@"
+
+# List manifest rows with their latest review record, flagging unreviewed rows and pending owner audits; default evals/datasets/gym-tier*.json.
+dataset-audit *manifests:
+    uv run --locked corsair dataset audit "$@"

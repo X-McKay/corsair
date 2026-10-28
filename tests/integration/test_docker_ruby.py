@@ -1,7 +1,7 @@
 """Real-Docker qualification for the Ruby secret-disclosure recipe.
 
-These tests need the reviewed ``corsair-ruby:0.1`` image (``just images``) and a Docker
-daemon. They mirror the Python native gates: a vulnerable tree discloses the private
+These tests need the content-tagged ``corsair-ruby`` image (``just images-gym``) and a
+Docker daemon. They mirror the Python native gates: a vulnerable tree discloses the private
 fixture through path traversal, the guarded fix blocks it, an unexpected target
 exception becomes ERROR (never a positive), a target that never reaches the finding line
 is rejected for absent coverage, and every container is cleaned up against its identity.
@@ -35,11 +35,13 @@ from corsair.contracts import (
 from corsair.policies.verdicts import fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import content_image, with_content_images
 
 pytestmark = pytest.mark.docker
 
-RUBY_IMAGE = "corsair-ruby:0.1"
 RUBY_KIND = "ruby.secret_disclosure/1"
+RUBY_IMAGE = content_image(RUBY_KIND)
 
 VULNERABLE = """module Attachments
   # Read a stored attachment by name under the given root.
@@ -152,10 +154,12 @@ def _prepared(tmp_path: Path, image_id: str, body: str, *, fixed: bool = False):
         fixed_source=Source(path="fixed") if fixed else None,
         recipe=_recipe(),
     )
-    settings = Settings(
-        source_root=str(tmp_path),
-        artifact_root=str(tmp_path / "artifacts"),
-        runtime="runc",
+    settings = with_content_images(
+        Settings(
+            source_root=str(tmp_path),
+            artifact_root=str(tmp_path / "artifacts"),
+            runtime="runc",
+        )
     )
     store = ArtifactStore(tmp_path / "artifacts")
     return settings, store, prepare_case(case, settings, store, _manifest(image_id))
@@ -171,7 +175,7 @@ def _assert_cleanup(client: docker.DockerClient, operation_id: str) -> None:
 
 def test_real_ruby_vulnerable_discloses_and_fix_blocks(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(RUBY_KIND)
+    image_id = DockerSandbox(with_content_images(Settings()), client=client).image_id_for(RUBY_KIND)
 
     settings, store, prepared = _prepared(tmp_path / "vuln", image_id, VULNERABLE, fixed=True)
     verifier = EvidenceVerifier(settings, store, DockerSandbox(settings, client, store=store))
@@ -191,6 +195,7 @@ def test_real_ruby_vulnerable_discloses_and_fix_blocks(tmp_path: Path) -> None:
     assert observation.adversarial and observation.adversarial.outcome.value == "VIOLATION"
     assert observation.control.covered_lines and 4 in observation.control.covered_lines
     assert 4 in observation.adversarial.covered_lines
+    assert_sandbox_seconds(observation)
     # Two short Ruby role containers; this records the per-role order of magnitude.
     # Test-side bound on the control + adversarial pair; the kernel probe timeout is separate and
     # slower hosts have taken over 20 s here, so leave generous headroom.
@@ -219,7 +224,7 @@ def test_real_ruby_vulnerable_discloses_and_fix_blocks(tmp_path: Path) -> None:
 
 def test_real_ruby_unexpected_exception_is_error_not_positive(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(RUBY_KIND)
+    image_id = DockerSandbox(with_content_images(Settings()), client=client).image_id_for(RUBY_KIND)
     settings, store, prepared = _prepared(tmp_path, image_id, RAISES)
     observation = EvidenceVerifier(
         settings, store, DockerSandbox(settings, client, store=store)
@@ -236,12 +241,18 @@ def test_real_ruby_unexpected_exception_is_error_not_positive(tmp_path: Path) ->
     assert observation.control and observation.control.outcome.value == "PROPERTY_HELD"
     assert observation.adversarial and observation.adversarial.outcome.value == "ERROR"
     assert observation.adversarial.outcome.value != "VIOLATION"
+    # The raise on line 3 stops before the bound File.read line: the ERROR role keeps the
+    # lines that did run, and target_executed follows the bound line's coverage.
+    assert observation.adversarial.error_kind == "target_exception"
+    assert 3 in observation.adversarial.covered_lines
+    assert prepared.bound_line not in observation.adversarial.covered_lines
+    assert observation.adversarial.target_executed is False
     _assert_cleanup(client, "ruby-error")
 
 
 def test_real_ruby_absent_finding_line_coverage_is_invalid(tmp_path: Path) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id_for(RUBY_KIND)
+    image_id = DockerSandbox(with_content_images(Settings()), client=client).image_id_for(RUBY_KIND)
     settings, store, prepared = _prepared(tmp_path, image_id, UNCOVERED)
     observation = EvidenceVerifier(
         settings, store, DockerSandbox(settings, client, store=store)

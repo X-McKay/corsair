@@ -7,12 +7,14 @@ path (a pure selector plus a bounded packet hook) and the on-demand loader path
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
 
 from corsair.adapters.inference.adk import _auditor_prompt, _producer_prompt
 from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.agents import resources as agent_resources
 from corsair.agents.auditor.contracts import AuditInput
 from corsair.agents.resources import (
     _MAX_REFERENCE_BYTES,
@@ -77,6 +79,30 @@ def test_selection_is_none_for_an_unclear_class_or_unknown_recipe_kind():
     assert select_reference("producer", unclear, "python.secret_disclosure/1") is None
     # A recipe kind without packaged references selects nothing even on a clear class.
     assert select_reference("producer", _finding("Path traversal"), "other.kind/9") is None
+
+
+def test_selection_reads_only_the_finding_and_recipe_kind():
+    # Outcome-blind by construction: no oracle, outcome, observation or model output
+    # parameter exists, and the finding contract carries none either.
+    assert list(inspect.signature(select_reference).parameters) == [
+        "role",
+        "finding",
+        "recipe_kind",
+    ]
+    forbidden = ("oracle", "outcome", "verdict", "observation", "expected", "label")
+    assert not [name for name in Finding.model_fields if any(f in name for f in forbidden)]
+
+
+def test_runtime_digest_covers_the_reference_selection_tables(monkeypatch: pytest.MonkeyPatch):
+    # Which kinds receive a packaged note changes the packets, so it changes identity.
+    before = runtime_skill_digest("producer"), runtime_skill_digest("auditor")
+    monkeypatch.setattr(
+        agent_resources,
+        "_SELECTABLE_RECIPE_KINDS",
+        agent_resources._SELECTABLE_RECIPE_KINDS | {"ruby.secret_disclosure/1"},
+    )
+    after = runtime_skill_digest("producer"), runtime_skill_digest("auditor")
+    assert before[0] != after[0] and before[1] != after[1]
 
 
 @pytest.mark.parametrize("title", ["OS command injection in count_lines", "Unusual behavior"])

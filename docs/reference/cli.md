@@ -109,14 +109,14 @@ corsair doctor --model --format human --settings .state/settings.json
 
 | Check | What it reports |
 | --- | --- |
-| `model_config` | Connector, producer and auditor model names, the `api_base` host and port only (never userinfo, path, query, or fragment), `request_timeout_seconds`, and the `extra_body` key names. |
+| `model_config` | Connector, producer and auditor model names, the `api_base` host and port only (never userinfo, path, query, or fragment), `request_timeout_seconds`, the `extra_body` key names, and each role's effective decoding (the set `temperature`, `top_p` and `seed`, or `server default`). |
 | `model_credentials` | Whether each role's provider credential variable is set, by **name only**; the value is never read into the report. A missing required variable fails; a route with no known variable warns. |
 | `model_producer`, `model_auditor` | One non-streaming request per role with a 32-token output cap and no tools: latency, finish reason, and reported output tokens. Stopping at the probe cap still passes, because the route answered; reasoning tokens count against the cap, and role caps are separate. |
 | `model_producer_tools` | One request on the producer model declaring a single argument-free tool, with a 128-token cap. It passes only when the response is a native call of that tool. When the model declares that it supports a response schema alongside tools, the probe pairs a trivial schema with the tool, as the producer's requests do. A text answer fails (the route would void every producer episode); stopping at the cap without a call is an inconclusive `warn`. |
 
 Credential variables follow the connector's conventions: `gemini` needs `GOOGLE_API_KEY` or `GEMINI_API_KEY` (or `GOOGLE_CLOUD_PROJECT` when `GOOGLE_GENAI_USE_VERTEXAI` is `true`); `litellm` routes map by model prefix: `openai/` to `OPENAI_API_KEY`, `anthropic/` to `ANTHROPIC_API_KEY`, `gemini/` to `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `openrouter/`, `groq/`, `mistral/`, `deepseek/`, `xai/` to their `PREFIX_API_KEY`, `together_ai/` to `TOGETHERAI_API_KEY`; `hosted_vllm/` (`HOSTED_VLLM_API_KEY`) and `litellm_proxy/` (`LITELLM_PROXY_API_KEY`) are optional, and `ollama/` needs none. The mapping lives in [`diagnostics.py`](../../src/corsair/entrypoints/diagnostics.py).
 
-Each request is bounded by `request_timeout_seconds` plus five seconds, and the three run concurrently. A failed model check carries sanitized detail and, for a known class (timeout, authentication, unknown model, connection, missing providers extra, missing tool call), a fixed `remedy`. A ready `--model` report shows that each route answered a minimal request and that the producer route returns tool calls. It is not a provider qualification: prompt-sized requests, provider policy, role output caps, evidence, and accuracy remain untested, and the requests are billed like any other.
+Each probe carries its role's configured decoding exactly as the agent sends it, and nothing when unset. Each request is bounded by `request_timeout_seconds` plus five seconds, and the three run concurrently. A failed model check carries sanitized detail and, for a known class (timeout, authentication, unknown model, connection, missing providers extra, missing tool call), a fixed `remedy`. A ready `--model` report shows that each route answered a minimal request and that the producer route returns tool calls. It is not a provider qualification: prompt-sized requests, provider policy, role output caps, evidence, and accuracy remain untested, and the requests are billed like any other.
 
 A failed doctor report identifies the failed dependency, adds the same fixed `remedy` to a failed check of a known class, and exits nonzero. A missing workflow or activity task-queue poller is reported as a warning check, but the overall report is not ready and exits `1`. Resolve the dependency rather than bypassing the check or substituting fake health data.
 
@@ -183,7 +183,7 @@ corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
 corsair inspect "$RUN_ID" --explain --settings .state/settings.json
 ```
 
-Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one. In human mode it renders the result with its gate ledger verified: each round that reached the kernel is classified from that round's own committed receipts, revalidated with the trusted verifier's admission rules, so **Stopped at** names the kernel or audit gate (`demonstrated`, `clean_negative`, `coverage`, `audit_reject`, ...). A round whose receipts do not validate shows `evidence_unverified`, never a gate read from unverified fields. The same view after `investigate --wait` verifies against the local artifact root only when it already exists; otherwise, and after `inspect --online --watch`, which never opens a local store, kernel rounds show `evidence_unverified` with a caption saying so. The verdict shown is always the recorded one.
+Without `--online`, `inspect` reads the immutable committed result from the shared artifact store. It cannot recover a result if the artifact root is unavailable or the workflow has not recorded one. In human mode it renders the result with its gate ledger verified: each round that reached the kernel is classified from that round's own committed receipts, revalidated with the trusted verifier's admission rules, so **Stopped at** names the kernel or audit gate (`demonstrated`, `clean_negative`, `coverage`, `audit_reject`, ...). A round whose receipts do not validate shows `evidence_unverified`, never a gate read from unverified fields; when its recorded role is INVALID or ERROR the label names that role's trusted cause (`evidence_unverified:coverage_control`, see [evaluations](../agents/evaluations.md)), and the caption still marks it unverified. The same view after `investigate --wait` verifies against the local artifact root only when it already exists; otherwise, and after `inspect --online --watch`, which never opens a local store, kernel rounds show `evidence_unverified` with a caption saying so. The verdict shown is always the recorded one.
 
 The result's `timeline` (in JSON too) is the workflow's bounded phase timeline, recorded at finalization: up to the last 32 transitions, each with `phase`, `session`, `round` and the deterministic workflow time `at`. It is the same data the live status query reports, persisted so durations can be read after the workflow has closed; it is presentation metadata and never an input to a verdict. Results recorded before the field existed read as an empty timeline, and the Phases table is then omitted. JSON output is otherwise unchanged: the ledger is computed for display only and is not added to the result.
 
@@ -407,6 +407,42 @@ corsair inspect "$RUN_ID" --online --settings .state/settings.json
 corsair inspect "$RUN_ID" --settings .state/settings.json
 ```
 
+### `dataset draft CHAIN_DIR...`
+
+```bash
+corsair dataset draft evals/datasets/chain/python/xxe-a evals/datasets/chain/python/xxe-b \
+  --recipe-template .work/intake/wave1/recipe-python-xxe.json --split held_out \
+  --out .work/intake/wave1/draft [--budget budget.json] [--source-root DIR]
+```
+
+Drafts reviewed intake for up to 64 chain directories, offline. For each directory it assembles `<case id>/request.json` from `case.json` and `input.json` and the operator's recipe template (an admitted `Recipe` member without `module_file` or the callable field; title, file, line and callable come from `input.json` only, `claim_scope` is `component`, and `source`/`fixed_source` are admitted in place, with the legacy `../../../../../benchmarks/corpus/` prefix mapped to `evals/datasets/corpus/`), a mechanical `<case id>/oracle.proposed.json`, `draft.json` (`corsair.dataset-draft/1`, refused by every dataset loader) and the code-owned `review.md` (case id, kind, family, split, source digest, proposed acceptable verdicts, proposed `expected_fix`, proposal basis, validator blockers, and empty decision, reviewer and reviewed oracle digest columns). It never reads a directory's `README.md`, `manifest.json`, `submission.json`, `verification/` or legacy narrative, and never writes under the evals tree. See [intake](../guides/evaluation-gym.md#intake-drafting-and-freezing-reviewed-cases) for ids, provenance and the proposal rules. It exits `0` when every row passes the `dataset validate` checks, `1` when a drafted row has blockers, and `2` (nothing written) when an input is refused: an unknown recipe kind, a template that sets a bound field or does not bind, an unreadable or inadmissible directory or source, or a non-empty `--out`.
+
+With `--source-root DIR` (a staging root such as `.work/intake`) the chain directories and their source trees must instead lie below `DIR` and are admitted relative to it (a directory or tree outside it, or a symbolic link on the chain path or in a tree, is refused with exit `2`); `--out` may not lie under an `evals/datasets` tree. `draft.json` records `source_root` and `staged: true` and each row's `staged_source`/`staged_fixed_source` (path below `DIR` and licence files), and `review.md` adds the code-owned `staged tree` and `licence file` columns after the source digest. Such a draft is frozen only with `--import-into`. See [staged material](../guides/evaluation-gym.md#staged-material).
+
+### `dataset freeze DRAFT_DIR --review REVIEW.md --into MANIFEST --against MANIFEST...`
+
+```bash
+corsair dataset freeze .work/intake/wave1/draft --review .work/intake/wave1/review.md \
+  --into evals/datasets/gym-tier2.json \
+  --against evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json \
+  [--import-into evals/datasets/corpus/DIR [--allow-noassertion]] [--record-review DIR]
+```
+
+Freezes the rows of a reviewed draft whose decision is `accept` (the proposed oracle) or `amend` (the `oracle.json` the reviewer wrote in the row's draft directory) into a `corsair.dataset/1` manifest with frozen digests, appending to an existing manifest. It refuses with exit `2` and writes nothing when any row lacks a decision or has an invalid one, a code-owned cell was edited, a draft file changed, a filled reviewed oracle digest does not match, an accepted row fails the `dataset validate` checks, a family, case, chain pair or source tree (variant stem or snapshot digest) sits in a different split in an `--against` manifest or the existing `--into` manifest, a case is already frozen there, or the result would exceed 64 entries; each refusal names its rule. After writing it logs `dataset.frozen` with the old (`none`) and new dataset digests, re-validates the manifest, and exits `1`: a new cohort identity to review and commit. It exits `0` without writing when every row was rejected.
+
+A staged draft (`dataset draft --source-root`) requires `--import-into`, a directory below `<evals tree of --into>/datasets/corpus/`; `--import-into` for an unstaged draft is refused. Before writing, freeze also refuses (exit `2`) a target outside the corpus (`import_outside_corpus`), an existing `<DIR>/<case id>/` (`import_target_exists`), a staged tree whose snapshot digest changed since the draft (`import_source_changed`), and a tree without a `LICENSE`/`LICENCE`/`COPYING`/`UNLICENSE`/`NOTICE` file unless `--allow-noassertion` is given (`licence_missing`). For accepted and amended rows only it copies each admitted tree byte for byte into `<DIR>/<case id>/source/` and `fixed/`, re-admits each copy against its digest (on a mismatch it removes the copies and refuses `import_digest_mismatch`), writes `<DIR>/<case id>/provenance.json` (`licence` `retained` or `NOASSERTION`, staged paths, snapshot digests and licence files per tree), and then writes the requests, oracles and manifest as above with sources pointing at the imported trees; the output's `imported` list names each copied row and its licence.
+
+Every complete review, including one that rejects every row, is recorded before the manifest is replaced as `<DIR>/<manifest stem>/<draft id>-<split>.json` (`corsair.dataset-review/1`; `DIR` defaults to `reviews/` beside the manifest, `--record-review DIR` redirects it), and the output's `review_record` names the file; a refused freeze records nothing. The sheet may carry an optional last `reason` column. See [review records](../guides/evaluation-gym.md#review-records-and-the-audit).
+
+### `dataset audit [MANIFEST...]`
+
+```bash
+corsair dataset audit evals/datasets/gym-tier0.json evals/datasets/gym-tier1.json \
+  evals/datasets/gym-tier2.json [--reviews DIR] [--format json]
+```
+
+Lists every row of each manifest (default `evals/datasets/gym-tier*.json`) with its latest review record from `<DIR>/<manifest stem>/` (`DIR` defaults to `reviews/` beside the manifest): decision, reviewer, record file, and the flags `unreviewed`, `pending_owner_audit`, `oracle_changed` and `rejected_but_frozen`, with counts. An unreadable manifest or record is listed as a problem. It reads only and always exits `0`; the human table prints reviewer names only as short plain text and never a reason, which stays in the JSON.
+
 Do not delete an intent to obtain a pass, reuse a run ID with a different request, or blindly rerun an uncertain operation. Preserve the run ID, inspect owned resource identifiers, and record uncertainty. Temporal history alone cannot restore a separate local artifact filesystem after host loss.
 
 ## Exit statuses
@@ -414,8 +450,9 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression, or an `intake` dry run blocked a finding. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, candidate replay (an unavailable replay), evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression, an `intake` dry run blocked a finding, a `dataset draft` row has validator blockers, or `dataset refreeze`/`dataset freeze` wrote a manifest. `runs`, `inspect` and `explain` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
+| `3` | `corsair gym gate` or `gym verify` given a `--noise` band was INCONCLUSIVE: every deciding regression lies within noise (inside the band's spread, or not below its resampled interval on a band carrying intervals, or, with pooled per-case counts, not separated by Fisher's exact test on episodes), so a confirmation run decides; for `gym verify`, the INCONCLUSIVE tier's [confirmation stage](../guides/evaluation-gym.md#the-confirmation-stage) re-ran its flipped cases and still could not decide, or was skipped. See [the noise band](../guides/evaluation-gym.md#the-noise-band-and-inconclusive). |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 
 Always parse the returned JSON or result panel in addition to the exit code. In particular, the labels `EXPLOIT_DEMONSTRATED`, `COMPONENT_EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` and the execution statuses `BLOCKED` and `CANCELLED` have different evidence and operational meanings.

@@ -1,0 +1,73 @@
+{
+  "case_id": "adversarial02",
+  "execution_status": "ERROR",
+  "fix_status": "NOT_REQUESTED",
+  "kind": "python.secret_disclosure/1",
+  "negative_threshold": 2,
+  "oracle": {
+    "acceptable": [
+      "INCONCLUSIVE"
+    ],
+    "acceptable_verdicts": [
+      "EXPLOIT_NOT_DEMONSTRATED",
+      "INCONCLUSIVE"
+    ],
+    "expected_execution": "COMPLETED",
+    "expected_fix": null,
+    "expected_verdict": null,
+    "forbidden": [
+      "REFUTED",
+      "SUPPORTED",
+      "CONDITIONAL"
+    ],
+    "forbidden_verdicts": [
+      "EXPLOIT_DEMONSTRATED"
+    ]
+  },
+  "prepared": null,
+  "reason": "redacted at capture",
+  "recorded_verdict": "ERROR",
+  "rounds": [
+    {
+      "audit": null,
+      "index": 1,
+      "observation": null,
+      "producer": {
+        "decision": null,
+        "feedback": {
+          "gate": "provider_max_tokens",
+          "operational": true,
+          "reason": "producer response stopped at the 12288-token per-request output cap (MAX_TOKENS) before structured completion; reasoning tokens count against this cap"
+        },
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 2667,
+          "llm_calls": 1,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2667,
+              "output_tokens": 12288,
+              "seconds": 150.084045734955,
+              "thought_tokens": 12288
+            }
+          ],
+          "output_tokens": 12288,
+          "seconds": 150.10262908507138,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 12288,
+          "tool_calls": 0,
+          "tool_calls_detail": []
+        }
+      },
+      "session": 1
+    }
+  ],
+  "run_id": "gym-tier1-20261027t012146-ade22e.c6.r2",
+  "schema_version": "corsair.gym-kernel-case/1"
+}

@@ -1,9 +1,11 @@
 """Pre-run check views: `doctor` (environment checks with their remedies), `dataset
 validate` and `dataset refreeze` (identity, cohort, one row of checks per entry and any
-digest rewrite) and `intake` (a scanner-report dry run: one row per finding, admissible or
-why it is blocked).
+digest rewrite), `dataset audit` (each manifest row's latest review record and its flags)
+and `intake` (a scanner-report dry run: one row per finding, admissible or why it is
+blocked).
 """
 
+import re
 from typing import Any
 
 from rich.console import Console, Group, RenderableType
@@ -30,6 +32,10 @@ _DATASET_CHECKS = (
     ("oracle", "Oracle"),
 )
 _CHECK_WORDS = {"pass": ("ok", "green"), "fail": ("FAIL", "bold red"), "skip": ("-", "dim")}
+_AUDIT_STYLES = {"reviewed": "green", "pending_owner_audit": "yellow", "unreviewed": "dim"}
+# A reviewer cell is the reviewer's own text: the table shows it only as a short plain name
+# and otherwise as `hidden` (JSON output keeps it).
+_REVIEWER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 _.@()+-]{0,79}")
 
 
 def _check_word(status: str) -> Text:
@@ -160,3 +166,63 @@ def print_datasets(console: Console, value: dict[str, Any]) -> None:
     if value.get("rewritten"):
         # A rewritten manifest is a new frozen cohort, never a plain pass (exit 1).
         console.print(Text("Digests rewritten; review the diff and commit", style="bold yellow"))
+
+
+def _reviewer(value: object) -> Text:
+    if value is None:
+        return Text("-", style="dim")
+    if isinstance(value, str) and _REVIEWER_NAME.fullmatch(value):
+        return Text(value)
+    return Text("hidden", style="dim")
+
+
+def print_review_audit(console: Console, value: dict[str, Any]) -> None:
+    """Render `dataset audit`: per manifest, each row's status, decision, reviewer and record
+    file (below the manifest's reviews directory, named in the panel)."""
+    for manifest in value["manifests"]:
+        table = Table(expand=True)
+        table.add_column("Case", overflow="fold", ratio=3)
+        table.add_column("Split", no_wrap=True)
+        table.add_column("Status", no_wrap=True)
+        table.add_column("Decision", no_wrap=True)
+        table.add_column("Reviewer", overflow="fold", ratio=2)
+        table.add_column("Record", overflow="fold", ratio=2)
+        for row in manifest["rows"]:
+            status = str(row["status"])
+            word = Text(safe_text(status), style=_AUDIT_STYLES.get(status, "red"))
+            flags = [flag for flag in row["flags"] if flag != status]
+            if flags:
+                word.append("\n" + safe_text(", ".join(flags)), style="red")
+            record = Text("-", style="dim")
+            if row["record"] is not None:
+                record = as_text(str(row["record"]).rsplit("/", 1)[-1])
+                if row["reconstructed"]:
+                    record.append("\nreconstructed", style="dim")
+            table.add_row(
+                as_text(row["case_id"]),
+                as_text(row["split"]),
+                word,
+                Text("-", style="dim") if row["decision"] is None else as_text(row["decision"]),
+                _reviewer(row["reviewer"]),
+                record,
+            )
+        header = label_grid()
+        header.add_row(field_label("Digest"), as_text(manifest["dataset_digest"]))
+        header.add_row(
+            field_label("Records"), as_text(f"{manifest['records']} in {manifest['reviews']}")
+        )
+        parts: list[RenderableType] = [header, table]
+        parts.extend(
+            Text("Problem: ", style="red") + as_text(item) for item in manifest["problems"]
+        )
+        title = f"Corsair · Review audit {safe_text(manifest['manifest'])}"
+        console.print(Panel(Group(*parts), title=title, border_style="cyan"))
+    counts = value["counts"]
+    console.print(
+        as_text(
+            f"{counts['rows']} row(s): {counts['reviewed']} reviewed, "
+            f"{counts['pending_owner_audit']} pending owner audit, "
+            f"{counts['unreviewed']} unreviewed, {counts['oracle_changed']} oracle changed, "
+            f"{counts['rejected_but_frozen']} rejected but frozen"
+        )
+    )

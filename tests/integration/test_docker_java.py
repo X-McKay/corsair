@@ -1,7 +1,7 @@
 """Real-Docker qualification for the Java secret-disclosure recipe (Linux amd64).
 
-These tests require a reachable Docker daemon and the ``corsair-java:0.1`` image built
-from ``deploy/java/Dockerfile`` (``just images``). They exercise the trusted Java driver
+These tests require a reachable Docker daemon and the content-tagged ``corsair-java`` image
+built from ``deploy/java/Dockerfile`` (``just images-gym``). They exercise the trusted Java driver
 end to end through the same kernel as the Python observer: control, adversarial
 disclosure, a neutralized revision, the fixed differential, an unexpected target
 exception, absent target-line coverage, a source tree that does not compile, and
@@ -35,13 +35,15 @@ from corsair.contracts import (
 from corsair.policies.verdicts import fix_status
 from corsair.settings import Settings
 from corsair.steps.verification import EvidenceVerifier
+from tests.integration.sandbox_seconds import assert_sandbox_seconds
+from tests.integration.trusted_images import content_image, content_images
 
 pytestmark = pytest.mark.docker
 
 JAVA_KIND = "java.secret_disclosure/1"
 # A scratch build of deploy/java/Dockerfile can be qualified without retagging the
 # released image, e.g. CORSAIR_TEST_JAVA_IMAGE=corsair-java:fix.
-JAVA_IMAGE = os.environ.get("CORSAIR_TEST_JAVA_IMAGE", "corsair-java:0.1")
+JAVA_IMAGE = os.environ.get("CORSAIR_TEST_JAVA_IMAGE") or content_image(JAVA_KIND)
 MODULE = "src/main/java/com/example/XmlLoader.java"
 
 # Vulnerable: a DocumentBuilderFactory left at permissive defaults expands external
@@ -180,7 +182,7 @@ def _submission() -> Submission:
 
 def _images() -> dict[str, str]:
     """The default recipe-kind image map with ``JAVA_IMAGE`` for the Java kind."""
-    return {**Settings().images, JAVA_KIND: JAVA_IMAGE}
+    return {**content_images(), JAVA_KIND: JAVA_IMAGE}
 
 
 def _image_id(client: docker.DockerClient) -> str:
@@ -270,6 +272,7 @@ def test_real_docker_java_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> N
     assert observation.control and observation.control.outcome.value == "PROPERTY_HELD"
     assert observation.adversarial and observation.adversarial.outcome.value == "VIOLATION"
     assert 13 in observation.adversarial.covered_lines
+    assert_sandbox_seconds(observation)
     _assert_cleanup(client, "java-vulnerable")
 
     # When the exploit is blocked by a thrown exception, JaCoCo marks the parse line

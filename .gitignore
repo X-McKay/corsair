@@ -10,6 +10,9 @@
 outputs/
 build/
 dist/
+# Imported corpus trees are reviewed package content byte for byte (digests cover them).
+!evals/datasets/corpus/**/build/
+!evals/datasets/corpus/**/dist/
 *.egg-info/
 *.whl
 
@@ -57,3 +60,7 @@ result-*
 !.claude/skills/corsair-development
 !.claude/skills/corsair-evaluations
 .codex/
+
+# Experiment-loop worktrees
+.worktrees/
+.claude/worktrees/

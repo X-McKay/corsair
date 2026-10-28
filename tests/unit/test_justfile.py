@@ -41,7 +41,10 @@ def test_default_just_lists_recipes_without_running_side_effects():
     assert process.returncode == 0, process.stderr
     assert "Available recipes" in process.stdout
     recipes = ("check", "test-all", "verify", "eval-agent", "demo", "temporal-up")
-    for recipe in (*recipes, "live-agent", "live-chain", "dataset-families"):
+    gym = ("gym-run", "gym-gate", "gym-verify", "gym-runs", "gym-replay", "gym-capture")
+    gym += ("gym-ledger", "images-gym", "gym-noise")
+    datasets = ("dataset-families", "dataset-audit")
+    for recipe in (*recipes, "live-agent", "live-chain", *datasets, *gym):
         assert recipe in process.stdout
 
 
@@ -96,9 +99,32 @@ def test_default_just_lists_recipes_without_running_side_effects():
             ["dataset; touch SHOULD_NOT_EXIST.json", "--repeats", "2", "--dry-run"],
             ["run", "--locked", "--extra", "providers", "python", "scripts/live_eval.py", "chain"],
         ),
+        (
+            "gym-run",
+            ["tier0; touch SHOULD_NOT_EXIST", "--repeats", "3", "--case", "a b"],
+            ["run", "--locked", "--extra", "providers", "corsair", "gym", "run"],
+        ),
+        (
+            "gym-ledger",
+            ["append", "--lesson", "it's $(touch SHOULD_NOT_EXIST)"],
+            ["run", "--locked", "--extra", "providers", "corsair", "gym", "ledger"],
+        ),
+        ("images-gym", ["--settings", "a b.json"], ["run", "--locked", "corsair", "gym", "images"]),
+        (
+            "dataset-audit",
+            ["evals/datasets/gym tier1.json", "tier2 $(touch SHOULD_NOT_EXIST).json"]
+            + ["--format", "json"],
+            ["run", "--locked", "corsair", "dataset", "audit"],
+        ),
+        ("dataset-audit", [], ["run", "--locked", "corsair", "dataset", "audit"]),
     ],
 )
 def test_literal_forwarding_through_real_just(tmp_path, recipe, arguments, prefix):
+    assert _recorded_uv(tmp_path, recipe, arguments) == prefix + arguments
+    assert not (tmp_path / "SHOULD_NOT_EXIST").exists()
+
+
+def _recorded_uv(tmp_path: Path, recipe: str, arguments: list[str]) -> list[str]:
     # A test-only executable records argv; it does not fake provider/evidence execution.
     (tmp_path / "justfile").write_bytes((ROOT / "justfile").read_bytes())
     bin_path = tmp_path / "bin"
@@ -115,7 +141,95 @@ def test_literal_forwarding_through_real_just(tmp_path, recipe, arguments, prefi
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == prefix + arguments
+    return json.loads(result.stdout)
+
+
+GYM = ["run", "--locked", "--extra", "providers", "corsair", "gym"]
+
+
+@pytest.mark.parametrize(
+    "recipe,arguments,expected",
+    [
+        (
+            "gym-gate",
+            ["base $(touch SHOULD_NOT_EXIST).json", "cand.json"],
+            [*GYM, "gate", "--baseline", "base $(touch SHOULD_NOT_EXIST).json"]
+            + ["--candidate", "cand.json"],
+        ),
+        (
+            "gym-gate",
+            ["base.json", "cand.json", "--track", "accuracy"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--track", "accuracy"],
+        ),
+        (
+            "gym-gate",
+            ["base.json", "cand.json", "--noise", "noise $(touch SHOULD_NOT_EXIST).json"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--noise", "noise $(touch SHOULD_NOT_EXIST).json"],
+        ),
+        (
+            "gym-gate",
+            ["base.json", "cand.json", "--min-cases", "3", "--root", "gym root"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate", "cand.json"]
+            + ["--min-cases", "3", "--root", "gym root"],
+        ),
+        (
+            "gym-gate",
+            ["base.json", "slice $(touch SHOULD_NOT_EXIST)/scorecard.json", "--slice"]
+            + ["--noise", "noise-tier1.json", "--root", "gym root"],
+            [*GYM, "gate", "--baseline", "base.json", "--candidate"]
+            + ["slice $(touch SHOULD_NOT_EXIST)/scorecard.json", "--slice"]
+            + ["--noise", "noise-tier1.json", "--root", "gym root"],
+        ),
+        (
+            "gym-ledger",
+            ["append", "--id", "s1", "--entry", "experiment"]
+            + ["--slice", "run dir; touch SHOULD_NOT_EXIST"]
+            + ["--reference-tier1", "ref tier1.json", "--root", "gym root"],
+            [*GYM, "ledger", "append", "--id", "s1", "--entry", "experiment"]
+            + ["--slice", "run dir; touch SHOULD_NOT_EXIST", "--reference-tier1", "ref tier1.json"]
+            + ["--root", "gym root"],
+        ),
+        (
+            "gym-noise",
+            ["run a", "run $(touch SHOULD_NOT_EXIST)", "run c", "--out", "band file.json"],
+            [*GYM, "noise", "run a", "run $(touch SHOULD_NOT_EXIST)", "run c"]
+            + ["--out", "band file.json"],
+        ),
+        ("gym-replay", ["run dir", "case01"], [*GYM, "replay", "run dir", "--case", "case01"]),
+        (
+            "gym-replay",
+            ["run dir", "case01", "--superseded"],
+            [*GYM, "replay", "run dir", "--case", "case01", "--superseded"],
+        ),
+        (
+            "gym-verify",
+            ["ref dir", "--skip-tier1"],
+            [*GYM, "verify", "--reference", "ref dir", "--skip-tier1"],
+        ),
+        (
+            "gym-verify",
+            ["ref dir", "--noise", "noise-tier0.json", "--noise", "noise-tier1.json"],
+            [*GYM, "verify", "--reference", "ref dir", "--noise", "noise-tier0.json"]
+            + ["--noise", "noise-tier1.json"],
+        ),
+        (
+            "gym-verify",
+            ["ref dir", "--min-cases", "3", "--noise", "noise-tier1.json"],
+            [*GYM, "verify", "--reference", "ref dir", "--min-cases", "3"]
+            + ["--noise", "noise-tier1.json"],
+        ),
+        ("gym-runs", ["--tier", "tier0"], [*GYM, "runs", "--tier", "tier0"]),
+        (
+            "gym-capture",
+            ["run dir", "case01", "--reference", "other run"],
+            [*GYM, "capture", "run dir", "--case", "case01", "--reference", "other run"],
+        ),
+    ],
+)
+def test_gym_recipes_place_their_positional_arguments(tmp_path, recipe, arguments, expected):
+    assert _recorded_uv(tmp_path, recipe, arguments) == expected
     assert not (tmp_path / "SHOULD_NOT_EXIST").exists()
 
 

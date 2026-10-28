@@ -12,7 +12,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,11 +26,12 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.base_tool import BaseTool
+from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 from pydantic import ValidationError
 
-from corsair.adapters.inference.models import model_for_role
+from corsair.adapters.inference.models import decoding_config, model_for_role
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditInput, AuditOutput, AuditResult
@@ -42,15 +43,23 @@ from corsair.agents.producer.contracts import (
 )
 from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.toolsets import build_producer_toolset
-from corsair.agents.resources import RoleName, load_agent_spec, select_reference
+from corsair.agents.resources import (
+    RoleName,
+    load_agent_spec,
+    packet_probe_text,
+    select_reference,
+)
 from corsair.contracts import (
+    ArtifactRef,
     Feedback,
     Finding,
     JavaRecipe,
     LineProvenance,
     Recipe,
     Usage,
+    digest,
 )
+from corsair.contracts.common import MAX_USAGE_CALL_ENTRIES, ModelCall, ToolCall
 from corsair.observability.logging import event
 from corsair.policies.time_bounds import (
     AUDITOR_ACTIVITY_SECONDS,
@@ -58,6 +67,7 @@ from corsair.policies.time_bounds import (
     episode_bounds,
     producer_activity_seconds,
 )
+from corsair.ports.scm import SourceAdmissionError
 from corsair.settings import ModelSettings, Settings
 
 _MAX_PROMPT_BYTES = 32_768
@@ -78,6 +88,40 @@ _SENSITIVE_HEADER = re.compile(
 )
 _BEARER_TOKEN = re.compile(r"\bbearer\s+[^\s,;]+", re.IGNORECASE)
 _COMMON_SECRET = re.compile(r"\b(?:sk-|AIza|ghp_|xox[baprs]-)[A-Za-z0-9_=-]+")
+_MAX_TOOL_NAME_CHARS = 128
+
+
+def _reported_count(usage: object, name: str) -> int | None:
+    """One provider-reported token count, or ``None`` when it was not reported."""
+
+    value = getattr(usage, name, None)
+    return None if value is None else int(value)
+
+
+def _reported_cached_count(usage: object) -> int | None:
+    """Cached input tokens only when positive: ADK's LiteLLM route reports absence as 0."""
+
+    value = _reported_count(usage, "cached_content_token_count")
+    return value if value is not None and value > 0 else None
+
+
+def _add_known(total: int | None, value: int | None) -> int | None:
+    """Add a reported count to a running total that stays ``None`` until one is reported."""
+
+    return total if value is None else (total or 0) + value
+
+
+def _tool_call_index(call: ToolCall) -> int:
+    return call.index
+
+
+def _tool_result_bytes(tool_response: dict[str, Any]) -> int:
+    """Size of a native tool response as compact JSON, the form the model receives."""
+
+    rendered = json.dumps(
+        tool_response, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return len(rendered.encode("utf-8"))
 
 
 @dataclass
@@ -99,6 +143,17 @@ class _EpisodeAccounting:
     applied_output_cap: int | None = None
     final_response_hit_output_cap: bool = False
     skills_preloaded: list[str] = field(default_factory=list)
+    cached_input_tokens: int | None = None
+    thought_tokens: int | None = None
+    model_calls: list[ModelCall] = field(default_factory=list)
+    tool_calls_detail: list[ToolCall] = field(default_factory=list)
+    calls_truncated: bool = False
+    # Dispatch time of the model request awaiting its complete response; model
+    # requests within one episode are sequential.
+    model_started: float | None = None
+    # Admission ordinal and time of each tool call awaiting its response, keyed by
+    # ADK's function-call id so parallel calls pair correctly.
+    open_tool_calls: dict[str | None, tuple[int, float]] = field(default_factory=dict)
 
     async def before_model(
         self, callback_context: CallbackContext, llm_request: LlmRequest
@@ -121,6 +176,7 @@ class _EpisodeAccounting:
             else min(configured, self.max_output_tokens)
         )
         self.applied_output_cap = llm_request.config.max_output_tokens
+        self.model_started = time.perf_counter()
         return None
 
     async def before_tool(
@@ -134,6 +190,41 @@ class _EpisodeAccounting:
             tool_context._invocation_context.end_invocation = True
             return {"error": "tool-call budget exhausted"}
         self.tool_calls += 1
+        self.open_tool_calls[tool_context.function_call_id] = (
+            self.tool_calls,
+            time.perf_counter(),
+        )
+        return None
+
+    async def after_tool(
+        self,
+        tool: BaseTool,
+        args: dict[str, Any],
+        tool_context: ToolContext,
+        tool_response: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Record one admitted tool call's result size and time; never alter the result.
+
+        ADK skips after-tool callbacks for an unknown tool name, so such a call is
+        counted in ``tool_calls`` by ``before_tool`` but has no detail entry.  A call
+        the budget refused was never admitted and has no entry either.
+        """
+
+        del args
+        opened = self.open_tool_calls.pop(tool_context.function_call_id, None)
+        if opened is None:
+            return None
+        index, started = opened
+        if self.within_call_cap(index):
+            self.tool_calls_detail.append(
+                ToolCall(
+                    index=index,
+                    name=tool.name[:_MAX_TOOL_NAME_CHARS],
+                    result_bytes=_tool_result_bytes(tool_response),
+                    truncated=tool_response.get("truncated") is True,
+                    seconds=time.perf_counter() - started,
+                )
+            )
         return None
 
     async def after_model(
@@ -143,14 +234,22 @@ class _EpisodeAccounting:
 
         del callback_context
         usage = llm_response.usage_metadata
-        if usage is not None:
-            prompt_tokens = getattr(usage, "prompt_token_count", None)
-            output_tokens = getattr(usage, "candidates_token_count", None)
-            if prompt_tokens is not None:
-                self.input_tokens = (self.input_tokens or 0) + int(prompt_tokens)
-            if output_tokens is not None:
-                self.output_tokens = (self.output_tokens or 0) + int(output_tokens)
+        # Output tokens are the provider's candidate count as reported; thought tokens
+        # are recorded beside them and never added (see ``ModelCall``).
+        self.input_tokens = _add_known(
+            self.input_tokens, _reported_count(usage, "prompt_token_count")
+        )
+        self.output_tokens = _add_known(
+            self.output_tokens, _reported_count(usage, "candidates_token_count")
+        )
+        self.cached_input_tokens = _add_known(
+            self.cached_input_tokens, _reported_cached_count(usage)
+        )
+        self.thought_tokens = _add_known(
+            self.thought_tokens, _reported_count(usage, "thoughts_token_count")
+        )
         if not llm_response.partial:
+            self.record_model_call(usage)
             # Only the latest complete response decides whether the episode ended
             # truncated; an earlier capped turn that the model recovered from does not.
             self.final_response_hit_output_cap = _stopped_at_output_cap(llm_response)
@@ -159,7 +258,37 @@ class _EpisodeAccounting:
             self.provider_error_message = str(llm_response.error_message or "")
         return None
 
+    def record_model_call(self, usage: object) -> None:
+        """Close the dispatched model request with its complete response's usage."""
+
+        if self.model_started is None:
+            return
+        seconds = time.perf_counter() - self.model_started
+        self.model_started = None
+        if not self.within_call_cap(self.llm_calls):
+            return
+        self.model_calls.append(
+            ModelCall(
+                index=self.llm_calls,
+                input_tokens=_reported_count(usage, "prompt_token_count"),
+                cached_input_tokens=_reported_cached_count(usage),
+                output_tokens=_reported_count(usage, "candidates_token_count"),
+                thought_tokens=_reported_count(usage, "thoughts_token_count"),
+                seconds=seconds,
+            )
+        )
+
+    def within_call_cap(self, index: int) -> bool:
+        """Whether a call ordinal fits its detail list; past the cap only totals grow."""
+
+        if index <= MAX_USAGE_CALL_ENTRIES:
+            return True
+        self.calls_truncated = True
+        return False
+
     def usage(self, seconds: float) -> Usage:
+        # Parallel tool calls finish in any order; the record keeps admission order.
+        tool_calls_detail = sorted(self.tool_calls_detail, key=_tool_call_index)
         return Usage(
             llm_calls=self.llm_calls,
             tool_calls=self.tool_calls,
@@ -169,6 +298,11 @@ class _EpisodeAccounting:
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
             seconds=seconds,
+            cached_input_tokens=self.cached_input_tokens,
+            thought_tokens=self.thought_tokens,
+            model_calls=self.model_calls,
+            tool_calls_detail=tool_calls_detail,
+            calls_truncated=self.calls_truncated,
         )
 
 
@@ -362,6 +496,57 @@ def _auditor_prompt(audit_input: AuditInput) -> str:
     )
 
 
+class _ProbeSources:
+    """The packet probe's source reader: its tools are declared, never called."""
+
+    def read_text(self, snapshot: ArtifactRef, path: str, *, max_bytes: int) -> str:
+        del snapshot, path, max_bytes
+        raise SourceAdmissionError("the packet probe admits no source")
+
+    def iter_files(self, snapshot: ArtifactRef) -> Iterable[tuple[str, bytes]]:
+        del snapshot
+        raise SourceAdmissionError("the packet probe admits no source")
+
+
+def probe_packet_parts(role: RoleName) -> list[tuple[str, str]]:
+    """Render the role's packaged probe request into its deterministic request parts.
+
+    Each tool declaration the live toolset gives native ADK (compact JSON, in declaration
+    order, named ``tool.<name>``) and then the ``packet`` from the live packet builder:
+    the parts ``corsair agent preview`` splits a captured request into, without the
+    instruction (``*_prompt_digest`` covers it), the response schema (the output-schema
+    digest) or any route-specific ``set_model_response`` tool (the model identity).
+    """
+
+    if role == "producer":
+        producer_input = ProducerInput.model_validate_json(packet_probe_text(role))
+        tools = build_producer_toolset(producer_input, _ProbeSources())
+        declarations = [FunctionTool(func=tool)._get_declaration() for tool in tools]
+        parts = [
+            (
+                f"tool.{declaration.name}",
+                _packet_json(declaration.model_dump(mode="json", exclude_none=True)),
+            )
+            for declaration in declarations
+            if declaration is not None
+        ]
+        return [*parts, ("packet", _producer_prompt(producer_input))]
+    audit_input = AuditInput.model_validate_json(packet_probe_text(role))
+    return [("packet", _auditor_prompt(audit_input))]
+
+
+def packet_parts_digest(parts: Iterable[tuple[str, str]]) -> str:
+    """The digest of named request parts, in order: the manifest's packet digest form."""
+
+    return digest([{"name": name, "text": text} for name, text in parts])
+
+
+def probe_packet_digest(role: RoleName) -> str:
+    """The run manifest's ``<role>_packet_digest``: the rendered probe's parts digest."""
+
+    return packet_parts_digest(probe_packet_parts(role))
+
+
 def _feedback_for_provider(code: str | None, message: str | None) -> Feedback:
     """Classify one provider failure without retrying inside a durable activity."""
 
@@ -471,6 +656,7 @@ async def _run_native_episode(
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
     agent.before_tool_callback = accounting.before_tool
+    agent.after_tool_callback = accounting.after_tool
     last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
@@ -525,6 +711,20 @@ def _role_model(
     if model_override is not None:
         return model_override
     return model_for_role(settings, role, request_timeout_seconds=bounds.request_seconds)
+
+
+def _role_decoding(
+    settings: Settings | ModelSettings, role: RoleName
+) -> types.GenerateContentConfig | None:
+    """The role's configured sampling parameters as a native generation config.
+
+    ADK copies the agent's config into every request of the episode, and its LiteLLM
+    route sends only the non-null fields. Nothing set means no config, so the server's
+    own defaults apply exactly as before decoding was configurable.
+    """
+
+    model_settings = settings.models if isinstance(settings, Settings) else settings
+    return decoding_config(model_settings.decoding.for_role(role))
 
 
 def _effective_limit(requested: int, configured: int) -> int:
@@ -587,7 +787,11 @@ async def run_producer(
     bounds = _role_bounds(
         settings, window_seconds, producer_activity_seconds(producer_input.budget, 0)
     )
-    agent = build_producer(_role_model(settings, "producer", bounds, model_override), private_tools)
+    agent = build_producer(
+        _role_model(settings, "producer", bounds, model_override),
+        private_tools,
+        decoding=_role_decoding(settings, "producer"),
+    )
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
@@ -677,7 +881,10 @@ async def run_auditor(
             feedback=_feedback_for_packet(error),
         )
     bounds = _role_bounds(settings, window_seconds, AUDITOR_ACTIVITY_SECONDS)
-    agent = build_auditor(_role_model(settings, "auditor", bounds, model_override))
+    agent = build_auditor(
+        _role_model(settings, "auditor", bounds, model_override),
+        decoding=_role_decoding(settings, "auditor"),
+    )
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(

@@ -1,0 +1,110 @@
+{
+  "case_id": "chain-python-cmdi-a",
+  "execution_status": "COMPLETED",
+  "fix_status": "NOT_REQUESTED",
+  "kind": "python.command_sentinel/1",
+  "negative_threshold": 2,
+  "oracle": {
+    "acceptable": [
+      "REFUTED",
+      "INCONCLUSIVE"
+    ],
+    "acceptable_verdicts": [
+      "EXPLOIT_NOT_DEMONSTRATED"
+    ],
+    "expected_execution": "COMPLETED",
+    "expected_fix": "NOT_REQUESTED",
+    "expected_verdict": "EXPLOIT_NOT_DEMONSTRATED",
+    "forbidden": [
+      "SUPPORTED"
+    ],
+    "forbidden_verdicts": [
+      "EXPLOIT_DEMONSTRATED"
+    ]
+  },
+  "prepared": null,
+  "reason": "redacted at capture",
+  "recorded_verdict": "INCONCLUSIVE",
+  "rounds": [
+    {
+      "audit": null,
+      "index": 1,
+      "observation": null,
+      "producer": {
+        "decision": {
+          "kind": "no_grounded_candidate",
+          "reason": "redacted at capture",
+          "schema_version": "corsair.producer-decision/1",
+          "submission": null
+        },
+        "feedback": null,
+        "usage": {
+          "cached_input_tokens": null,
+          "calls_truncated": false,
+          "input_tokens": 13790,
+          "llm_calls": 3,
+          "model_calls": [
+            {
+              "cached_input_tokens": null,
+              "index": 1,
+              "input_tokens": 2687,
+              "output_tokens": 1652,
+              "seconds": 20.655484879855067,
+              "thought_tokens": 1624
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 2,
+              "input_tokens": 4426,
+              "output_tokens": 2223,
+              "seconds": 28.54261890007183,
+              "thought_tokens": 2207
+            },
+            {
+              "cached_input_tokens": null,
+              "index": 3,
+              "input_tokens": 6677,
+              "output_tokens": 1715,
+              "seconds": 21.664279171964154,
+              "thought_tokens": 1599
+            }
+          ],
+          "output_tokens": 5590,
+          "seconds": 70.89161512092687,
+          "skills_loaded": [],
+          "skills_preloaded": [
+            "source-grounding"
+          ],
+          "thought_tokens": 5430,
+          "tool_calls": 3,
+          "tool_calls_detail": [
+            {
+              "index": 1,
+              "name": "read_file",
+              "result_bytes": 253,
+              "seconds": 0.000324691878631711,
+              "truncated": false
+            },
+            {
+              "index": 2,
+              "name": "list_files",
+              "result_bytes": 38,
+              "seconds": 0.00029412307776510715,
+              "truncated": false
+            },
+            {
+              "index": 3,
+              "name": "set_model_response",
+              "result_bytes": 460,
+              "seconds": 6.172084249556065e-05,
+              "truncated": false
+            }
+          ]
+        }
+      },
+      "session": 1
+    }
+  ],
+  "run_id": "gym-tier1-20261027t012146-ade22e.c8.r2",
+  "schema_version": "corsair.gym-kernel-case/1"
+}
