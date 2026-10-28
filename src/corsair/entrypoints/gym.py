@@ -13,7 +13,8 @@ Runs persist in one store shared by every worktree of the repository,
 records, ``runs/<run-id>/`` each run directory and ``reference/`` the reference scorecards,
 so a run outlives the worktree that produced it. ``lock/`` holds the run lock: one live
 ``gym run`` or ``gym verify`` at a time per gym root, because every live run shares one model
-endpoint and overlapping runs skew each other's timing and failures.
+endpoint and overlapping runs skew each other's timing and failures. Waiters queue under
+``lock/queue/`` and take the lock in the order they joined.
 
 A run pins what it scores: the manifest is read once at admission, its bytes are kept as
 ``dataset.json`` in the run directory with its digest in ``run.json``, and the end of the
@@ -136,6 +137,7 @@ _SERVER_STOP_SECONDS = 20.0
 # The run lock under the gym root.
 LOCK_DIR = "lock"
 LOCK_FILE = "holder.json"
+LOCK_QUEUE = "queue"
 DEFAULT_LOCK_TIMEOUT = 2 * 60 * 60.0
 LOCK_POLL_SECONDS = 2.0
 LOCK_NOTICE_SECONDS = 60.0
@@ -712,7 +714,15 @@ async def temporal_endpoint(address: str | None, log: Path) -> AsyncGenerator[st
 
 
 class GymLockTimeout(GymRefused):
-    """The run lock stayed held by a live process for the whole ``--lock-timeout``."""
+    """The run lock stayed held, or earlier waiters stayed queued, for all of ``--lock-timeout``."""
+
+
+def _wall() -> datetime:
+    return datetime.now(UTC)
+
+
+def _stamp(moment: datetime) -> str:
+    return moment.isoformat()
 
 
 @dataclass(frozen=True)
@@ -725,20 +735,34 @@ class LockHolder:
     branch: str
     commit: str
     tier: str
+    # When the run (process) started; the lock may have been taken much later.
     started_at: str
     # Unique per acquisition, so a release never removes another holder's lock.
     token: str
+    # When this holder took the lock; None in a holder file from before it was recorded.
+    acquired_at: str | None = None
 
     def record(self) -> dict[str, Any]:
         """The holder for run.json and views; the token stays in the lock file."""
         return {key: value for key, value in asdict(self).items() if key != "token"}
 
-    def held_seconds(self) -> float:
-        try:
-            started = datetime.fromisoformat(self.started_at)
-        except ValueError:
-            return 0.0
-        return max(0.0, (datetime.now(UTC) - started).total_seconds())
+    def held_seconds(self, now: datetime | None = None) -> float | None:
+        """Seconds since this holder took the lock; None when that time is unknown."""
+        acquired = _moment(self.acquired_at)
+        if acquired is None:
+            return None
+        return max(0.0, ((now or _wall()) - acquired).total_seconds())
+
+
+def _moment(text: str | None) -> datetime | None:
+    """A recorded timezone-aware ISO time, or None when absent or unreadable."""
+    if text is None:
+        return None
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return moment if moment.tzinfo is not None else None
 
 
 # A holder record that cannot be read names no live process; it is reclaimed.
@@ -746,7 +770,7 @@ _UNREADABLE = LockHolder("unreadable", 0, "", "unknown", "unknown", "unknown", "
 
 
 def new_lock_holder(run_id: str, *, tier: str, branch: str, commit: str) -> LockHolder:
-    """This process as the holder of the lock for ``run_id``."""
+    """This process as the holder of the lock for ``run_id``; ``acquire_lock`` stamps it."""
     return LockHolder(
         run_id=run_id,
         pid=os.getpid(),
@@ -759,22 +783,91 @@ def new_lock_holder(run_id: str, *, tier: str, branch: str, commit: str) -> Lock
     )
 
 
+@dataclass(frozen=True)
+class LockTicket:
+    """A waiter's place in the first-come queue: ``<gym root>/lock/queue/<token>.json``."""
+
+    run_id: str
+    pid: int
+    host: str
+    branch: str
+    commit: str
+    tier: str
+    joined_at: str
+    # The waiter's holder token: one ticket per waiter, removed only by that waiter.
+    token: str
+
+    def record(self) -> dict[str, Any]:
+        """The ticket for views; the token stays in the ticket file."""
+        return {key: value for key, value in asdict(self).items() if key != "token"}
+
+    def order(self) -> tuple[datetime, str]:
+        """First come first served: join time, then token for ties."""
+        joined = _moment(self.joined_at)
+        if joined is None:  # Never published: _parse_ticket refuses such a ticket.
+            raise ValueError(f"ticket {self.token} has no readable join time")
+        return joined, self.token
+
+
+def _ticket_for(holder: LockHolder, joined: datetime) -> LockTicket:
+    return LockTicket(
+        run_id=holder.run_id,
+        pid=holder.pid,
+        host=holder.host,
+        branch=holder.branch,
+        commit=holder.commit,
+        tier=holder.tier,
+        joined_at=_stamp(joined),
+        token=holder.token,
+    )
+
+
 def lock_file(gym_root: Path) -> Path:
     """``<gym root>/lock/holder.json``: present exactly while the lock is held."""
     return gym_root / LOCK_DIR / LOCK_FILE
 
 
-def _parse_holder(text: str) -> LockHolder:
+def queue_dir(gym_root: Path) -> Path:
+    """``<gym root>/lock/queue/``: one ticket per waiting run, in join order."""
+    return gym_root / LOCK_DIR / LOCK_QUEUE
+
+
+def _string_fields(value: object, names: Iterable[str]) -> dict[str, Any] | None:
+    """The named fields of a JSON record when ``pid`` is an int and the rest strings."""
+    if not isinstance(value, dict):
+        return None
     try:
-        value = json.loads(text)
-        fields = {name: value[name] for name in LockHolder.__dataclass_fields__}
-    except (ValueError, TypeError, KeyError):
-        return _UNREADABLE
+        fields = {name: value[name] for name in names}
+    except KeyError:
+        return None
     if not isinstance(fields["pid"], int) or not all(
         isinstance(item, str) for name, item in fields.items() if name != "pid"
     ):
+        return None
+    return fields
+
+
+def _parse_holder(text: str) -> LockHolder:
+    try:
+        value = json.loads(text)
+    except ValueError:
         return _UNREADABLE
-    return LockHolder(**fields)
+    required = [name for name in LockHolder.__dataclass_fields__ if name != "acquired_at"]
+    fields = _string_fields(value, required)
+    acquired = value.get("acquired_at") if isinstance(value, dict) else None
+    if fields is None or not (acquired is None or isinstance(acquired, str)):
+        return _UNREADABLE
+    return LockHolder(**fields, acquired_at=acquired)
+
+
+def _parse_ticket(text: str) -> LockTicket | None:
+    try:
+        fields = _string_fields(json.loads(text), LockTicket.__dataclass_fields__)
+    except ValueError:
+        return None
+    if fields is None or _moment(fields["joined_at"]) is None:
+        return None
+    return LockTicket(**fields)
 
 
 def read_lock(gym_root: Path) -> LockHolder | None:
@@ -783,6 +876,20 @@ def read_lock(gym_root: Path) -> LockHolder | None:
         return _parse_holder(lock_file(gym_root).read_text())
     except FileNotFoundError:
         return None
+
+
+def _read_queue(gym_root: Path) -> list[tuple[Path, LockTicket | None]]:
+    """Every published ticket (None when unreadable); temporary write names are skipped."""
+    directory = queue_dir(gym_root)
+    if not directory.is_dir():
+        return []
+    tickets = []
+    for path in sorted(directory.glob("*.json")):
+        try:
+            tickets.append((path, _parse_ticket(path.read_text())))
+        except FileNotFoundError:
+            continue
+    return tickets
 
 
 def pid_alive(pid: int) -> bool:
@@ -796,8 +903,8 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
-def _holder_alive(holder: LockHolder, alive: Callable[[int], bool]) -> bool | None:
-    """True or False for a holder on this host; None (never stale) for another host's."""
+def _holder_alive(holder: LockHolder | LockTicket, alive: Callable[[int], bool]) -> bool | None:
+    """True or False for a process on this host; None (never stale) for another host's."""
     if holder.pid <= 0:
         return False
     if holder.host != socket.gethostname():
@@ -818,32 +925,104 @@ def _lock_guard(gym_root: Path) -> Generator[Path]:
             fcntl.flock(guard, fcntl.LOCK_UN)
 
 
+def _publish(path: Path, value: Mapping[str, Any], token: str) -> None:
+    """Write ``value`` whole to a temporary name and link it into place (never replacing)."""
+    temporary = path.with_name(f".write-{token}")
+    temporary.write_text(json.dumps(dict(value), indent=2, sort_keys=True) + "\n")
+    try:
+        os.link(temporary, path)  # Fails rather than replaces when the name exists.
+    finally:
+        temporary.unlink()
+
+
+def _reclaim_tickets(
+    gym_root: Path, own: str, alive: Callable[[int], bool]
+) -> tuple[list[LockTicket], LockTicket | None]:
+    """Under the guard: drop dead or unreadable tickets; ``(live others, own ticket)``."""
+    live: list[LockTicket] = []
+    mine = None
+    for path, ticket in _read_queue(gym_root):
+        if ticket is not None and ticket.token == own:
+            mine = ticket
+            continue
+        if ticket is not None and _holder_alive(ticket, alive) is not False:
+            live.append(ticket)
+            continue
+        path.unlink(missing_ok=True)
+        if ticket is None:
+            name, why = "unreadable", "the ticket could not be read"
+        else:
+            name = ticket.run_id
+            why = f"process {ticket.pid} on {ticket.host or 'an unknown host'} is gone"
+        event(
+            "gym.queue_reclaimed",
+            level=logging.WARNING,
+            run_id=name,
+            message=f"removed the gym lock queue ticket of {name}: {why}",
+        )
+    return live, mine
+
+
+@dataclass(frozen=True)
+class _Attempt:
+    """One attempt under the guard: taken (``holder``) or why not, and what was reclaimed."""
+
+    holder: LockHolder | None
+    blocking: LockHolder | None
+    ahead: tuple[LockTicket, ...]
+    waiting: int
+    ticket: LockTicket | None
+    reclaimed: LockHolder | None
+
+
 def _try_lock(
-    gym_root: Path, holder: LockHolder, alive: Callable[[int], bool]
-) -> tuple[LockHolder | None, LockHolder | None]:
-    """One attempt: ``(live holder blocking us or None when taken, stale holder reclaimed)``."""
+    gym_root: Path,
+    holder: LockHolder,
+    alive: Callable[[int], bool],
+    wall: Callable[[], datetime],
+    joined: LockTicket | None,
+) -> _Attempt:
+    """Take the lock when it is free and no live waiter joined earlier, else join the queue.
+
+    Under the guard: a stale holder and dead waiters' tickets are reclaimed; the lock is
+    published with ``acquired_at`` and this waiter's ticket removed in the same step. A
+    caller that is blocked publishes its ticket (``joined`` keeps its first join time).
+    """
     with _lock_guard(gym_root) as path:
         current = read_lock(gym_root)
         reclaimed = None
-        if current is not None:
-            if _holder_alive(current, alive) is not False:
-                return current, None
+        if current is not None and _holder_alive(current, alive) is False:
             path.unlink()
-            reclaimed = current
+            reclaimed, current = current, None
             event(
                 "gym.lock_reclaimed",
                 level=logging.WARNING,
-                run_id=current.run_id,
-                message=f"reclaimed the gym lock from {current.run_id}: process {current.pid} "
-                f"on {current.host or 'an unknown host'} is gone",
+                run_id=reclaimed.run_id,
+                message=f"reclaimed the gym lock from {reclaimed.run_id}: process "
+                f"{reclaimed.pid} on {reclaimed.host or 'an unknown host'} is gone",
             )
-        temporary = path.with_name(f".write-{holder.token}")
-        temporary.write_text(json.dumps(asdict(holder), indent=2, sort_keys=True) + "\n")
-        try:
-            os.link(temporary, path)  # Fails rather than replaces when the name exists.
-        finally:
-            temporary.unlink()
-        return None, reclaimed
+        others, published = _reclaim_tickets(gym_root, holder.token, alive)
+        now = wall()
+        mine = joined or published or _ticket_for(holder, now)
+        ahead = tuple(
+            sorted((item for item in others if item.order() < mine.order()), key=LockTicket.order)
+        )
+        ticket_path = queue_dir(gym_root) / f"{holder.token}.json"
+        if current is None and not ahead:
+            taken = replace(holder, acquired_at=_stamp(now))
+            _publish(path, asdict(taken), holder.token)
+            ticket_path.unlink(missing_ok=True)
+            return _Attempt(taken, None, (), 0, None, reclaimed)
+        if published is None:
+            ticket_path.parent.mkdir(exist_ok=True)
+            _publish(ticket_path, asdict(mine), holder.token)
+        return _Attempt(None, current, ahead, len(others) + 1, mine, reclaimed)
+
+
+def _leave_queue(gym_root: Path, token: str) -> None:
+    """Remove this waiter's own ticket, if it is still queued; never another waiter's."""
+    with _lock_guard(gym_root):
+        (queue_dir(gym_root) / f"{token}.json").unlink(missing_ok=True)
 
 
 def duration_text(seconds: float) -> str:
@@ -856,32 +1035,90 @@ def duration_text(seconds: float) -> str:
     return f"{minutes}m {secs:02d}s" if minutes else f"{secs}s"
 
 
-def _holder_text(holder: LockHolder) -> str:
+def _holder_text(holder: LockHolder | LockTicket) -> str:
     return (
         f"{holder.run_id} ({holder.tier}, {holder.branch}@{holder.commit[:7]}, pid {holder.pid} "
         f"on {holder.host or 'an unknown host'})"
     )
 
 
+def _held_text(seconds: float | None) -> str:
+    return "held time unknown" if seconds is None else f"held {duration_text(seconds)}"
+
+
+def _waiters_text(count: int) -> str:
+    return f"{count} earlier waiter{'s' if count != 1 else ''}"
+
+
 @dataclass(frozen=True)
 class LockWait:
-    """How a run came to hold the lock: whom it waited for, how long, what it reclaimed."""
+    """How a run came to hold the lock: whom it waited for, how long, what it reclaimed.
+
+    ``queue_position`` is the 1-based place it joined the queue at (None when it took a
+    free lock at its first attempt) and ``waiters_ahead`` how many live waiters were ahead.
+    """
 
     holder: LockHolder
     seconds: float
     waited_for: tuple[LockHolder, ...] = ()
     reclaimed: tuple[LockHolder, ...] = ()
+    queue_position: int | None = None
+    waiters_ahead: int = 0
 
     def record(self) -> dict[str, Any]:
         """``run.json``'s ``lock`` entry."""
         return {
             "used": True,
             "holder_run_id": self.holder.run_id,
-            "waited": bool(self.waited_for),
+            "waited": bool(self.waited_for) or self.queue_position is not None,
             "wait_seconds": round(self.seconds, 1),
             "waited_for": [item.record() for item in self.waited_for],
             "reclaimed": [item.record() for item in self.reclaimed],
+            "queue_position": self.queue_position,
+            "waiters_ahead": self.waiters_ahead,
         }
+
+
+def _waiting_notice(attempt: _Attempt, waited: float, timeout: float, now: datetime) -> None:
+    position = f"queue position {len(attempt.ahead) + 1} of {attempt.waiting}"
+    if attempt.blocking is not None:
+        named = attempt.blocking.run_id
+        whom = (
+            f"held by {named} ({attempt.blocking.tier}, "
+            f"{_held_text(attempt.blocking.held_seconds(now))})"
+        )
+    else:
+        named = attempt.ahead[0].run_id
+        whom = f"free, behind {_waiters_text(len(attempt.ahead))} (next: {named})"
+    event(
+        "gym.lock_waiting",
+        run_id=named,
+        seconds=round(waited),
+        message=f"waiting for the gym lock {whom}; {position}; waited "
+        f"{duration_text(waited)} of {duration_text(timeout)}",
+    )
+
+
+def _timeout_text(gym_root: Path, attempt: _Attempt, waited: float) -> str:
+    where = f"the gym lock under {gym_root / LOCK_DIR}"
+    if attempt.blocking is not None:
+        state = f"{where} is still held by {_holder_text(attempt.blocking)}"
+        remedy = (
+            "if that process no longer runs, release it with `corsair gym lock release --force`"
+        )
+    else:
+        state = (
+            f"{where} is free, but {_waiters_text(len(attempt.ahead))} still queued ahead of "
+            f"this run (next: {_holder_text(attempt.ahead[0])})"
+        )
+        remedy = (
+            "if that waiter no longer runs on another host, remove its ticket under "
+            f"{queue_dir(gym_root)}"
+        )
+    return (
+        f"{state} after waiting {duration_text(waited)}; nothing was started. Wait for "
+        f"that run, raise --lock-timeout, or, {remedy}."
+    )
 
 
 async def acquire_lock(
@@ -892,44 +1129,53 @@ async def acquire_lock(
     alive: Callable[[int], bool] = pid_alive,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    wall: Callable[[], datetime] = _wall,
 ) -> LockWait:
-    """Take the gym root's run lock, waiting while a live process holds it.
+    """Take the gym root's run lock first come first served, waiting while it is busy.
 
-    A holder whose process is gone on this host is reclaimed with a logged notice. While a
-    live holder keeps it, one line names the holder when the wait starts and every minute
-    after; after ``timeout`` seconds the wait ends with ``GymLockTimeout`` and nothing else.
+    A caller that finds the lock free and no live waiter ahead takes it at once and leaves
+    no ticket. Otherwise it joins the queue under ``lock/queue/`` and takes the lock only
+    once it is free and no live ticket joined earlier. A holder or ticket whose process is
+    gone on this host is reclaimed with a logged notice. While it waits, one line names the
+    holder (or the next waiter) and this caller's queue position when the wait starts and
+    every minute after; after ``timeout`` seconds the wait ends with ``GymLockTimeout``.
+    The caller's own ticket is removed when it takes the lock, times out or fails.
     """
     begun = clock()
     waited_for: list[LockHolder] = []
     reclaimed: list[LockHolder] = []
     notice_at = begun
-    while True:
-        blocking, stale = _try_lock(gym_root, holder, alive)
-        if stale is not None:
-            reclaimed.append(stale)
-        if blocking is None:
-            return LockWait(holder, clock() - begun, tuple(waited_for), tuple(reclaimed))
-        if all(item.token != blocking.token for item in waited_for):
-            waited_for.append(blocking)
-        waited = clock() - begun
-        if waited >= timeout:
-            raise GymLockTimeout(
-                f"the gym lock under {gym_root / LOCK_DIR} is still held by "
-                f"{_holder_text(blocking)} after waiting {duration_text(waited)}; nothing was "
-                "started. Wait for that run, raise --lock-timeout, or, if that process no "
-                "longer runs, release it with `corsair gym lock release --force`."
-            )
-        if clock() >= notice_at:
-            event(
-                "gym.lock_waiting",
-                run_id=blocking.run_id,
-                seconds=round(waited),
-                message=f"waiting for the gym lock held by {blocking.run_id} "
-                f"({blocking.tier}, held {duration_text(blocking.held_seconds())}); waited "
-                f"{duration_text(waited)} of {duration_text(timeout)}",
-            )
-            notice_at += LOCK_NOTICE_SECONDS
-        await sleep(min(LOCK_POLL_SECONDS, timeout - waited))
+    joined: LockTicket | None = None
+    position: tuple[int, int] | None = None
+    try:
+        while True:
+            attempt = _try_lock(gym_root, holder, alive, wall, joined)
+            if attempt.reclaimed is not None:
+                reclaimed.append(attempt.reclaimed)
+            if attempt.holder is not None:
+                return LockWait(
+                    attempt.holder,
+                    clock() - begun,
+                    tuple(waited_for),
+                    tuple(reclaimed),
+                    queue_position=None if position is None else position[0],
+                    waiters_ahead=0 if position is None else position[1],
+                )
+            joined = attempt.ticket
+            if position is None:
+                position = (len(attempt.ahead) + 1, len(attempt.ahead))
+            blocking = attempt.blocking
+            if blocking is not None and all(item.token != blocking.token for item in waited_for):
+                waited_for.append(blocking)
+            waited = clock() - begun
+            if waited >= timeout:
+                raise GymLockTimeout(_timeout_text(gym_root, attempt, waited))
+            if clock() >= notice_at:
+                _waiting_notice(attempt, waited, timeout, wall())
+                notice_at += LOCK_NOTICE_SECONDS
+            await sleep(min(LOCK_POLL_SECONDS, timeout - waited))
+    finally:
+        _leave_queue(gym_root, holder.token)
 
 
 def release_lock(gym_root: Path, holder: LockHolder) -> bool:
@@ -949,7 +1195,10 @@ def release_lock(gym_root: Path, holder: LockHolder) -> bool:
 
 
 def force_release(gym_root: Path) -> LockHolder | None:
-    """Remove the lock whoever holds it; return that holder (None when it was free)."""
+    """Remove the lock whoever holds it; return that holder (None when it was free).
+
+    The queue is left alone: its waiters still take the lock in the order they joined.
+    """
     with _lock_guard(gym_root) as path:
         current = read_lock(gym_root)
         if current is not None:
@@ -974,17 +1223,47 @@ async def gym_lock(
 
 
 def lock_status(
-    gym_root: Path, *, alive: Callable[[int], bool] = pid_alive
+    gym_root: Path,
+    *,
+    alive: Callable[[int], bool] = pid_alive,
+    wall: Callable[[], datetime] = _wall,
 ) -> dict[str, Any] | None:
-    """The holder with ``alive`` (None on another host) and ``elapsed_seconds``, or None."""
+    """The holder with ``alive`` (None on another host) and ``held_seconds``, or None.
+
+    ``held_seconds`` counts from acquisition and is None when the holder file records no
+    acquisition time (one written before it did).
+    """
     holder = read_lock(gym_root)
     if holder is None:
         return None
+    held = holder.held_seconds(wall())
     return {
         **holder.record(),
         "alive": _holder_alive(holder, alive),
-        "elapsed_seconds": round(holder.held_seconds(), 1),
+        "held_seconds": None if held is None else round(held, 1),
     }
+
+
+def queue_status(
+    gym_root: Path,
+    *,
+    alive: Callable[[int], bool] = pid_alive,
+    wall: Callable[[], datetime] = _wall,
+) -> list[dict[str, Any]]:
+    """Every readable queue ticket in join order with ``alive`` and ``waited_seconds``."""
+    tickets = sorted(
+        (ticket for _, ticket in _read_queue(gym_root) if ticket is not None),
+        key=LockTicket.order,
+    )
+    now = wall()
+    return [
+        {
+            **ticket.record(),
+            "alive": _holder_alive(ticket, alive),
+            "waited_seconds": round(max(0.0, (now - ticket.order()[0]).total_seconds()), 1),
+        }
+        for ticket in tickets
+    ]
 
 
 _LIVENESS = {True: "running", False: "process gone", None: "liveness unknown on another host"}
@@ -992,12 +1271,27 @@ _LIVENESS = {True: "running", False: "process gone", None: "liveness unknown on 
 
 def lock_line(status: Mapping[str, Any]) -> str:
     """One code-owned line for a held lock, from ``lock_status``."""
+    held = status["held_seconds"]
+    since = (
+        "; held time unknown (the holder file records no acquisition time)."
+        if held is None
+        else f" for {duration_text(held)} since it took the lock."
+    )
     return (
         f"Gym lock: held by `{status['run_id']}` ({status['tier']}, "
         f"{status['branch']}@{str(status['commit'])[:7]}, pid {status['pid']} on "
-        f"{status['host'] or 'an unknown host'}, {_LIVENESS[status['alive']]}) for "
-        f"{duration_text(status['elapsed_seconds'])}."
+        f"{status['host'] or 'an unknown host'}, {_LIVENESS[status['alive']]}){since}"
     )
+
+
+def queue_lines(queue: Sequence[Mapping[str, Any]]) -> list[str]:
+    """One code-owned line per waiter, from ``queue_status``, in the order they get the lock."""
+    return [
+        f"{number}. `{row['run_id']}` ({row['tier']}, pid {row['pid']} on "
+        f"{row['host'] or 'an unknown host'}, {_LIVENESS[row['alive']]}), waiting "
+        f"{duration_text(row['waited_seconds'])}."
+        for number, row in enumerate(queue, start=1)
+    ]
 
 
 def _lock_scope(
@@ -1442,7 +1736,14 @@ async def verify_candidate(
             )
             # Only the first tier waited; later tiers run under the lock already held.
             if held is not None:
-                held = replace(held, seconds=0.0, waited_for=(), reclaimed=())
+                held = replace(
+                    held,
+                    seconds=0.0,
+                    waited_for=(),
+                    reclaimed=(),
+                    queue_position=None,
+                    waiters_ahead=0,
+                )
             runs[name] = run
             narrowed = min_cases is not None and name in MIN_CASES_TIERS
             reference_trajectories = None
