@@ -906,6 +906,25 @@ async def test_noise_reads_per_case_stability_from_the_trajectories_beside_each_
     assert unstable == ["rb-a"]
 
 
+@pytest.mark.asyncio
+async def test_noise_records_resampled_intervals_with_the_given_seed(tmp_path, capsys):
+    root = tmp_path / "gym"
+    first = root / "runs/gym-tier1-20261027t012146-ade22e"
+    second = root / "runs/gym-tier1-20261027t111450-29968e"
+    _identified(first / SCORECARD_FILE, BASELINE, run_id=first.name, trajectories=True)
+    _identified(second / SCORECARD_FILE, NOISY, run_id=second.name, trajectories=True)
+    args = ["gym", "noise", str(first), str(second), "--root", str(root)]
+    assert await _run(_arguments(*args, "--out", str(tmp_path / "zero.json"))) == 0
+    zero = read_noise(tmp_path / "zero.json")
+    assert (zero.resamples, zero.seed) == (2000, 0)
+    assert await _run(_arguments(*args, "--seed", "7", "--out", str(tmp_path / "seven.json"))) == 0
+    seven = read_noise(tmp_path / "seven.json")
+    assert seven.seed == 7 and seven.objective_j.interval is not None
+    capsys.readouterr()
+    with pytest.raises(SystemExit):
+        _arguments(*args, "--seed", "-1")
+
+
 def _band(tmp_path: Path) -> Path:
     first, second = _noise_runs(tmp_path / "gym")
     out = tmp_path / "noise-tier1.json"
