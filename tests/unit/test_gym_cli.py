@@ -5,7 +5,9 @@ every other subcommand reads saved files only.
 """
 
 import json
+import os
 import shutil
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -41,6 +43,8 @@ from tests.unit.evaluation.test_gym_paired import _side as paired_side
 from tests.unit.evaluation.test_gym_slice import _sliced as sliced_side
 
 ROOT = Path(__file__).resolve().parents[2]
+_JOINED = "2026-10-27T01:01:00+00:00"
+_LATER = "2026-10-27T01:02:00+00:00"
 
 
 def _arguments(*argv: str, format: str = "json") -> cli.CliArguments:
@@ -690,6 +694,7 @@ def test_no_lock_says_it_is_for_scripted_tests_only(capsys):
 
 def _held(root: Path, run_id: str = "gym-tier1-20261027t010000-aaaaaa") -> gym.LockHolder:
     holder = gym.new_lock_holder(run_id, tier="tier1", branch="gym/h1", commit="c" * 40)
+    holder = replace(holder, acquired_at=holder.started_at)
     path = gym.lock_file(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({**holder.record(), "token": holder.token}))
@@ -702,13 +707,13 @@ async def test_lock_status_and_a_forced_release_print_the_holder(tmp_path, capsy
     assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
     assert capsys.readouterr().out == f"Gym lock under `{tmp_path / 'lock'}` is free.\n"
     assert await _run(_arguments("gym", "lock", "status", *root)) == 0
-    assert json.loads(capsys.readouterr().out) == {"held": False, "holder": None}
+    assert json.loads(capsys.readouterr().out) == {"held": False, "holder": None, "queue": []}
 
     holder = _held(tmp_path)
     assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
     text = capsys.readouterr().out
     assert text.startswith(f"Gym lock: held by `{holder.run_id}` (tier1, gym/h1@ccccccc, pid ")
-    assert ", running) for " in text
+    assert ", running) for " in text and text.endswith(" since it took the lock.\n")
     assert await _run(_arguments("gym", "lock", "status", *root)) == 0
     status = json.loads(capsys.readouterr().out)
     assert status["held"] is True and status["holder"]["run_id"] == holder.run_id
@@ -723,6 +728,58 @@ async def test_lock_status_and_a_forced_release_print_the_holder(tmp_path, capsy
     assert gym.read_lock(tmp_path) is None
     assert await _run(_arguments(*release)) == 0
     assert json.loads(capsys.readouterr().out) == {"released": False, "holder": None}
+
+
+def _waiting(root: Path, run_id: str, *, joined: str, pid: int) -> gym.LockTicket:
+    holder = gym.new_lock_holder(run_id, tier="tier0", branch="gym/h2", commit="d" * 40)
+    ticket = gym.LockTicket(
+        run_id=run_id,
+        pid=pid,
+        host=holder.host,
+        branch=holder.branch,
+        commit=holder.commit,
+        tier=holder.tier,
+        joined_at=joined,
+        token=holder.token,
+    )
+    directory = gym.queue_dir(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{ticket.token}.json").write_text(json.dumps(asdict(ticket)))
+    return ticket
+
+
+@pytest.mark.asyncio
+async def test_lock_status_lists_the_queue_and_a_forced_release_leaves_it(tmp_path, capsys):
+    root = ["--root", str(tmp_path)]
+    holder = _held(tmp_path)
+    first = _waiting(tmp_path, "gym-tier0-20261027t010100-bbbbbb", joined=_JOINED, pid=os.getpid())
+    gone = _waiting(tmp_path, "gym-tier0-20261027t010200-cccccc", joined=_LATER, pid=999_999_999)
+
+    assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith(f"Gym lock: held by `{holder.run_id}` (tier1,")
+    assert lines[0].endswith("since it took the lock.")
+    assert lines[1:3] == ["", "Queue (2 waiting, first come first served):"]
+    assert lines[3].startswith(f"1. `{first.run_id}` (tier0, pid {os.getpid()} on ")
+    assert ", running), waiting " in lines[3]
+    assert lines[4].startswith(f"2. `{gone.run_id}` (tier0, pid 999999999 on ")
+    assert ", process gone), waiting " in lines[4]
+    assert await _run(_arguments("gym", "lock", "status", *root)) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert [row["run_id"] for row in status["queue"]] == [first.run_id, gone.run_id]
+    assert [row["alive"] for row in status["queue"]] == [True, False]
+    assert all("token" not in row for row in status["queue"])
+
+    release = ["gym", "lock", "release", "--force", *root]
+    assert await _run(_arguments(*release)) == 0
+    assert json.loads(capsys.readouterr().out)["released"] is True
+    assert sorted(path.name for path in gym.queue_dir(tmp_path).iterdir()) == sorted(
+        [f"{first.token}.json", f"{gone.token}.json"]
+    ), "a forced release leaves the queue alone"
+    assert await _run(_arguments("gym", "lock", "status", *root, format="markdown")) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == f"Gym lock under `{tmp_path / 'lock'}` is free."
+    assert lines[2] == "Queue (2 waiting, first come first served):"
 
 
 @pytest.mark.asyncio

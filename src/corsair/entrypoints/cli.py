@@ -1257,15 +1257,22 @@ async def _handle_gym_lock(args: CliArguments, ui: Terminal) -> int:
         force_release,
         lock_line,
         lock_status,
+        queue_lines,
+        queue_status,
     )
 
     root = _gym_root(args)
     status = lock_status(root)
     if args.lock_command == "status":
+        queue = queue_status(root)
         text = (
             f"Gym lock under `{root / LOCK_DIR}` is free." if status is None else lock_line(status)
         )
-        _emit_view(ui, text + "\n", {"held": status is not None, "holder": status})
+        if queue:
+            text += f"\n\nQueue ({len(queue)} waiting, first come first served):\n" + "\n".join(
+                queue_lines(queue)
+            )
+        _emit_view(ui, text + "\n", {"held": status is not None, "holder": status, "queue": queue})
         return 0
     if status is not None and not args.force:
         raise GymRefused(
@@ -1977,8 +1984,15 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     lock = command("lock", "Show or release the gym root's run lock (<gym root>/lock/)")
     lock_commands = lock.add_subparsers(dest="lock_command", required=True, title="lock commands")
     for name, description in (
-        ("status", "Show the lock's holder (run id, tier, commit, pid, host) and how long"),
-        ("release", "Remove the lock whoever holds it; refused without --force"),
+        (
+            "status",
+            "Show the lock's holder (run id, tier, commit, pid, host, held since it took the "
+            "lock) and the queued waiters in the order they get it",
+        ),
+        (
+            "release",
+            "Remove the lock whoever holds it; refused without --force; leaves the queue alone",
+        ),
     ):
         lock_command = lock_commands.add_parser(name, help=description, description=description)
         _presentation_options(lock_command)
