@@ -31,6 +31,10 @@ and independent across cases: a synthetic run is what a run of the same configur
 could have scored if each case's episodes are draws at its pooled rate, so the interval
 carries each case's majority coin-flip, which the half-range of a few runs understates.
 The draws use ``random.Random(seed)``, so a band is reproducible from its runs and seed.
+
+Macro sandbox CPU seconds (the driver's CPU time for the sandboxed runs) are recorded per
+run with their spread and, on a resampled band, their interval: information only, which
+no gate rule reads.
 """
 
 import json
@@ -117,6 +121,7 @@ def noise_band(
         raise ValueError("a noise band reads one trajectory record per run")
     first = cards[0]
     seconds = [card.macro_p50_seconds for card in cards]
+    cpu = [card.macro_sandbox_cpu_seconds for card in cards]
     languages = sorted(set().union(*(card.languages for card in cards)))
     records = list(trajectories) if trajectories is not None else [None] * len(cards)
     missing = [
@@ -143,6 +148,13 @@ def noise_band(
             if any(value is None for value in seconds)
             else spread([value or 0.0 for value in seconds], ratio=True)
         ),
+        # Information only; no gate rule reads it.
+        macro_sandbox_cpu_seconds=(
+            None
+            if any(value is None for value in cpu)
+            else spread([value or 0.0 for value in cpu], ratio=True)
+        ),
+        sandbox_cpu_unknown=[card.sandbox_cpu_unknown for card in cards],
         languages={
             language: spread([_verified(card, language) for card in cards])
             for language in languages
@@ -238,7 +250,7 @@ def with_intervals(
                     worst_language_verified_accuracy=worst,
                 )
             )
-    seconds = band.macro_p50_seconds
+    seconds, cpu = band.macro_p50_seconds, band.macro_sandbox_cpu_seconds
     resampled = band.model_copy(
         update={
             "objective_j": interval(band.objective_j, lambda run: run.objective_j),
@@ -250,6 +262,9 @@ def with_intervals(
             ),
             "macro_p50_seconds": (
                 None if seconds is None else interval(seconds, lambda run: run.macro_p50_seconds)
+            ),
+            "macro_sandbox_cpu_seconds": (
+                None if cpu is None else interval(cpu, lambda run: run.macro_sandbox_cpu_seconds)
             ),
             "languages": {
                 language: interval(spread, lambda run, name=language: _verified(run, name))

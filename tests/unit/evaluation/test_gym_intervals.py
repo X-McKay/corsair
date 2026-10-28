@@ -99,6 +99,38 @@ def test_resampling_is_deterministic_under_a_seed():
     assert all(not card.sliced for card in first)
 
 
+def _cpu_side(run_id: str, cpu: dict[str, float]) -> tuple[Scorecard, list[Trajectory]]:
+    """``_side(PAIRED, run_id)`` whose episodes of each case took ``cpu[case]`` sandbox CPU
+    seconds (python's three cases, otherwise one figure for every case)."""
+    card, rows = _side(PAIRED, run_id)
+    rows = [
+        item.model_copy(update={"sandbox_cpu_seconds": cpu.get(item.case_id, cpu["*"])})
+        for item in rows
+    ]
+    rescored = build_scorecard(rows, run=card.run, dataset_digest=card.dataset_digest, cases=CASES)
+    figures = {
+        "macro_sandbox_cpu_seconds": rescored.macro_sandbox_cpu_seconds,
+        "sandbox_cpu_unknown": rescored.sandbox_cpu_unknown,
+    }
+    return card.model_copy(update=figures), rows
+
+
+def test_a_resampled_band_records_an_information_interval_on_sandbox_cpu_seconds():
+    sides = [_cpu_side("ref-0", {"*": 1.0}), _cpu_side("ref-1", {"*": 1.0, "py-a": 4.0})]
+    band = noise_band([card for card, _ in sides], [rows for _, rows in sides])
+    cpu = band.macro_sandbox_cpu_seconds
+    assert cpu is not None and cpu.interval is not None
+    # Python's mean moves by one case of three: (4 - 1) / 3 = 1, so the macro over three
+    # languages by 1/3; the resampled runs draw py-a at 1 or 4 seconds per episode.
+    assert cpu.values == pytest.approx([1.0, 4 / 3])
+    assert 1.0 <= cpu.interval.low <= cpu.interval.high <= 4 / 3
+    assert band.sandbox_cpu_unknown == [0, 0]
+    # The record decodes without the interval as a band written before intervals would.
+    assert without_intervals(band).macro_sandbox_cpu_seconds == cpu.model_copy(
+        update={"interval": None}
+    )
+
+
 def test_a_case_verifying_every_episode_gives_a_degenerate_interval():
     # Every case verifies all or none of its episodes in every run: no draw can differ.
     band = _resampled(PAIRED, PAIRED)

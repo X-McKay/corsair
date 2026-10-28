@@ -740,8 +740,17 @@ def _majority_verified_without_operational_failures(repeats: Sequence[Trajectory
     return 2 * sum(item.verified or item.operational for item in repeats) > len(repeats)
 
 
+def _case_cpu_seconds(repeats: Sequence[Trajectory]) -> float | None:
+    """A case's mean sandbox CPU seconds over its repeats; unknown when any lacks it."""
+    figures = [item.sandbox_cpu_seconds for item in repeats]
+    if not figures or any(figure is None for figure in figures):
+        return None
+    return mean(figure for figure in figures if figure is not None)
+
+
 def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
-    """Case-level majority accuracy; reward and tokens are means over repeats, then cases."""
+    """Case-level majority accuracy; reward, tokens and sandbox CPU seconds are means over
+    repeats, then cases (a case lacking any episode's CPU figure is left out)."""
     by_case: dict[str, list[Trajectory]] = defaultdict(list)
     for item in trajectories:
         by_case[item.case_id].append(item)
@@ -761,6 +770,8 @@ def group_summary(trajectories: Sequence[Trajectory]) -> GroupSummary:
         p95_effective_tokens=percentile(tokens, 95),
         p50_seconds=percentile(seconds, 50),
         p95_seconds=percentile(seconds, 95),
+        mean_sandbox_cpu_seconds=_known_mean(_case_cpu_seconds(case) for case in cases),
+        sandbox_cpu_unknown=sum(item.sandbox_cpu_seconds is None for item in trajectories),
         failure_stops=dict(sorted(stops.items(), key=lambda item: (-item[1], item[0]))),
         usage_unknown=sum(not item.usage_known for item in trajectories),
         mean_thought_share=_known_mean(
@@ -906,6 +917,10 @@ def build_scorecard(
             summary.mean_effective_tokens for summary in languages.values()
         ),
         macro_p50_seconds=_macro(summary.p50_seconds for summary in languages.values()),
+        macro_sandbox_cpu_seconds=_macro(
+            summary.mean_sandbox_cpu_seconds for summary in languages.values()
+        ),
+        sandbox_cpu_unknown=sum(item.sandbox_cpu_seconds is None for item in trajectories),
         macro_thought_share=_macro(summary.mean_thought_share for summary in languages.values()),
         capped_call_episodes=_known_total(
             summary.capped_call_episodes for summary in languages.values()

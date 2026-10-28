@@ -324,6 +324,74 @@ def test_a_report_missing_dataset_cases_is_sliced():
     assert card.repeats == 0
 
 
+def _cpu(case: str, language: str, cpu: float | None, repeat: int = 0) -> Trajectory:
+    item = _trajectory(case, language, True)
+    return item.model_copy(update={"repeat": repeat, "sandbox_cpu_seconds": cpu})
+
+
+def _cpu_card(figures: dict[tuple[str, str], list[float | None]]):
+    rows = [
+        _cpu(case, language, cpu, repeat)
+        for (case, language), values in figures.items()
+        for repeat, cpu in enumerate(values)
+    ]
+    cases = {case: f"{language}.kind/1" for case, language in figures}
+    return build_scorecard(rows, run=_context(), dataset_digest="d" * 64, cases=cases)
+
+
+def test_macro_sandbox_cpu_seconds_is_the_macro_of_per_case_means():
+    card = _cpu_card(
+        {
+            ("a", "python"): [1.0, 2.0, 3.0],
+            ("b", "python"): [4.0, 4.0, 4.0],
+            ("c", "ruby"): [6.0, 6.0, 6.0],
+        }
+    )
+    # python: case means 2 and 4, so 3; ruby 6; the macro over languages 4.5.
+    assert card.languages["python"].mean_sandbox_cpu_seconds == pytest.approx(3.0)
+    assert card.languages["ruby"].mean_sandbox_cpu_seconds == pytest.approx(6.0)
+    assert card.macro_sandbox_cpu_seconds == pytest.approx(4.5)
+    assert card.languages["python"].sandbox_cpu_unknown == 0
+    assert card.sandbox_cpu_unknown == 0
+    # Information only: J and its terms do not read it.
+    keys = [("a", "python"), ("b", "python"), ("c", "ruby")]
+    unknown = _cpu_card({key: [None] * 3 for key in keys})
+    assert (card.objective_j, card.macro_reward) == (unknown.objective_j, unknown.macro_reward)
+
+
+def test_an_episode_lacking_sandbox_cpu_seconds_leaves_its_case_unknown_and_is_counted():
+    card = _cpu_card(
+        {
+            ("a", "python"): [1.0, None, 3.0],
+            ("b", "python"): [4.0, 4.0, 4.0],
+            ("c", "ruby"): [None, None, None],
+        }
+    )
+    # Case a is unknown, never a mean of its known episodes or a zero: python reads case b.
+    assert card.languages["python"].mean_sandbox_cpu_seconds == pytest.approx(4.0)
+    assert card.languages["python"].sandbox_cpu_unknown == 1
+    # Ruby's only case is unknown, so ruby and the macro over languages are unknown.
+    assert card.languages["ruby"].mean_sandbox_cpu_seconds is None
+    assert card.languages["ruby"].sandbox_cpu_unknown == 3
+    assert card.macro_sandbox_cpu_seconds is None
+    assert card.sandbox_cpu_unknown == 4
+    assert card.kinds["python.kind/1"].sandbox_cpu_unknown == 1
+
+
+def test_a_scorecard_stored_before_sandbox_cpu_seconds_decodes_with_them_unknown():
+    card = _cpu_card({("a", "python"): [1.0, 1.0, 1.0]})
+    record = card.model_dump(mode="json")
+    for name in ("macro_sandbox_cpu_seconds", "sandbox_cpu_unknown"):
+        record.pop(name)
+    for summary in [*record["languages"].values(), *record["kinds"].values()]:
+        for name in ("mean_sandbox_cpu_seconds", "sandbox_cpu_unknown"):
+            summary.pop(name)
+    stored = type(card).model_validate(record)
+    assert stored.macro_sandbox_cpu_seconds is None and stored.sandbox_cpu_unknown is None
+    assert stored.languages["python"].mean_sandbox_cpu_seconds is None
+    assert stored.languages["python"].sandbox_cpu_unknown is None
+
+
 def test_score_report_reads_the_frozen_manifest_and_refuses_another_dataset(tmp_path):
     dataset_path = ROOT / "evals/datasets/dev.json"
     dataset, _, _ = load_dataset(dataset_path)

@@ -72,6 +72,70 @@ def test_the_gate_view_names_its_track_and_rule():
     assert REASON_TEXT[GateReason.LATENCY_NOT_COMPARABLE] in view
 
 
+def _timed(card, cpu: float | None):
+    """``card`` rescored with every episode at ``cpu`` sandbox CPU seconds."""
+    rows = [
+        Trajectory(
+            run_id=f"{case}-{repeat}",
+            case_id=case,
+            repeat=repeat,
+            kind=kind,
+            language=kind.split(".")[0],
+            status="pass",
+            passed=True,
+            verified=True,
+            false_label=False,
+            usage_known=True,
+            effective_tokens=100.0,
+            seconds=12.5,
+            sandbox_cpu_seconds=None if case == "rb-a" and repeat == 0 else cpu,
+            reward_verdict=1.0,
+            reward=1.0,
+        )
+        for case, kind in CASES.items()
+        for repeat in range(3)
+    ]
+    return build_scorecard(rows, run=card.run, dataset_digest="d" * 64, cases=CASES)
+
+
+def test_scorecard_prints_sandbox_cpu_seconds_beside_p50_as_information():
+    card = _timed(_card("base", True), 0.5)
+    # Ruby's only case lacks one episode's figure, so ruby and the macro are unknown.
+    text = render_scorecard(card)
+    assert (
+        "- Macro p50 seconds: 12.5\n"
+        "- Macro sandbox CPU seconds (information): unknown; episodes lacking it: 1\n"
+    ) in text
+    assert "| p50 s | p95 s | Mean sandbox CPU s | Sandbox CPU unknown |" in text
+    assert "| python | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | 0.500 | 0 |" in text
+    assert "| ruby | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | unknown | 1 |" in text
+    known = card.model_copy(update={"macro_sandbox_cpu_seconds": 0.5})
+    assert "- Macro sandbox CPU seconds (information): 0.500; episodes lacking it: 1" in (
+        render_scorecard(known)
+    )
+    # A scorecard stored before the figure prints both as unknown.
+    old = render_scorecard(_card("base", True).model_copy(update={"sandbox_cpu_unknown": None}))
+    assert "- Macro sandbox CPU seconds (information): unknown; episodes lacking it: unknown" in old
+
+
+def test_the_gate_view_prints_sandbox_cpu_seconds_and_their_ratio_as_information():
+    baseline = _timed(_card("base", True), 0.5).model_copy(
+        update={"macro_sandbox_cpu_seconds": 0.5}
+    )
+    candidate = _timed(_card("cand", True), 0.4).model_copy(
+        update={"macro_sandbox_cpu_seconds": 0.4}
+    )
+    verdict = gate(baseline, candidate)
+    text = render_gate(verdict, baseline, candidate)
+    assert "| Macro sandbox CPU seconds (information) | 0.500 | 0.400 | -0.100 |" in text
+    assert "| Sandbox CPU seconds ratio (installed reference, information) |  | 0.800 |  |" in text
+    assert "| Episodes lacking sandbox CPU seconds | 1 | 1 | +0 |" in text
+    assert "band mean, information" not in text
+    # Information only: the verdict is the gate's without the figure.
+    plain = gate(_card("base", True), _card("cand", True))
+    assert verdict.model_dump() == plain.model_dump()
+
+
 def test_scorecard_summary_lists_languages_kinds_and_failure_stops():
     text = render_scorecard(_card("base", False))
     assert "| python |" in text
@@ -116,7 +180,8 @@ def test_scorecard_shows_thought_share_and_capped_episodes():
     header = next(line for line in text.splitlines() if line.startswith("| Language |"))
     assert "| Thought share | Capped eps | Reasoning capped | Failure stops |" in header
     assert (
-        "| python | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | 0 | 0.900 | 2 | 2 |" in text
+        "| python | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | unknown | 3 | 0 | 0.900 "
+        "| 2 | 2 |" in text
     )
     assert "- Capped-call episodes: 2; reasoning cap exhausted: 2" in text
     assert "- Macro thought share: 0.900" in text
@@ -125,7 +190,7 @@ def test_scorecard_shows_thought_share_and_capped_episodes():
 def test_scorecard_prints_unknown_markers_as_unknown():
     text = render_scorecard(_card("base", True))
     assert (
-        "| ruby | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | 0 "
+        "| ruby | 1 | 3 | 1.000 | 1.000 | 1.000 | 100 | 12.5 | 12.5 | unknown | 3 | 0 "
         "| unknown | unknown | unknown | none |" in text
     )
     assert "- Capped-call episodes: unknown; reasoning cap exhausted: unknown" in text

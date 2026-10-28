@@ -28,6 +28,7 @@ from corsair.contracts import (
     TargetExceptionEpisode,
 )
 from corsair.evaluation.gym.gate import (
+    band_ratio,
     deciding_accuracy_spread,
     inside_band,
     noise_reading,
@@ -301,6 +302,13 @@ FLIP_NOISE_TEXT: dict[FlipNoise, str] = {
 }
 
 INSTALLED = " (installed reference)"
+
+SANDBOX_CPU_TEXT = (
+    "Sandbox CPU seconds are information only: the trusted driver's CPU time for the "
+    "sandboxed runs, a mean over each case's repeats and then over cases and languages, "
+    "with a case left out when any of its episodes lacks the figure. No reward, objective, "
+    "gate decision or noise rule reads them."
+)
 NOT_IN_BAND_TEXT = "Not in the noise band (read against the installed reference)"
 
 
@@ -551,8 +559,9 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         rows.append(
             ["p50 seconds ratio (band mean)", "", _number(verdict.seconds_ratio_to_band), ""]
         )
+    rows.extend(_sandbox_cpu_rows(verdict, baseline, candidate))
     lines.extend(_table(["Metric", "Baseline", "Candidate", "Delta"], rows))
-    lines.append("")
+    lines.extend(["", SANDBOX_CPU_TEXT, ""])
     language_rows = []
     for language, delta in verdict.language_deltas.items():
         before = baseline.languages[language]
@@ -652,6 +661,48 @@ def _regressed(verdict: GateVerdict, language: str, baseline: Scorecard) -> str:
     if language not in verdict.regressed_languages:
         return "no"
     return "yes (single case)" if language in verdict.single_case_languages else "yes"
+
+
+def _ratio(before: float | None, after: float | None) -> float | None:
+    """``after`` over ``before``; unknown when either is or ``before`` is not positive."""
+    if before is None or after is None or before <= 0:
+        return None
+    return after / before
+
+
+def _sandbox_cpu_rows(
+    verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard
+) -> list[list[str]]:
+    """Macro sandbox CPU seconds, their ratio (and, with a band, the ratio to its mean) and
+    the episodes lacking them; information only, read by no rule."""
+    before, after = baseline.macro_sandbox_cpu_seconds, candidate.macro_sandbox_cpu_seconds
+    rows = [
+        [
+            "Macro sandbox CPU seconds (information)",
+            _number(before),
+            _number(after),
+            _signed(None if before is None or after is None else after - before),
+        ],
+        [
+            "Sandbox CPU seconds ratio (installed reference, information)",
+            "",
+            _number(_ratio(before, after)),
+            "",
+        ],
+    ]
+    if verdict.noise is not None and not verdict.slice:
+        ratio = band_ratio(after, verdict.noise.macro_sandbox_cpu_seconds)
+        rows.append(["Sandbox CPU seconds ratio (band mean, information)", "", _number(ratio), ""])
+    missing_before, missing_after = baseline.sandbox_cpu_unknown, candidate.sandbox_cpu_unknown
+    rows.append(
+        [
+            "Episodes lacking sandbox CPU seconds",
+            _count(missing_before),
+            _count(missing_after),
+            _count_delta(missing_before, missing_after),
+        ]
+    )
+    return rows
 
 
 def _band_mean_rows(verdict: GateVerdict, candidate: Scorecard) -> list[list[str]]:
@@ -1125,6 +1176,7 @@ def render_noise(band: NoiseBand) -> str:
         ("Macro verified accuracy", band.macro_verified_accuracy, 3, False),
         ("Macro effective tokens", band.macro_effective_tokens, 0, True),
         ("Macro p50 seconds", band.macro_p50_seconds, 1, True),
+        ("Macro sandbox CPU seconds (information)", band.macro_sandbox_cpu_seconds, 3, True),
     ]
     metrics.extend(
         (f"{language} verified accuracy", spread, 3, False)
@@ -1136,13 +1188,17 @@ def render_noise(band: NoiseBand) -> str:
         if spread is None:
             rows.append([name, *("unknown" for _ in range(len(runs) + 4 + extra))])
             continue
+        if spread is band.macro_sandbox_cpu_seconds:
+            reading = "not read (information)"
+        else:
+            reading = _mean_ratio_band(spread, "x") if ratio else _difference_band(spread)
         row = [
             name,
             *(_number(value, digits) for value in spread.values),
             _number(spread.mean, digits),
             _number(spread.half_range, digits),
             _number(spread.stdev, digits),
-            _mean_ratio_band(spread, "x") if ratio else _difference_band(spread),
+            reading,
         ]
         if band.resampled:
             interval = spread.interval
@@ -1157,8 +1213,24 @@ def render_noise(band: NoiseBand) -> str:
     if band.resampled:
         header += ["Resampled interval", "Resampled mean"]
     lines.extend(_table(header, rows))
-    lines.extend(["", NOISE_TEXT, "", *_interval_lines(band), *_noise_case_lines(band)])
+    lines.extend(["", *_sandbox_cpu_run_lines(band), NOISE_TEXT, ""])
+    lines.extend([*_interval_lines(band), *_noise_case_lines(band)])
     return "\n".join(lines) + "\n"
+
+
+def _sandbox_cpu_run_lines(band: NoiseBand) -> list[str]:
+    """The episodes each run lacked sandbox CPU seconds for, and that the figure informs only;
+    nothing on a band that records neither."""
+    if band.macro_sandbox_cpu_seconds is None and not band.sandbox_cpu_unknown:
+        return []
+    lines = []
+    if band.sandbox_cpu_unknown:
+        counts = ", ".join(
+            f"`{run}` {_count(count)}"
+            for run, count in zip(band.runs, band.sandbox_cpu_unknown, strict=True)
+        )
+        lines.append(f"Episodes lacking sandbox CPU seconds per run: {counts}.")
+    return [*lines, SANDBOX_CPU_TEXT, ""]
 
 
 def _cases(count: int) -> str:
@@ -1276,6 +1348,8 @@ def _group_rows(groups: Mapping[str, GroupSummary]) -> list[list[str]]:
             _number(summary.mean_effective_tokens, 0),
             _number(summary.p50_seconds, 1),
             _number(summary.p95_seconds, 1),
+            _number(summary.mean_sandbox_cpu_seconds),
+            _count(summary.sandbox_cpu_unknown),
             str(summary.usage_unknown),
             _number(summary.mean_thought_share),
             _count(summary.capped_call_episodes),
@@ -1297,6 +1371,8 @@ _GROUP_HEADER = [
     "Mean eff. tokens",
     "p50 s",
     "p95 s",
+    "Mean sandbox CPU s",
+    "Sandbox CPU unknown",
     "Usage unknown",
     "Thought share",
     "Capped eps",
@@ -1340,6 +1416,9 @@ def render_scorecard(scorecard: Scorecard) -> str:
         + _number(scorecard.worst_language_verified_accuracy),
         f"- Macro effective tokens: {_number(scorecard.macro_effective_tokens, 0)}",
         f"- Macro p50 seconds: {_number(scorecard.macro_p50_seconds, 1)}",
+        "- Macro sandbox CPU seconds (information): "
+        f"{_number(scorecard.macro_sandbox_cpu_seconds)}; "
+        f"episodes lacking it: {_count(scorecard.sandbox_cpu_unknown)}",
         f"- Macro thought share: {_number(scorecard.macro_thought_share)}",
         f"- Capped-call episodes: {_count(scorecard.capped_call_episodes)}; "
         f"reasoning cap exhausted: {_count(scorecard.reasoning_cap_exhausted)}",

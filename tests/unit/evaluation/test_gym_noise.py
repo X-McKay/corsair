@@ -26,6 +26,7 @@ from corsair.evaluation.gym.noise import (
 from corsair.evaluation.gym.render import (
     BAND_REASON_TEXT,
     REASON_TEXT,
+    SANDBOX_CPU_TEXT,
     render_gate,
     render_noise,
 )
@@ -74,6 +75,44 @@ def test_a_band_records_every_metric_per_run_with_its_identity():
     assert band.languages["python"].band == 0.0
     assert band.macro_effective_tokens.max_ratio == pytest.approx(1.2)
     assert band.macro_p50_seconds is not None and band.macro_p50_seconds.band == 0.0
+
+
+def _timed(card: Scorecard, cpu: float | None, unknown: int | None = 0) -> Scorecard:
+    """``card`` with macro sandbox CPU seconds and its count of episodes lacking them."""
+    return card.model_copy(
+        update={"macro_sandbox_cpu_seconds": cpu, "sandbox_cpu_unknown": unknown}
+    )
+
+
+def test_a_band_records_sandbox_cpu_seconds_as_information():
+    first, second = _timed(_run(BASELINE, "ref"), 2.0, 1), _timed(_run(NOISY, "again"), 3.0)
+    band = _band(first, second)
+    cpu = band.macro_sandbox_cpu_seconds
+    assert cpu is not None and cpu.values == [2.0, 3.0]
+    assert (cpu.mean, cpu.half_range) == (2.5, 0.5)
+    assert cpu.stdev == pytest.approx(2**0.5 / 2)
+    assert cpu.max_ratio == pytest.approx(1.5)
+    assert band.sandbox_cpu_unknown == [1, 0]
+    # A run without the figure leaves the band's unknown, never a zero.
+    assert _band(first, _run(NOISY, "again")).macro_sandbox_cpu_seconds is None
+    # Information only: the same band without it gates every candidate the same way.
+    candidate = _timed(_card(NOISY, run_id="cand", tokens=128.0), 9.0)
+    plain = _band(_run(BASELINE, "ref"), _run(NOISY, "again"))
+    with_cpu = gate(_card(BASELINE), candidate, noise=band)
+    without = gate(_card(BASELINE), candidate, noise=plain)
+    assert with_cpu.model_dump(exclude={"noise"}) == without.model_dump(exclude={"noise"})
+    # A band written before the figure decodes with it unknown.
+    record = band.model_dump(mode="json")
+    record.pop("macro_sandbox_cpu_seconds")
+    record.pop("sandbox_cpu_unknown")
+    old = NoiseBand.model_validate(record)
+    assert (old.macro_sandbox_cpu_seconds, old.sandbox_cpu_unknown) == (None, [])
+    with pytest.raises(ValidationError, match="one value per run"):
+        NoiseBand.model_validate(
+            {**band.model_dump(), "macro_sandbox_cpu_seconds": spread([1.0, 2.0, 3.0])}
+        )
+    with pytest.raises(ValidationError, match="lacking sandbox CPU seconds of every run"):
+        NoiseBand.model_validate({**band.model_dump(), "sandbox_cpu_unknown": [1]})
 
 
 def test_a_band_round_trips_and_refuses_an_inconsistent_record(tmp_path):
@@ -338,6 +377,21 @@ def test_single_case_languages_are_reported_without_changing_the_decision():
     assert "Single-case languages: ruby." in text
 
 
+def test_the_gate_view_prints_sandbox_cpu_ratios_to_the_band_mean_as_information():
+    band = _band(_timed(_run(BASELINE, "ref"), 2.0, 1), _timed(_run(NOISY, "again"), 3.0))
+    baseline = _timed(_card(BASELINE), 2.0, 1)
+    candidate = _timed(_card(NOISY, run_id="cand", tokens=128.0), 2.25, 3)
+    text = render_gate(gate(baseline, candidate, noise=band), baseline, candidate)
+    assert "| Macro sandbox CPU seconds (information) | 2.000 | 2.250 | +0.250 |" in text
+    assert "| Sandbox CPU seconds ratio (installed reference, information) |  | 1.125 |  |" in text
+    # 2.25 over the band's mean of 2.5.
+    assert "| Sandbox CPU seconds ratio (band mean, information) |  | 0.900 |  |" in text
+    assert "| Episodes lacking sandbox CPU seconds | 1 | 3 | +2 |" in text
+    assert SANDBOX_CPU_TEXT in text
+    unknown = render_gate(gate(baseline, candidate, noise=_noise()), baseline, candidate)
+    assert "| Sandbox CPU seconds ratio (band mean, information) |  | unknown |  |" in unknown
+
+
 def test_the_gate_view_prints_the_band_and_what_lies_within_it():
     baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand", tokens=128.0)
     verdict = gate(baseline, candidate, noise=_noise())
@@ -364,6 +418,16 @@ def test_the_noise_view_lists_every_metric_per_run():
     assert "| Metric | `ref` | `again` | Mean | Half-range | Stdev | Gate band |" in text
     assert "| ruby verified accuracy | 0.500 | 0.000 | 0.250 | 0.250 | 0.354 | ±0.500 |" in text
     assert "| Macro effective tokens | 100 | 130 | 115 | 15 | 21 | 0.870x to 1.130x |" in text
+    assert "| Macro sandbox CPU seconds (information) | unknown | unknown |" in text
+    timed = render_noise(
+        _band(_timed(_run(BASELINE, "ref"), 2.0, 1), _timed(_run(NOISY, "again"), 3.0))
+    )
+    assert (
+        "| Macro sandbox CPU seconds (information) | 2.000 | 3.000 | 2.500 | 0.500 | 0.707 "
+        "| not read (information) |"
+    ) in timed
+    assert "Episodes lacking sandbox CPU seconds per run: `ref` 1, `again` 0." in timed
+    assert SANDBOX_CPU_TEXT in timed
 
 
 # Per-case stability: each case's majority outcome per run, from the runs' trajectories
