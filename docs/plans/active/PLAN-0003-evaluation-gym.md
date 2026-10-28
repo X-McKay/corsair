@@ -763,4 +763,23 @@ content-addressed tags and cannot contaminate parallel runs.
   per run). Per-run majorities are the wrong unit at 3 repeats; the band and the paired outcomes need pooled
   episode rates with an exact test (s23). The 1.10x token ceiling is also measured against one installed run
   while the reference's own runs span 42.3k to 47.1k.
+- 2026-10-28 s23 merged (07a59152; branch `gym/s23-episode-rates` at 5fab1e34; ledger `s23`): the band pools each
+  case's episodes over its runs and classifies stability by the binomial probability that a run of the band's
+  repeats passes its majority at the pooled rate (stable pass when a majority fail has probability at most 0.05,
+  stable fail when a majority pass does; at 3 repeats over 9 episodes that is 8 or 9 verified, or 0 or 1); a
+  paired flip is outside noise only when Fisher's exact test (two-sided, p < 0.05) separates the candidate's
+  episodes from the pooled reference episodes and the rate moved with the flip; a deciding language's majority
+  fall is a regression only when its pooled episode rate is lower with p < 0.05, and the accuracy track's rise
+  needs the same in the other direction; token and p50 ratios are measured against the band mean (the ceiling
+  reads that ratio; the installed-reference ratio stays reported). Old bands decode without pooled counts and
+  keep the per-run majority rules. `reference/noise-tier1.json` rebuilt from the same three runs (the s20-format
+  band kept as `noise-tier1.n3-majority.json`): 10 stable pass, 3 stable fail (chain-python-cmdi-a,
+  ih-python-codeinjection-a, aurelia-path), 8 unstable; adversarial01 is 3/9 with a 0.259 majority-pass
+  probability. h9's stored run re-gated: objective INCONCLUSIVE (javascript majority fell, within noise),
+  accuracy REJECTED (no language rose beyond noise); adversarial01 2/3 vs 3/9 p 0.52, adversarial02 3/3 vs 4/9
+  p 0.20, case02 2/3 vs 5/9 p 1.0, case03 3/3 vs 6/9 p 0.51, deep-override 1/3 vs 5/9 p 1.0; python 24/33 vs
+  60/99 p 0.30, javascript 12/18 vs 31/54 p 0.58; tokens 1.064x of the band mean (band 0.949 to 1.058). Left for
+  s24: the majority-fell trigger and the accuracy and J deltas still anchor on the installed reference run, so
+  javascript "fell" from the reference's best run (5/6) while its episode rate rose. Ran a fourth same-identity
+  reference run (queued 02:15 UTC) to take the pooled counts to 12 episodes per case.
 
