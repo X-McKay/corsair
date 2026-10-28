@@ -749,4 +749,18 @@ content-addressed tags and cannot contaminate parallel runs.
   position, run.json's `lock` entry gains `queue_position` and `waiters_ahead`, and `gym lock status` lists the
   queue. Offline: `just check`, 1664 unit and 58 Temporal tests pass. A ticket from another host or a reused pid
   keeps its place until `--lock-timeout`; removing its file is the only remedy.
+- 2026-10-28 h9 REJECTED at the full tier1 gate (run 0c1a0c, 3 repeats, 72 min; ledger `h9`; branch
+  `gym/h9-carry-output-cap` at ec748e46 kept unmerged). Both tracks: `tokens_above_ceiling` (1.121x against
+  e6b13d, the cheapest of the three reference runs; the band reaches 1.115x) and `language_regressed`
+  (javascript 0.833 -> 0.667, within noise: deep-override, an unstable case). Python rose 0.455 -> 0.818
+  (adversarial01, the band's stable_fail, plus the unstable adversarial02, case02 and case03), J +0.209, macro
+  +0.033. The experimenter's episode audit shows the carry rule fired in 3 of 63 episodes (one python round-1 cap
+  carried to a clean negative, two aurelia caps carried to round 3) and none passed, and the corpus requests set
+  `max_rounds` 2, so only a round-1 cap can be carried in python. The python gain and the token rise are
+  therefore run variance under the reference behaviour. Gym lesson: a candidate that behaves as the reference
+  exceeded the n=3 python band (+-0.091) by 0.27 and flipped a case the band called stable_fail because its
+  majority rested on 1 of 3 episodes in each run (a 1-in-3 episode rate gives a 26 % chance of a majority pass
+  per run). Per-run majorities are the wrong unit at 3 repeats; the band and the paired outcomes need pooled
+  episode rates with an exact test (s23). The 1.10x token ceiling is also measured against one installed run
+  while the reference's own runs span 42.3k to 47.1k.
 
