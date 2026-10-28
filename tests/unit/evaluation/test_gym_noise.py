@@ -25,7 +25,7 @@ from corsair.evaluation.gym.noise import (
 from corsair.evaluation.gym.render import REASON_TEXT, render_gate, render_noise
 from tests.unit.evaluation.test_gym_gate import ALL, BASELINE, NONE, _card
 from tests.unit.evaluation.test_gym_paired import BASELINE as PAIRED
-from tests.unit.evaluation.test_gym_paired import _side
+from tests.unit.evaluation.test_gym_paired import _side, legacy_band
 
 IDENTITY = {"config": ["c" * 64], "producer_prompt": ["p" * 64]}
 # One target-side exception's worth of noise: ruby's only verified case flips.
@@ -144,9 +144,11 @@ def test_bands_are_assigned_to_the_gates_of_their_dataset():
 # Decisions with a band
 
 
-def _noise() -> NoiseBand:
-    """Two runs of one configuration: ruby flips once, J moves, tokens differ 1.2x."""
-    return _band(_run(BASELINE, "ref"), _run(NOISY, "again", tokens=120.0))
+def _noise(tokens: float = 130.0) -> NoiseBand:
+    """Two runs of one configuration: ruby flips once, J moves, and the second run spent
+    ``tokens`` against the first's 100 (by default a mean of 115, ratios to it of 0.870 to
+    1.130)."""
+    return _band(_run(BASELINE, "ref"), _run(NOISY, "again", tokens=tokens))
 
 
 def test_without_a_band_every_decision_is_unchanged():
@@ -163,9 +165,13 @@ def test_without_a_band_every_decision_is_unchanged():
 
 
 def test_a_regression_inside_the_band_is_inconclusive():
-    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand", tokens=120.0)
+    # 128 tokens: 1.28x the installed baseline, 1.113x the band's mean of 115 (above the
+    # 1.10 ceiling, inside the band's 1.130).
+    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand", tokens=128.0)
     assert gate(baseline, candidate).decision is GateDecision.REJECTED
     verdict = gate(baseline, candidate, noise=_noise())
+    assert verdict.token_ratio == pytest.approx(1.28)
+    assert verdict.token_ratio_to_band == pytest.approx(128 / 115)
     assert verdict.decision is GateDecision.INCONCLUSIVE
     assert verdict.exit_code == 3
     assert verdict.reasons == [
@@ -195,9 +201,28 @@ def test_a_regression_outside_the_band_stays_rejected():
 
 
 def test_tokens_above_the_band_reject_even_when_the_rest_is_noise():
-    verdict = gate(_card(BASELINE), _card(NOISY, run_id="cand", tokens=125.0), noise=_noise())
+    verdict = gate(_card(BASELINE), _card(NOISY, run_id="cand", tokens=135.0), noise=_noise())
     assert verdict.decision is GateDecision.REJECTED
     assert "macro_effective_tokens" not in verdict.within_noise
+
+
+def test_the_token_ceiling_reads_the_ratio_to_the_bands_mean():
+    # 112 tokens: 1.12x the installed baseline of 100 but 0.974x the band's mean of 115.
+    candidate = _card(BASELINE, run_id="cand", tokens=112.0)
+    assert gate(_card(BASELINE), candidate).reasons == [
+        GateReason.OBJECTIVE_BELOW_THRESHOLD,
+        GateReason.TOKENS_ABOVE_CEILING,
+    ]
+    verdict = gate(_card(BASELINE), candidate, noise=_noise())
+    assert GateReason.TOKENS_ABOVE_CEILING not in verdict.reasons
+    assert (verdict.token_ratio, verdict.token_ratio_to_band) == (
+        pytest.approx(1.12),
+        pytest.approx(112 / 115),
+    )
+    # p50 seconds: every run took 10 s, so the band's mean is 10 and the ratio 1.
+    assert verdict.seconds_ratio == verdict.seconds_ratio_to_band == pytest.approx(1.0)
+    # Without a band there is no band ratio.
+    assert gate(_card(BASELINE), candidate).token_ratio_to_band is None
 
 
 def test_an_objective_improvement_inside_the_band_is_not_accepted():
@@ -236,7 +261,9 @@ def test_an_accuracy_gain_inside_the_band_does_not_meet_the_accuracy_criterion()
 
 
 def test_the_efficiency_track_needs_a_saving_beyond_the_token_band():
-    noise = _noise()
+    # Runs of 100 and 80 tokens: a mean of 90, ratios to it of 0.889 to 1.111. 85 tokens
+    # are 0.85x the installed baseline but 0.944x the band's mean; 78 are 0.867x of it.
+    noise = _noise(80.0)
     inside = gate(_card(BASELINE), _card(BASELINE, run_id="cand", tokens=85.0), track="efficiency")
     assert inside.decision is GateDecision.ACCEPTED
     banded = gate(
@@ -249,14 +276,14 @@ def test_the_efficiency_track_needs_a_saving_beyond_the_token_band():
     assert GateReason.EFFICIENCY_NOT_IMPROVED in banded.reasons
     beyond = gate(
         _card(BASELINE),
-        _card(BASELINE, run_id="cand", tokens=80.0),
+        _card(BASELINE, run_id="cand", tokens=78.0),
         track="efficiency",
         noise=noise,
     )
     assert beyond.decision is GateDecision.ACCEPTED
     lower = gate(
         _card(BASELINE),
-        _card(NOISY, run_id="cand", tokens=80.0),
+        _card(NOISY, run_id="cand", tokens=78.0),
         track="efficiency",
         noise=noise,
     )
@@ -304,18 +331,22 @@ def test_single_case_languages_are_reported_without_changing_the_decision():
 
 
 def test_the_gate_view_prints_the_band_and_what_lies_within_it():
-    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand", tokens=120.0)
+    baseline, candidate = _card(BASELINE), _card(NOISY, run_id="cand", tokens=128.0)
     verdict = gate(baseline, candidate, noise=_noise())
     text = render_gate(verdict, baseline, candidate)
     assert text.startswith("## Gate: INCONCLUSIVE\n")
     assert REASON_TEXT[GateReason.WITHIN_NOISE] in text
     assert "Noise band from 2 runs: `ref`, `again`." in text
+    assert "The band carries no pooled per-case counts" in text
     assert "| Metric | Delta | Noise band | Within noise |" in text
-    assert "| Token ratio | 1.200 | 0.833 to 1.200 | yes |" in text
+    assert "| Token ratio to band mean | 1.113 | 0.870 to 1.130 | yes |" in text
+    assert "| Token ratio (installed reference) |  | 1.280 |  |" in text
+    assert "| Token ratio (band mean) |  | 1.113 |  |" in text
     assert "| ruby verified accuracy | -0.500 | ±0.500 | yes |" in text
     assert "Within noise: objective_j, macro_verified_accuracy" in text
     plain = render_gate(gate(baseline, candidate), baseline, candidate)
     assert "Noise band" not in plain and "Within noise" not in plain
+    assert "band mean" not in plain
 
 
 def test_the_noise_view_lists_every_metric_per_run():
@@ -323,7 +354,7 @@ def test_the_noise_view_lists_every_metric_per_run():
     assert text.startswith("## Noise band: 2 runs\n")
     assert "| Metric | `ref` | `again` | Mean | Half-range | Stdev | Gate band |" in text
     assert "| ruby verified accuracy | 0.500 | 0.000 | 0.250 | 0.250 | 0.354 | ±0.500 |" in text
-    assert "| Macro effective tokens | 100 | 120 | 110 | 10 | 14 | 0.833x to 1.200x |" in text
+    assert "| Macro effective tokens | 100 | 130 | 115 | 15 | 21 | 0.870x to 1.130x |" in text
 
 
 # Per-case stability: each case's majority outcome per run, from the runs' trajectories
@@ -344,17 +375,27 @@ def test_a_band_classifies_each_case_by_its_majority_outcome_in_every_run():
     assert band.cases is not None
     by_case = {case.case_id: case for case in band.cases}
     assert [case.case_id for case in band.cases] == sorted(PAIRED)
+    # py-a pools 4 of 6: a 3-repeat majority pass with probability 20/27.
     assert by_case["py-a"] == NoiseCase(
         case_id="py-a",
         language="python",
         majority_verified=[True, False],
         verified_episodes=[3, 1],
         stability="unstable",
+        episodes=6,
+        verified=4,
+        majority_pass_probability=20 / 27,
     )
-    assert by_case["rb-a"].stability == "stable_pass"
+    # rb-a kept its majority in both runs but pools 5 of 6: a majority fail with
+    # probability 1 - 200/216 = 0.074, above 0.05, so it is not stable.
+    assert by_case["rb-a"].stability == "unstable"
     assert by_case["rb-a"].verified_episodes == [3, 2]
+    assert by_case["rb-a"].majority_pass_probability == pytest.approx(200 / 216)
+    assert by_case["py-b"].stability == "stable_pass"
+    assert (by_case["py-b"].verified, by_case["py-b"].episodes) == (6, 6)
     assert by_case["py-c"].stability == "stable_fail"
     assert by_case["py-c"].majority_verified == [False, False]
+    assert band.pooled
     assert {case.case_id for case in band.cases if case.stability == "stable_fail"} == {
         "py-c",
         "jv-b",
@@ -386,12 +427,53 @@ def test_a_band_written_before_per_case_stability_still_decodes_without_cases():
     assert "Per-case stability: not recorded" in render_noise(old)
 
 
+def test_a_case_verifying_one_episode_in_three_in_every_run_is_unstable():
+    # The per-run majority failed in each run, so the earlier rule called it stable_fail;
+    # pooled, 3 of 9 passes a 3-repeat majority with probability 7/27 (about 0.26).
+    third = {**PAIRED, "py-c": [True, False, False]}
+    sides = [_side(third, f"ref-{index}") for index in range(3)]
+    band = noise_band([card for card, _ in sides], [rows for _, rows in sides])
+    case = next(case for case in band.cases or [] if case.case_id == "py-c")
+    assert case.majority_verified == [False, False, False]
+    assert (case.verified, case.episodes) == (3, 9)
+    assert case.majority_pass_probability == pytest.approx(7 / 27)
+    assert case.stability == "unstable"
+    assert legacy_band(band).cases is not None
+    assert next(
+        case for case in legacy_band(band).cases or [] if case.case_id == "py-c"
+    ).stability == ("stable_fail")
+
+
+def test_a_band_written_before_pooled_counts_decodes_and_says_it_carries_none():
+    cards, rows = _case_runs()
+    old = legacy_band(noise_band(cards, rows))
+    assert not old.pooled
+    assert all(case.episodes is None for case in old.cases or [])
+    assert by_id(old)["rb-a"].stability == "stable_pass"
+    text = render_noise(old)
+    assert "The band carries no pooled counts (it was written before them)" in text
+    assert "Pooled verified" not in text
+
+
+def by_id(band: NoiseBand) -> dict[str, NoiseCase]:
+    return {case.case_id: case for case in band.cases or []}
+
+
 def test_an_incoherent_case_record_is_refused():
     cards, rows = _case_runs()
     record = noise_band(cards, rows).model_dump(mode="json")
     case = record["cases"][0]
-    with pytest.raises(ValidationError, match="follows its majority outcomes"):
+    with pytest.raises(ValidationError, match="follows its majority-pass probability"):
         NoiseCase.model_validate({**case, "stability": "unstable"})
+    with pytest.raises(ValidationError, match="all of its pooled counts or none"):
+        NoiseCase.model_validate({**case, "episodes": None})
+    with pytest.raises(ValidationError, match="pools its verified episodes"):
+        NoiseCase.model_validate({**case, "verified": case["verified"] - 1})
+    legacy = {key: value for key, value in case.items() if key not in _POOLED}
+    with pytest.raises(ValidationError, match="follows its majority outcomes"):
+        NoiseCase.model_validate({**legacy, "stability": "unstable"})
+    with pytest.raises(ValidationError, match="every case or of none"):
+        NoiseBand.model_validate({**record, "cases": [legacy, *record["cases"][1:]]})
     with pytest.raises(ValidationError, match="one majority outcome and one count per run"):
         NoiseCase.model_validate({**case, "verified_episodes": [3, 3, 3]})
     with pytest.raises(ValidationError, match="one entry per run"):
@@ -402,20 +484,36 @@ def test_an_incoherent_case_record_is_refused():
         NoiseBand.model_validate({**record, "cases": [case, case]})
 
 
+_POOLED = ("episodes", "verified", "majority_pass_probability")
+
+
 def _three_runs(case: dict) -> dict:
-    """A coherent case record of three runs, for a band of two."""
+    """A coherent case record of three runs, for a band of two (without pooled counts)."""
     return {
         "majority_verified": [*case["majority_verified"], True],
         "verified_episodes": [*case["verified_episodes"], 3],
         "stability": "stable_pass" if all(case["majority_verified"]) else "unstable",
+        **dict.fromkeys(_POOLED),
     }
 
 
 def test_the_noise_view_counts_the_classification_and_names_unstable_and_failing_cases():
     cards, rows = _case_runs()
     text = render_noise(noise_band(cards, rows))
-    assert "Per-case stability: 3 stable pass, 2 stable fail, 1 unstable." in text
-    assert "- Unstable (a flip counts neither way): `py-a`" in text
+    assert "Per-case stability: 2 stable pass, 2 stable fail, 2 unstable." in text
+    assert "Each case's episodes are pooled over the runs." in text
+    assert "- Unstable: `py-a`, `rb-a`" in text
     assert "- Stable fail: `jv-b`, `py-c`" in text
+    header = (
+        "| Case | Language | `ref` verified | `again` verified | Pooled verified "
+        "| Majority-pass probability | Stability |"
+    )
+    assert header in text
+    assert "| `py-a` | python | 3 | 1 | 4/6 (0.667) | 0.741 | unstable |" in text
+    assert "| `rb-a` | ruby | 3 | 2 | 5/6 (0.833) | 0.926 | unstable |" in text
+    assert "| `py-c` | python | 0 | 0 | 0/6 (0.000) | 0.000 | stable fail |" in text
+    legacy = render_noise(legacy_band(noise_band(cards, rows)))
+    assert "Per-case stability: 3 stable pass, 2 stable fail, 1 unstable." in legacy
+    assert "- Unstable (a flip counts neither way): `py-a`" in legacy
     missing = render_noise(noise_band(cards, [rows[0], None]))
-    assert "Per-case stability: unknown; no trajectories reproducing run `again`." in missing
+    assert "Per-case stability: unknown; no trajectories reproducing run `again`;" in missing

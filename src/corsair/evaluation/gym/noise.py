@@ -6,10 +6,14 @@ token usage) and they also recorded one configuration identity and one repeat co
 their spread is that configuration's run-to-run noise. A gate given the band reads a
 delta inside it as noise (``evaluation.gym.gate``).
 
-Given each run's trajectories, the band also classifies every case scored in all runs by
-its majority outcome per run (``case_outcomes``): ``stable_pass``, ``stable_fail`` or
-``unstable``. A run without trajectories reproducing its scorecard leaves the cases
-unknown, with the reason and the run named; nothing is guessed.
+Given each run's trajectories, the band also records every case scored in all runs: its
+majority outcome and verified episodes per run, its episodes and verified episodes pooled
+over the runs, and the probability that a run of the band's repeats at that pooled rate
+gets a majority pass (``exact.majority_pass_probability``). The case is ``stable_pass``
+when a majority fail has probability at most ``SIGNIFICANCE_LEVEL``, ``stable_fail``
+when a majority pass has, and ``unstable`` otherwise. A run without trajectories
+reproducing its scorecard leaves the cases unknown, with the reason and the run named;
+nothing is guessed.
 """
 
 import json
@@ -17,7 +21,8 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from corsair.contracts import CaseStability, GateReason, NoiseBand, NoiseCase, Scorecard, Trajectory
+from corsair.contracts import GateReason, NoiseBand, NoiseCase, Scorecard, Trajectory
+from corsair.evaluation.gym.exact import majority_pass_probability
 from corsair.evaluation.gym.gate import (
     MIN_REPEATS,
     incomparable_reasons,
@@ -100,36 +105,37 @@ def noise_band(
             language: spread([_verified(card, language) for card in cards])
             for language in languages
         },
-        cases=None if missing else _noise_cases([rows or [] for rows in records]),
+        cases=None if missing else _noise_cases([rows or [] for rows in records], first.repeats),
         cases_unknown="trajectories_missing" if missing else None,
         cases_unknown_runs=missing,
     )
 
 
-def _noise_cases(runs: Sequence[Sequence[Trajectory]]) -> list[NoiseCase]:
-    """Every case scored in all ``runs``, by its majority outcome and verified count per run."""
+def _noise_cases(runs: Sequence[Sequence[Trajectory]], repeats: int) -> list[NoiseCase]:
+    """Every case scored in all ``runs``: its majority outcome and verified count per run,
+    its pooled counts and the majority-pass probability of a run of ``repeats``."""
     outcomes = [case_outcomes(rows) for rows in runs]
     verified = [Counter(item.case_id for item in rows if item.verified) for rows in runs]
+    episodes = [Counter(item.case_id for item in rows) for rows in runs]
     shared = set(outcomes[0]).intersection(*outcomes[1:])
     cases = []
     for case in sorted(shared):
-        majority = [run[case][1] for run in outcomes]
+        pooled_verified = sum(counts[case] for counts in verified)
+        pooled_episodes = sum(counts[case] for counts in episodes)
+        probability = majority_pass_probability(pooled_verified, pooled_episodes, repeats)
         cases.append(
             NoiseCase(
                 case_id=case,
                 language=outcomes[0][case][0],
-                majority_verified=majority,
+                majority_verified=[run[case][1] for run in outcomes],
                 verified_episodes=[counts[case] for counts in verified],
-                stability=_stability(majority),
+                stability=NoiseCase.pooled_stability(probability),
+                episodes=pooled_episodes,
+                verified=pooled_verified,
+                majority_pass_probability=probability,
             )
         )
     return cases
-
-
-def _stability(majority: Sequence[bool]) -> CaseStability:
-    if all(majority):
-        return "stable_pass"
-    return "unstable" if any(majority) else "stable_fail"
 
 
 def _verified(card: Scorecard, language: str) -> float:

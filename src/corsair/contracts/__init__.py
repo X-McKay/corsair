@@ -43,9 +43,11 @@ from .evidence import EvidenceInput as EvidenceInput
 from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation
 from .evidence import RoleOutcome as RoleOutcome
+from .gym import SIGNIFICANCE_LEVEL as SIGNIFICANCE_LEVEL
 from .gym import Budgets as Budgets
 from .gym import CaseStability as CaseStability
 from .gym import DecidingMetric as DecidingMetric
+from .gym import EpisodeRate as EpisodeRate
 from .gym import FlipNoise as FlipNoise
 from .gym import GateDecision as GateDecision
 from .gym import GateReason as GateReason

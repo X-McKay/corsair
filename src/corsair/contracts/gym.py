@@ -386,7 +386,8 @@ class NoiseSpread(Contract):
     ``values`` follow ``NoiseBand.runs``. ``half_range`` is (max - min) / 2 and ``stdev``
     the sample standard deviation. A gate reads a difference within ``band`` (max - min,
     the largest difference two of these runs showed) as noise, and for a positive scale
-    metric (tokens, seconds) a ratio within ``1 / max_ratio`` to ``max_ratio``.
+    metric (tokens, seconds) a ratio to ``mean`` within min / mean to max / mean.
+    ``max_ratio`` (max / min) is recorded for information.
     """
 
     values: list[float] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
@@ -417,16 +418,24 @@ class NoiseSpread(Contract):
         return self
 
 
-# A case across the runs of a noise band: its majority outcome held in every run (pass
-# or fail), or differed between runs (a coin-flip whose flip a gate reads as noise).
+# A case across the runs of a noise band. With pooled counts: a run of the band's repeats
+# fails (``stable_pass``) or passes (``stable_fail``) its majority with probability at
+# most ``SIGNIFICANCE_LEVEL``, else ``unstable``. A band without pooled counts (written
+# before them) classifies by the per-run majority outcomes: the same in every run, or not.
 CaseStability = Literal["stable_pass", "stable_fail", "unstable"]
 # Why a noise band records no per-case stability: a run's trajectories reproducing its
 # scorecard were not found.
 NoiseCasesUnknown = Literal["trajectories_missing"]
-# Why a paired flip is within noise: its language's band is a whole case, or the band
-# classifies the case ``unstable`` (the more specific reason wins when both hold).
-FlipNoise = Literal["language_band", "unstable_case"]
+# Why a paired flip is within noise. With a band carrying pooled counts for the case:
+# Fisher's exact test on the candidate's episodes against the band's pooled episodes does
+# not separate them in the flip's direction (``episode_rate``). Otherwise: the case's
+# language band is a whole case, or the band classifies the case ``unstable`` (which wins
+# when both hold).
+FlipNoise = Literal["language_band", "unstable_case", "episode_rate"]
 _MAX_NOISE_CASES = 4096
+# The level the gym's exact rules read: a pooled majority probability at most this is
+# stable, and Fisher's exact test separates two episode rates when p is below it.
+SIGNIFICANCE_LEVEL = 0.05
 
 
 class NoiseCase(Contract):
@@ -434,7 +443,12 @@ class NoiseCase(Contract):
 
     ``majority_verified`` is the case's outcome in each run (whether more than half its
     repeats verified, ``evaluation.gym.scoring.majority_verified``); ``verified_episodes``
-    counts the repeats that verified. ``stability`` follows the outcomes.
+    counts the repeats that verified. ``episodes`` and ``verified`` pool the case's
+    episodes and verified episodes over every run, and ``majority_pass_probability`` is
+    the binomial probability that a run of the band's repeats at the pooled rate
+    (verified / episodes) gets a majority pass. ``stability`` follows that probability
+    (see ``CaseStability``); on a case recorded before pooled counts all three are
+    ``None`` and ``stability`` follows the majority outcomes.
     """
 
     case_id: Identifier
@@ -442,6 +456,23 @@ class NoiseCase(Contract):
     majority_verified: list[bool] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
     verified_episodes: list[int] = Field(min_length=2, max_length=_MAX_NOISE_RUNS)
     stability: CaseStability
+    episodes: int | None = Field(default=None, ge=1)
+    verified: int | None = Field(default=None, ge=0)
+    majority_pass_probability: float | None = Field(default=None, ge=0, le=1)
+
+    @property
+    def pooled(self) -> bool:
+        """Whether the case carries pooled counts (a band written since they exist)."""
+        return self.episodes is not None
+
+    @staticmethod
+    def pooled_stability(probability: float) -> CaseStability:
+        """A case's stability from its majority-pass probability."""
+        if 1 - probability <= SIGNIFICANCE_LEVEL + _SPREAD_TOLERANCE:
+            return "stable_pass"
+        if probability <= SIGNIFICANCE_LEVEL + _SPREAD_TOLERANCE:
+            return "stable_fail"
+        return "unstable"
 
     @model_validator(mode="after")
     def coherent_case(self):
@@ -449,6 +480,15 @@ class NoiseCase(Contract):
             raise ValueError("a noise case has one majority outcome and one count per run")
         if any(count < 0 for count in self.verified_episodes):
             raise ValueError("a noise case's verified episode counts are not negative")
+        pooled = (self.episodes, self.verified, self.majority_pass_probability)
+        if None in pooled and any(value is not None for value in pooled):
+            raise ValueError("a noise case records all of its pooled counts or none")
+        if self.episodes is not None and self.majority_pass_probability is not None:
+            if self.verified != sum(self.verified_episodes) or self.verified > self.episodes:
+                raise ValueError("a noise case pools its verified episodes, at most its episodes")
+            if self.stability != self.pooled_stability(self.majority_pass_probability):
+                raise ValueError("a noise case's stability follows its majority-pass probability")
+            return self
         if all(self.majority_verified):
             expected = "stable_pass"
         elif any(self.majority_verified):
@@ -469,7 +509,9 @@ class NoiseBand(Contract):
     ``macro_p50_seconds`` is unknown when any run's is. ``cases`` classifies every case
     scored in all runs from the runs' trajectories; it is ``None`` with ``cases_unknown``
     (naming ``cases_unknown_runs``) when a run's trajectories were missing, and ``None``
-    without a reason on a band written before per-case stability.
+    without a reason on a band written before per-case stability. A band whose cases carry
+    pooled counts (``pooled``) lets a gate read flips and deciding languages by Fisher's
+    exact test on episodes; a band without them is read by its spreads, as before.
     """
 
     schema_version: Literal["corsair.gym-noise/1"] = "corsair.gym-noise/1"
@@ -511,7 +553,14 @@ class NoiseBand(Contract):
             raise ValueError("a noise case has one entry per run")
         if len({case.case_id for case in cases}) != len(cases):
             raise ValueError("a noise band classifies each case once")
+        if len({case.pooled for case in cases}) > 1:
+            raise ValueError("a noise band pools the counts of every case or of none")
         return self
+
+    @property
+    def pooled(self) -> bool:
+        """Whether the band carries pooled per-case episode counts."""
+        return bool(self.cases) and all(case.pooled for case in self.cases or [])
 
 
 class DecidingMetric(Contract):
@@ -522,6 +571,40 @@ class DecidingMetric(Contract):
     delta: float
 
 
+class EpisodeRate(Contract):
+    """A candidate's episodes against a noise band's pooled reference episodes.
+
+    ``p_value`` is Fisher's exact test, two-sided, on verified against unverified
+    episodes (``evaluation.gym.exact.fisher_exact``).
+    """
+
+    reference_verified: int = Field(ge=0)
+    reference_episodes: int = Field(ge=1)
+    candidate_verified: int = Field(ge=0)
+    candidate_episodes: int = Field(ge=1)
+    p_value: float = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def coherent_counts(self):
+        if (
+            self.reference_verified > self.reference_episodes
+            or self.candidate_verified > self.candidate_episodes
+        ):
+            raise ValueError("verified episodes are at most the episodes")
+        return self
+
+    @property
+    def direction(self) -> int:
+        """+1 when the candidate's rate is higher than the reference's, -1 lower, 0 equal."""
+        candidate = self.candidate_verified * self.reference_episodes
+        reference = self.reference_verified * self.candidate_episodes
+        return (candidate > reference) - (candidate < reference)
+
+    def separates(self, direction: int) -> bool:
+        """Whether the candidate's rate moved in ``direction`` with p below the level."""
+        return self.direction == direction and self.p_value < SIGNIFICANCE_LEVEL
+
+
 class PairedCase(Contract):
     """One case whose majority outcome flipped between baseline and candidate."""
 
@@ -529,17 +612,56 @@ class PairedCase(Contract):
     language: str = Field(min_length=1, max_length=64)
     # Whether the language decides the gate (see ``GateVerdict.min_cases``).
     deciding: bool = True
-    # With a noise band whose spread for the case's language is a whole case (±1.0), or
-    # that classifies the case ``unstable``: the flip is read as noise, never as a
-    # regression or an improvement.
+    # With a noise band carrying pooled counts for the case: Fisher's exact test does not
+    # separate the candidate's episodes from the pooled reference episodes in the flip's
+    # direction. With a band without them: its spread for the case's language is a whole
+    # case (±1.0), or it classifies the case ``unstable``. Such a flip is read as noise,
+    # never as a regression or an improvement.
     within_noise: bool = False
     # Why the flip is within noise; ``None`` on records written before reasons existed.
     noise_reason: FlipNoise | None = None
+    # With a band carrying pooled counts for the case: the episodes the test read and its
+    # p-value; all ``None`` otherwise.
+    reference_verified: int | None = Field(default=None, ge=0)
+    reference_episodes: int | None = Field(default=None, ge=1)
+    candidate_verified: int | None = Field(default=None, ge=0)
+    candidate_episodes: int | None = Field(default=None, ge=1)
+    p_value: float | None = Field(default=None, ge=0, le=1)
+
+    @property
+    def rate(self) -> EpisodeRate | None:
+        """The episode comparison the flip was read by, when there was one."""
+        if (
+            self.reference_verified is None
+            or self.reference_episodes is None
+            or self.candidate_verified is None
+            or self.candidate_episodes is None
+            or self.p_value is None
+        ):
+            return None
+        return EpisodeRate(
+            reference_verified=self.reference_verified,
+            reference_episodes=self.reference_episodes,
+            candidate_verified=self.candidate_verified,
+            candidate_episodes=self.candidate_episodes,
+            p_value=self.p_value,
+        )
 
     @model_validator(mode="after")
     def coherent_noise_reason(self):
         if self.noise_reason is not None and not self.within_noise:
             raise ValueError("a noise reason names a flip within noise")
+        counts = (
+            self.reference_verified,
+            self.reference_episodes,
+            self.candidate_verified,
+            self.candidate_episodes,
+            self.p_value,
+        )
+        if None in counts and any(value is not None for value in counts):
+            raise ValueError("a paired case records all of its episode counts and p-value or none")
+        if self.rate is not None and self.within_noise != (self.noise_reason == "episode_rate"):
+            raise ValueError("a flip read by its episodes is within noise only by episode rate")
         return self
 
 
@@ -584,10 +706,21 @@ class GateVerdict(Contract):
     delta_j: float | None = None
     # Candidate minus baseline macro (majority) verified accuracy.
     delta_macro_verified_accuracy: float | None = None
+    # Candidate over the installed baseline's macro effective tokens.
     token_ratio: float | None = None
     # Candidate over baseline macro p50 seconds; reported even when not comparable.
     seconds_ratio: float | None = None
+    # With a noise band: the candidate over the mean of the band's runs. The token
+    # ceiling, the efficiency ratios and their noise (the band's min / mean to max / mean)
+    # are then read on these. ``None`` without a band, or when either side is unknown.
+    token_ratio_to_band: float | None = None
+    seconds_ratio_to_band: float | None = None
     language_deltas: dict[str, float | None] = Field(default_factory=dict)
+    # With a band carrying pooled counts and the candidate's trajectories: per deciding
+    # language, the candidate's episodes of its cases against the band's pooled episodes
+    # of its cases. A language regresses only when its rate is lower with p below
+    # ``SIGNIFICANCE_LEVEL`` and improves only when it is higher with p below it.
+    language_rates: dict[str, EpisodeRate] = Field(default_factory=dict)
     regressed_languages: list[str] = Field(default_factory=list)
     # Regressed languages explained entirely by operational episodes.
     operationally_confounded_languages: list[str] = Field(default_factory=list)

@@ -1,5 +1,7 @@
 """Gym gate: deciding languages (``min_cases``) and paired per-case outcomes."""
 
+from functools import partial
+
 import pytest
 
 from corsair.contracts import (
@@ -407,8 +409,25 @@ def _case_band(*runs: dict[str, list[bool]], cases: bool = True) -> NoiseBand:
     return noise_band([card for card, _ in sides], trajectories)
 
 
+def legacy_band(band: NoiseBand) -> NoiseBand:
+    """``band`` as written before pooled counts: no pooled fields, and each case classified
+    by its per-run majority outcomes."""
+    record = band.model_dump(mode="json")
+    for case in record["cases"] or []:
+        for field in ("episodes", "verified", "majority_pass_probability"):
+            case.pop(field)
+        flags = case["majority_verified"]
+        case["stability"] = (
+            "stable_pass" if all(flags) else "unstable" if any(flags) else "stable_fail"
+        )
+    return NoiseBand.model_validate(record)
+
+
+# Bands without pooled counts (written before them) keep the earlier per-case rule.
+
+
 def test_a_flip_on_a_case_the_band_classifies_unstable_is_noise_and_counts_neither_way():
-    band = _case_band(*COIN_FLIPS)
+    band = legacy_band(_case_band(*COIN_FLIPS))
     assert band.languages["python"].band == 0.0
     record = {**BASELINE, "py-a": NONE, "py-c": ALL}
     paired = paired_outcomes(
@@ -435,7 +454,7 @@ def test_a_flip_on_a_case_the_band_classifies_unstable_is_noise_and_counts_neith
 
 
 def test_a_flip_on_a_stable_case_stays_a_flip_and_decides_the_paired_regression():
-    band = _case_band(*COIN_FLIPS)
+    band = legacy_band(_case_band(*COIN_FLIPS))
     better = {**BASELINE, "py-c": ALL}
     fallen = {**BASELINE, "py-a": NONE, "py-b": NONE, "py-c": ALL}
     options = {"track": "accuracy", "target_language": "python"}
@@ -458,6 +477,7 @@ def test_a_coin_flip_case_in_a_whole_case_language_is_named_by_its_case():
     record = {**BASELINE, "rb-a": NONE}
     for cases, reason in ((True, "unstable_case"), (False, "language_band")):
         band = _case_band(BASELINE, flipped, cases=cases)
+        band = legacy_band(band) if cases else band
         paired = paired_outcomes(
             _rows(BASELINE, "base"), _rows(record, "cand"), deciding=["ruby"], noise=band
         )
@@ -475,7 +495,7 @@ def test_a_noise_reason_needs_a_flip_within_noise_and_old_records_decode():
 
 
 def test_the_paired_view_names_why_a_flip_is_noise_and_the_bands_classification():
-    band = _case_band(*COIN_FLIPS)
+    band = legacy_band(_case_band(*COIN_FLIPS))
     better = {**BASELINE, "py-c": ALL}
     fallen = {**BASELINE, "py-a": NONE, "py-c": ALL, "jv-a": NONE}
     verdict = _crossed(
@@ -485,7 +505,11 @@ def test_the_paired_view_names_why_a_flip_is_noise_and_the_bands_classification(
     text = render_gate(verdict, before, after)
     assert "- Pass to fail: `jv-a` (java), `py-a` (python, within noise: unstable case)" in text
     assert "- Fail to pass: `py-c` (python, within noise: unstable case)" in text
-    assert "- Noise band per-case stability: 2 stable pass, 1 stable fail, 3 unstable." in text
+    assert (
+        "- Noise band per-case stability (by per-run majority, no pooled counts): "
+        "2 stable pass, 1 stable fail, 3 unstable."
+    ) in text
+    assert "The band carries no pooled per-case counts" in text
     assert "- Unstable in the band: `py-a`, `py-b`, `py-c`" in text
     assert "- Stable fail in the band: `jv-b`" in text
     language = _crossed(
@@ -499,6 +523,177 @@ def test_the_paired_view_names_why_a_flip_is_noise_and_the_bands_classification(
     view = render_gate(language, before, after)
     assert "`rb-a` (ruby, within noise: language band)" in view
     assert "- Noise band per-case stability: unknown (the band recorded none)." in view
+
+
+# Bands with pooled counts: Fisher's exact test on episodes decides flips and languages
+
+
+def test_with_pooled_counts_a_flip_is_noise_unless_the_exact_test_separates_it():
+    # COIN_FLIPS pools 6 of 9 for each python case and 9 of 9 for jv-a.
+    band = _case_band(*COIN_FLIPS)
+    assert band.pooled
+    record = {**BASELINE, "py-a": NONE, "py-c": ALL, "jv-a": NONE}
+    paired = paired_outcomes(
+        _rows(BASELINE, "base"),
+        _rows(record, "cand"),
+        deciding=["java", "python"],
+        noise=band,
+    )
+    # py-a: 0/3 against 6/9, p = 2/11; py-c: 3/3 against 6/9, p = 112/220 (hypergeometric
+    # terms 1, 27, 108, 84 / 220, of which 1, 27 and 84 are at most 84).
+    py_a = PairedCase(
+        case_id="py-a",
+        language="python",
+        within_noise=True,
+        noise_reason="episode_rate",
+        reference_verified=6,
+        reference_episodes=9,
+        candidate_verified=0,
+        candidate_episodes=3,
+        p_value=2 / 11,
+    )
+    # jv-a: 0/3 against 9/9, p = 1/220: separated, a real flip.
+    jv_a = PairedCase(
+        case_id="jv-a",
+        language="java",
+        reference_verified=9,
+        reference_episodes=9,
+        candidate_verified=0,
+        candidate_episodes=3,
+        p_value=1 / 220,
+    )
+    assert paired.pass_to_fail_cases == [jv_a, py_a]
+    (py_c,) = paired.fail_to_pass_cases
+    assert (py_c.within_noise, py_c.noise_reason) == (True, "episode_rate")
+    assert py_c.p_value == pytest.approx(112 / 220)
+    assert (paired.deciding_pass_to_fail, paired.deciding_fail_to_pass) == (1, 0)
+
+
+def test_a_case_verifying_one_episode_in_three_flips_within_noise_with_pooled_counts():
+    # Every reference run verifies py-c once in three: a majority fail in each run.
+    third = {**BASELINE, "py-c": [True, False, False]}
+    band = _case_band(third, third, third)
+    for record, p_value in (
+        # 2/3 against 3/9: p = 414/792; 3/3 against 3/9: p = 2/11.
+        ({**third, "py-c": [True, True, False]}, 414 / 792),
+        ({**third, "py-c": ALL}, 2 / 11),
+    ):
+        paired = paired_outcomes(
+            _rows(third, "base"), _rows(record, "cand"), deciding=["python"], noise=band
+        )
+        (flip,) = paired.fail_to_pass_cases
+        assert (flip.case_id, flip.noise_reason, flip.p_value) == (
+            "py-c",
+            "episode_rate",
+            pytest.approx(p_value),
+        )
+        assert paired.deciding_fail_to_pass == 0
+        # The earlier rule called py-c stable_fail and counted the flip.
+        legacy = paired_outcomes(
+            _rows(third, "base"),
+            _rows(record, "cand"),
+            deciding=["python"],
+            noise=legacy_band(band),
+        )
+        assert legacy.deciding_fail_to_pass == 1
+
+
+def test_a_flip_in_a_whole_case_language_is_read_by_its_episodes_with_pooled_counts():
+    # Ruby's single case flipped between the band's runs (a whole-case language band). With
+    # pooled counts the flip is read by its episodes, not by the language band: 0/3 against
+    # the pooled 6/9 gives p = 2/11, noise by episode rate.
+    band = _case_band(BASELINE, {**BASELINE, "rb-a": NONE}, BASELINE)
+    assert band.languages["ruby"].band == 1.0
+    paired = paired_outcomes(
+        _rows(BASELINE, "base"),
+        _rows({**BASELINE, "rb-a": NONE}, "cand"),
+        deciding=["ruby"],
+        noise=band,
+    )
+    (flip,) = paired.pass_to_fail_cases
+    assert (flip.noise_reason, flip.p_value) == ("episode_rate", pytest.approx(2 / 11))
+
+
+def test_a_paired_case_records_all_of_its_episode_counts_or_none():
+    with pytest.raises(ValueError, match="all of its episode counts"):
+        PairedCase(case_id="py-a", language="python", reference_verified=3)
+    with pytest.raises(ValueError, match="only by episode rate"):
+        PairedCase(
+            case_id="py-a",
+            language="python",
+            within_noise=True,
+            noise_reason="unstable_case",
+            reference_verified=6,
+            reference_episodes=9,
+            candidate_verified=0,
+            candidate_episodes=3,
+            p_value=2 / 11,
+        )
+
+
+# Three runs of the baseline configuration in which python never moves (9/9 for py-a and
+# py-b, 0/9 for py-c: 18 of 27 pooled) while ruby flips once, so J has a spread.
+STEADY = (BASELINE, {**BASELINE, "rb-a": NONE}, BASELINE)
+
+
+def test_with_pooled_counts_a_deciding_language_regresses_only_when_the_test_separates_it():
+    band = _case_band(*STEADY)
+    # python 3/9 against 18/27: p = 0.122, not separated.
+    fell = _gate(BASELINE, {**BASELINE, "py-a": NONE}, min_cases=3, noise=band)
+    assert fell.regressed_languages == ["python"]
+    rate = fell.language_rates["python"]
+    assert (rate.reference_verified, rate.reference_episodes) == (18, 27)
+    assert (rate.candidate_verified, rate.candidate_episodes) == (3, 9)
+    assert rate.p_value == pytest.approx(0.12209495993766098)
+    assert "python" in fell.languages_within_noise
+    assert fell.decision is GateDecision.INCONCLUSIVE
+    assert fell.reasons[0] is GateReason.LANGUAGE_REGRESSED
+    assert fell.reasons[-1] is GateReason.WITHIN_NOISE
+    # The band's python spread is zero: read by its spread, the same fall is a regression.
+    legacy = _gate(BASELINE, {**BASELINE, "py-a": NONE}, min_cases=3, noise=legacy_band(band))
+    assert legacy.language_rates == {}
+    assert legacy.decision is GateDecision.REJECTED
+    # python 0/9 against 18/27: p = 0.00103, separated: a regression outside noise.
+    both = _gate(BASELINE, {**BASELINE, "py-a": NONE, "py-b": NONE}, min_cases=3, noise=band)
+    assert both.language_rates["python"].p_value == pytest.approx(0.0010328936914031463)
+    assert "python" not in both.languages_within_noise
+    assert both.decision is GateDecision.REJECTED
+    # Without the candidate's trajectories the language is read by its spread.
+    (before, _), (after, _) = _side(BASELINE, "base"), _side({**BASELINE, "py-a": NONE}, "cand")
+    assert gate(before, after, min_cases=3, noise=band).language_rates == {}
+
+
+def test_with_pooled_counts_the_accuracy_criterion_needs_a_separated_rise():
+    low = {**BASELINE, "py-b": NONE}
+    band = _case_band(low, {**low, "rb-a": NONE}, low)
+    targeted = partial(_gate, track="accuracy", target_language="python", min_cases=3)
+    # python 6/9 against 9/27: p = 0.122; one case's majority rose, beyond a zero spread.
+    one = {**low, "py-b": ALL}
+    assert targeted(low, one, noise=legacy_band(band)).decision is GateDecision.ACCEPTED
+    verdict = targeted(low, one, noise=band)
+    assert verdict.language_rates["python"].p_value == pytest.approx(0.12209495993766098)
+    assert verdict.reasons == [GateReason.ACCURACY_NOT_IMPROVED]
+    # python 9/9 against 9/27: p = 0.00103, separated.
+    two = {**low, "py-b": ALL, "py-c": ALL}
+    assert targeted(low, two, noise=band).decision is GateDecision.ACCEPTED
+    macro = _gate(low, two, noise=band, min_cases=3, track="accuracy")
+    assert macro.decision is GateDecision.ACCEPTED
+
+
+def test_the_view_prints_each_flips_episodes_and_the_language_rates():
+    band = _case_band(*STEADY)
+    candidate = {**BASELINE, "py-a": NONE}
+    verdict = _gate(BASELINE, candidate, min_cases=3, noise=band)
+    (before, _), (after, _) = _side(BASELINE, "base"), _side(candidate, "cand")
+    text = render_gate(verdict, before, after)
+    assert "The band carries pooled per-case counts" in text
+    # py-a: 0/3 against 9/9, p = 1/220, a real flip; python as a whole is not separated.
+    assert "- Pass to fail: `py-a` (python, 0/3 vs 9/9 episodes, p 0.005)" in text
+    assert "| Language | Reference episodes | Candidate episodes | p | Within noise |" in text
+    assert "| python | 18/27 (0.667) | 3/9 (0.333) | 0.122 | yes |" in text
+    # The spread stays as information; the within-noise cell names the rule it read.
+    assert "| python verified accuracy | -0.333 | ±0.000 | yes (episode rate) |" in text
+    assert "- Noise band per-case stability (by pooled episodes):" in text
 
 
 def test_an_incomparable_gate_reads_no_paired_outcomes():

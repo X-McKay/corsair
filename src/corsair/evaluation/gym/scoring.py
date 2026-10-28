@@ -714,9 +714,14 @@ def _fraction(flags: Sequence[bool]) -> float | None:
     return sum(flags) / len(flags) if flags else None
 
 
+def is_majority(verified: int, repeats: int) -> bool:
+    """Whether ``verified`` of ``repeats`` episodes is more than half: a majority pass."""
+    return 2 * verified > repeats
+
+
 def majority_verified(repeats: Sequence[Trajectory]) -> bool:
     """A case's outcome: whether more than half of its repeats verified."""
-    return 2 * sum(item.verified for item in repeats) > len(repeats)
+    return is_majority(sum(item.verified for item in repeats), len(repeats))
 
 
 def case_outcomes(trajectories: Sequence[Trajectory]) -> dict[str, tuple[str, bool]]:
