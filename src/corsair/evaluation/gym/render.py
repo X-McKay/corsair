@@ -19,13 +19,20 @@ from corsair.contracts import (
     GroupSummary,
     NoiseBand,
     NoiseCase,
+    NoiseRule,
     NoiseSpread,
     OperationalEpisode,
     PairedCase,
+    ResampledInterval,
     Scorecard,
     TargetExceptionEpisode,
 )
-from corsair.evaluation.gym.gate import deciding_accuracy_spread, inside_band
+from corsair.evaluation.gym.gate import (
+    deciding_accuracy_spread,
+    inside_band,
+    noise_reading,
+    worst_language_spread,
+)
 
 REASON_TEXT: dict[GateReason, str] = {
     GateReason.DATASET_MISMATCH: "The runs scored different frozen datasets.",
@@ -111,11 +118,137 @@ BAND_REASON_TEXT: dict[GateReason, str] = {
 }
 
 
+# A gate that read a band's resampled intervals words these reasons against them; the
+# view follows each with the candidate's figures, the band's mean and the interval.
+INTERVAL_REASON_TEXT: dict[GateReason, str] = {
+    GateReason.LANGUAGE_REGRESSED: (
+        "A language's majority verified accuracy fell below the noise band's mean for it "
+        "(below the installed reference's, for a language the band lacks); the fall is "
+        "outside noise only below the band's resampled interval, or when an exact test on "
+        "its episodes separates the rates."
+    ),
+    GateReason.OBJECTIVE_BELOW_THRESHOLD: (
+        "The objective J gained less than the required margin over the noise band's mean, "
+        "or did not rise above the band's resampled interval."
+    ),
+    GateReason.ACCURACY_NOT_IMPROVED: (
+        "Neither macro nor the target language's verified accuracy rose above the noise "
+        "band's mean by one case's majority beyond noise (above the band's resampled "
+        "interval, or an exact test on the language's episodes)."
+    ),
+    GateReason.ACCURACY_BELOW_BASELINE: (
+        "Macro verified accuracy fell below the noise band's mean; the fall is outside noise "
+        "only below the band's resampled interval."
+    ),
+    GateReason.WITHIN_NOISE: (
+        "Every regression, measured from the noise band's mean, lies within the measured "
+        "noise (not below the band's resampled interval, or an exact test on episodes that "
+        "does not separate the rates): run the candidate once more (a confirmation run) and "
+        "gate that run before deciding."
+    ),
+}
+
+
+def read_by_intervals(verdict: GateVerdict) -> bool:
+    """Whether the gate read its band's resampled intervals."""
+    return verdict.anchored_to_band and "interval" in verdict.noise_rules.values()
+
+
 def reason_text(reason: GateReason, verdict: GateVerdict) -> str:
-    """A reason's fixed sentence; the band-mean wording when the gate measured from it."""
+    """A reason's fixed sentence; the band-mean wording when the gate measured from it, and
+    the interval wording, with the candidate's figures, when it read the band's intervals."""
+    if read_by_intervals(verdict) and reason in INTERVAL_REASON_TEXT:
+        figures = _reason_figures(reason, verdict)
+        text = INTERVAL_REASON_TEXT[reason]
+        return f"{text} Candidate against the band: {figures}." if figures else text
     if verdict.anchored_to_band and reason in BAND_REASON_TEXT:
         return BAND_REASON_TEXT[reason]
     return REASON_TEXT[reason]
+
+
+def _interval_text(interval: ResampledInterval | None, suffix: str = "") -> str:
+    if interval is None:
+        return "unknown"
+    return f"{interval.low:.3f}{suffix} to {interval.high:.3f}{suffix}"
+
+
+def _figure(
+    label: str,
+    value: float | None,
+    mean: float | None,
+    interval: ResampledInterval | None,
+    note: str | None = None,
+) -> str:
+    """``label value (band mean m, resampled interval low to high[, note])``."""
+    details = [f"band mean {_number(mean)}", f"resampled interval {_interval_text(interval)}"]
+    if note:
+        details.append(note)
+    return f"{label} {_number(value)} ({', '.join(details)})"
+
+
+def _from_mean(mean: float, delta: float | None) -> float | None:
+    return None if delta is None else mean + delta
+
+
+def _objective_figure(verdict: GateVerdict, noise: NoiseBand) -> str:
+    band = noise.objective_j
+    value = _from_mean(band.mean, verdict.delta_j_to_band)
+    return _figure("J", value, band.mean, band.interval)
+
+
+# On the accuracy track, a gate reading deciding languages by their episodes counts a
+# macro gain only by a language whose rate rose (the interval is then information).
+RATE_GAIN_NOTE = "its gain read by its languages' episodes"
+
+
+def _accuracy_figure(verdict: GateVerdict, noise: NoiseBand, gain: bool = False) -> str:
+    """The macro verified accuracy decided on: over the deciding languages with them.
+    ``gain`` names the accuracy track's criterion, which episode rates decide when read."""
+    note = RATE_GAIN_NOTE if gain and verdict.language_rates else None
+    if verdict.deciding_languages:
+        metric = verdict.deciding_macro_verified_accuracy_to_band
+        subset = noise.language_set(verdict.deciding_languages)
+        return _figure(
+            "deciding macro verified accuracy",
+            None if metric is None else metric.candidate,
+            None if metric is None else metric.baseline,
+            None if subset is None else subset.macro_verified_accuracy,
+            note,
+        )
+    band = noise.macro_verified_accuracy
+    value = _from_mean(band.mean, verdict.delta_macro_verified_accuracy_to_band)
+    return _figure("macro verified accuracy", value, band.mean, band.interval, note)
+
+
+def _language_figure(verdict: GateVerdict, noise: NoiseBand, language: str) -> str:
+    band = noise.languages.get(language)
+    if band is None:
+        return f"{language} not in band"
+    rate = verdict.language_rates.get(language)
+    note = None if rate is None else f"read by its episodes, p {rate.p_value:.3f}"
+    value = _from_mean(band.mean, verdict.language_deltas_to_band.get(language))
+    return _figure(language, value, band.mean, band.interval, note)
+
+
+def _reason_figures(reason: GateReason, verdict: GateVerdict) -> str:
+    """The candidate's figures, the band's mean and its interval for what ``reason`` read."""
+    noise = verdict.noise
+    if noise is None:
+        return ""
+    figures = []
+    reasons = set(verdict.reasons) if reason is GateReason.WITHIN_NOISE else {reason}
+    if GateReason.OBJECTIVE_BELOW_THRESHOLD in reasons:
+        figures.append(_objective_figure(verdict, noise))
+    if reasons & {GateReason.ACCURACY_NOT_IMPROVED, GateReason.ACCURACY_BELOW_BASELINE}:
+        gain = GateReason.ACCURACY_NOT_IMPROVED in reasons
+        figures.append(_accuracy_figure(verdict, noise, gain))
+    if GateReason.ACCURACY_NOT_IMPROVED in reasons and verdict.target_language is not None:
+        figures.append(_language_figure(verdict, noise, verdict.target_language))
+    if GateReason.LANGUAGE_REGRESSED in reasons:
+        figures.extend(
+            _language_figure(verdict, noise, language) for language in verdict.regressed_languages
+        )
+    return "; ".join(figures)
 
 
 TRACK_TEXT: dict[GateTrack, str] = {
@@ -197,6 +330,38 @@ LEGACY_GATE_TEXT = (
     "The band carries no pooled per-case counts: flips and languages are read against its "
     "spreads and its per-run majority classification, as before pooled counts."
 )
+
+INTERVAL_GATE_TEXT = (
+    "The band carries resampled intervals: J, macro, worst-language and deciding verified "
+    "accuracy and each language's majority verified accuracy are read by the candidate's "
+    "value against the band's 2.5th to 97.5th percentile interval. It is within noise "
+    "inside the interval, a fall is outside noise only below it, and a gain counts only "
+    "above it (and by its minimum step). Token and p50 seconds ratios keep the band's "
+    "min / mean to max / mean; their intervals are information."
+)
+
+NO_INTERVALS_TEXT = (
+    "The band carries no resampled intervals (it was written before them, without the "
+    "runs' trajectories, or with a case every episode of which was operational): J, macro "
+    "and each language's verified accuracy are read by their delta from the band's mean "
+    "against twice the half-range."
+)
+
+RESAMPLE_TEXT = (
+    "Each synthetic run draws, for every case, the band's repeats episodes with "
+    "replacement from that case's episodes pooled over the band's runs, and is scored as a "
+    "run is. Cases and their episodes are treated as exchangeable within a case and "
+    "independent across cases. An interval spans the 2.5th to the 97.5th percentile over "
+    "the synthetic runs."
+)
+
+# How a gate read a metric, as the noise table names it.
+RULE_TEXT: dict[NoiseRule, str] = {
+    "interval": "interval",
+    "half_range": "half-range",
+    "band_ratio": "band ratio",
+    "episode_rate": "episode rate",
+}
 
 RATES_TEXT = (
     "Deciding languages by episode rate (the candidate's episodes against the band's pooled "
@@ -692,9 +857,22 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     if verdict.slice:
         return [f"Noise band from {noise.n_runs} runs: {runs}. {SLICE_NOISE_TEXT}", "", pooled, ""]
     lines = [f"Noise band from {noise.n_runs} runs: {runs}. {NOISE_TEXT}", "", pooled, ""]
+    operational = _operational_run_lines(noise)
+    if operational:
+        lines.extend([operational[0].removeprefix("- "), ""])
     if verdict.decision is GateDecision.INCOMPARABLE:
         # Nothing was compared, so no delta was read against the band.
         return lines
+    if read_by_intervals(verdict):
+        intervals = f"{noise.resamples} synthetic runs, seed {noise.seed}"
+        lines.extend([f"{INTERVAL_GATE_TEXT} Resampled from {intervals}.", ""])
+        lines.extend(_interval_table(verdict, noise))
+        lines.append("")
+        lines.extend(_rate_lines(verdict))
+        named = ", ".join(verdict.within_noise) or "none"
+        languages = ", ".join(verdict.languages_within_noise) or "none"
+        return [*lines, f"Within noise: {named}; languages: {languages}.", ""]
+    lines.extend([NO_INTERVALS_TEXT, ""])
 
     def within(flag: bool) -> str:
         return "yes" if flag else "no"
@@ -768,6 +946,163 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     return lines
 
 
+def _yes(flag: bool) -> str:
+    return "yes" if flag else "no"
+
+
+def _rule(verdict: GateVerdict, name: str, language: bool = False) -> str:
+    rules = verdict.language_noise_rules if language else verdict.noise_rules
+    rule = rules.get(name)
+    return "none" if rule is None else RULE_TEXT[rule]
+
+
+def _ratio_interval(spread: NoiseSpread | None) -> str:
+    """A scale metric's interval as ratios to the band's mean; information only."""
+    if spread is None or spread.interval is None or spread.mean <= 0:
+        return "unknown"
+    low, high = spread.interval.low / spread.mean, spread.interval.high / spread.mean
+    return f"{low:.3f} to {high:.3f} (information)"
+
+
+def _interval_table(verdict: GateVerdict, noise: NoiseBand) -> list[str]:
+    """Each metric's candidate value and delta from the band's mean against its resampled
+    interval and its half-range band, with the rule the gate read it by."""
+    metrics = set(verdict.within_noise)
+    j, macro = noise.objective_j, noise.macro_verified_accuracy
+    rows = [
+        [
+            "Objective J",
+            _number(_from_mean(j.mean, verdict.delta_j_to_band)),
+            _signed(verdict.delta_j_to_band),
+            _interval_text(j.interval),
+            _difference_band(j),
+            _rule(verdict, "objective_j"),
+            _yes("objective_j" in metrics),
+        ],
+        [
+            "Macro verified accuracy",
+            _number(_from_mean(macro.mean, verdict.delta_macro_verified_accuracy_to_band)),
+            _signed(verdict.delta_macro_verified_accuracy_to_band),
+            _interval_text(macro.interval),
+            _difference_band(macro),
+            _rule(verdict, "macro_verified_accuracy"),
+            _yes("macro_verified_accuracy" in metrics),
+        ],
+    ]
+    languages = list(verdict.language_deltas)
+    worst = worst_language_spread(noise, languages)
+    every = noise.language_set(languages)
+    worst_delta = verdict.delta_worst_language_verified_accuracy_to_band
+    worst_reading = noise_reading(
+        noise,
+        worst_delta,
+        None if worst is None else _from_mean(worst.mean, worst_delta),
+        worst,
+        None if every is None else every.worst_language_verified_accuracy,
+    )
+    rows.append(
+        [
+            "Worst language verified accuracy (reported)",
+            _number(worst_reading.value),
+            _signed(worst_delta),
+            _interval_text(worst_reading.interval),
+            _difference_band(worst),
+            _rule(verdict, "worst_language_verified_accuracy"),
+            _yes(worst_reading.inside()),
+        ]
+    )
+    for name, value, spread, metric in (
+        (
+            "Token ratio to band mean",
+            verdict.token_ratio_to_band,
+            noise.macro_effective_tokens,
+            "macro_effective_tokens",
+        ),
+        (
+            "p50 seconds ratio to band mean",
+            verdict.seconds_ratio_to_band,
+            noise.macro_p50_seconds,
+            "macro_p50_seconds",
+        ),
+    ):
+        rows.append(
+            [
+                name,
+                _number(value),
+                "",
+                _ratio_interval(spread),
+                _mean_ratio_band(spread),
+                _rule(verdict, metric),
+                _yes(metric in metrics),
+            ]
+        )
+    if verdict.deciding_languages:
+        rows.extend(_deciding_interval_rows(verdict, noise))
+    for language in languages:
+        spread = noise.languages.get(language)
+        delta = verdict.language_deltas_to_band.get(language)
+        value = None if spread is None else _from_mean(spread.mean, delta)
+        rows.append(
+            [
+                f"{language} verified accuracy",
+                _number(value),
+                _band_delta(verdict, language),
+                _interval_text(None if spread is None else spread.interval),
+                _difference_band(spread),
+                _rule(verdict, language, language=True),
+                _yes(language in verdict.languages_within_noise),
+            ]
+        )
+    header = [
+        "Metric",
+        "Candidate",
+        "Delta (band mean)",
+        "Resampled interval",
+        "Half-range band",
+        "Rule",
+        "Within noise",
+    ]
+    return _table(header, rows)
+
+
+def _deciding_interval_rows(verdict: GateVerdict, noise: NoiseBand) -> list[list[str]]:
+    """The deciding macro and worst-language rows of the interval table."""
+    subset = noise.language_set(verdict.deciding_languages)
+    rows = []
+    for name, metric, spread, interval, key in (
+        (
+            "Deciding macro verified accuracy",
+            verdict.deciding_macro_verified_accuracy_to_band,
+            deciding_accuracy_spread(noise, verdict.deciding_languages),
+            None if subset is None else subset.macro_verified_accuracy,
+            "deciding_macro_verified_accuracy",
+        ),
+        (
+            "Deciding worst language verified accuracy (reported)",
+            verdict.deciding_worst_language_to_band,
+            worst_language_spread(noise, verdict.deciding_languages),
+            None if subset is None else subset.worst_language_verified_accuracy,
+            "deciding_worst_language",
+        ),
+    ):
+        delta = None if metric is None else metric.delta
+        reading = noise_reading(
+            noise, delta, None if metric is None else metric.candidate, spread, interval
+        )
+        rows.append(
+            [
+                name,
+                _number(reading.value),
+                _signed(delta),
+                _interval_text(interval),
+                _difference_band(spread),
+                _rule(verdict, key),
+                _yes(reading.inside()),
+            ]
+        )
+    return rows
+
+
 def render_noise(band: NoiseBand) -> str:
     """Each metric per run with its mean, half-range, deviation and the band a gate reads."""
     runs = [f"`{run}`" for run in band.runs]
@@ -782,6 +1117,7 @@ def render_noise(band: NoiseBand) -> str:
             ", ".join(f"`{value[:12]}`" for value in band.run_identity.get("config", []))
             or "unknown"
         ),
+        *_operational_run_lines(band),
         "",
     ]
     metrics: list[tuple[str, NoiseSpread | None, int, bool]] = [
@@ -795,25 +1131,93 @@ def render_noise(band: NoiseBand) -> str:
         for language, spread in band.languages.items()
     )
     rows = []
+    extra = 2 if band.resampled else 0
     for name, spread, digits, ratio in metrics:
         if spread is None:
-            rows.append(
-                [name, *("unknown" for _ in runs), "unknown", "unknown", "unknown", "unknown"]
-            )
+            rows.append([name, *("unknown" for _ in range(len(runs) + 4 + extra))])
             continue
-        rows.append(
-            [
-                name,
-                *(_number(value, digits) for value in spread.values),
-                _number(spread.mean, digits),
-                _number(spread.half_range, digits),
-                _number(spread.stdev, digits),
-                _mean_ratio_band(spread, "x") if ratio else _difference_band(spread),
-            ]
-        )
-    lines.extend(_table(["Metric", *runs, "Mean", "Half-range", "Stdev", "Gate band"], rows))
-    lines.extend(["", NOISE_TEXT, "", *_noise_case_lines(band)])
+        row = [
+            name,
+            *(_number(value, digits) for value in spread.values),
+            _number(spread.mean, digits),
+            _number(spread.half_range, digits),
+            _number(spread.stdev, digits),
+            _mean_ratio_band(spread, "x") if ratio else _difference_band(spread),
+        ]
+        if band.resampled:
+            interval = spread.interval
+            row.append(
+                "unknown"
+                if interval is None
+                else f"{_number(interval.low, digits)} to {_number(interval.high, digits)}"
+            )
+            row.append(_number(None if interval is None else interval.mean, digits))
+        rows.append(row)
+    header = ["Metric", *runs, "Mean", "Half-range", "Stdev", "Gate band"]
+    if band.resampled:
+        header += ["Resampled interval", "Resampled mean"]
+    lines.extend(_table(header, rows))
+    lines.extend(["", NOISE_TEXT, "", *_interval_lines(band), *_noise_case_lines(band)])
     return "\n".join(lines) + "\n"
+
+
+def _cases(count: int) -> str:
+    return "1 case" if count == 1 else f"{count} cases"
+
+
+def _interval_lines(band: NoiseBand) -> list[str]:
+    """How the band's intervals were drawn, and each language set's macro and worst
+    language interval; or that the band carries none."""
+    if not band.resampled:
+        return [NO_INTERVALS_TEXT, ""]
+    lines = [
+        f"Resampled intervals: {band.resamples} synthetic runs, seed {band.seed}. "
+        f"{RESAMPLE_TEXT} {INTERVAL_GATE_TEXT}",
+        "",
+    ]
+    rows = [
+        [
+            f"{', '.join(item.languages)} (at least {_cases(item.min_cases)})",
+            _interval_text(item.macro_verified_accuracy),
+            _number(item.macro_verified_accuracy.mean),
+            _interval_text(item.worst_language_verified_accuracy),
+            _number(item.worst_language_verified_accuracy.mean),
+        ]
+        for item in band.language_sets
+    ]
+    if rows:
+        header = [
+            "Languages",
+            "Macro interval",
+            "Macro resampled mean",
+            "Worst-language interval",
+            "Worst-language resampled mean",
+        ]
+        lines.extend([*_table(header, rows), ""])
+    return lines
+
+
+OPERATIONAL_RUNS_TEXT = (
+    "operational episodes (a harness fault, not the configuration's behaviour) are left out "
+    "of the pooled counts and the resampled intervals; the per-run values are the runs as "
+    "scored"
+)
+
+OPERATIONAL_CASES_TEXT = (
+    "Every episode operational in every run (no rate is pooled for them, never a zero rate, "
+    "and the band records no resampled interval)"
+)
+
+
+def _operational_run_lines(band: NoiseBand) -> list[str]:
+    """The operational episodes of each run, when the band counted them."""
+    if not band.operational_episodes:
+        return []
+    counts = ", ".join(
+        f"`{run}` {_count(count)}"
+        for run, count in zip(band.runs, band.operational_episodes, strict=True)
+    )
+    return [f"- Operational episodes per run: {counts}; {OPERATIONAL_RUNS_TEXT}."]
 
 
 def _noise_case_lines(band: NoiseBand) -> list[str]:
@@ -835,8 +1239,12 @@ def _noise_case_lines(band: NoiseBand) -> list[str]:
     unstable = "Unstable" if band.pooled else "Unstable (a flip counts neither way)"
     for label, stability in ((unstable, "unstable"), ("Stable fail", "stable_fail")):
         lines.append(f"- {label}: {_case_ids(band.cases, stability) or 'none'}")
+    if band.operational_cases:
+        named = ", ".join(f"`{case}`" for case in band.operational_cases)
+        lines.append(f"- {OPERATIONAL_CASES_TEXT}: {named}")
     if not band.pooled:
         return lines
+    excluded = any(case.operational_excluded for case in band.cases)
     rows = [
         [
             f"`{case.case_id}`",
@@ -845,12 +1253,14 @@ def _noise_case_lines(band: NoiseBand) -> list[str]:
             _rate(case.verified or 0, case.episodes or 1),
             _number(case.majority_pass_probability),
             case.stability.replace("_", " "),
+            *([str(case.operational_excluded)] if excluded else []),
         ]
         for case in band.cases
     ]
     runs = [f"`{run}` verified" for run in band.runs]
     header = ["Case", "Language", *runs, "Pooled verified", "Majority-pass probability"]
-    lines.extend(["", *_table([*header, "Stability"], rows)])
+    header += ["Stability", *(["Operational left out"] if excluded else [])]
+    lines.extend(["", *_table(header, rows)])
     return lines
 
 

@@ -7,6 +7,7 @@ not reported stay ``None``; nothing here turns an unknown into zero.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
@@ -378,6 +379,34 @@ NoiseMetric = Literal[
 # Floating-point slack for a recomputed spread.
 _SPREAD_TOLERANCE = 1e-9
 _MAX_NOISE_RUNS = 64
+_MAX_LANGUAGE_SETS = 64
+# How a gate read a metric against its noise band: the candidate's value inside the
+# band's resampled interval (``interval``), the delta from the band's mean within twice the
+# half-range (``half_range``, a band without intervals), a ratio to the band's mean within
+# its runs' min / mean to max / mean (``band_ratio``, tokens and seconds), or Fisher's
+# exact test on the language's episodes (``episode_rate``).
+NoiseRule = Literal["interval", "half_range", "band_ratio", "episode_rate"]
+
+
+class ResampledInterval(Contract):
+    """A metric's spread over a noise band's synthetic runs (``NoiseBand.resamples``).
+
+    Each synthetic run draws, for every case, the band's repeats episodes with replacement
+    from that case's episodes pooled over the band's runs, and is scored as a run is.
+    ``low`` and ``high`` are the 2.5th and 97.5th nearest-rank percentiles of the metric
+    over the synthetic runs and ``mean`` its mean over them (which, for a skewed metric,
+    can lie outside ``low`` to ``high``).
+    """
+
+    low: float
+    high: float
+    mean: float
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.low > self.high + _SPREAD_TOLERANCE:
+            raise ValueError("a resampled interval's low end is at most its high end")
+        return self
 
 
 class NoiseSpread(Contract):
@@ -396,6 +425,9 @@ class NoiseSpread(Contract):
     stdev: float = Field(ge=0)
     # max / min of a positive scale metric; ``None`` for a difference metric.
     max_ratio: float | None = Field(default=None, ge=1)
+    # The resampled interval (``NoiseBand.resamples``); ``None`` on a band written before
+    # intervals, or when a synthetic run left the metric unknown.
+    interval: ResampledInterval | None = None
 
     @property
     def band(self) -> float:
@@ -444,7 +476,8 @@ class NoiseCase(Contract):
     ``majority_verified`` is the case's outcome in each run (whether more than half its
     repeats verified, ``evaluation.gym.scoring.majority_verified``); ``verified_episodes``
     counts the repeats that verified. ``episodes`` and ``verified`` pool the case's
-    episodes and verified episodes over every run, and ``majority_pass_probability`` is
+    non-operational episodes and verified episodes over every run (``operational_excluded``
+    counts those left out), and ``majority_pass_probability`` is
     the binomial probability that a run of the band's repeats at the pooled rate
     (verified / episodes) gets a majority pass. ``stability`` follows that probability
     (see ``CaseStability``); on a case recorded before pooled counts all three are
@@ -459,6 +492,10 @@ class NoiseCase(Contract):
     episodes: int | None = Field(default=None, ge=1)
     verified: int | None = Field(default=None, ge=0)
     majority_pass_probability: float | None = Field(default=None, ge=0, le=1)
+    # Operational episodes (a harness fault, ``Trajectory.operational``) of the case over
+    # every run, left out of ``episodes``, ``verified`` and the band's resampling; their
+    # per-run majority outcome is still the run's as scored.
+    operational_excluded: int = Field(default=0, ge=0)
 
     @property
     def pooled(self) -> bool:
@@ -500,6 +537,20 @@ class NoiseCase(Contract):
         return self
 
 
+class LanguageSetInterval(Contract):
+    """Macro and worst-language verified accuracy over one set of a band's languages.
+
+    ``languages`` are the band's languages with at least ``min_cases`` cases, the set a
+    gate with that ``--min-cases`` decides on; a band records one entry per distinct case
+    count of its languages, so the entry with ``min_cases`` 1 covers every language.
+    """
+
+    min_cases: int = Field(ge=1)
+    languages: list[str] = Field(min_length=1, max_length=_MAX_LANGUAGE_SETS)
+    macro_verified_accuracy: ResampledInterval
+    worst_language_verified_accuracy: ResampledInterval
+
+
 class NoiseBand(Contract):
     """``corsair gym noise``: the spread of two or more runs of one configuration.
 
@@ -512,6 +563,15 @@ class NoiseBand(Contract):
     without a reason on a band written before per-case stability. A band whose cases carry
     pooled counts (``pooled``) lets a gate read flips and deciding languages by Fisher's
     exact test on episodes; a band without them is read by its spreads, as before.
+
+    With the runs' trajectories the band also records ``resamples`` synthetic runs drawn
+    with ``seed`` (see ``ResampledInterval``): an interval on objective J, macro verified
+    accuracy, each language's majority verified accuracy, macro effective tokens and macro
+    p50 seconds, and macro and worst-language verified accuracy per set of languages a
+    ``--min-cases`` threshold selects (``language_sets``). A gate reads the composite
+    accuracy metrics against these intervals in place of the half-range; tokens and seconds
+    intervals are information. A band written before them, or without trajectories, has
+    ``resamples`` and ``seed`` ``None`` and no interval.
     """
 
     schema_version: Literal["corsair.gym-noise/1"] = "corsair.gym-noise/1"
@@ -531,6 +591,17 @@ class NoiseBand(Contract):
     cases: list[NoiseCase] | None = Field(default=None, max_length=_MAX_NOISE_CASES)
     cases_unknown: NoiseCasesUnknown | None = None
     cases_unknown_runs: list[Identifier] = Field(default_factory=list, max_length=_MAX_NOISE_RUNS)
+    # Per run in ``runs`` order: its scorecard's operational episodes (``None`` when the
+    # scorecard did not count them); empty on a band written before they were recorded.
+    operational_episodes: list[int | None] = Field(default_factory=list, max_length=_MAX_NOISE_RUNS)
+    # Cases whose every episode in every run was operational: no rate to pool, so they are
+    # left out of ``cases`` and the band records no resampled interval. Never a zero rate.
+    operational_cases: list[Identifier] = Field(default_factory=list, max_length=_MAX_NOISE_CASES)
+    resamples: int | None = Field(default=None, ge=1)
+    seed: int | None = Field(default=None, ge=0)
+    language_sets: list[LanguageSetInterval] = Field(
+        default_factory=list, max_length=_MAX_LANGUAGE_SETS
+    )
 
     @model_validator(mode="after")
     def coherent_band(self):
@@ -555,12 +626,39 @@ class NoiseBand(Contract):
             raise ValueError("a noise band classifies each case once")
         if len({case.pooled for case in cases}) > 1:
             raise ValueError("a noise band pools the counts of every case or of none")
+        if self.operational_episodes and len(self.operational_episodes) != self.n_runs:
+            raise ValueError("a noise band counts the operational episodes of every run")
+        if {case.case_id for case in cases} & set(self.operational_cases):
+            raise ValueError("an operational-only case has no pooled record")
+        if self.operational_cases and self.resamples is not None:
+            raise ValueError("a band with an operational-only case records no interval")
+        if (self.resamples is None) != (self.seed is None):
+            raise ValueError("a noise band records its resample count and seed together")
+        required = [self.objective_j, self.macro_verified_accuracy, *self.languages.values()]
+        if self.resamples is not None and any(item.interval is None for item in required):
+            raise ValueError(
+                "a resampled noise band has an interval on J, macro and every language"
+            )
+        if self.resamples is None and (
+            self.language_sets or any(item.interval is not None for item in spreads)
+        ):
+            raise ValueError("a noise band without resamples records no interval")
         return self
 
     @property
     def pooled(self) -> bool:
         """Whether the band carries pooled per-case episode counts."""
         return bool(self.cases) and all(case.pooled for case in self.cases or [])
+
+    @property
+    def resampled(self) -> bool:
+        """Whether the band carries resampled intervals."""
+        return self.resamples is not None
+
+    def language_set(self, languages: Collection[str]) -> LanguageSetInterval | None:
+        """The intervals over exactly ``languages``; ``None`` when the band has none."""
+        wanted = sorted(languages)
+        return next((item for item in self.language_sets if item.languages == wanted), None)
 
 
 class DecidingMetric(Contract):
@@ -753,6 +851,13 @@ class GateVerdict(Contract):
     # With a band: the headline metrics and the languages whose delta lies inside it.
     within_noise: list[NoiseMetric] = Field(default_factory=list)
     languages_within_noise: list[str] = Field(default_factory=list)
+    # With a band of the gated dataset: how each metric was read against it, by metric
+    # (``objective_j``, ``macro_verified_accuracy``, ``worst_language_verified_accuracy``,
+    # ``macro_effective_tokens``, ``macro_p50_seconds`` and, with ``min_cases``,
+    # ``deciding_macro_verified_accuracy`` and ``deciding_worst_language``) and by language.
+    # Empty without a band and on records written before intervals (the half-range rule).
+    noise_rules: dict[str, NoiseRule] = Field(default_factory=dict)
+    language_noise_rules: dict[str, NoiseRule] = Field(default_factory=dict)
     # Only baseline languages with at least this many cases decide ``language_regressed``,
     # ``accuracy_not_improved`` and ``accuracy_below_baseline``; 1 (every language, and
     # every record before ``--min-cases``) leaves the next five fields empty.

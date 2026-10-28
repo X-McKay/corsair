@@ -148,6 +148,7 @@ class CliArguments(argparse.Namespace):
     noise: list[str] | None
     noise_first: str
     noise_rest: list[str]
+    noise_seed: int
     min_cases: int | None
     slice: bool
 
@@ -1002,7 +1003,7 @@ async def _handle_gym_noise(args: CliArguments, ui: Terminal) -> int:
         scorecard_trajectories(run_scorecard(path), card, runs)[0]
         for path, card in zip(paths, cards, strict=True)
     ]
-    band = noise_band(cards, trajectories)
+    band = noise_band(cards, trajectories, seed=args.noise_seed)
     if args.out:
         out = Path(args.out)
     else:
@@ -1440,6 +1441,14 @@ def positive_limit(value: str) -> int:
     if limit < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return limit
+
+
+def noise_seed(value: str) -> int:
+    """Admit a resampling seed: a non-negative integer, recorded in the noise band."""
+    seed = int(value)
+    if seed < 0:
+        raise argparse.ArgumentTypeError("must be at least 0")
+    return seed
 
 
 _DURATION = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
@@ -1914,6 +1923,14 @@ def _gym_parsers(gym: argparse.ArgumentParser) -> None:
     noise_cmd.add_argument("noise_first", metavar="RUN", help="Run directory or scorecard")
     noise_cmd.add_argument("noise_rest", nargs="+", metavar="RUN", help="Further runs")
     noise_cmd.add_argument("--out", metavar="FILE", help="Band file (default: see above)")
+    noise_cmd.add_argument(
+        "--seed",
+        dest="noise_seed",
+        type=noise_seed,
+        default=0,
+        metavar="N",
+        help="Seed of the resampled intervals' draws, recorded in the band (default 0)",
+    )
     noise_cmd.add_argument(
         "--root",
         dest="gym_root",

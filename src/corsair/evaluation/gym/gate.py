@@ -50,6 +50,18 @@ improvement criterion of the accuracy or efficiency track, still rejects. A band
 another dataset, budgets or repeat count makes the gate INCOMPARABLE (``noise_mismatch``).
 Without a band every decision is as above.
 
+A band carrying resampled intervals (``NoiseBand.resampled``, see ``evaluation.gym.noise``)
+replaces the half-range for the composite accuracy metrics: J, macro verified accuracy,
+the deciding macro (the interval of the band's language set equal to the deciding
+languages), worst-language and each language's majority verified accuracy. Such a metric
+is within noise when the candidate's value lies inside the interval; a fall (a deciding
+language, the efficiency accuracy floor) is outside noise only below its low end; and a
+gain (J's, the accuracy track's macro and target steps) must also exceed its high end. The
+deltas reported and stepped are still from the band's mean. Token and p50 seconds ratios,
+and the episode-rate tests on flips and languages, are read as without intervals. The
+verdict records the rule each metric was read by (``noise_rules``,
+``language_noise_rules``); a band without intervals reads every metric by its half-range.
+
 Deciding languages (``min_cases``): with ``min_cases`` above 1 only baseline languages with
 at least that many cases decide ``language_regressed``, ``accuracy_not_improved`` and
 ``accuracy_below_baseline`` (macro verified accuracy and the minimum gain are then taken
@@ -96,6 +108,7 @@ is visible; that is reported, never a refusal.
 
 from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
+from dataclasses import dataclass
 from statistics import mean
 
 from corsair.contracts import (
@@ -108,10 +121,12 @@ from corsair.contracts import (
     GateVerdict,
     NoiseBand,
     NoiseMetric,
+    NoiseRule,
     NoiseSpread,
     PairedCase,
     PairedCounts,
     PairedOutcomes,
+    ResampledInterval,
     RunIdentity,
     Scorecard,
     Trajectory,
@@ -598,11 +613,73 @@ def _inside_ratio(ratio: float | None, spread: NoiseSpread | None) -> bool:
     return low - _EPSILON <= ratio <= high + _EPSILON
 
 
-def _beyond(delta: float | None, noise: NoiseBand | None, spread: NoiseSpread | None) -> bool:
-    """A gain counts beyond the band; without a band every gain does."""
-    if noise is None:
-        return True
-    return delta is not None and spread is not None and delta > spread.band + _EPSILON
+@dataclass(frozen=True)
+class NoiseReading:
+    """One composite metric as a gate reads it against a noise band.
+
+    ``delta`` is measured from the band's mean (or the installed baseline, where the band
+    lacks the metric) and ``value`` is the candidate's figure. With the band's resampled
+    ``interval`` the candidate's value is read against it; otherwise the delta against
+    twice the ``spread``'s half-range. ``banded`` says whether a band was given at all.
+    """
+
+    delta: float | None
+    value: float | None
+    spread: NoiseSpread | None
+    interval: ResampledInterval | None
+    banded: bool
+
+    @property
+    def rule(self) -> NoiseRule | None:
+        """The rule the metric was read by; ``None`` when the band does not cover it."""
+        if self.interval is not None:
+            return "interval"
+        return "half_range" if self.spread is not None else None
+
+    def inside(self) -> bool:
+        """Within noise: the value inside the interval, else the delta inside the band."""
+        if self.interval is not None:
+            return (
+                self.value is not None
+                and self.interval.low - _EPSILON <= self.value <= self.interval.high + _EPSILON
+            )
+        return inside_band(self.delta, self.spread)
+
+    def fall_within(self) -> bool:
+        """A fall within noise: not below the interval's low end, else inside the band."""
+        if self.interval is not None:
+            return self.value is not None and self.value >= self.interval.low - _EPSILON
+        return inside_band(self.delta, self.spread)
+
+    def gain_beyond(self) -> bool:
+        """A gain counts above the interval's high end, else beyond the band; without a band
+        every gain does."""
+        if not self.banded:
+            return True
+        if self.interval is not None:
+            return self.value is not None and self.value > self.interval.high + _EPSILON
+        return (
+            self.delta is not None
+            and self.spread is not None
+            and self.delta > self.spread.band + _EPSILON
+        )
+
+
+def noise_reading(
+    noise: NoiseBand | None,
+    delta: float | None,
+    value: float | None,
+    spread: NoiseSpread | None,
+    interval: ResampledInterval | None = None,
+) -> NoiseReading:
+    """A metric's reading; the interval counts only on a band that was given."""
+    return NoiseReading(
+        delta=delta,
+        value=value,
+        spread=spread,
+        interval=None if noise is None else interval,
+        banded=noise is not None,
+    )
 
 
 def _saving_beyond(
@@ -617,30 +694,57 @@ def _saving_beyond(
     return ratio < min(spread.values) / spread.mean - _EPSILON
 
 
+def _interval(spread: NoiseSpread | None) -> ResampledInterval | None:
+    return None if spread is None else spread.interval
+
+
+def language_readings(
+    noise: NoiseBand | None, candidate: Scorecard, deltas: Mapping[str, float | None]
+) -> dict[str, NoiseReading]:
+    """Per language of ``deltas``: its majority verified accuracy read against the band."""
+    readings = {}
+    for language, delta in deltas.items():
+        spread = None if noise is None else noise.languages.get(language)
+        summary = candidate.languages.get(language)
+        value = None if summary is None else summary.verified_accuracy
+        readings[language] = noise_reading(noise, delta, value, spread, _interval(spread))
+    return readings
+
+
+def noise_rules(
+    readings: Mapping[str, NoiseReading], rates: Collection[str] = ()
+) -> dict[str, NoiseRule]:
+    """How each reading was read against the band: by its episodes when named in
+    ``rates``, else by its interval or half-range; a reading the band does not cover is
+    left out."""
+    rules: dict[str, NoiseRule] = {}
+    for name, reading in readings.items():
+        rule: NoiseRule | None = "episode_rate" if name in rates else reading.rule
+        if rule is not None:
+            rules[name] = rule
+    return rules
+
+
 def within_noise(
     noise: NoiseBand,
     *,
-    deltas: dict[str, float | None],
-    delta_j: float,
-    accuracy: float,
+    objective: NoiseReading,
+    macro: NoiseReading,
+    languages: Mapping[str, NoiseReading],
     tokens: float | None,
     seconds: float | None,
 ) -> tuple[list[NoiseMetric], list[str]]:
-    """The headline metrics and the languages whose delta lies inside the band.
+    """The headline metrics and the languages that lie inside the band.
 
     ``tokens`` and ``seconds`` are ratios to the band's mean."""
     inside: dict[NoiseMetric, bool] = {
-        "objective_j": inside_band(delta_j, noise.objective_j),
-        "macro_verified_accuracy": inside_band(accuracy, noise.macro_verified_accuracy),
+        "objective_j": objective.inside(),
+        "macro_verified_accuracy": macro.inside(),
         "macro_effective_tokens": _inside_ratio(tokens, noise.macro_effective_tokens),
         "macro_p50_seconds": _inside_ratio(seconds, noise.macro_p50_seconds),
     }
-    languages = [
-        language
-        for language, delta in deltas.items()
-        if inside_band(delta, noise.languages.get(language))
-    ]
-    return [metric for metric, flag in inside.items() if flag], languages
+    within = [language for language, reading in languages.items() if reading.inside()]
+    return [metric for metric, flag in inside.items() if flag], within
 
 
 def _regression_within_noise(
@@ -662,16 +766,13 @@ def _regression_within_noise(
 
 
 def _language_beyond(
-    language: str,
-    delta: float | None,
-    noise: NoiseBand | None,
-    rates: dict[str, EpisodeRate],
+    language: str, reading: NoiseReading, rates: Mapping[str, EpisodeRate]
 ) -> bool:
     """A language's gain counts: by the exact test when its rate was read, else beyond its
-    spread in the band (every gain without a band)."""
+    interval or spread in the band (every gain without a band)."""
     if language in rates:
         return rates[language].separates(1)
-    return _beyond(delta, noise, None if noise is None else noise.languages.get(language))
+    return reading.gain_beyond()
 
 
 def _track_reasons(
@@ -680,11 +781,10 @@ def _track_reasons(
     *,
     track: GateTrack,
     target_language: str | None,
-    deltas: dict[str, float | None],
-    delta_j: float,
-    accuracy: float | None,
+    objective: NoiseReading,
+    accuracy: NoiseReading,
     accuracy_step: float,
-    accuracy_band: NoiseSpread | None,
+    languages: Mapping[str, NoiseReading],
     tokens: float | None,
     seconds: float | None,
     noise: NoiseBand | None = None,
@@ -692,39 +792,43 @@ def _track_reasons(
 ) -> list[GateReason]:
     """The track's own reasons, after the shared language-regression check.
 
-    ``accuracy`` is the macro verified accuracy delta the gate decides on (over the
-    deciding languages), ``accuracy_step`` its minimum gain and ``accuracy_band`` its
-    spread in the band. With a band, each improvement criterion also needs its delta
-    beyond the band; with ``rates`` (deciding languages read by the exact test) the macro
-    criterion instead needs a deciding language that rose with its rate higher at p below
-    the level, and the target language needs its own. ``tokens`` and ``seconds`` are the
-    ratios decided on: to the band's mean with a band, else to the baseline.
+    ``objective`` is J, ``accuracy`` the macro verified accuracy the gate decides on (over
+    the deciding languages) with ``accuracy_step`` its minimum gain, and ``languages``
+    each language's majority verified accuracy, each read against the band. With a band,
+    each improvement criterion also needs its gain beyond noise: above the resampled
+    interval's high end, or beyond the half-range on a band without intervals. With
+    ``rates`` (deciding languages read by the exact test) the macro criterion instead needs
+    a deciding language that rose with its rate higher at p below the level, and the
+    target language needs its own. ``tokens`` and ``seconds`` are the ratios decided on:
+    to the band's mean with a band, else to the baseline.
     """
     rates = rates or {}
     if track == "objective":
         reasons = []
-        if delta_j < MIN_OBJECTIVE_GAIN - _EPSILON or not _beyond(
-            delta_j, noise, None if noise is None else noise.objective_j
-        ):
+        gain = objective.delta
+        if gain is None or gain < MIN_OBJECTIVE_GAIN - _EPSILON or not objective.gain_beyond():
             reasons.append(GateReason.OBJECTIVE_BELOW_THRESHOLD)
         if not _within(tokens, MAX_TOKEN_RATIO):
             reasons.append(GateReason.TOKENS_ABOVE_CEILING)
         return reasons
     if track == "accuracy":
         reasons = []
-        target = None if target_language is None else deltas.get(target_language)
+        target = None if target_language is None else languages.get(target_language)
         macro_beyond = (
             any(
-                (deltas.get(language) or 0.0) > _EPSILON and rate.separates(1)
+                language in languages
+                and (languages[language].delta or 0.0) > _EPSILON
+                and rate.separates(1)
                 for language, rate in rates.items()
             )
             if rates
-            else _beyond(accuracy, noise, accuracy_band)
+            else accuracy.gain_beyond()
         )
-        improved = (_at_least(accuracy, accuracy_step) and macro_beyond) or (
+        improved = (_at_least(accuracy.delta, accuracy_step) and macro_beyond) or (
             target_language is not None
-            and _at_least(target, language_step(baseline, target_language))
-            and _language_beyond(target_language, target, noise, rates)
+            and target is not None
+            and _at_least(target.delta, language_step(baseline, target_language))
+            and _language_beyond(target_language, target, rates)
         )
         if not improved:
             reasons.append(GateReason.ACCURACY_NOT_IMPROVED)
@@ -732,7 +836,7 @@ def _track_reasons(
             reasons.append(GateReason.TOKENS_ABOVE_CEILING)
         return reasons
     reasons = []
-    if accuracy is None or accuracy < -_EPSILON:
+    if accuracy.delta is None or accuracy.delta < -_EPSILON:
         reasons.append(GateReason.ACCURACY_BELOW_BASELINE)
     comparable = latency_comparable(baseline, candidate)
     tokens_band = None if noise is None else noise.macro_effective_tokens
@@ -966,11 +1070,11 @@ def gate(
     band = None if mismatched else noise
     deltas_to_band: dict[str, float | None] = {}
     j_to_band = macro_to_band = worst_to_band = None
+    worst = None if band is None else worst_language_spread(band, list(baseline.languages))
     if band is not None:
         deltas_to_band = band_language_deltas(band, candidate, deltas)
         j_to_band = candidate.objective_j - band.objective_j.mean
         macro_to_band = candidate.macro_verified_accuracy - band.macro_verified_accuracy.mean
-        worst = worst_language_spread(band, list(baseline.languages))
         if worst is not None:
             worst_to_band = candidate.worst_language_verified_accuracy - worst.mean
     decided_deltas = deltas if band is None else deltas_to_band
@@ -984,20 +1088,59 @@ def gate(
     narrowed = min_cases > 1
     metrics = deciding_metrics(baseline, candidate, deciders) if narrowed else None
     deciding_to_band: tuple[DecidingMetric | None, DecidingMetric | None] = (None, None)
-    # The macro accuracy delta, step and band decided on: over the deciding languages.
-    decided_accuracy: float | None = decided_macro
+    # Each composite metric as read against the band: its delta, the candidate's value, the
+    # band's spread and, on a band with them, its resampled interval.
+    j_spread = None if noise is None else noise.objective_j
+    objective = noise_reading(
+        noise, decided_j, candidate.objective_j, j_spread, _interval(j_spread)
+    )
+    macro_spread = None if noise is None else noise.macro_verified_accuracy
+    macro = noise_reading(
+        noise,
+        decided_macro,
+        candidate.macro_verified_accuracy,
+        macro_spread,
+        _interval(macro_spread),
+    )
+    every = None if noise is None else noise.language_set(baseline.languages)
+    worst_reading = noise_reading(
+        noise,
+        worst_to_band,
+        candidate.worst_language_verified_accuracy,
+        worst,
+        None if every is None else every.worst_language_verified_accuracy,
+    )
+    readings = language_readings(noise, candidate, decided_deltas)
+    # The macro accuracy, step and band decided on: over the deciding languages.
+    decided = macro
     accuracy_step = min_accuracy_gain(baseline)
-    accuracy_band = None if noise is None else noise.macro_verified_accuracy
+    deciding_worst: NoiseReading | None = None
     if narrowed:
         accuracy_step = min_accuracy_gain(baseline, deciders)
         accuracy_band = None if noise is None else deciding_accuracy_spread(noise, deciders)
+        worst_band = None if band is None else worst_language_spread(band, deciders)
         if band is not None and metrics is not None:
             deciding_to_band = (
                 _from_band_mean(accuracy_band, metrics[0]),
-                _from_band_mean(worst_language_spread(band, deciders), metrics[1]),
+                _from_band_mean(worst_band, metrics[1]),
             )
+        subset = None if noise is None else noise.language_set(deciders)
         anchored = deciding_to_band[0] or (None if metrics is None else metrics[0])
-        decided_accuracy = None if anchored is None else anchored.delta
+        decided = noise_reading(
+            noise,
+            None if anchored is None else anchored.delta,
+            None if anchored is None else anchored.candidate,
+            accuracy_band,
+            None if subset is None else subset.macro_verified_accuracy,
+        )
+        anchored_worst = deciding_to_band[1] or (None if metrics is None else metrics[1])
+        deciding_worst = noise_reading(
+            noise,
+            None if anchored_worst is None else anchored_worst.delta,
+            None if anchored_worst is None else anchored_worst.candidate,
+            worst_band,
+            None if subset is None else subset.worst_language_verified_accuracy,
+        )
     reasons = incomparable_reasons(baseline, candidate, min_repeats)
     if mismatched:
         reasons.append(GateReason.NOISE_MISMATCH)
@@ -1007,6 +1150,8 @@ def gate(
     languages_within: list[str] = []
     paired: PairedOutcomes | None = None
     rates: dict[str, EpisodeRate] = {}
+    rules: dict[str, NoiseRule] = {}
+    language_rules: dict[str, NoiseRule] = {}
     if not reasons:
         if candidate_trajectories is not None:
             rates = language_rates(noise, candidate_trajectories, deciders)
@@ -1027,11 +1172,10 @@ def gate(
                 candidate,
                 track=track,
                 target_language=target_language,
-                deltas=decided_deltas,
-                delta_j=decided_j,
-                accuracy=decided_accuracy,
+                objective=objective,
+                accuracy=decided,
                 accuracy_step=accuracy_step,
-                accuracy_band=accuracy_band,
+                languages=readings,
                 tokens=decided_tokens,
                 seconds=decided_seconds,
                 noise=noise,
@@ -1041,12 +1185,28 @@ def gate(
         if noise is not None:
             within, languages_within = within_noise(
                 noise,
-                deltas=decided_deltas,
-                delta_j=decided_j,
-                accuracy=decided_macro,
+                objective=objective,
+                macro=macro,
+                languages=readings,
                 tokens=tokens_to_band,
                 seconds=seconds_to_band,
             )
+            named = {
+                "objective_j": objective,
+                "macro_verified_accuracy": macro,
+                "worst_language_verified_accuracy": worst_reading,
+            }
+            if narrowed:
+                named["deciding_macro_verified_accuracy"] = decided
+                if deciding_worst is not None:
+                    named["deciding_worst_language"] = deciding_worst
+            rules = noise_rules(named)
+            # Token and p50 seconds ratios are read against the band's runs' min / mean to
+            # max / mean, as before intervals.
+            rules["macro_effective_tokens"] = "band_ratio"
+            if noise.macro_p50_seconds is not None:
+                rules["macro_p50_seconds"] = "band_ratio"
+            language_rules = noise_rules(readings, rates)
             # A language read by the exact test is within noise when the test does not
             # separate its rate from the band's.
             languages_within = sorted(
@@ -1070,20 +1230,18 @@ def gate(
             reasons.append(GateReason.PAIRED_REGRESSION)
             deciding.append(GateReason.PAIRED_REGRESSION)
         decision = GateDecision.REJECTED if deciding else GateDecision.ACCEPTED
-        accuracy_within = (
-            inside_band(decided_accuracy, accuracy_band)
-            if narrowed
-            else "macro_verified_accuracy" in within
-        )
-        # A regressed language read by the exact test is outside noise only when its rate
-        # is lower with p below the level.
+        # A fall (the accuracy floor, a regressed language) is outside noise only below
+        # the resampled interval's low end, or beyond the half-range on a band without
+        # intervals; a regressed language read by the exact test only when its rate is
+        # lower with p below the level.
+        accuracy_within = decided.fall_within()
         regressions_within = [
             language
             for language in regressed
             if (
                 not rates[language].separates(-1)
                 if language in rates
-                else language in languages_within
+                else language in readings and readings[language].fall_within()
             )
         ]
         if (
@@ -1129,6 +1287,8 @@ def gate(
         noise=noise,
         within_noise=within,
         languages_within_noise=languages_within,
+        noise_rules=rules,
+        language_noise_rules=language_rules,
         min_cases=min_cases,
         deciding_languages=deciders if narrowed else [],
         reported_languages=(

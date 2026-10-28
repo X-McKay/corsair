@@ -409,8 +409,13 @@ def test_a_band_classifies_each_case_by_its_majority_outcome_in_every_run():
         "py-c",
         "jv-b",
     }
-    # The per-language spreads are unchanged by reading the trajectories.
-    assert band.languages == noise_band(cards).languages
+    # The per-language spreads are unchanged by reading the trajectories, which add only
+    # their resampled intervals.
+    unread = noise_band(cards).languages
+    read = {
+        name: item.model_copy(update={"interval": None}) for name, item in band.languages.items()
+    }
+    assert read == unread
 
 
 def test_a_band_missing_a_runs_trajectories_records_no_cases_and_names_the_run():

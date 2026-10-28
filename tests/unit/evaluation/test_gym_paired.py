@@ -410,9 +410,9 @@ def _case_band(*runs: dict[str, list[bool]], cases: bool = True) -> NoiseBand:
 
 
 def legacy_band(band: NoiseBand) -> NoiseBand:
-    """``band`` as written before pooled counts: no pooled fields, and each case classified
-    by its per-run majority outcomes."""
-    record = band.model_dump(mode="json")
+    """``band`` as written before pooled counts: no pooled fields, each case classified by
+    its per-run majority outcomes, and (being older still) no resampled intervals."""
+    record = without_intervals(band).model_dump(mode="json")
     for case in record["cases"] or []:
         for field in ("episodes", "verified", "majority_pass_probability"):
             case.pop(field)
@@ -420,6 +420,18 @@ def legacy_band(band: NoiseBand) -> NoiseBand:
         case["stability"] = (
             "stable_pass" if all(flags) else "unstable" if any(flags) else "stable_fail"
         )
+    return NoiseBand.model_validate(record)
+
+
+def without_intervals(band: NoiseBand) -> NoiseBand:
+    """``band`` as written before resampled intervals."""
+    record = band.model_dump(mode="json")
+    spreads = [record["objective_j"], record["macro_verified_accuracy"]]
+    spreads += [record["macro_effective_tokens"], *record["languages"].values()]
+    for spread in [*spreads, record["macro_p50_seconds"] or {}]:
+        spread.pop("interval", None)
+    for field in ("resamples", "seed", "language_sets"):
+        record.pop(field)
     return NoiseBand.model_validate(record)
 
 
@@ -691,8 +703,16 @@ def test_the_view_prints_each_flips_episodes_and_the_language_rates():
     assert "- Pass to fail: `py-a` (python, 0/3 vs 9/9 episodes, p 0.005)" in text
     assert "| Language | Reference episodes | Candidate episodes | p | Within noise |" in text
     assert "| python | 18/27 (0.667) | 3/9 (0.333) | 0.122 | yes |" in text
-    # The spread stays as information; the within-noise cell names the rule it read.
-    assert "| python verified accuracy | -0.333 | ±0.000 | yes (episode rate) |" in text
+    # The interval and spread stay as information; the rule column names the test it read.
+    assert (
+        "| python verified accuracy | 0.333 | -0.333 | 0.667 to 0.667 | ±0.000 | episode rate "
+        "| yes |"
+    ) in text
+    # The same row against a band without intervals names the rule in its within cell.
+    legacy = render_gate(
+        _gate(BASELINE, candidate, min_cases=3, noise=without_intervals(band)), before, after
+    )
+    assert "| python verified accuracy | -0.333 | ±0.000 | yes (episode rate) |" in legacy
     assert "- Noise band per-case stability (by pooled episodes):" in text
 
 
