@@ -726,4 +726,18 @@ content-addressed tags and cannot contaminate parallel runs.
   h9 (a producer output-cap stop is carried to the next round while rounds remain; python slice adversarial01,
   adversarial02, case02 with sentinels case01 and chain-python-codeinjection-b), and queued a third same-identity
   tier1 reference run from `ref-494f2523` behind h9's slice so the band moves to n=3.
+- 2026-10-28 h9 slice screen ACCEPTED (run d1ceae, 5 repeats, python slice: adversarial01 3/5, adversarial02 3/5,
+  case02 4/5 against 1/3, 1/3 and 1/3, 3/3 in the reference runs; sentinels case01 4/5 and
+  chain-python-codeinjection-b 5/5; slice macro effective tokens 77.7k; identity `budget_policy` bc3340a4 ->
+  ca58bffc plus the s19 skills digests). These corpus requests set `max_rounds` 2, so h9 carries only a round-1
+  cap. Full tier1 (run 0c1a0c, 3 repeats) started at 00:51 UTC after a 76-minute lock wait behind the third
+  reference run; the lock is not FIFO. Third same-identity reference run 4adc6b at 494f2523: macro verified
+  accuracy 0.856, J 1.133, macro effective tokens 47.1k, p50 92.6 s, javascript 0.5, python 0.636, 10 cap-outs,
+  no target exceptions. `reference/noise-tier1.json` rebuilt at n=3 (the n=2 band kept as `noise-tier1.n2.json`;
+  ledger `ref-w5-tier1-run3`): J 1.074 / 1.124 / 1.133 (half-range 0.030), macro 0.874 +-0.014, tokens 1.115x,
+  p50 1.291x, python +-0.091, javascript +-0.167. Stability over three runs: 12 stable_pass, 4 stable_fail
+  (adversarial01 at 1 of 3 in every run joins chain-python-cmdi-a, ih-python-codeinjection-a and aurelia-path),
+  5 unstable (adversarial02, case02, case03, sbj-javascript-deep-override, mixin-deep); viking04-merge is a
+  stable_pass at 2 of 3 in every run. A h9 flip on adversarial01 now counts outside noise; adversarial02 and
+  case02 flips stay within it, so the full gate rests on the python language band and the paired counts.
 
