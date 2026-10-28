@@ -564,7 +564,10 @@ class NoiseBand(Contract):
 
 
 class DecidingMetric(Contract):
-    """One headline metric recomputed over the deciding languages only (``min_cases``)."""
+    """One headline metric recomputed over the deciding languages only (``min_cases``).
+
+    ``baseline`` is the installed baseline scorecard's figure, or, in the ``*_to_band``
+    fields of ``GateVerdict``, the mean of the noise band's runs."""
 
     baseline: float
     candidate: float
@@ -716,6 +719,18 @@ class GateVerdict(Contract):
     token_ratio_to_band: float | None = None
     seconds_ratio_to_band: float | None = None
     language_deltas: dict[str, float | None] = Field(default_factory=dict)
+    # ``delta_j``, ``delta_macro_verified_accuracy`` and ``language_deltas`` are always
+    # measured from the installed baseline scorecard. With a noise band (of the gated
+    # dataset, budgets and repeats) the same deltas measured from the mean of the band's
+    # runs follow, and every rule reads them: ``language_regressed``, the accuracy steps,
+    # J's gain, the efficiency accuracy floor and the noise checks. A language the band
+    # lacks keeps its installed-reference delta in ``language_deltas_to_band``, and the
+    # worst-language delta is unknown when the band lacks a baseline language. ``None``
+    # and empty without a band, and on records written before them.
+    delta_j_to_band: float | None = None
+    delta_macro_verified_accuracy_to_band: float | None = None
+    delta_worst_language_verified_accuracy_to_band: float | None = None
+    language_deltas_to_band: dict[str, float | None] = Field(default_factory=dict)
     # With a band carrying pooled counts and the candidate's trajectories: per deciding
     # language, the candidate's episodes of its cases against the band's pooled episodes
     # of its cases. A language regresses only when its rate is lower with p below
@@ -748,6 +763,12 @@ class GateVerdict(Contract):
     # Macro and worst-language verified accuracy over the deciding languages, as decided on.
     deciding_macro_verified_accuracy: DecidingMetric | None = None
     deciding_worst_language: DecidingMetric | None = None
+    # With a noise band: the same two figures with ``baseline`` the mean over the band's
+    # runs of each run's figure over the deciding languages; the gate then decides on
+    # these. ``None`` without a band or when the band lacks a deciding language (the
+    # installed-reference figures then decide).
+    deciding_macro_verified_accuracy_to_band: DecidingMetric | None = None
+    deciding_worst_language_to_band: DecidingMetric | None = None
     # J recomputed over the deciding languages; informational, never decided on.
     objective_j_deciding: DecidingMetric | None = None
     # Paired per-case majority outcomes, when both runs' trajectories were read.
@@ -768,6 +789,11 @@ class GateVerdict(Contract):
     def exit_code(self) -> int:
         """0 accepted, 1 rejected, 2 incomparable, 3 inconclusive."""
         return self.decision.exit_code
+
+    @property
+    def anchored_to_band(self) -> bool:
+        """Whether the gate measured its deltas from the noise band's mean."""
+        return self.delta_j_to_band is not None
 
 
 class KindBudget(Contract):

@@ -84,6 +84,40 @@ REASON_TEXT: dict[GateReason, str] = {
     GateReason.REPEATS_MISMATCH: "The runs have different repeats per case.",
 }
 
+# A gate given a noise band measures these reasons' deltas from the band's mean.
+BAND_REASON_TEXT: dict[GateReason, str] = {
+    GateReason.LANGUAGE_REGRESSED: (
+        "A language's majority verified accuracy fell below the noise band's mean for it "
+        "(below the installed reference's, for a language the band lacks)."
+    ),
+    GateReason.OBJECTIVE_BELOW_THRESHOLD: (
+        "The objective J gained less than the required margin over the noise band's mean, "
+        "or not beyond the band."
+    ),
+    GateReason.ACCURACY_NOT_IMPROVED: (
+        "Neither macro nor the target language's verified accuracy rose above the noise "
+        "band's mean by one case's majority beyond noise (the band's spread, or an exact "
+        "test on the language's episodes)."
+    ),
+    GateReason.ACCURACY_BELOW_BASELINE: (
+        "Macro verified accuracy fell below the noise band's mean."
+    ),
+    GateReason.WITHIN_NOISE: (
+        "Every regression, measured from the noise band's mean, lies within the measured "
+        "noise (the band's spread, or an exact test on episodes that does not separate the "
+        "rates): run the candidate once more (a confirmation run) and gate that run before "
+        "deciding."
+    ),
+}
+
+
+def reason_text(reason: GateReason, verdict: GateVerdict) -> str:
+    """A reason's fixed sentence; the band-mean wording when the gate measured from it."""
+    if verdict.anchored_to_band and reason in BAND_REASON_TEXT:
+        return BAND_REASON_TEXT[reason]
+    return REASON_TEXT[reason]
+
+
 TRACK_TEXT: dict[GateTrack, str] = {
     "objective": (
         "Objective track: no language regressed, J gained at least 0.01 and macro "
@@ -133,8 +167,21 @@ FLIP_NOISE_TEXT: dict[FlipNoise, str] = {
     "episode_rate": "episode rate",
 }
 
+INSTALLED = " (installed reference)"
+NOT_IN_BAND_TEXT = "Not in the noise band (read against the installed reference)"
+
+
+def band_anchor_text(runs: int) -> str:
+    """The one sentence a gate view measured from the band's mean leads with."""
+    return (
+        f"Deltas are measured from the mean of the noise band's {runs} runs, which the gate "
+        "decides on; the installed reference's deltas follow, labelled (installed reference)."
+    )
+
+
 NOISE_TEXT = (
-    "A delta inside the band is noise; an improvement must exceed it, and a regression "
+    "A gate measures each delta from the band's mean. A delta inside the band is noise; an "
+    "improvement must exceed it, and a regression "
     "inside it is inconclusive. Token and p50 seconds ratios are to the band's mean and "
     "within noise between its runs' min / mean and max / mean."
 )
@@ -248,6 +295,13 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         SLICE_TEXT if verdict.slice else TRACK_TEXT[verdict.track],
         "",
     ]
+    # The band the deltas were measured from; none without a band or before band deltas.
+    band = verdict.noise if verdict.anchored_to_band else None
+    if band is not None:
+        lines.extend([band_anchor_text(band.n_runs), ""])
+        missing = [name for name in verdict.language_deltas if name not in band.languages]
+        if missing:
+            lines.extend([f"{NOT_IN_BAND_TEXT}: {', '.join(missing)}.", ""])
     if verdict.slice:
         cases = ", ".join(f"`{case}`" for case in verdict.slice_cases) or "none"
         repeats = _count(verdict.slice_repeats)
@@ -271,7 +325,7 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 "",
             ]
         )
-    lines.extend(f"- {REASON_TEXT[reason]}" for reason in verdict.reasons)
+    lines.extend(f"- {reason_text(reason, verdict)}" for reason in verdict.reasons)
     if verdict.operationally_confounded_languages:
         confounded = ", ".join(verdict.operationally_confounded_languages)
         lines.append(f"- Operationally confounded: {confounded}")
@@ -298,22 +352,29 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         ),
         ("Macro p50 seconds", baseline.macro_p50_seconds, candidate.macro_p50_seconds),
     ]
-    rows = [
+    suffix = "" if band is None else INSTALLED
+    rows = [] if band is None else _band_mean_rows(verdict, candidate)
+    rows.extend(
         [
-            name,
+            name + suffix,
             _number(before),
             _number(after),
             _signed(None if before is None or after is None else after - before),
         ]
         for name, before, after in metrics
-    ]
+    )
     deciding_metrics = [
         ("Deciding macro verified accuracy", verdict.deciding_macro_verified_accuracy),
         ("Deciding worst language verified accuracy", verdict.deciding_worst_language),
         ("Deciding objective J (informational)", verdict.objective_j_deciding),
     ]
     rows.extend(
-        [name, _number(metric.baseline), _number(metric.candidate), _signed(metric.delta)]
+        [
+            name + suffix,
+            _number(metric.baseline),
+            _number(metric.candidate),
+            _signed(metric.delta),
+        ]
         for name, metric in deciding_metrics
         if metric is not None
     )
@@ -334,13 +395,26 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
         capped_after = None if after is None else after.capped_call_episodes
         operational_after = None if after is None else after.operational_episodes
         target_after = None if after is None else after.target_exception_episodes
+        accuracy = [
+            _number(before.verified_accuracy),
+            _number(None if after is None else after.verified_accuracy),
+            _signed(delta),
+            _regressed(verdict, language, baseline),
+        ]
+        if band is not None:
+            spread = band.languages.get(language)
+            accuracy = [
+                "not in band" if spread is None else _number(spread.mean),
+                accuracy[1],
+                _band_delta(verdict, language),
+                accuracy[3],
+                accuracy[0],
+                accuracy[2],
+            ]
         language_rows.append(
             [
                 language,
-                _number(before.verified_accuracy),
-                _number(None if after is None else after.verified_accuracy),
-                _signed(delta),
-                _regressed(verdict, language, baseline),
+                *accuracy,
                 _count(before.capped_call_episodes),
                 _count(capped_after),
                 _count_delta(before.capped_call_episodes, capped_after),
@@ -353,14 +427,21 @@ def render_gate(verdict: GateVerdict, baseline: Scorecard, candidate: Scorecard)
                 "yes" if language in verdict.operationally_confounded_languages else "no",
             ]
         )
+    accuracy_header = ["Baseline verified", "Candidate verified", "Delta", "Regressed"]
+    if band is not None:
+        accuracy_header = [
+            "Band mean verified",
+            "Candidate verified",
+            "Delta (band mean)",
+            "Regressed",
+            "Installed reference verified",
+            "Delta (installed reference)",
+        ]
     lines.extend(
         _table(
             [
                 "Language",
-                "Baseline verified",
-                "Candidate verified",
-                "Delta",
-                "Regressed",
+                *accuracy_header,
                 "Baseline capped eps",
                 "Candidate capped eps",
                 "Capped delta",
@@ -406,6 +487,52 @@ def _regressed(verdict: GateVerdict, language: str, baseline: Scorecard) -> str:
     if language not in verdict.regressed_languages:
         return "no"
     return "yes (single case)" if language in verdict.single_case_languages else "yes"
+
+
+def _band_mean_rows(verdict: GateVerdict, candidate: Scorecard) -> list[list[str]]:
+    """The metric rows measured from the band's mean: mean, candidate, delta."""
+    headline = [
+        ("Objective J", candidate.objective_j, verdict.delta_j_to_band),
+        (
+            "Macro verified accuracy",
+            candidate.macro_verified_accuracy,
+            verdict.delta_macro_verified_accuracy_to_band,
+        ),
+        (
+            "Worst language verified accuracy",
+            candidate.worst_language_verified_accuracy,
+            verdict.delta_worst_language_verified_accuracy_to_band,
+        ),
+    ]
+    rows = [
+        [f"{name} (band mean)", _number(after - delta), _number(after), _signed(delta)]
+        for name, after, delta in headline
+        if delta is not None
+    ]
+    deciding = [
+        ("Deciding macro verified accuracy", verdict.deciding_macro_verified_accuracy_to_band),
+        ("Deciding worst language verified accuracy", verdict.deciding_worst_language_to_band),
+    ]
+    rows.extend(
+        [
+            f"{name} (band mean)",
+            _number(metric.baseline),
+            _number(metric.candidate),
+            _signed(metric.delta),
+        ]
+        for name, metric in deciding
+        if metric is not None
+    )
+    return rows
+
+
+def _band_delta(verdict: GateVerdict, language: str) -> str:
+    """A language's delta from the band's mean, or its installed-reference delta (labelled)
+    when the band lacks it."""
+    delta = _signed(verdict.language_deltas_to_band.get(language))
+    if verdict.noise is not None and language not in verdict.noise.languages:
+        return delta + INSTALLED
+    return delta
 
 
 def _episodes(rate: EpisodeRate) -> str:
@@ -573,16 +700,25 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
         return "yes" if flag else "no"
 
     metrics = set(verdict.within_noise)
+    # Deltas from the band's mean; a record written before them shows the installed
+    # reference's, as it was decided.
+    anchored = verdict.anchored_to_band
+    delta_j = verdict.delta_j_to_band if anchored else verdict.delta_j
+    accuracy = (
+        verdict.delta_macro_verified_accuracy_to_band
+        if anchored
+        else verdict.delta_macro_verified_accuracy
+    )
     rows = [
         [
             "Objective J",
-            _signed(verdict.delta_j),
+            _signed(delta_j),
             _difference_band(noise.objective_j),
             within("objective_j" in metrics),
         ],
         [
             "Macro verified accuracy",
-            _signed(verdict.delta_macro_verified_accuracy),
+            _signed(accuracy),
             _difference_band(noise.macro_verified_accuracy),
             within("macro_verified_accuracy" in metrics),
         ],
@@ -599,7 +735,9 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
             within("macro_p50_seconds" in metrics),
         ],
     ]
-    deciding = verdict.deciding_macro_verified_accuracy
+    deciding = (
+        verdict.deciding_macro_verified_accuracy_to_band or verdict.deciding_macro_verified_accuracy
+    )
     if verdict.deciding_languages:
         band = deciding_accuracy_spread(noise, verdict.deciding_languages)
         deciding_delta = None if deciding is None else deciding.delta
@@ -614,7 +752,7 @@ def _noise_lines(verdict: GateVerdict) -> list[str]:
     rows.extend(
         [
             f"{language} verified accuracy",
-            _signed(delta),
+            _band_delta(verdict, language) if anchored else _signed(delta),
             _difference_band(noise.languages.get(language)),
             within(language in verdict.languages_within_noise)
             + (" (episode rate)" if language in verdict.language_rates else ""),

@@ -29,9 +29,16 @@ only on language regressions, the token ceiling, the accuracy floor and the INCO
 conditions; its verdict says ``smoke`` so its ACCEPTED is never read as an acceptance.
 
 A gate given a noise band (``noise``, from ``corsair gym noise``: two or more runs of one
-configuration) reads each metric's delta against it. A difference lies within noise when
-its magnitude is at most the band (max - min across those runs). Token and p50 seconds
-ratios are then taken against the mean of the band's runs (``token_ratio_to_band``,
+configuration) measures every delta it decides on from the mean of the band's runs
+instead of the installed baseline, which is one of those runs and can sit at either end of
+them: ΔJ, macro and worst-language verified accuracy, each language's majority verified
+accuracy and, with ``min_cases``, the deciding macro and worst-language figures (the
+``*_to_band`` verdict fields; the installed baseline's deltas keep their fields). The
+majority-fell trigger, the accuracy steps, J's gain, the efficiency accuracy floor and
+the noise checks all read them. A language the band lacks, or deciding figures over a
+language it lacks, fall back to the installed baseline. A difference lies within noise
+when its magnitude is at most the band (max - min across those runs). Token and p50
+seconds ratios are likewise taken against the band's mean (``token_ratio_to_band``,
 ``seconds_ratio_to_band``; the ratios to the installed baseline are still reported): the
 token ceiling and the efficiency ratios read them, and a ratio lies within noise between
 the band's min / mean and max / mean. An improvement criterion is then met only beyond the
@@ -88,7 +95,7 @@ is visible; that is reported, never a refusal.
 """
 
 from collections import Counter
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from statistics import mean
 
 from corsair.contracts import (
@@ -235,20 +242,23 @@ def identity_changes(baseline: Scorecard, candidate: Scorecard) -> dict[str, boo
 
 
 def operationally_confounded(
-    baseline: Scorecard, candidate: Scorecard, regressed: Sequence[str]
+    baseline: Scorecard,
+    candidate: Scorecard,
+    regressed: Sequence[str],
+    reference: Mapping[str, float] | None = None,
 ) -> list[str]:
-    """Regressed languages that would not regress had their operational episodes verified."""
+    """Regressed languages that would not regress had their operational episodes verified.
+
+    ``reference`` gives a language's accuracy to regress from (the noise band's mean);
+    a language it does not name is read against the baseline's."""
     confounded = []
     for language in regressed:
         before, after = baseline.languages.get(language), candidate.languages.get(language)
         if before is None or after is None or before.verified_accuracy is None:
             continue
+        floor = (reference or {}).get(language, before.verified_accuracy)
         ceiling = after.verified_accuracy_without_operational_failures
-        if (
-            after.operational_episodes
-            and ceiling is not None
-            and ceiling >= before.verified_accuracy - _EPSILON
-        ):
+        if after.operational_episodes and ceiling is not None and ceiling >= floor - _EPSILON:
             confounded.append(language)
     return confounded
 
@@ -329,14 +339,58 @@ def deciding_metrics(
     return accuracy, worst, objective
 
 
-def deciding_accuracy_spread(noise: NoiseBand, languages: Collection[str]) -> NoiseSpread | None:
-    """The band's spread of macro verified accuracy over ``languages`` only: per run, the
-    mean of those languages' verified accuracies. Unknown when the band lacks one."""
+def _per_run_spread(
+    noise: NoiseBand, languages: Collection[str], reduce: Callable[[list[float]], float]
+) -> NoiseSpread | None:
+    """The band's spread of ``reduce`` over ``languages``' verified accuracies, per run.
+    Unknown when the band lacks one of them (or none is named)."""
     spreads = [noise.languages.get(language) for language in languages]
     known = [item for item in spreads if item is not None]
     if not known or len(known) != len(spreads):
         return None
-    return spread([mean(item.values[run] for item in known) for run in range(noise.n_runs)])
+    return spread([reduce([item.values[run] for item in known]) for run in range(noise.n_runs)])
+
+
+def deciding_accuracy_spread(noise: NoiseBand, languages: Collection[str]) -> NoiseSpread | None:
+    """The band's spread of macro verified accuracy over ``languages`` only: per run, the
+    mean of those languages' verified accuracies. Unknown when the band lacks one."""
+    return _per_run_spread(noise, languages, mean)
+
+
+def worst_language_spread(noise: NoiseBand, languages: Collection[str]) -> NoiseSpread | None:
+    """The band's spread of worst-language verified accuracy over ``languages``: per run,
+    the lowest of those languages' verified accuracies. Unknown when the band lacks one."""
+    return _per_run_spread(noise, languages, min)
+
+
+def band_language_deltas(
+    noise: NoiseBand, candidate: Scorecard, deltas: dict[str, float | None]
+) -> dict[str, float | None]:
+    """Per language of ``deltas``: the candidate's majority verified accuracy minus the
+    band's mean of it. A language the band lacks keeps its delta from ``deltas`` (the
+    installed reference); one the candidate lacks is unknown."""
+    anchored: dict[str, float | None] = {}
+    for language, delta in deltas.items():
+        band = noise.languages.get(language)
+        after = candidate.languages.get(language)
+        if band is None:
+            anchored[language] = delta
+        elif after is None or after.verified_accuracy is None:
+            anchored[language] = None
+        else:
+            anchored[language] = after.verified_accuracy - band.mean
+    return anchored
+
+
+def _from_band_mean(
+    band: NoiseSpread | None, metric: DecidingMetric | None
+) -> DecidingMetric | None:
+    """``metric`` measured from the band's mean of it instead of the installed baseline."""
+    if band is None or metric is None:
+        return None
+    return DecidingMetric(
+        baseline=band.mean, candidate=metric.candidate, delta=metric.candidate - band.mean
+    )
 
 
 def _whole_case(band: NoiseSpread | None) -> bool:
@@ -906,23 +960,46 @@ def gate(
         seconds_to_band = band_ratio(candidate.macro_p50_seconds, noise.macro_p50_seconds)
     decided_tokens = tokens if noise is None else tokens_to_band
     decided_seconds = seconds if noise is None else seconds_to_band
+    # With a band of these runs' dataset, budgets and repeats, every delta decided on is
+    # measured from the mean of the band's runs; the installed reference's are reported.
+    mismatched = noise is not None and noise_mismatch(noise, baseline, candidate)
+    band = None if mismatched else noise
+    deltas_to_band: dict[str, float | None] = {}
+    j_to_band = macro_to_band = worst_to_band = None
+    if band is not None:
+        deltas_to_band = band_language_deltas(band, candidate, deltas)
+        j_to_band = candidate.objective_j - band.objective_j.mean
+        macro_to_band = candidate.macro_verified_accuracy - band.macro_verified_accuracy.mean
+        worst = worst_language_spread(band, list(baseline.languages))
+        if worst is not None:
+            worst_to_band = candidate.worst_language_verified_accuracy - worst.mean
+    decided_deltas = deltas if band is None else deltas_to_band
+    decided_j = delta_j if j_to_band is None else j_to_band
+    decided_macro = accuracy if macro_to_band is None else macro_to_band
     regressed = [
         language
-        for language, delta in deltas.items()
+        for language, delta in decided_deltas.items()
         if language in deciders and (delta is None or delta < -_EPSILON)
     ]
     narrowed = min_cases > 1
     metrics = deciding_metrics(baseline, candidate, deciders) if narrowed else None
+    deciding_to_band: tuple[DecidingMetric | None, DecidingMetric | None] = (None, None)
     # The macro accuracy delta, step and band decided on: over the deciding languages.
-    decided_accuracy: float | None = accuracy
+    decided_accuracy: float | None = decided_macro
     accuracy_step = min_accuracy_gain(baseline)
     accuracy_band = None if noise is None else noise.macro_verified_accuracy
     if narrowed:
-        decided_accuracy = None if metrics is None else metrics[0].delta
         accuracy_step = min_accuracy_gain(baseline, deciders)
         accuracy_band = None if noise is None else deciding_accuracy_spread(noise, deciders)
+        if band is not None and metrics is not None:
+            deciding_to_band = (
+                _from_band_mean(accuracy_band, metrics[0]),
+                _from_band_mean(worst_language_spread(band, deciders), metrics[1]),
+            )
+        anchored = deciding_to_band[0] or (None if metrics is None else metrics[0])
+        decided_accuracy = None if anchored is None else anchored.delta
     reasons = incomparable_reasons(baseline, candidate, min_repeats)
-    if noise is not None and noise_mismatch(noise, baseline, candidate):
+    if mismatched:
         reasons.append(GateReason.NOISE_MISMATCH)
     decision = GateDecision.INCOMPARABLE
     confounded: list[str] = []
@@ -935,7 +1012,13 @@ def gate(
             rates = language_rates(noise, candidate_trajectories, deciders)
         if regressed:
             reasons.append(GateReason.LANGUAGE_REGRESSED)
-            confounded = operationally_confounded(baseline, candidate, regressed)
+            means = {} if band is None else band.languages
+            confounded = operationally_confounded(
+                baseline,
+                candidate,
+                regressed,
+                {language: item.mean for language, item in means.items()},
+            )
         if confounded:
             reasons.append(GateReason.OPERATIONALLY_CONFOUNDED)
         reasons.extend(
@@ -944,8 +1027,8 @@ def gate(
                 candidate,
                 track=track,
                 target_language=target_language,
-                deltas=deltas,
-                delta_j=delta_j,
+                deltas=decided_deltas,
+                delta_j=decided_j,
                 accuracy=decided_accuracy,
                 accuracy_step=accuracy_step,
                 accuracy_band=accuracy_band,
@@ -958,9 +1041,9 @@ def gate(
         if noise is not None:
             within, languages_within = within_noise(
                 noise,
-                deltas=deltas,
-                delta_j=delta_j,
-                accuracy=accuracy,
+                deltas=decided_deltas,
+                delta_j=decided_j,
+                accuracy=decided_macro,
                 tokens=tokens_to_band,
                 seconds=seconds_to_band,
             )
@@ -1033,6 +1116,10 @@ def gate(
         token_ratio_to_band=tokens_to_band,
         seconds_ratio_to_band=seconds_to_band,
         language_deltas=deltas,
+        delta_j_to_band=j_to_band,
+        delta_macro_verified_accuracy_to_band=macro_to_band,
+        delta_worst_language_verified_accuracy_to_band=worst_to_band,
+        language_deltas_to_band=deltas_to_band,
         language_rates=rates,
         regressed_languages=regressed,
         operationally_confounded_languages=confounded,
@@ -1051,6 +1138,8 @@ def gate(
         ),
         deciding_macro_verified_accuracy=None if metrics is None else metrics[0],
         deciding_worst_language=None if metrics is None else metrics[1],
+        deciding_macro_verified_accuracy_to_band=deciding_to_band[0],
+        deciding_worst_language_to_band=deciding_to_band[1],
         objective_j_deciding=None if metrics is None else metrics[2],
         paired=paired,
     )

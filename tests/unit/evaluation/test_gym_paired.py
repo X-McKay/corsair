@@ -748,4 +748,10 @@ def test_the_view_names_the_paired_regression_and_the_deciding_band():
     (before, _), (after, _) = _side(BASELINE, "base"), _side(noisy, "cand")
     verdict = _gate(BASELINE, noisy, min_cases=3, noise=band)
     text = render_gate(verdict, before, after)
-    assert "| Deciding macro verified accuracy | -0.333 | ±0.333 | yes |" in text
+    # Python at 2/3 and 1/3 across the band: the candidate's 1/3 is 1/6 below its mean.
+    assert "| Deciding macro verified accuracy | -0.167 | ±0.333 | yes |" in text
+    assert "| Deciding macro verified accuracy (band mean) | 0.500 | 0.333 | -0.167 |" in text
+    assert (
+        "| Deciding macro verified accuracy (installed reference) | 0.667 | 0.333 | -0.333 |"
+        in text
+    )
