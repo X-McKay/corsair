@@ -782,4 +782,18 @@ content-addressed tags and cannot contaminate parallel runs.
   s24: the majority-fell trigger and the accuracy and J deltas still anchor on the installed reference run, so
   javascript "fell" from the reference's best run (5/6) while its episode rate rose. Ran a fourth same-identity
   reference run (queued 02:15 UTC) to take the pooled counts to 12 episodes per case.
+- 2026-10-28 s24 merged (e0d4d3b7; branch `gym/s24-band-mean-deltas` at ff88242a; ledger `s24`): with a band,
+  J, macro and worst-language verified accuracy, the deciding figures and each language's majority accuracy are
+  measured from the band's mean over the reference runs (installed-reference deltas stay in their fields and
+  the views, labelled); `language_regressed`, the accuracy steps, the J criterion, the efficiency floor and the
+  within-noise reading all use the band-anchored deltas. Offline: `just check`, 1704 unit and 58 Temporal tests.
+  Same-identity run 4adc6b gated against the reference reads INCONCLUSIVE with every metric within noise.
+  h9's stored run now reads objective ACCEPTED (J +0.173 from the mean against a +-0.059 half-range, javascript
+  +0.000, python +0.242, tokens 1.064x) and accuracy REJECTED (python's episode rate does not separate, p 0.30).
+  That objective acceptance is wrong: the rule changed no outcome. The half-range of three run values
+  understates the variance of J and of the majority accuracies, because each case's majority is a coin flip at
+  its pooled rate (python's expected majority accuracy at the pooled rates is about 0.63 with a standard
+  deviation near 0.09, so 0.818 is a two-sigma draw, not a 0.059-band event). s25: bands for the composites
+  drawn from the pooled episodes (resampled synthetic runs), replacing the half-range for J, macro and language
+  accuracies. h9 stays rejected (ledger `h9`); it is not re-run.
 
