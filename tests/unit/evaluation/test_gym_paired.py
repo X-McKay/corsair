@@ -428,7 +428,8 @@ def without_intervals(band: NoiseBand) -> NoiseBand:
     record = band.model_dump(mode="json")
     spreads = [record["objective_j"], record["macro_verified_accuracy"]]
     spreads += [record["macro_effective_tokens"], *record["languages"].values()]
-    for spread in [*spreads, record["macro_p50_seconds"] or {}]:
+    scale = [record["macro_p50_seconds"], record["macro_sandbox_cpu_seconds"]]
+    for spread in [*spreads, *(item for item in scale if item)]:
         spread.pop("interval", None)
     for field in ("resamples", "seed", "language_sets"):
         record.pop(field)

@@ -234,6 +234,13 @@ class GroupSummary(Contract):
     p95_effective_tokens: float | None = None
     p50_seconds: float | None = None
     p95_seconds: float | None = None
+    # Sandbox CPU seconds (``Trajectory.sandbox_cpu_seconds``): information only, never a
+    # reward, objective or gate input. The mean over cases of each case's mean over its
+    # repeats; a case with any episode lacking the figure is unknown and left out, and the
+    # group is unknown when every case is. ``sandbox_cpu_unknown`` counts the episodes that
+    # lacked it; both unknown on older scorecards.
+    mean_sandbox_cpu_seconds: float | None = Field(default=None, ge=0)
+    sandbox_cpu_unknown: int | None = Field(default=None, ge=0)
     failure_stops: dict[str, int] = Field(default_factory=dict)
     usage_unknown: int = Field(default=0, ge=0)
     # Reasoning markers (see ``Trajectory``): case means of repeat means, and attempt
@@ -279,6 +286,11 @@ class Scorecard(Contract):
     objective_j: float
     macro_effective_tokens: float | None = None
     macro_p50_seconds: float | None = None
+    # Information only, never a reward, objective or gate input: the mean over languages of
+    # ``GroupSummary.mean_sandbox_cpu_seconds``, unknown when any language's is, and the
+    # episodes that lacked the figure; both unknown on older scorecards.
+    macro_sandbox_cpu_seconds: float | None = Field(default=None, ge=0)
+    sandbox_cpu_unknown: int | None = Field(default=None, ge=0)
     # Reasoning markers: the mean over languages and the attempt totals; none feeds J.
     macro_thought_share: float | None = None
     capped_call_episodes: int | None = Field(default=None, ge=0)
@@ -585,6 +597,12 @@ class NoiseBand(Contract):
     macro_verified_accuracy: NoiseSpread
     macro_effective_tokens: NoiseSpread
     macro_p50_seconds: NoiseSpread | None = None
+    # Information only; no gate rule reads it. ``Scorecard.macro_sandbox_cpu_seconds`` per
+    # run, unknown when any run's is (and on a band written before it), with its resampled
+    # interval on a resampled band; and per run in ``runs`` order the episodes that lacked
+    # the figure (``None`` for a scorecard that did not count them; empty on older bands).
+    macro_sandbox_cpu_seconds: NoiseSpread | None = None
+    sandbox_cpu_unknown: list[int | None] = Field(default_factory=list, max_length=_MAX_NOISE_RUNS)
     # Per language: majority verified accuracy.
     languages: dict[str, NoiseSpread] = Field(min_length=1)
     # Per case, by case id; see the class docstring for ``None``.
@@ -609,10 +627,17 @@ class NoiseBand(Contract):
             raise ValueError("a noise band names each of its n_runs distinct runs once")
         spreads = [self.objective_j, self.macro_verified_accuracy, self.macro_effective_tokens]
         spreads += [*self.languages.values()]
-        if self.macro_p50_seconds is not None:
-            spreads.append(self.macro_p50_seconds)
+        spreads += [
+            item
+            for item in (self.macro_p50_seconds, self.macro_sandbox_cpu_seconds)
+            if item is not None
+        ]
         if any(len(spread.values) != self.n_runs for spread in spreads):
             raise ValueError("every noise spread has one value per run")
+        if self.sandbox_cpu_unknown and len(self.sandbox_cpu_unknown) != self.n_runs:
+            raise ValueError(
+                "a noise band counts the episodes lacking sandbox CPU seconds of every run"
+            )
         if self.cases is not None and (self.cases_unknown or self.cases_unknown_runs):
             raise ValueError("a noise band records either its cases or why they are unknown")
         if not set(self.cases_unknown_runs) <= set(self.runs) or (
