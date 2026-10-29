@@ -10,9 +10,13 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any
 
+from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import BaseLlm
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.tool_context import ToolContext
+from google.genai import types
 from pydantic import ValidationError
 
 from corsair.adapters.inference.adk import _EpisodeAccounting, _run_native_episode
@@ -27,6 +31,7 @@ from corsair.settings import Settings
 
 @dataclass
 class IntakeAccounting(_EpisodeAccounting):
+    explicit_tool_object_types: bool = False
     max_loader_calls: int = 0
     loader_tool_names: frozenset[str] = frozenset()
     allowed_skill_names: frozenset[str] = frozenset()
@@ -35,6 +40,28 @@ class IntakeAccounting(_EpisodeAccounting):
     tool_counts: dict[str, int] = field(default_factory=dict)
     completion_errors: dict[str, int] = field(default_factory=dict)
     skills_loaded: list[str] = field(default_factory=list)
+
+    async def before_model(
+        self, callback_context: CallbackContext, llm_request: LlmRequest
+    ) -> LlmResponse | None:
+        denied = await super().before_model(callback_context, llm_request)
+        if denied is not None or not self.explicit_tool_object_types or llm_request.config is None:
+            return denied
+        # vLLM's Qwen parser reads a parameter's type without following $ref.
+        # Keep ADK's generated schema and canonical validation; expose only the
+        # existing referenced object type, before dispatch, without touching output.
+        for tool in llm_request.config.tools or []:
+            if not isinstance(tool, types.Tool):
+                continue
+            for declaration in tool.function_declarations or []:
+                schema = declaration.parameters_json_schema
+                if declaration.name != "set_model_response" or not isinstance(schema, dict):
+                    continue
+                issue = schema.get("properties", {}).get("issue", {})
+                definition = schema.get("$defs", {}).get("Issue", {})
+                if issue.get("$ref") == "#/$defs/Issue" and definition.get("type") == "object":
+                    issue["type"] = "object"
+        return None
 
     async def before_tool(self, tool, args, tool_context):
         if tool.name in self.loader_tool_names and self.loader_calls >= self.max_loader_calls:
@@ -123,6 +150,10 @@ async def run_intake(
     spec = load_agent_spec("intake")
     llm_limit = min(budget.episode_llm_calls, budget.max_llm_calls, 4)
     accounting = IntakeAccounting(
+        explicit_tool_object_types=(
+            settings.models.connector == "litellm"
+            and settings.models.intake.startswith("hosted_vllm/")
+        ),
         max_llm_calls=llm_limit,
         max_output_tokens=budget.max_output_tokens,
         max_tool_calls=budget.max_tool_calls,

@@ -400,3 +400,76 @@ async def test_activity_deducts_sandbox_setup_time(tmp_path, monkeypatch):
     result = await intake_agent.IntakeActivities(settings, store).analyze(item)
     assert seen == [6]
     assert result.decision.error_code == "MODEL_FAILED"
+
+
+@pytest.mark.parametrize("hosted_vllm", [False, True])
+async def test_native_completion_exposes_explicit_nested_object_type(tmp_path, hosted_vllm):
+    """vLLM's parser needs the object type beside the Pydantic reference."""
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    model = ScriptedLlm(
+        model="nested-object-schema",
+        structured_tools=False,
+        responses=[tool_response("set_model_response", proposal_dict())],
+    )
+    settings = (
+        Settings(models={"connector": "litellm", "intake": "hosted_vllm/qwen"})
+        if hosted_vllm
+        else Settings()
+    )
+    result = await run_intake(prepared(ArtifactStore(tmp_path)), settings, Reader(), model)
+    assert result.proposal is not None
+    assert model.requests[0].config is not None
+    declarations = [
+        declaration
+        for tool in model.requests[0].config.tools or []
+        for declaration in tool.function_declarations or []
+        if declaration.name == "set_model_response"
+    ]
+    assert len(declarations) == 1
+    schema = declarations[0].parameters_json_schema
+    assert isinstance(schema, dict)
+    assert schema["properties"]["issue"].get("type") == ("object" if hosted_vllm else None)
+    assert schema["properties"]["issue"]["$ref"] == "#/$defs/Issue"
+    assert schema["$defs"]["Issue"]["additionalProperties"] is False
+    assert result.usage.llm_calls == result.usage.tool_calls == 1
+    assert "type" not in IntakeProposal.model_json_schema()["properties"]["issue"]
+
+
+def test_explicit_object_schema_still_rejects_json_encoded_issue():
+    from pydantic import ValidationError
+
+    value = proposal_dict()
+    value["issue"] = json.dumps(value["issue"])
+    with pytest.raises(ValidationError):
+        IntakeProposal.model_validate(value)
+
+
+async def test_hosted_vllm_schema_callback_preserves_native_call_limit(tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    item = prepared(ArtifactStore(tmp_path))
+    item = item.model_copy(
+        update={
+            "request": item.request.model_copy(
+                update={
+                    "budget": item.request.budget.model_copy(
+                        update={"max_llm_calls": 1, "episode_llm_calls": 1}
+                    )
+                }
+            )
+        }
+    )
+    settings = Settings(models={"connector": "litellm", "intake": "hosted_vllm/qwen"})
+    model = ScriptedLlm(
+        model="limited-qwen",
+        structured_tools=False,
+        responses=[
+            tool_response("list_files", {}),
+            tool_response("set_model_response", proposal_dict()),
+        ],
+    )
+    output = await run_intake(item, settings, Reader(), model)
+    assert output.output_failure == "LLM_BUDGET_EXHAUSTED"
+    assert output.usage.llm_calls == len(model.requests) == 1
+    assert output.proposal is None
