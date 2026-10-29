@@ -2,7 +2,7 @@
 
 import asyncio
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy, WorkflowIDReusePolicy
@@ -30,6 +30,10 @@ class IntakeInvestigationWorkflow:
     def __init__(self):
         self.phase = "pending"
         self.investigation_run_id: str | None = None
+        self.started: datetime | None = None
+        self.deadline: datetime | None = None
+        self.image_reference: str | None = None
+        self.image_id: str | None = None
 
     @workflow.query
     def status(self) -> dict:
@@ -37,12 +41,18 @@ class IntakeInvestigationWorkflow:
             "phase": self.phase,
             "investigation_run_id": self.investigation_run_id,
             "schema_version": "corsair.intake-investigation-result/1",
+            "started": self.started.isoformat() if self.started else None,
+            "deadline": self.deadline.isoformat() if self.deadline else None,
+            "image_reference": self.image_reference,
+            "image_id": self.image_id,
         }
 
     @workflow.run
     async def run(self, request: IntakeInvestigationRequest) -> IntakeInvestigationResult:
         identity = workflow.info().workflow_id
-        deadline = workflow.now() + timedelta(seconds=request.intake.budget.max_elapsed_seconds)
+        self.started = workflow.now()
+        deadline = self.started + timedelta(seconds=request.intake.budget.max_elapsed_seconds)
+        self.deadline = deadline
         prefix = f"issue-{digest(identity)[:24]}"
         intake_id = f"{prefix}.intake"
         result = IntakeInvestigationResult(run_id=identity, case_id=request.case_id)
@@ -71,6 +81,18 @@ class IntakeInvestigationWorkflow:
                     "usage_complete": intake.decision.status != "error",
                 }
             )
+            if intake.decision.classification == "in_scope_supported" and intake.proposal:
+                selected = next(
+                    (
+                        image
+                        for image in intake.inventory.images
+                        if image.reference == intake.proposal.suggested_image
+                        and image.image_id == intake.decision.image_id
+                    ),
+                    None,
+                )
+                if selected is not None:
+                    self.image_reference, self.image_id = selected.reference, selected.image_id
             if workflow.cancellation_reason() is not None:
                 raise asyncio.CancelledError
             if workflow.now() >= deadline:
@@ -168,7 +190,9 @@ class IntakeInvestigationWorkflow:
                 update={
                     "status": "incomplete",
                     "stop_reason": (
-                        "DEADLINE_EXHAUSTED"
+                        "CANCELLED"
+                        if workflow.cancellation_reason() is not None
+                        else "DEADLINE_EXHAUSTED"
                         if workflow.now() >= deadline
                         else "INVESTIGATION_UNCERTAIN"
                         if self.investigation_run_id is not None

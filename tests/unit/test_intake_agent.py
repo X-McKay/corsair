@@ -82,6 +82,28 @@ async def test_native_intake_tools_and_structured_output(tmp_path):
     assert "/private/host-source" not in str(model.requests)
 
 
+@pytest.mark.parametrize("failed_operation", ["list", "read"])
+async def test_source_preload_error_is_inspection_failure_before_model_dispatch(
+    tmp_path, failed_operation
+):
+    from corsair.adapters.storage.filesystem import ArtifactStore
+
+    class UnavailableReader(Reader):
+        def read(self, operation, relative=""):
+            if operation == failed_operation:
+                raise RuntimeError("PRIVATE_READER_ERROR")
+            return super().read(operation, relative)
+
+    model = ScriptedLlm(model="unused", responses=[])
+    output = await run_intake(
+        prepared(ArtifactStore(tmp_path)), Settings(), UnavailableReader(), model
+    )
+    assert output.error_code == "INSPECTION_FAILED"
+    assert output.error_stage == "inspection" and output.error_type == "RuntimeError"
+    assert model.requests == []
+    assert "PRIVATE_READER_ERROR" not in output.model_dump_json()
+
+
 async def test_native_intake_rejects_invented_image(tmp_path):
     from corsair.adapters.storage.filesystem import ArtifactStore
 
@@ -106,19 +128,24 @@ async def test_native_intake_schema_completion_tool(tmp_path):
     assert result.tool_counts == {"set_model_response": 1}
 
 
-async def test_native_completion_errors_are_categorical_not_raw_model_text(tmp_path):
+@pytest.mark.parametrize("unread_path", [False, True])
+async def test_native_completion_errors_are_categorical_not_raw_model_text(tmp_path, unread_path):
     from corsair.adapters.storage.filesystem import ArtifactStore
 
+    proposal = proposal_dict()
+    if unread_path:
+        proposal["locations"] = [{"path": "unread.py"}]
     model = ScriptedLlm(
         model="scripted-invalid-completion",
         structured_tools=False,
         responses=[
             tool_response("set_model_response", {"scope": "in_scope"}),
-            tool_response("set_model_response", proposal_dict()),
+            tool_response("set_model_response", proposal),
         ],
     )
     result = await run_intake(prepared(ArtifactStore(tmp_path)), Settings(), Reader(), model)
-    assert result.proposal is not None
+    assert (result.proposal is not None) is (not unread_path)
+    assert result.output_failure == ("SOURCE_NOT_INSPECTED" if unread_path else None)
     assert result.completion_errors["missing:issue"] == 1
 
 
@@ -400,6 +427,66 @@ async def test_activity_deducts_sandbox_setup_time(tmp_path, monkeypatch):
     result = await intake_agent.IntakeActivities(settings, store).analyze(item)
     assert seen == [6]
     assert result.decision.error_code == "MODEL_FAILED"
+
+
+@pytest.mark.parametrize("failure", ["schema", "inspection"])
+async def test_activity_records_categorical_diagnostics_without_exception_content(
+    tmp_path, monkeypatch, caplog, failure
+):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    from corsair.adapters.storage.filesystem import ArtifactStore
+    from corsair.contracts.intake_agent import IntakeAgentOutput, IntakeResult
+    from corsair.steps import intake_agent
+
+    @asynccontextmanager
+    async def client_session():
+        yield object()
+
+    @asynccontextmanager
+    async def inspection_session(inspection):
+        if failure == "inspection":
+            raise RuntimeError("PRIVATE_PROVIDER_BODY")
+        yield inspection
+
+    async def run(*args):
+        del args
+        return IntakeAgentOutput(
+            error_code="OUTPUT_INVALID",
+            output_failure="SCHEMA_INVALID",
+            completion_errors={"schema:missing": 1},
+            tool_counts={"list_files": 1},
+        )
+
+    monkeypatch.setattr("corsair.adapters.sandboxing.images.docker_client", client_session)
+    monkeypatch.setattr(intake_agent, "inspection_session", inspection_session)
+    monkeypatch.setattr(
+        intake_agent, "DockerInspection", lambda *args: SimpleNamespace(image_id=None)
+    )
+    monkeypatch.setattr(intake_agent, "run_intake", run)
+    monkeypatch.setattr(intake_agent.activity, "heartbeat", lambda *args: None)
+    caplog.set_level("INFO", logger="corsair")
+    settings = Settings()
+    store = ArtifactStore(tmp_path)
+    activities = intake_agent.IntakeActivities(settings, store)
+    item = prepared(store).model_copy(update={"config_digest": settings.identity})
+    result = await activities.record(await activities.analyze(item))
+    assert result.result_artifact is not None
+    saved = IntakeResult.model_validate(store.get_json(result.result_artifact))
+    if failure == "schema":
+        assert saved.diagnostics.output_failure == "SCHEMA_INVALID"
+        assert saved.diagnostics.completion_errors == {"schema:missing": 1}
+        assert saved.diagnostics.tool_counts == {"list_files": 1}
+    else:
+        assert saved.diagnostics.error_stage == "inspection"
+        assert saved.diagnostics.error_type == "RuntimeError"
+    logs = [getattr(record, "fields", {}) for record in caplog.records]
+    assert any(
+        item.get("run_id") == "intake-test" and item.get("error_code") == saved.decision.error_code
+        for item in logs
+    )
+    assert "PRIVATE_PROVIDER_BODY" not in saved.model_dump_json() + str(logs)
 
 
 @pytest.mark.parametrize("hosted_vllm", [False, True])

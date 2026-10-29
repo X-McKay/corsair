@@ -75,6 +75,15 @@ ErrorCode = Literal[
     "IMAGE_CHECK_FAILED",
 ]
 Classification = Literal["in_scope_supported", "in_scope_not_supported", "out_of_scope"]
+IntakeOutputFailure = Literal[
+    "LLM_BUDGET_EXHAUSTED",
+    "TOOL_BUDGET_EXHAUSTED",
+    "NO_STRUCTURED_OUTPUT",
+    "SCHEMA_INVALID",
+    "IMAGE_OUTSIDE_INVENTORY",
+    "CANONICAL_ISSUE_MODIFIED",
+    "SOURCE_NOT_INSPECTED",
+]
 
 
 class Location(Contract):
@@ -224,23 +233,23 @@ class PreparedIntake(Contract):
     episode_seconds: int | None = Field(default=None, ge=1, le=3600)
 
 
-class IntakeAgentOutput(Contract):
-    source_preloaded: list[str] = Field(default_factory=list, max_length=4)
-    inspection_reads: int = Field(default=0, ge=0)
+class IntakeDiagnostics(Contract):
+    """Bounded operational metadata, never provider bodies or model explanations."""
+
+    error_stage: (
+        Literal["configuration", "inspection", "model", "proposal", "image_recheck"] | None
+    ) = None
+    error_type: str | None = Field(
+        default=None, max_length=120, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"
+    )
     completion_errors: dict[str, int] = Field(default_factory=dict, max_length=32)
     tool_counts: dict[str, int] = Field(default_factory=dict, max_length=4)
-    output_failure: (
-        Literal[
-            "LLM_BUDGET_EXHAUSTED",
-            "TOOL_BUDGET_EXHAUSTED",
-            "NO_STRUCTURED_OUTPUT",
-            "SCHEMA_INVALID",
-            "IMAGE_OUTSIDE_INVENTORY",
-            "CANONICAL_ISSUE_MODIFIED",
-            "SOURCE_NOT_INSPECTED",
-        ]
-        | None
-    ) = None
+    output_failure: IntakeOutputFailure | None = None
+
+
+class IntakeAgentOutput(IntakeDiagnostics):
+    source_preloaded: list[str] = Field(default_factory=list, max_length=4)
+    inspection_reads: int = Field(default=0, ge=0)
     proposal: IntakeProposal | None = None
     usage: Usage = Field(default_factory=Usage)
     error_code: ErrorCode | None = None
@@ -250,6 +259,7 @@ class IntakeResult(Contract):
     schema_version: Literal["corsair.intake-result/2"] = "corsair.intake-result/2"
     run_id: Identifier
     decision: IntakeDecision
+    diagnostics: IntakeDiagnostics = Field(default_factory=IntakeDiagnostics)
     proposal: IntakeProposal | None = None
     source: ArtifactRef | None = None
     input_artifact: ArtifactRef | None = None

@@ -92,6 +92,8 @@ This sends a few minimal requests per role model and no agent content (see the [
 - `model_producer_tools` fails because the model answered in text: the route does not return native function calls, so every producer episode would end without using its tools. A LiteLLM `openai/` route on vLLM behaves this way, and settings already reject it for the producer; use a route that returns tool calls, such as `hosted_vllm/` with tool calling enabled on the server.
 - `model_producer_tools` warns that it stopped at the probe cap: a reasoning model spent the cap before calling the tool. The result is inconclusive, not a failure; confirm the route with an isolated producer evaluation.
 
+The same native-call checks apply to `model_intake_tools`. `model_intake` reports `MODEL_CONFIGURATION_UNSUPPORTED` before dispatch for the blocked LiteLLM `openai/` route. Use the explicitly configured, qualified route described in [agentic intake](../guides/intake-agent.md). For a missing intake reader image, run `just image-intake`; additional candidate images need their operator-reviewed build or installation process. `just images` also includes the reader.
+
 A passing probe does not show that role-sized requests fit the role output caps; `provider_max_tokens` feedback in a result still means a role's cap was too small for its response.
 
 ## Provider feedback or native observation reports an error

@@ -23,7 +23,7 @@ from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeNamespaceRequest, DescribeTaskQueueRequest
 
 from corsair.adapters.temporal.client import connect
-from corsair.entrypoints.terminal import failure_remedy
+from corsair.entrypoints.render.remedies import failure_remedy
 from corsair.observability.logging import safe_text
 from corsair.settings import Settings
 
@@ -50,16 +50,44 @@ def _directory(path: str, *, writable=False) -> str:
     return "Writable artifact root or parent; no files created"
 
 
-def _docker(settings: Settings) -> str:
+def _check_docker_images(settings: Settings) -> list[dict]:
+    """Check daemon/runtime and every configured image without pulling or running code."""
     with closing(docker.from_env(timeout=5)) as client:
         client.ping()
-        tags = sorted({settings.image, *settings.images.values()})
-        resolved = {tag: str(client.images.get(tag).id) for tag in tags}
-        runtimes = client.info().get("Runtimes", {})
+        info = client.info()
+        runtimes = info.get("Runtimes", {})
         if settings.runtime not in runtimes:
             raise ValueError(f"configured runtime {settings.runtime} is not registered")
-        images = "; ".join(f"{tag}={image_id}" for tag, image_id in resolved.items())
-        return f"Daemon reachable; runtime={settings.runtime}; images={images}"
+        checks = [
+            {
+                "name": "docker",
+                "status": "pass",
+                "detail": f"Daemon reachable; runtime={settings.runtime}",
+            }
+        ]
+        tags = sorted(
+            {
+                settings.image,
+                *settings.images.values(),
+                settings.intake_image,
+                *(image.reference for image in settings.intake_images),
+            }
+        )
+        for tag in tags:
+            try:
+                image = client.images.get(tag)
+                checks.append(
+                    {"name": f"image:{tag}", "status": "pass", "detail": f"Local image {image.id}"}
+                )
+            except Exception as error:
+                check = _failed_check(f"image:{tag}", error)
+                if tag == settings.intake_image:
+                    check["remedy"] = (
+                        "Build the reviewed inspection image with `just image-intake`, "
+                        "then run `corsair doctor`."
+                    )
+                checks.append(check)
+        return checks
 
 
 def _failed_check(name: str, error: Exception) -> dict:
@@ -81,13 +109,16 @@ async def diagnose(
     for name, operation in (
         ("source_root", lambda: _directory(settings.source_root)),
         ("artifact_root", lambda: _directory(settings.artifact_root, writable=True)),
-        ("docker", lambda: _docker(settings)),
     ):
         try:
             detail = await asyncio.to_thread(operation)
             checks.append({"name": name, "status": "pass", "detail": detail})
         except Exception as error:
             checks.append(_failed_check(name, error))
+    try:
+        checks.extend(await asyncio.to_thread(_check_docker_images, settings))
+    except Exception as error:
+        checks.append(_failed_check("docker", error))
     try:
         async with asyncio.timeout(8):
             client = await connect(settings)
@@ -146,7 +177,8 @@ _INFRASTRUCTURE_QUALIFICATION = (
 )
 _MODEL_QUALIFICATION = (
     "Infrastructure checks plus one minimal request per role model and one tool round trip "
-    "on the producer model. Poller presence is not an execution test. Prompt-sized requests, "
+    "on the producer and intake models. Poller presence is not an execution test. "
+    "Prompt-sized requests, "
     "provider policy, role output caps, native evidence and accuracy were not tested."
 )
 # A tiny cap keeps the probe cheap; reasoning tokens count against it, so a truncated text
@@ -197,8 +229,8 @@ _PROVIDERS_REMEDY = (
     "Install Corsair's providers extra with `just sync` or `uv sync --locked --extra providers`."
 )
 _TOOL_ROUTE_REMEDY = (
-    "This route did not return a native function call, so producer episodes would never call "
-    "their tools. Serve the producer on a route that returns tool calls (for vLLM, a "
+    "This route did not return a native function call, which intake and producer episodes "
+    "require. Configure the affected role with a route that returns tool calls (for vLLM, a "
     "hosted_vllm/ route with tool calling enabled); see docs/operations/troubleshooting.md."
 )
 
@@ -220,7 +252,8 @@ def _model_config_check(settings: Settings) -> dict:
     models = settings.models
     keys = ", ".join(sorted(models.extra_body)) or "none"
     detail = (
-        f"connector={models.connector}; producer={models.producer}; auditor={models.auditor}; "
+        f"connector={models.connector}; producer={models.producer}; "
+        f"auditor={models.auditor}; intake={models.intake}; "
         f"api_base host={_api_base_host(models.api_base)}; "
         f"request_timeout_seconds={models.request_timeout_seconds}; extra_body keys={keys}"
     )
@@ -244,7 +277,7 @@ def _model_credentials_check(settings: Settings) -> dict:
     """Confirm each role's provider variable is present, by name only; values are never read."""
     statuses: list[str] = []
     notes: list[str] = []
-    for role in ("producer", "auditor"):
+    for role in ("producer", "auditor", "intake"):
         model_name = getattr(settings.models, role)
         requirement = _credential_requirement(settings, model_name)
         if requirement is None:
@@ -400,11 +433,13 @@ def _text_probe_check(role: str, response: LlmResponse | None, latency_ms: int) 
     return {"name": name, "status": "pass", "detail": safe_text(detail)}
 
 
-def _tool_probe_check(response: LlmResponse | None, latency_ms: int, paired: bool) -> dict:
+def _tool_probe_check(
+    response: LlmResponse | None, latency_ms: int, paired: bool, role: str
+) -> dict:
     """Pass only when the response is a native call of the one declared function."""
     from google.genai import types
 
-    name = "model_producer_tools"
+    name = f"model_{role}_tools"
     if response is None:
         return {"name": name, "status": "fail", "detail": "No complete response was returned"}
     calls = [
@@ -444,7 +479,7 @@ def _tool_probe_check(response: LlmResponse | None, latency_ms: int, paired: boo
 
 async def _probe_check(model: BaseLlm, role: str, *, tool: bool, timeout: float) -> dict:
     """Run one probe and turn any raised provider failure into a sanitized failed check."""
-    name = "model_producer_tools" if tool else f"model_{role}"
+    name = f"model_{role}_tools" if tool else f"model_{role}"
     try:
         request = _probe_request(model, tool=tool)
         paired = request.config.response_schema is not None
@@ -452,7 +487,7 @@ async def _probe_check(model: BaseLlm, role: str, *, tool: bool, timeout: float)
     except Exception as error:
         return _model_failure(name, error)
     if tool:
-        return _tool_probe_check(response, latency_ms, paired)
+        return _tool_probe_check(response, latency_ms, paired, role)
     return _text_probe_check(role, response, latency_ms)
 
 
@@ -460,9 +495,11 @@ def _resolve_models(settings: Settings, resolve: ModelResolver) -> dict[str, Bas
     """Build each role's model exactly as its agent does, without contacting the provider."""
     from google.adk.models.registry import LLMRegistry
 
-    roles: tuple[RoleName, ...] = ("producer", "auditor")
+    roles: tuple[RoleName, ...] = ("producer", "auditor", "intake")
     resolved: dict[str, BaseLlm] = {}
     for role in roles:
+        if role == "intake" and _intake_route_blocked(settings):
+            continue
         model = resolve(settings, role)
         # LlmAgent.canonical_model resolves a plain model id through the same registry.
         resolved[role] = LLMRegistry.new_llm(model) if isinstance(model, str) else model
@@ -471,11 +508,29 @@ def _resolve_models(settings: Settings, resolve: ModelResolver) -> dict[str, Bas
     return resolved
 
 
+def _intake_route_blocked(settings: Settings) -> bool:
+    return settings.models.connector == "litellm" and settings.models.intake.startswith("openai/")
+
+
 async def diagnose_model(
     settings: Settings, *, resolve_model: ModelResolver | None = None
 ) -> list[dict]:
     """Check the configured model routes with minimal requests; never an agent prompt or source."""
     checks = [_model_config_check(settings), _model_credentials_check(settings)]
+    if _intake_route_blocked(settings):
+        checks.append(
+            {
+                "name": "model_intake",
+                "status": "fail",
+                "detail": (
+                    "MODEL_CONFIGURATION_UNSUPPORTED: intake cannot use the openai/ tool route."
+                ),
+                "remedy": (
+                    "Configure models.intake with a qualified native tool route; "
+                    "see docs/guides/intake-agent.md."
+                ),
+            }
+        )
     try:
         if resolve_model is None:
             from corsair.adapters.inference.models import model_for_role
@@ -490,9 +545,11 @@ async def diagnose_model(
     with redirect_stdout(sys.stderr):
         checks.extend(
             await asyncio.gather(
-                _probe_check(models["producer"], "producer", tool=False, timeout=timeout),
-                _probe_check(models["producer"], "producer", tool=True, timeout=timeout),
-                _probe_check(models["auditor"], "auditor", tool=False, timeout=timeout),
+                *(
+                    _probe_check(model, role, tool=tool, timeout=timeout)
+                    for role, model in models.items()
+                    for tool in ((False, True) if role in {"producer", "intake"} else (False,))
+                ),
             )
         )
     return checks

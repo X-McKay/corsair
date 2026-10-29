@@ -288,7 +288,7 @@ async def test_inspect_names_round_stops_from_the_committed_receipts(tmp_path, m
     _settings_for(store, monkeypatch)
     before = _snapshot(store.root)
 
-    human = ["--format", "human", "--no-color", "inspect"]
+    human = ["--format", "human", "--details", "--no-color", "inspect"]
     assert await execute(parser().parse_args([*human, "run-verified"])) == 0
     output = capsys.readouterr().out
     stop = next(line for line in output.splitlines() if line.startswith("│ 1.1"))

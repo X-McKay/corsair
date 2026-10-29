@@ -4,6 +4,10 @@ This is the current work index. Current user guides start at the [documentation 
 
 ## Active work
 
+- [PLAN-0007: CLI presentation](archive/plans/PLAN-0007-cli-presentation.md) records unified progress, explicit end states, compact summaries, responsive Rich views and native terminal/replay verification.
+
+- [PLAN-0006: intake operations and code quality](archive/plans/PLAN-0006-intake-code-quality.md) records the CLI, diagnostics, readiness, navigation and function refactors, real workflow verification and remaining evaluation limits.
+
 - [ISSUE-0001: intake conflicting-report abstention](active/ISSUE-0001-intake-conflicting-reports.md) remains open after a false-supported candidate result.
 - [PLAN-0005: live intake-to-investigation workflow](archive/plans/PLAN-0005-intake-live-end-to-end.md) records the production CLI, exact selected-image handoff, categorical stops and real all-role Qwen chain while keeping the operator-binding prerequisite explicit.
 - [PLAN-0004: Qwen intake route evaluation](archive/plans/PLAN-0004-intake-qwen-route-evaluation.md) records native tool/schema compatibility and both frozen cohorts, including the unresolved false-supported contradictory report.

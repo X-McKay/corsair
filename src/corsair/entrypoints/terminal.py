@@ -24,14 +24,24 @@ from rich.text import Text
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import InvestigationResult, Observation
+from corsair.contracts.intake_agent import IntakeResult
+from corsair.contracts.intake_pipeline import IntakeInvestigationResult
 from corsair.entrypoints.render.checks import print_checks, print_datasets, print_intake
+from corsair.entrypoints.render.common import inspect_command
+from corsair.entrypoints.render.intake import (
+    print_intake_explanation,
+    print_intake_parent,
+    print_intake_result,
+)
 from corsair.entrypoints.render.preview import print_preview, print_preview_diff
 from corsair.entrypoints.render.progress import (
     child_changes,
     child_line,
+    completion_label,
     progress_fields,
     progress_line,
     progress_panel,
+    wait_summary,
 )
 from corsair.entrypoints.render.remedies import failure_remedy
 from corsair.entrypoints.render.reports import print_comparison, print_evaluation
@@ -54,6 +64,7 @@ class TerminalOptions(Protocol):
     format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
+    details: bool
     log_format: Literal["text", "json"]
 
 
@@ -67,6 +78,8 @@ class Terminal:
         requested = options.format
         self.human = requested == "human" or (requested == "auto" and sys.stdout.isatty())
         self.markdown = requested == "markdown"
+        self.details = getattr(options, "details", False)
+        self.settings_path: str | None = getattr(options, "settings", None)
         # JSON mode must remain free of cursor movement even when running on a TTY.
         colors = not options.no_color and requested not in {"json", "markdown"}
         animation = self.human and not options.no_animation
@@ -104,10 +117,46 @@ class Terminal:
         if not self.human:
             print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
-        if isinstance(rendered, dict) and "statements" in rendered:
+        if isinstance(rendered, dict) and "phase" in rendered and "run_id" not in rendered:
+            self.out.print(
+                progress_panel(
+                    "Workflow status",
+                    rendered,
+                    progress_fields(rendered, _utcnow(), 0),
+                    animate=False,
+                    width=self.out.width,
+                )
+            )
+        elif (
+            isinstance(rendered, dict)
+            and rendered.get("schema_version") == "corsair.intake-result/2"
+        ):
+            print_intake_result(
+                self.out, IntakeResult.model_validate(rendered), details=self.details
+            )
+        elif (
+            isinstance(rendered, dict)
+            and rendered.get("schema_version") == "corsair.intake-investigation-result/1"
+        ):
+            print_intake_parent(
+                self.out,
+                IntakeInvestigationResult.model_validate(rendered),
+                store=store,
+                details=self.details,
+                settings_path=self.settings_path,
+            )
+        elif isinstance(rendered, dict) and rendered.get("intake_explanation") is True:
+            print_intake_explanation(self.out, rendered)
+        elif isinstance(rendered, dict) and "statements" in rendered:
             print_explanation(self.out, rendered, store)
         elif isinstance(rendered, dict) and "disposition" in rendered:
-            print_result(self.out, InvestigationResult.model_validate(rendered), store)
+            print_result(
+                self.out,
+                InvestigationResult.model_validate(rendered),
+                store,
+                details=self.details,
+                settings_path=self.settings_path,
+            )
         elif isinstance(rendered, dict) and {"operation_id", "submission_digest"} <= set(rendered):
             print_observation(self.out, Observation.model_validate(rendered))
         elif isinstance(rendered, dict) and "runs" in rendered:
@@ -169,6 +218,7 @@ class Terminal:
         label: str,
         *,
         query: Callable[[], Awaitable[Mapping[str, object]]] | None = None,
+        run_id: str | None = None,
     ) -> T:
         """Observe actual SDK completion; query failures never invent success or progress.
 
@@ -177,30 +227,44 @@ class Terminal:
         JSON mode writes nothing beyond the logs.
         """
         begun = time.monotonic()
+        updated = begun
         last: Mapping[str, object] | None = None
         seen: dict[str, str] = {}
+        query_failed = False
+        outcome = "Detached"
 
         def frame() -> Panel:
             now = _utcnow()
             fields = progress_fields(last, now, time.monotonic() - begun)
-            return progress_panel(label, last, fields, now=now)
+            return progress_panel(
+                label,
+                last,
+                fields,
+                now=now,
+                width=self.err.width,
+                unavailable_for=time.monotonic() - updated if query_failed else None,
+            )
 
         display: AbstractContextManager[object] = nullcontext()
         if self.animate and query is not None:
             display = Live(
-                console=self.err, get_renderable=frame, refresh_per_second=4, transient=False
+                console=self.err, get_renderable=frame, refresh_per_second=4, transient=True
             )
         elif self.animate:
             display = self.err.status(Text(label), spinner="dots", spinner_style="cyan")
         task = asyncio.ensure_future(awaitable)
-        query_failed = False
-        with display:
-            try:
+        try:
+            with display:
                 while not task.done():
                     if query is not None:
                         try:
                             async with asyncio.timeout(2):
                                 actual = await query()
+                            updated = time.monotonic()
+                            if query_failed and self.human and not self.animate:
+                                self.err.print(Text("Status restored", style="cyan"))
+                            recovered = query_failed
+                            query_failed = False
                             if actual != last:
                                 phase = actual.get("phase")
                                 round_index = actual.get("round")
@@ -208,27 +272,61 @@ class Terminal:
                                 total = actual.get("total")
                                 event(
                                     "workflow.progress",
+                                    run_id=run_id,
                                     phase=phase if isinstance(phase, str) else None,
                                     round=round_index if isinstance(round_index, int) else None,
                                     completed=completed if isinstance(completed, int) else None,
                                     total=total if isinstance(total, int) else None,
                                 )
                                 last = actual
+                                if isinstance(display, Live):
+                                    display.update(frame(), refresh=True)
                                 if self.human and not self.animate:
                                     self._print_progress(label, last, seen, begun)
-                            query_failed = False
+                            if recovered and isinstance(display, Live):
+                                display.update(frame(), refresh=True)
                         except Exception as error:
                             if not query_failed:
                                 event(
                                     "workflow.progress_unavailable",
+                                    run_id=run_id,
                                     level=logging.WARNING,
                                     error_type=type(error).__name__,
                                 )
+                                if self.human and not self.animate:
+                                    self.err.print(
+                                        Text(
+                                            "Status unavailable; waiting for completion "
+                                            "with the last known state.",
+                                            style="yellow",
+                                        )
+                                    )
                             query_failed = True
+                            if isinstance(display, Live):
+                                display.update(frame(), refresh=True)
                     await asyncio.wait({task}, timeout=_POLL_SECONDS)
-                return await task
-            finally:
-                if not task.done():
-                    # Cancels local waiting, not the durable remote workflow.
-                    task.cancel()
-                    await asyncio.gather(task, return_exceptions=True)
+                result = await task
+                outcome = completion_label(result)
+                return result
+        except Exception:
+            outcome = "Failed"
+            raise
+        finally:
+            if not task.done():
+                # Cancels local waiting, not the durable remote workflow.
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            if self.human and (query is not None or run_id is not None):
+                waited = time.monotonic() - begun
+                reconnect = (
+                    inspect_command(run_id, "--online", "--watch", settings_path=self.settings_path)
+                    if run_id
+                    else None
+                )
+                if self.animate:
+                    self.err.print(wait_summary(label, outcome, waited, reconnect))
+                else:
+                    fields = [("status", outcome), *progress_fields(None, _utcnow(), waited)[:1]]
+                    if outcome == "Detached" and reconnect:
+                        fields.append(("reconnect", reconnect))
+                    self.err.print(progress_line(label, fields), soft_wrap=True)

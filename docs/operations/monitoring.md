@@ -12,7 +12,7 @@ Run the read-only preflight against the same settings that the worker and client
 uv run --locked corsair doctor --format human --settings .state/settings.json
 ```
 
-`doctor` reports separate checks for `source_root`, `artifact_root`, Docker, Temporal, and `worker_pollers`. A `warn` for pollers makes the overall report not ready and exits `1`: both workflow and activity pollers must be present on the configured task queue. The report also shows installed SDK versions. It does **not** build the image, create the artifact root, submit work, send a prompt, verify credentials, test provider policy, or perform native evidence execution.
+`doctor` reports separate checks for `source_root`, `artifact_root`, Docker, each configured image (including intake), Temporal, and `worker_pollers`. A `warn` for pollers makes the overall report not ready and exits `1`: both workflow and activity pollers must be present on the configured task queue. The report also shows installed SDK versions. Without `--model` it sends no prompt and does not verify provider credentials. It never builds images, creates the artifact root, submits work or performs native evidence execution.
 
 For a machine-readable transcript, stdout is JSON only; diagnostics remain on stderr:
 
@@ -36,6 +36,8 @@ For an investigation, the native query returns its actual phase, session and rou
 
 ### Reading the live view
 
+An intake-gated parent follows its selected investigation child in the same view. The image reference and immutable ID remain visible alongside the actual child phase/session/round. **Investigation status unavailable** means the child query failed; the displayed parent metadata remains known. A full status-query failure retains the last state with a visible age until recovery.
+
 While `investigate --wait`, `inspect --online --watch` or `eval` waits, a human terminal shows that query as a live panel on stderr (or, with `--no-animation`, one line per status change). Read it as follows:
 
 - **Session n/max and round n/max** show how much of the admitted schedule has been used. A second session appears only after a first session ended in an independent clean negative, and a later one only while enough sessions remain to reach the threshold of clean negatives on distinct exploit payloads.
@@ -56,13 +58,18 @@ If one is present, preserve its immutable container ID and its `corsair.operatio
 
 ## After completion
 
+Waiting ends with a static operational label. **Completed** means a result arrived, not that an exploit was demonstrated or refuted. **Stopped**, **Failed**, **Cancelled** and **Incomplete** preserve their distinct meanings. Ctrl+C leaves **Detached** with `corsair inspect RUN_ID --online --watch`; durable execution continues unless separately cancelled. JSON output has no presentation frames.
+
 Read the committed result from the shared artifact root:
 
 ```bash
 uv run --locked corsair inspect "$RUN_ID" --settings .state/settings.json
+uv run --locked corsair inspect "$RUN_ID" --details --settings .state/settings.json
 ```
 
 Offline inspection validates the immutable result receipt and does not contact Temporal. If it reports no committed result, use online inspection to learn whether the workflow is still live; do not rerun the same ID or delete an intent. The [disaster-recovery guide](disaster-recovery.md) covers the different case where the artifact root itself is lost.
+
+Human output starts with a compact verdict/scope/image summary. `--details` adds round gates, phase durations, usage and full identities. Intake parents include the child's recorded verdict only when its exact committed receipt can be read locally; otherwise they state that it is unavailable. Narrow terminals use stacked round and run cards. Machine receipts remain complete regardless of `--details`.
 
 List what the artifact root holds, newest first, and drill into one run's native receipts:
 
@@ -71,7 +78,7 @@ uv run --locked corsair runs --case case01 --limit 10 --settings .state/settings
 uv run --locked corsair inspect "$RUN_ID" --evidence --settings .state/settings.json
 ```
 
-`runs` admits only results committed under their own `result.<run_id>` name and counts unreadable or unbound records as `invalid_records`; a nonzero count is an integrity lead to investigate, not something to delete. `inspect --evidence` reports, per observation and role, the outcome, target execution, covered lines, native exit code, cleanup confirmation, container ID and image ID, plus whether the saved receipts still pass the trusted verifier (`receipts_admissible`) and, when they do, the checked `target_line` (the bound line), the finding's `declared_line` and its `line_provenance`. It never prints payloads or the rest of the prepared case. Use the container ID and labels from a receipt with `cleanup_confirmed: false` when following up with the Docker container listing above. See the [CLI reference](../reference/cli.md#runs) for every field.
+`runs` admits only results committed under their own result or intake-parent operation identity and counts unreadable or unbound records as `invalid_records`; a nonzero count is an integrity lead to investigate, not something to delete. Stopped intake parents remain visible without an investigation child; `explain PARENT` shows the categorical stop and next action. For a child, `inspect --evidence` reports, per observation and role, the outcome, target execution, covered lines, native exit code, cleanup confirmation, container ID and image ID, plus whether the saved receipts still pass the trusted verifier (`receipts_admissible`) and, when they do, the checked `target_line` (the bound line), the finding's `declared_line` and its `line_provenance`. It never prints payloads or the rest of the prepared case. Use the container ID and labels from a receipt with `cleanup_confirmed: false` when following up with the Docker container listing above. See the [CLI reference](../reference/cli.md#runs) for every field.
 
 The final result retains `execution_status`, disposition, reason, rounds, artifact identities, and a manifest. Check operational state first:
 
@@ -98,5 +105,7 @@ uv run --locked --extra providers corsair worker \
 ```
 
 The optional file mirror is metadata-only JSONL even if stderr uses text. Fields include safe identities, activity attempts, phase/round, durations, usage, status, image ID, and redacted error classification. Prompts, source content, payloads, credentials, provider response bodies, and raw reasoning are not log fields; raw SDK diagnostics are suppressed. Still restrict logs: run IDs, local paths, timing, and workflow metadata are sensitive operational data. Logs are not evidence artifacts and are not a replacement for `inspect` or the immutable artifact store.
+
+Intake emits `intake.submitted`, `intake.completed`, `intake.prepare_failed` and `intake.recorded`. Connected runs emit `intake_investigation.submitted` and `intake_investigation.completed`; queried progress includes `run_id`. Filter by parent ID, then follow `investigation_run_id` for the child. The committed intake event includes categorical `error_code`/`output_failure`, phase, exception type and artifact hash when available; exception messages and model content are excluded.
 
 No in-product retention job, alerting service, or automated backup is implemented. Operators must apply their own restricted storage and backup controls; see [disaster recovery](disaster-recovery.md) before promising recoverability.

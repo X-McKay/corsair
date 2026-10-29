@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -21,7 +22,8 @@ from corsair.observability.logging import configure_logging, event, safe_text
 
 if TYPE_CHECKING:
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.contracts import BatchItem, InvestigationResult, Oracle
+    from corsair.contracts import BatchItem, InvestigationRequest, InvestigationResult, Oracle
+    from corsair.contracts.intake_agent import IntakeRequest
     from corsair.entrypoints.terminal import Terminal
     from corsair.settings import Settings
 
@@ -34,11 +36,13 @@ class CliArguments(argparse.Namespace):
     format: Literal["auto", "human", "json", "markdown"]
     no_color: bool
     no_animation: bool
+    details: bool
     log_format: Literal["text", "json"]
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
     log_file: str | None
     intake_json: str | None
     issue: str | None
+    source: str | None
     request: str
     submission: str
     run_id: str | None
@@ -278,16 +282,20 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
         from corsair.adapters.storage.filesystem import ArtifactStore
 
         store = ArtifactStore(settings.artifact_root)
-        parent_ref = store.reconcile(f"intake-investigation.{identity}")
-        if parent_ref is not None:
-            from corsair.contracts.intake_pipeline import IntakeInvestigationResult
+        from corsair.entrypoints.runs import load_intake_parent
+        from corsair.policies.intake_explanation import explain_intake_parent
 
-            parent = IntakeInvestigationResult.model_validate(store.get_json(parent_ref))
-            if parent.run_id != identity:
-                raise ValueError("committed parent identity differs from lookup")
-            if args.explain or args.evidence:
-                raise ValueError("inspect the investigation child for evidence/explanation")
-            ui.emit(parent.model_copy(update={"result_artifact": parent_ref}))
+        parent = load_intake_parent(store, identity)
+        if parent is not None:
+            if args.evidence:
+                if parent.investigation_run_id is None:
+                    raise ValueError(
+                        "intake stopped before investigation; use --explain for the stop reason"
+                    )
+                raise ValueError(
+                    f"inspect {parent.investigation_run_id} --evidence for native receipts"
+                )
+            ui.emit(explain_intake_parent(parent) if args.explain else parent, store=store)
             return 0
         result = _result_from_store(store, identity)
         if args.evidence:
@@ -302,7 +310,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
             ui.emit(result, store=store)
         return 0
 
-    from corsair.adapters.temporal.client import connect, wait_for_result
+    from corsair.adapters.temporal.client import connect, query_intake_progress, wait_for_result
     from corsair.contracts import BatchItem, InvestigationResult
     from corsair.workflows.evaluation import EvaluationWorkflow
     from corsair.workflows.investigation import InvestigationWorkflow
@@ -310,6 +318,22 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
     client = await ui.wait(connect(settings), "Connecting to Temporal")
     initial = client.get_workflow_handle(identity)
     description = await initial.describe()
+    if description.workflow_type == "corsair.intake":
+        from corsair.contracts.intake_agent import IntakeResult
+
+        intake_handle = client.get_workflow_handle(identity, result_type=IntakeResult)
+        if args.watch:
+            ui.emit(
+                await ui.wait(wait_for_result(intake_handle), f"Intake {identity}", run_id=identity)
+            )
+        else:
+            ui.emit(
+                {
+                    "run_id": identity,
+                    "state": description.status.name if description.status else None,
+                }
+            )
+        return 0
     if description.workflow_type == "corsair.intake-investigation.v1":
         from corsair.contracts.intake_pipeline import IntakeInvestigationResult
 
@@ -319,11 +343,13 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
                 await ui.wait(
                     wait_for_result(parent_handle),
                     f"Investigation {identity}",
-                    query=lambda: parent_handle.query("status"),
-                )
+                    query=lambda: query_intake_progress(client, parent_handle),
+                    run_id=identity,
+                ),
+                store=_existing_store(settings) if ui.human else None,
             )
         else:
-            ui.emit(await parent_handle.query("status", rpc_timeout=timedelta(seconds=5)))
+            ui.emit(await query_intake_progress(client, parent_handle))
         return 0
     is_batch = description.workflow_type == "corsair.evaluation"
     if description.workflow_type not in {"corsair.investigation", "corsair.evaluation"}:
@@ -338,6 +364,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
                 wait_for_result(handle),
                 f"{'Evaluation' if is_batch else 'Investigation'} {handle.id}",
                 query=lambda: handle.query(query),
+                run_id=handle.id,
             )
         )
     else:
@@ -348,11 +375,17 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 async def _handle_explain(args: CliArguments, ui: Terminal) -> int:
     """Explain a committed result's verdict from the artifact store; no services."""
     from corsair.adapters.storage.filesystem import ArtifactStore
-    from corsair.entrypoints.runs import explain_run
+    from corsair.entrypoints.runs import explain_run, load_intake_parent
+    from corsair.policies.intake_explanation import explain_intake_parent
 
     identity = validate_run_id(args.run_id or "")
     store = ArtifactStore(_settings(args).artifact_root)
-    ui.emit(explain_run(store, _result_from_store(store, identity)))
+    parent = load_intake_parent(store, identity)
+    ui.emit(
+        explain_intake_parent(parent)
+        if parent
+        else explain_run(store, _result_from_store(store, identity))
+    )
     return 0
 
 
@@ -368,63 +401,126 @@ async def _handle_cancel(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
-async def _handle_agent_intake(args: CliArguments, ui: Terminal) -> int:
-    """Agentic issue input; main's scanner dry-run and trusted Case route stay intact."""
-    from corsair.adapters.temporal.client import connect
+@dataclass(frozen=True)
+class IssueInputOptions:
+    """Only the issue-input switches shared by the two intake commands."""
+
+    json_path: str | None
+    issue_reference: str | None
+    source_path: str | None
+    binding_path: str | None
+
+    def __post_init__(self) -> None:
+        if bool(self.json_path) == bool(self.issue_reference):
+            raise ValueError("provide exactly one of --json or --issue")
+        if self.binding_path and self.source_path:
+            raise ValueError("Case binding already supplies the source; omit --source")
+        if not self.binding_path and not self.source_path:
+            raise ValueError("--source is required without a Case binding request")
+
+
+def _load_issue_request(
+    options: IssueInputOptions,
+    settings: Settings,
+) -> tuple[IntakeRequest, InvestigationRequest | None]:
+    """Load bounded issue input and resolve the operator's source or Case binding."""
     from corsair.contracts import Source
     from corsair.contracts.intake_agent import IntakeRequest, JsonIssueInput, parse_issue_json
-    from corsair.contracts.intake_pipeline import IntakeInvestigationRequest
-    from corsair.entrypoints.api import start_intake, start_intake_investigation
     from corsair.entrypoints.requests import load_investigation_request, parse_issue_reference
 
-    settings = _settings(args)
-    identity = validate_run_id(args.run_id or f"issue-{uuid4().hex}")
-    request_path = getattr(args, "request", None)
-    binding = load_investigation_request(Path(request_path)) if request_path else None
-    if binding is not None and getattr(args, "source", None):
-        raise ValueError("binding request already supplies the admitted source")
-    if binding is None and not args.source:
-        raise ValueError("--source is required without a Case binding request")
+    binding = (
+        load_investigation_request(Path(options.binding_path)) if options.binding_path else None
+    )
     source = (
         binding.case.source
         if binding is not None
-        else Source(path=str(Path(args.source).absolute()))
+        else Source(path=str(Path(options.source_path or "").absolute()))
     )
-    if args.issue:
-        issue_input = parse_issue_reference(args.issue, settings.intake_github_repositories)
+    if options.issue_reference:
+        issue_input = parse_issue_reference(
+            options.issue_reference, settings.intake_github_repositories
+        )
     else:
-        if args.intake_json is None:
-            raise ValueError("--json or --issue is required")
-        with Path(args.intake_json).open("rb") as stream:
+        if options.json_path is None:
+            raise ValueError("--json is required without --issue")
+        with Path(options.json_path).open("rb") as stream:
             issue_input = JsonIssueInput(payload=parse_issue_json(stream.read(65537)))
     intake = (
         IntakeRequest(input=issue_input, source=source)
         if binding is None
         else IntakeRequest(input=issue_input, source=source, budget=binding.budget)
     )
+    return intake, binding
+
+
+async def _handle_agent_intake(args: CliArguments, ui: Terminal) -> int:
+    """Run standalone issue intake and render its classification and selected image."""
+    from corsair.adapters.temporal.client import connect, wait_for_result
+    from corsair.entrypoints.api import start_intake
+
+    options = IssueInputOptions(args.intake_json, args.issue, args.source, None)
+    settings = _settings(args)
+    identity = validate_run_id(args.run_id or f"issue-{uuid4().hex}")
+    intake, _ = _load_issue_request(options, settings)
     client = await ui.wait(connect(settings), "Connecting to Temporal")
-    if args.command == "intake-agent":
-        intake_handle = await start_intake(client, intake, settings, run_id=identity)
-        intake_result = await ui.wait(
-            intake_handle.result(), "Inspecting issue and available images"
-        )
-        ui.emit(intake_result)
-        return 0 if intake_result.decision.status == "completed" else 1
+    handle = await start_intake(client, intake, settings, run_id=identity)
+    event("intake.submitted", run_id=handle.id, task_queue=settings.task_queue)
+    result = await ui.wait(
+        wait_for_result(handle), "Inspecting issue and available images", run_id=handle.id
+    )
+    ui.emit(result)
+    event(
+        "intake.completed",
+        run_id=handle.id,
+        status=result.decision.status,
+        classification=result.decision.classification,
+        error_code=result.decision.error_code,
+    )
+    return 0 if result.decision.status == "completed" else 1
+
+
+async def _handle_intake_investigation(args: CliArguments, ui: Terminal) -> int:
+    """Submit the intake-gated parent and optionally observe its investigation child."""
+    from corsair.adapters.temporal.client import connect, query_intake_progress, wait_for_result
+    from corsair.contracts.intake_pipeline import IntakeInvestigationRequest
+    from corsair.entrypoints.api import start_intake_investigation
+
+    options = IssueInputOptions(args.intake_json, args.issue, args.source, args.request)
+    settings = _settings(args)
+    identity = validate_run_id(args.run_id or f"issue-{uuid4().hex}")
+    intake, binding = _load_issue_request(options, settings)
+    client = await ui.wait(connect(settings), "Connecting to Temporal")
     request = IntakeInvestigationRequest(
         case_id=binding.case.case_id if binding else identity,
         intake=intake,
         binding=None if binding is None else binding.case,
     )
     handle = await start_intake_investigation(client, request, settings, run_id=identity)
+    event(
+        "intake_investigation.submitted",
+        run_id=handle.id,
+        case_id=request.case_id,
+        task_queue=settings.task_queue,
+    )
     if not args.wait:
         ui.emit({"run_id": handle.id, "state": "submitted"})
         return 0
     result = await ui.wait(
-        handle.result(),
+        wait_for_result(handle),
         f"Intake-gated investigation {identity}",
-        query=lambda: handle.query("status"),
+        query=lambda: query_intake_progress(client, handle),
+        run_id=handle.id,
     )
-    ui.emit(result)
+    ui.emit(result, store=_existing_store(settings) if ui.human else None)
+    event(
+        "intake_investigation.completed",
+        run_id=handle.id,
+        status=result.status,
+        stop_reason=result.stop_reason,
+        investigation_run_id=result.investigation_run_id,
+        disposition=result.investigation_disposition,
+        execution_status=result.investigation_execution_status,
+    )
     return (
         0
         if result.status == "investigation_finished"
@@ -434,11 +530,13 @@ async def _handle_agent_intake(args: CliArguments, ui: Terminal) -> int:
 
 
 async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
-    if getattr(args, "intake_json", None) or getattr(args, "issue", None):
-        return await _handle_agent_intake(args, ui)
+    """Submit an admitted Case or intake workflow and optionally await completion."""
+    if args.request and args.source:
+        raise ValueError("Case binding already supplies the source; omit --source")
+    if args.intake_json or args.issue:
+        return await _handle_intake_investigation(args, ui)
     if not args.request:
         raise ValueError("provide a Case request or --json/--issue with --source")
-    """Submit one investigation and optionally wait for its actual result."""
     from corsair.adapters.temporal.client import connect, wait_for_result
     from corsair.entrypoints.requests import load_investigation_request
     from corsair.workflows.investigation import InvestigationWorkflow
@@ -464,6 +562,7 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
         wait_for_result(handle),
         f"Investigation {handle.id}",
         query=lambda: handle.query(InvestigationWorkflow.status),
+        run_id=handle.id,
     )
     # A worker sharing this host's artifact root lets the human view verify the ledger.
     ui.emit(result, store=_existing_store(settings) if ui.human else None)
@@ -505,6 +604,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
         wait_for_result(handle),
         f"Evaluation {handle.id}",
         query=lambda: handle.query(EvaluationWorkflow.status),
+        run_id=handle.id,
     )
     rows: list[dict[str, object]] = []
     for item in items:
@@ -650,7 +750,7 @@ async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
-async def _handle_agent(args: CliArguments, ui: Terminal) -> int:
+async def _handle_agent_preview(args: CliArguments, ui: Terminal) -> int:
     """Render what one role would receive, without a model; optionally diff a saved preview."""
     import json
 
@@ -699,7 +799,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "rescore": _handle_rescore,
     "intake": _handle_intake,
     "dataset": _handle_dataset,
-    "agent": _handle_agent,
+    "agent": _handle_agent_preview,
 }
 
 
@@ -755,6 +855,12 @@ def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = F
     )
     parser.add_argument(
         "--no-animation", action="store_true", default=False if defaults else argparse.SUPPRESS
+    )
+    parser.add_argument(
+        "--details",
+        action="store_true",
+        default=False if defaults else argparse.SUPPRESS,
+        help="Show round tables, phase timings and full identities in human results",
     )
     parser.add_argument(
         "--log-format",

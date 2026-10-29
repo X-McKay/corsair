@@ -1,5 +1,6 @@
 """Client-edge request loading; preserve path spelling for secure source admission."""
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,6 +41,7 @@ def parse_issue_reference(value: str, repositories: list[str]) -> "IssueReferenc
         if len(repositories) != 1:
             raise ValueError("numeric issue ID requires exactly one configured GitHub repository")
         value = f"{repositories[0]}#{value}"
-    repository, number = value.rsplit("#", 1)
-    owner, name = repository.split("/", 1)
-    return IssueReference(owner=owner, repository=name, number=int(number))
+    match = re.fullmatch(r"([^/#]+)/([^/#]+)#([0-9]+)", value)
+    if match is None or int(match[3]) < 1:
+        raise ValueError("issue reference must be OWNER/REPO#NUMBER with a positive issue number")
+    return IssueReference(owner=match[1], repository=match[2], number=int(match[3]))

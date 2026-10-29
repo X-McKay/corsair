@@ -20,6 +20,7 @@ from corsair.contracts import (
     Submission,
     digest,
 )
+from corsair.contracts.intake_pipeline import IntakeInvestigationResult
 from corsair.evaluation.ledger import gate_ledger, verified_rounds
 from corsair.policies.explanation import explain_result
 from corsair.settings import Settings
@@ -35,15 +36,22 @@ def _recorded_at(timestamp: float) -> str:
 
 def _committed_result(
     store: ArtifactStore, key: str, ref: ArtifactRef
-) -> InvestigationResult | None:
-    """Return a result only if it was committed under its own ``result.<run_id>`` name.
+) -> InvestigationResult | IntakeInvestigationResult | None:
+    """Read a child or parent result committed under its own operation identity.
 
     Raises ``ValueError`` for a result-shaped record that fails validation or binding.
     """
     if ref.media_type != "application/json" or ref.size > TERMINAL_RESULT_MAX_BYTES:
         return None
     value = store.get_json(ref)
-    if not isinstance(value, dict) or value.get("schema_version") != _RESULT_SCHEMA:
+    if not isinstance(value, dict):
+        return None
+    if value.get("schema_version") == "corsair.intake-investigation-result/1":
+        parent = IntakeInvestigationResult.model_validate(value)
+        if store.operation_key(f"intake-investigation.{parent.run_id}") != key:
+            raise ValueError("parent result is not committed under its own run identity")
+        return parent
+    if value.get("schema_version") != _RESULT_SCHEMA:
         return None
     result = InvestigationResult.model_validate(value)
     if store.operation_key(f"result.{result.run_id}") != key:
@@ -68,6 +76,22 @@ def list_runs(
             continue
         if result is None or (case_id is not None and result.case_id != case_id):
             continue
+        if isinstance(result, IntakeInvestigationResult):
+            rows.append(
+                {
+                    "run_id": result.run_id,
+                    "case_id": result.case_id,
+                    "kind": "intake_investigation",
+                    "status": result.status,
+                    "stop_reason": result.stop_reason,
+                    "investigation_run_id": result.investigation_run_id,
+                    "disposition": result.investigation_disposition,
+                    "execution_status": result.investigation_execution_status,
+                    "recorded_at": _recorded_at(recorded),
+                    "result_sha256": ref.sha256,
+                }
+            )
+            continue
         rows.append(
             {
                 "run_id": result.run_id,
@@ -82,6 +106,40 @@ def list_runs(
         )
     # Every record is scanned so the invalid count describes the whole store.
     return {"runs": rows[:limit], "invalid_records": invalid}
+
+
+def load_intake_parent(store: ArtifactStore, identity: str) -> IntakeInvestigationResult | None:
+    """Resolve and bind a committed parent to the requested identity."""
+    ref = store.reconcile(f"intake-investigation.{identity}")
+    if ref is None:
+        return None
+    parent = IntakeInvestigationResult.model_validate(store.get_json(ref))
+    if parent.run_id != identity:
+        raise ValueError("committed parent identity differs from lookup")
+    return parent.model_copy(update={"result_artifact": ref})
+
+
+def load_parent_investigation(
+    store: ArtifactStore, parent: IntakeInvestigationResult
+) -> InvestigationResult | None:
+    """Read the exact committed child named by the parent, or report it unavailable."""
+    identity, reference = parent.investigation_run_id, parent.investigation_result
+    if identity is None or reference is None:
+        return None
+    try:
+        if store.reconcile(f"result.{identity}") != reference:
+            return None
+        result = _committed_result(store, store.operation_key(f"result.{identity}"), reference)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(result, InvestigationResult) or (
+        result.run_id != identity
+        or result.case_id != parent.case_id
+        or result.disposition != parent.investigation_disposition
+        or result.execution_status != parent.investigation_execution_status
+    ):
+        return None
+    return result.model_copy(update={"result_artifact": reference})
 
 
 def _role_receipt(

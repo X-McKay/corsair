@@ -29,3 +29,23 @@ async def wait_for_result[T](handle: WorkflowHandle[Any, T]) -> T:
     while (await handle.describe(rpc_timeout=deadline)).status == WorkflowExecutionStatus.RUNNING:
         await asyncio.sleep(1)
     return await handle.result(rpc_timeout=deadline)
+
+
+async def query_intake_progress(client: Client, handle: WorkflowHandle) -> dict:
+    """Observe parent and active child metadata without changing durable execution."""
+    timeout = timedelta(milliseconds=750)
+    parent = dict(await handle.query("status", rpc_timeout=timeout))
+    child_id = parent.get("investigation_run_id")
+    if parent.get("phase") != "investigation" or not isinstance(child_id, str):
+        return parent
+    parent["parent_phase"] = parent["phase"]
+    try:
+        child = await client.get_workflow_handle(child_id).query("status", rpc_timeout=timeout)
+    except Exception:
+        # Keep known parent state; a temporarily unavailable child is not a failed run.
+        parent["child_status_unavailable"] = True
+        return parent
+    for key in ("phase", "session", "round", "max_sessions", "max_rounds", "gate", "timeline"):
+        if key in child:
+            parent[key] = child[key]
+    return parent

@@ -21,8 +21,18 @@ from pydantic import ValidationError
 
 from corsair.adapters.inference.adk import _EpisodeAccounting, _run_native_episode
 from corsair.adapters.inference.models import model_for_role
+from corsair.agents.intake.toolsets import TrackedInspection
 from corsair.agents.resources import load_agent_spec
-from corsair.contracts.intake_agent import IntakeAgentOutput, PreparedIntake
+from corsair.contracts import Budget
+from corsair.contracts.intake_agent import (
+    ErrorCode,
+    ImageInventory,
+    IntakeAgentOutput,
+    IntakeOutputFailure,
+    IntakeProposal,
+    Issue,
+    PreparedIntake,
+)
 from corsair.observability.logging import event
 from corsair.policies.time_bounds import episode_bounds
 from corsair.ports.intake import InspectionReader
@@ -126,6 +136,108 @@ class IntakeAccounting(_EpisodeAccounting):
         return super().usage(seconds).model_copy(update={"skills_loaded": self.skills_loaded})
 
 
+@dataclass
+class PreloadedSource:
+    """Source context supplied by trusted preload, separate from model tool calls."""
+
+    context: list[dict[str, Any]] = field(default_factory=list)
+    paths: list[str] = field(default_factory=list)
+    calls: int = 1
+    listing_truncated: bool = False
+
+
+async def preload_intake_source(
+    tracked: TrackedInspection, budget: Budget, payload: object
+) -> PreloadedSource | None:
+    listing = await asyncio.to_thread(tracked.read, "list")
+    paths = listing.get("files", [])
+    if not isinstance(paths, list) or any(not isinstance(path, str) for path in paths):
+        return None
+    serialized_input = json.dumps(payload, ensure_ascii=False)
+    manifests = {
+        "pyproject.toml",
+        "requirements.txt",
+        "package.json",
+        "pom.xml",
+        "build.gradle",
+        "Dockerfile",
+        "Cargo.toml",
+        "go.mod",
+    }
+    ordered = sorted(
+        paths,
+        key=lambda path: (
+            path not in serialized_input,
+            path.rsplit("/", 1)[-1] not in manifests,
+            path,
+        ),
+    )
+    source = PreloadedSource(listing_truncated=bool(listing.get("truncated", False)))
+    remaining_bytes = budget.tool_output_bytes
+    for path in ordered[: min(4, budget.max_tool_calls - 2)]:
+        record = await asyncio.to_thread(tracked.read, "read", path)
+        source.calls += 1
+        content = record.get("content")
+        if not isinstance(content, str):
+            source.context.append({"path": path, "error": "read_unavailable"})
+            continue
+        raw = content.encode()
+        truncated = len(raw) > remaining_bytes or bool(record.get("truncated"))
+        excerpt = raw[:remaining_bytes].decode("utf-8", errors="ignore")
+        source.context.append({"path": path, "content": excerpt, "truncated": truncated})
+        remaining_bytes -= len(excerpt.encode())
+        if truncated:
+            tracked.paths.discard(path)
+        else:
+            source.paths.append(path)
+        if remaining_bytes <= 0:
+            break
+    return source
+
+
+def build_intake_message(
+    prepared: PreparedIntake, canonical: Issue | None, source: PreloadedSource
+) -> str:
+    packet = {
+        "source_context": source.context,
+        "source_listing_truncated": source.listing_truncated,
+        "issue_input": prepared.payload if canonical is None else None,
+        "inspected_paths": source.paths,
+        "canonical_issue": None if canonical is None else canonical.model_dump(mode="json"),
+        "available_images": prepared.inventory.model_dump(mode="json")["images"],
+    }
+    return json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+
+
+def validate_intake_completion(
+    text: str,
+    canonical: Issue | None,
+    inventory: ImageInventory,
+    inspected_paths: set[str],
+    completion_errors: dict[str, int],
+) -> tuple[IntakeProposal | None, IntakeOutputFailure | None]:
+    """Validate native structured output and bind its claims to admitted context."""
+    from corsair.policies.intake_agent import validate_proposal
+
+    try:
+        proposal = IntakeProposal.model_validate_json(text)
+    except ValidationError as error:
+        for failure in error.errors(include_input=False, include_context=False, include_url=False):
+            category = f"schema:{failure['type']}"
+            if category in completion_errors or len(completion_errors) < 32:
+                completion_errors[category] = completion_errors.get(category, 0) + 1
+        return None, "SCHEMA_INVALID"
+    try:
+        validate_proposal(proposal, inventory)
+    except ValueError:
+        return None, "IMAGE_OUTSIDE_INVENTORY"
+    if canonical is not None and proposal.issue != canonical:
+        return None, "CANONICAL_ISSUE_MODIFIED"
+    if any(location.path not in inspected_paths for location in proposal.locations):
+        return None, "SOURCE_NOT_INSPECTED"
+    return proposal, None
+
+
 async def run_intake(
     prepared: PreparedIntake,
     settings: Settings,
@@ -134,9 +246,6 @@ async def run_intake(
 ) -> IntakeAgentOutput:
     """One bounded native intake episode, with inventory-constrained validation."""
     from corsair.agents.intake.factory import build_intake
-    from corsair.agents.intake.toolsets import TrackedInspection
-    from corsair.contracts.intake_agent import IntakeAgentOutput, IntakeProposal, Issue
-    from corsair.policies.intake_agent import validate_proposal
 
     if (
         model_override is None
@@ -144,7 +253,9 @@ async def run_intake(
         and settings.models.intake.startswith("openai/")
     ):
         # Preserve main's known tool/schema route restriction for this tool-using role.
-        return IntakeAgentOutput(error_code="MODEL_CONFIGURATION_UNSUPPORTED")
+        return IntakeAgentOutput(
+            error_code="MODEL_CONFIGURATION_UNSUPPORTED", error_stage="configuration"
+        )
     started = time.perf_counter()
     budget = prepared.request.budget
     spec = load_agent_spec("intake")
@@ -168,75 +279,35 @@ async def run_intake(
         canonical = Issue.model_validate(prepared.payload)
     if budget.max_tool_calls < 3:
         return IntakeAgentOutput(
-            error_code="OUTPUT_INVALID", output_failure="TOOL_BUDGET_EXHAUSTED"
+            error_code="OUTPUT_INVALID", output_failure="TOOL_BUDGET_EXHAUSTED", error_stage="model"
         )
     tracked = TrackedInspection(reader)
-    listing = await asyncio.to_thread(tracked.read, "list")
-    paths = listing.get("files", [])
-    if not isinstance(paths, list) or any(not isinstance(path, str) for path in paths):
-        return IntakeAgentOutput(error_code="INSPECTION_FAILED")
-    serialized_input = json.dumps(prepared.payload, ensure_ascii=False)
-    manifests = {
-        "pyproject.toml",
-        "requirements.txt",
-        "package.json",
-        "pom.xml",
-        "build.gradle",
-        "Dockerfile",
-        "Cargo.toml",
-        "go.mod",
-    }
-    ordered = sorted(
-        paths,
-        key=lambda path: (
-            path not in serialized_input,
-            path.rsplit("/", 1)[-1] not in manifests,
-            path,
-        ),
-    )
-    context = []
-    preloaded = []
-    remaining_bytes = budget.tool_output_bytes
-    preload_calls = 1
-    for path in ordered[: min(4, budget.max_tool_calls - 2)]:
-        record = await asyncio.to_thread(tracked.read, "read", path)
-        preload_calls += 1
-        content = record.get("content")
-        if not isinstance(content, str):
-            context.append({"path": path, "error": "read_unavailable"})
-            continue
-        raw = content.encode()
-        truncated = len(raw) > remaining_bytes or bool(record.get("truncated"))
-        excerpt = raw[:remaining_bytes].decode("utf-8", errors="ignore")
-        context.append({"path": path, "content": excerpt, "truncated": truncated})
-        remaining_bytes -= len(excerpt.encode())
-        if truncated:
-            tracked.paths.discard(path)
-        else:
-            preloaded.append(path)
-        if remaining_bytes <= 0:
-            break
-    accounting.max_tool_calls = budget.max_tool_calls - preload_calls
-    packet = {
-        "source_context": context,
-        "source_listing_truncated": listing.get("truncated", False),
-        "issue_input": prepared.payload if canonical is None else None,
-        "inspected_paths": preloaded,
-        "canonical_issue": None if canonical is None else canonical.model_dump(mode="json"),
-        "available_images": prepared.inventory.model_dump(mode="json")["images"],
-    }
-    message = json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+    try:
+        source = await preload_intake_source(tracked, budget, prepared.payload)
+    except Exception as error:
+        # Preload is Docker inspection, even though it precedes the model inside
+        # this adapter. Preserve the owning boundary without retaining its body.
+        return IntakeAgentOutput(
+            error_code="INSPECTION_FAILED",
+            error_stage="inspection",
+            error_type=type(error).__name__,
+        )
+    if source is None:
+        return IntakeAgentOutput(error_code="INSPECTION_FAILED", error_stage="inspection")
+    accounting.max_tool_calls = budget.max_tool_calls - source.calls
+    message = build_intake_message(prepared, canonical, source)
     if len(message.encode()) > 131072:
-        return IntakeAgentOutput(error_code="INPUT_LIMIT_EXCEEDED")
+        return IntakeAgentOutput(error_code="INPUT_LIMIT_EXCEEDED", error_stage="inspection")
     remaining_seconds = min(
         budget.max_elapsed_seconds, prepared.episode_seconds or budget.max_elapsed_seconds
     ) - (time.perf_counter() - started)
     if remaining_seconds <= 0:
         return IntakeAgentOutput(
             error_code="MODEL_FAILED",
+            error_stage="model",
             usage=accounting.usage(time.perf_counter() - started),
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
+            source_preloaded=source.paths,
+            inspection_reads=source.calls,
         )
     bounds = episode_bounds(remaining_seconds, settings.models.request_timeout_seconds)
     agent = build_intake(
@@ -262,99 +333,57 @@ async def run_intake(
         accounting=accounting,
     )
     usage = accounting.usage(time.perf_counter() - started)
-    if feedback is not None:
+
+    def build_output(
+        *,
+        proposal: IntakeProposal | None = None,
+        error_code: ErrorCode | None = None,
+        output_failure: IntakeOutputFailure | None = None,
+    ) -> IntakeAgentOutput:
         return IntakeAgentOutput(
-            error_code="MODEL_FAILED",
+            proposal=proposal,
+            error_code=error_code,
+            output_failure=output_failure,
+            error_stage=None
+            if error_code is None
+            else (
+                "model"
+                if error_code == "MODEL_FAILED"
+                or output_failure
+                in {"LLM_BUDGET_EXHAUSTED", "TOOL_BUDGET_EXHAUSTED", "NO_STRUCTURED_OUTPUT"}
+                else "proposal"
+            ),
             usage=usage,
             tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
+            source_preloaded=source.paths,
+            inspection_reads=source.calls,
             completion_errors=accounting.completion_errors,
         )
+
+    if feedback is not None:
+        return build_output(error_code="MODEL_FAILED")
     if accounting.llm_limit_exhausted:
-        return IntakeAgentOutput(
+        return build_output(
             error_code="OUTPUT_INVALID",
             output_failure="LLM_BUDGET_EXHAUSTED",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
         )
     if accounting.tool_limit_exhausted or accounting.loader_limit_exhausted:
-        return IntakeAgentOutput(
+        return build_output(
             error_code="OUTPUT_INVALID",
             output_failure="TOOL_BUDGET_EXHAUSTED",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
         )
     if text is None:
-        return IntakeAgentOutput(
+        return build_output(
             error_code="OUTPUT_INVALID",
             output_failure="NO_STRUCTURED_OUTPUT",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
         )
-    try:
-        proposal = IntakeProposal.model_validate_json(text)
-    except ValidationError as error:
-        for failure in error.errors(include_input=False, include_context=False, include_url=False):
-            category = f"schema:{failure['type']}"
-            if category in accounting.completion_errors or len(accounting.completion_errors) < 32:
-                accounting.completion_errors[category] = (
-                    accounting.completion_errors.get(category, 0) + 1
-                )
-        return IntakeAgentOutput(
-            error_code="OUTPUT_INVALID",
-            output_failure="SCHEMA_INVALID",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
-        )
-    try:
-        validate_proposal(proposal, prepared.inventory)
-    except ValueError:
-        return IntakeAgentOutput(
-            error_code="OUTPUT_INVALID",
-            output_failure="IMAGE_OUTSIDE_INVENTORY",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
-        )
-    if canonical is not None and proposal.issue != canonical:
-        return IntakeAgentOutput(
-            error_code="OUTPUT_INVALID",
-            output_failure="CANONICAL_ISSUE_MODIFIED",
-            usage=usage,
-            tool_counts=accounting.tool_counts,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            completion_errors=accounting.completion_errors,
-        )
-    if any(location.path not in tracked.paths for location in proposal.locations):
-        return IntakeAgentOutput(
-            error_code="OUTPUT_INVALID",
-            output_failure="SOURCE_NOT_INSPECTED",
-            usage=usage,
-            source_preloaded=preloaded,
-            inspection_reads=preload_calls,
-            tool_counts=accounting.tool_counts,
-        )
-    return IntakeAgentOutput(
-        proposal=proposal,
-        usage=usage,
-        tool_counts=accounting.tool_counts,
-        source_preloaded=preloaded,
-        inspection_reads=preload_calls,
-        completion_errors=accounting.completion_errors,
+    proposal, failure = validate_intake_completion(
+        text,
+        canonical,
+        prepared.inventory,
+        tracked.paths,
+        accounting.completion_errors,
+    )
+    return build_output(
+        proposal=proposal, error_code="OUTPUT_INVALID" if failure else None, output_failure=failure
     )

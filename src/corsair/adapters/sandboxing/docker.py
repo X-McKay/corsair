@@ -265,6 +265,52 @@ class DockerSandbox:
         )
         return ref
 
+    def _prepare_workspace(
+        self,
+        workspace: Path,
+        prepared: PreparedCase,
+        store: ArtifactStore,
+        job: dict[str, Any],
+    ) -> dict[str, dict[str, str]]:
+        """Materialize admitted inputs and return read-only container mounts."""
+        # Rootless Docker may require world-readable bind paths. Mounted files
+        # remain immutable to uid 1000 inside the container.
+        os.chmod(workspace, 0o755)
+        source_root = workspace / "source"
+        fixtures_root = workspace / "fixtures"
+        input_root = workspace / "input"
+        self._materialize_source(source_root, prepared, store)
+        self._materialize_fixtures(fixtures_root, prepared)
+        self._mkdir(input_root)
+        job_path = input_root / "job.json"
+        job_path.write_text(
+            json.dumps(job, sort_keys=True, separators=(",", ":")), encoding="utf-8"
+        )
+        os.chmod(job_path, 0o444)
+        os.chmod(input_root, 0o555)
+        return {
+            str(source_root): {"bind": "/source", "mode": "ro"},
+            str(fixtures_root): {"bind": "/fixtures", "mode": "ro"},
+            str(input_root): {"bind": "/input", "mode": "ro"},
+        }
+
+    def _validate_driver_receipt(
+        self,
+        stdout: bytes,
+        budget: Budget,
+        docker_exit_code: int | None,
+    ) -> dict[str, Any]:
+        """Admit a bounded driver record only when Docker attests the same exit code."""
+        record = self._driver_record(stdout, budget)
+        driver_exit = record.get("native_exit_code")
+        if (
+            type(driver_exit) is not int
+            or type(docker_exit_code) is not int
+            or driver_exit != docker_exit_code
+        ):
+            raise SandboxExecutionError("driver and Docker exit codes disagree")
+        return record
+
     def execute_role(
         self,
         prepared: PreparedCase,
@@ -319,23 +365,7 @@ class DockerSandbox:
         error_reason: str | None = None
         try:
             with tempfile.TemporaryDirectory(prefix="corsair-security-") as temporary:
-                workspace = Path(temporary)
-                # Rootless Docker may read only world-readable bind paths on some
-                # hosts.  All mounted files remain immutable to uid 1000 in-container.
-                os.chmod(workspace, 0o755)
-                source_root = workspace / "source"
-                fixtures_root = workspace / "fixtures"
-                input_root = workspace / "input"
-                self._materialize_source(source_root, prepared, store)
-                self._materialize_fixtures(fixtures_root, prepared)
-                self._mkdir(input_root)
-                job_path = input_root / "job.json"
-                job_path.write_text(
-                    json.dumps(job, sort_keys=True, separators=(",", ":")), encoding="utf-8"
-                )
-                os.chmod(job_path, 0o444)
-                os.chmod(input_root, 0o555)
-
+                volumes = self._prepare_workspace(Path(temporary), prepared, store, job)
                 container = client.containers.create(
                     image=image_id,
                     labels=labels,
@@ -369,11 +399,7 @@ class DockerSandbox:
                         type="json-file",
                         config={"max-size": "128k", "max-file": "1"},
                     ),
-                    volumes={
-                        str(source_root): {"bind": "/source", "mode": "ro"},
-                        str(fixtures_root): {"bind": "/fixtures", "mode": "ro"},
-                        str(input_root): {"bind": "/input", "mode": "ro"},
-                    },
+                    volumes=volumes,
                 )
                 immutable_id = str(container.id)
                 container.reload()
@@ -388,14 +414,7 @@ class DockerSandbox:
                 )
                 docker_exit_code = wait_result.get("StatusCode")
                 stdout = container.logs(stdout=True, stderr=False)
-                record = self._driver_record(stdout, budget)
-                driver_exit = record.get("native_exit_code")
-                if (
-                    type(driver_exit) is not int
-                    or type(docker_exit_code) is not int
-                    or driver_exit != docker_exit_code
-                ):
-                    raise SandboxExecutionError("driver and Docker exit codes disagree")
+                record = self._validate_driver_receipt(stdout, budget, docker_exit_code)
         except SandboxUnavailable:
             raise
         except (InterruptedError, KeyboardInterrupt):

@@ -17,7 +17,10 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from corsair.entrypoints.render.common import as_text, clock
+from corsair.contracts import BatchItem, ExecutionStatus, InvestigationResult
+from corsair.contracts.intake_agent import IntakeResult
+from corsair.contracts.intake_pipeline import IntakeInvestigationResult
+from corsair.entrypoints.render.common import as_text, clock, label_grid, short_digest
 from corsair.observability.logging import safe_text
 
 # Most recent phase transitions shown in the live panel.
@@ -42,12 +45,6 @@ def _count(value: object, limit: object) -> str:
     if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0:
         return f"{value}/{limit}"
     return str(value)
-
-
-_PROGRESS_KEYS = frozenset(
-    {"phase", "session", "round", "max_sessions", "max_rounds", "gate", "started", "deadline"}
-    | {"timeline", "completed", "total", "running", "errors", "children", "children_omitted"}
-)
 
 
 def _offset(at: datetime | None, started: datetime | None) -> str:
@@ -83,10 +80,60 @@ def progress_fields(
         remaining = (deadline - now).total_seconds()
         left = f"{clock(remaining)} left" if remaining > 0 else "passed"
         fields.append(("deadline", f"{deadline.isoformat(timespec='seconds')} ({left})"))
-    for key, value in status.items():
-        if key not in _PROGRESS_KEYS and isinstance(value, str | int | float | bool):
-            fields.append((key.replace("_", " "), safe_text(value)))
+    for key, label in (("investigation_run_id", "investigation"), ("image_reference", "image")):
+        if status.get(key) is not None:
+            fields.append((label, safe_text(status[key])))
+    if isinstance(status.get("image_id"), str):
+        fields.append(("image ID", short_digest(str(status["image_id"]))))
+    if status.get("child_status_unavailable") is True:
+        fields.append(("status", "Investigation status unavailable"))
     return fields
+
+
+def completion_label(value: object) -> str:
+    """Operational completion from typed receipts; never infer a security verdict."""
+    if isinstance(value, IntakeInvestigationResult):
+        if value.stop_reason == "CANCELLED":
+            return "Cancelled"
+        if value.status == "incomplete":
+            return "Incomplete"
+        if value.stop_reason == "INTAKE_ERROR":
+            return "Failed"
+        if value.status == "stopped":
+            return "Stopped"
+        return _execution_label(value.investigation_execution_status)
+    if isinstance(value, InvestigationResult):
+        return _execution_label(value.execution_status)
+    if isinstance(value, IntakeResult):
+        if value.decision.status == "error":
+            return "Failed"
+        return "Completed" if value.decision.classification == "in_scope_supported" else "Stopped"
+    if isinstance(value, list) and any(
+        isinstance(item, BatchItem) and item.error for item in value
+    ):
+        return "Completed with errors"
+    return "Completed"
+
+
+def _execution_label(status: ExecutionStatus | None) -> str:
+    return {
+        ExecutionStatus.COMPLETED: "Completed",
+        ExecutionStatus.ERROR: "Failed",
+        ExecutionStatus.CANCELLED: "Cancelled",
+        ExecutionStatus.BLOCKED: "Stopped",
+    }.get(status, "Incomplete")
+
+
+def wait_summary(label: str, outcome: str, waited: float, reconnect: str | None) -> Panel:
+    """A static final frame with local wait duration and a safe reconnect instruction."""
+    style = "red" if outcome == "Failed" else "cyan" if outcome == "Completed" else "yellow"
+    grid = label_grid()
+    grid.add_row(Text(outcome, style=f"bold {style}"), as_text(label))
+    grid.add_row("Waited", as_text(clock(waited)))
+    if outcome == "Detached" and reconnect is not None:
+        grid.add_row("Workflow", Text("Local wait ended; durable execution was not cancelled."))
+        grid.add_row("Reconnect", as_text(reconnect))
+    return Panel(grid, title="Corsair · Run status", border_style=style)
 
 
 def _child_rows(status: Mapping[str, object] | None) -> list[Mapping[str, object]]:
@@ -106,25 +153,36 @@ def _child_elapsed(row: Mapping[str, object], now: datetime) -> str:
     return clock((finished - started).total_seconds())
 
 
-def _child_table(status: Mapping[str, object], now: datetime) -> Table | None:
+def _child_table(status: Mapping[str, object], now: datetime, width: int) -> Table | None:
     rows = _child_rows(status)
     if not rows:
         return None
-    table = Table("State", "Case", "Repeat", "Elapsed", "Run", box=None, pad_edge=False)
+    table = (
+        label_grid()
+        if width < 80
+        else Table("State", "Case", "Repeat", "Elapsed", "Run", box=None, pad_edge=False)
+    )
     for row in rows[:_CHILD_TABLE_ROWS]:
         state = safe_text(row.get("state"))
-        table.add_row(
-            Text(state, style=_CHILD_STYLES.get(state, "")),
+        cells = [
             as_text(row.get("case_id")),
             as_text(row.get("repeat")),
             as_text(_child_elapsed(row, now)),
             as_text(row.get("run_id")),
-        )
+        ]
+        if width < 80:
+            cells = [
+                as_text(
+                    f"{safe_text(row.get('case_id'))} · repeat {safe_text(row.get('repeat'))}\n"
+                    f"{safe_text(row.get('run_id'))} · {_child_elapsed(row, now)}"
+                )
+            ]
+        table.add_row(Text(state, style=_CHILD_STYLES.get(state, "")), *cells)
     omitted = status.get("children_omitted")
     hidden = max(0, len(rows) - _CHILD_TABLE_ROWS)
     hidden += omitted if isinstance(omitted, int) and not isinstance(omitted, bool) else 0
     if hidden > 0:
-        table.add_row(as_text(f"… {hidden} more"), "", "", "", "")
+        table.add_row(as_text(f"… {hidden} more"), *([""] * (1 if width < 80 else 4)))
     return table
 
 
@@ -171,12 +229,24 @@ def progress_panel(
     fields: list[tuple[str, str]],
     *,
     now: datetime | None = None,
+    unavailable_for: float | None = None,
+    animate: bool = True,
+    width: int = 80,
 ) -> Panel:
     """Compact live view: status fields, then evaluation child rows with a progress bar or
     the most recent phase transitions, whichever the status query carries."""
-    summary = Table.grid(padding=(0, 2))
+    summary = label_grid()
     phase = next((value for key, value in fields if key == "phase"), "in progress")
-    summary.add_row(Spinner("dots", style="cyan"), Text(phase, style="bold"))
+    summary.add_row(Spinner("dots", style="cyan") if animate else Text("Phase"), as_text(phase))
+    if unavailable_for is not None:
+        summary.add_row(
+            Text("Status unavailable", style="yellow"),
+            as_text(
+                f"Last update {clock(unavailable_for)} ago; showing retained state."
+                if status is not None
+                else "No status received; waiting for query recovery."
+            ),
+        )
     for key, value in fields:
         if key != "phase":
             summary.add_row(Text(key.capitalize(), style="cyan"), as_text(value))
@@ -186,7 +256,7 @@ def progress_panel(
         bar = ProgressBar(total=total, completed=min(completed, total), width=30)
         summary.add_row(Text("Progress", style="cyan"), bar)
     parts: list[RenderableType] = [summary]
-    children = _child_table(status, now or datetime.now(UTC)) if status else None
+    children = _child_table(status, now or datetime.now(UTC), width) if status else None
     if children is not None:
         parts.extend([Text(""), children])
     timeline = status.get("timeline") if status else None

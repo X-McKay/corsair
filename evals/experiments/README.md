@@ -5,9 +5,9 @@ Use the same production factories and authoritative scorer. A new prompt/model/t
 ## Isolated agents
 
 ```bash
-uv run --locked --extra providers python evals/evaluators/agents.py producer \
+just -- eval-agent producer \
   evals/datasets/producer-dev.json --settings settings.json --repeats 3
-uv run --locked --extra providers python evals/evaluators/agents.py auditor \
+just -- eval-agent auditor \
   evals/datasets/auditor-dev.json --settings settings.json --repeats 3
 ```
 

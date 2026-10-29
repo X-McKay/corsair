@@ -40,13 +40,17 @@ test *args:
 alias test-offline := test
 
 # Build the reviewed native observer images (one per language under deploy/).
-images:
+images: image-intake
     docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
     docker build -f deploy/javascript/Dockerfile -t corsair-javascript:0.1 .
     docker build -f deploy/ruby/Dockerfile -t corsair-ruby:0.1 .
     docker build -f deploy/java/Dockerfile -t corsair-java:0.1 .
     docker build -f deploy/perl/Dockerfile -t corsair-perl:0.1 .
     docker build -f deploy/c/Dockerfile -t corsair-c:0.1 .
+
+# Build only the reviewed read-only intake inspection image.
+image-intake:
+    docker build -f deploy/intake/Dockerfile -t corsair-intake:0.1 .
 
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
 settings-init:

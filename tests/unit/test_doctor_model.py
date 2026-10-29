@@ -67,6 +67,7 @@ def _settings(**models: Any) -> Settings:
         "connector": "litellm",
         "producer": "hosted_vllm/served-model",
         "auditor": "hosted_vllm/served-model",
+        "intake": "hosted_vllm/served-model",
         "api_base": ENDPOINT,
         "extra_body": {"reasoning_effort": "low"},
         **models,
@@ -80,7 +81,11 @@ class _Resolver:
     """Return fake role models and record which roles were resolved."""
 
     def __init__(self, producer: BaseLlm, auditor: BaseLlm | None = None) -> None:
-        self.models = {"producer": producer, "auditor": auditor or producer}
+        self.models = {
+            "producer": producer,
+            "auditor": auditor or producer,
+            "intake": producer.model_copy(deep=True),
+        }
         self.calls: list[str] = []
 
     def __call__(self, settings: Settings, role: str) -> BaseLlm:
@@ -90,6 +95,58 @@ class _Resolver:
 
 
 _resolver = _Resolver
+
+
+async def test_doctor_reports_intake_route_rejection_without_dispatch():
+    resolve = _Resolver(ProbeLlm(model="producer"))
+    checks = _by_name(
+        await diagnose_model(_settings(intake="openai/blocked"), resolve_model=resolve)
+    )
+    assert checks["model_intake"]["status"] == "fail"
+    assert "MODEL_CONFIGURATION_UNSUPPORTED" in checks["model_intake"]["detail"]
+    assert "intake" not in resolve.calls
+
+
+async def test_doctor_checks_intake_text_and_tools_independently():
+    resolve = _Resolver(ProbeLlm(model="producer"))
+    resolve.models["intake"] = ProbeLlm(model="intake", tool_reply=_reply("no tool"))
+    checks = _by_name(await diagnose_model(_settings(), resolve_model=resolve))
+    assert checks["model_intake"]["status"] == "pass"
+    assert checks["model_intake_tools"]["status"] == "fail"
+
+
+def test_doctor_reports_missing_reader_and_additional_candidate_separately(monkeypatch):
+    from types import SimpleNamespace
+
+    from docker.errors import ImageNotFound
+
+    class Images:
+        def get(self, tag):
+            if tag in {"reader:missing", "extra:missing"}:
+                raise ImageNotFound("image missing")
+            return SimpleNamespace(
+                id="sha256:" + "1" * 64, attrs={"Os": "linux", "Architecture": "arm64"}
+            )
+
+    client = SimpleNamespace(
+        images=Images(),
+        ping=lambda: True,
+        close=lambda: None,
+        info=lambda: {"Runtimes": {"runc": {}}, "OSType": "linux", "Architecture": "arm64"},
+    )
+    monkeypatch.setattr(diagnostics.docker, "from_env", lambda **kwargs: client)
+    settings = Settings(
+        image="python:available",
+        images={},
+        intake_image="reader:missing",
+        intake_images=[
+            {"reference": "extra:missing", "language": "python", "execution_mode": "callable"}
+        ],
+    )
+    checks = _by_name(diagnostics._check_docker_images(settings))
+    assert checks["image:reader:missing"]["status"] == "fail"
+    assert checks["image:extra:missing"]["status"] == "fail"
+    assert checks["image:python:available"]["status"] == "pass"
 
 
 def _by_name(checks: list[dict]) -> dict[str, dict]:
@@ -102,12 +159,12 @@ async def test_healthy_route_reports_config_credentials_latency_and_tool_round_t
 
     checks = _by_name(await diagnose_model(_settings(), resolve_model=_resolver(producer, auditor)))
 
-    assert [check["status"] for check in checks.values()] == ["pass"] * 5
+    assert [check["status"] for check in checks.values()] == ["pass"] * 7
     config = checks["model_config"]["detail"]
     assert "connector=litellm" in config and "producer=hosted_vllm/served-model" in config
     assert "api_base host=llm.example.test:8443" in config and "/v1" not in config
     assert "request_timeout_seconds=120" in config and "extra_body keys=reasoning_effort" in config
-    assert checks["model_credentials"]["detail"].count("HOSTED_VLLM_API_KEY is set") == 2
+    assert checks["model_credentials"]["detail"].count("HOSTED_VLLM_API_KEY is set") == 3
     assert "not-a-real-credential-value" not in json.dumps(checks)
     assert "finish_reason=STOP" in checks["model_producer"]["detail"]
     assert "output_tokens=2" in checks["model_auditor"]["detail"]
@@ -210,7 +267,7 @@ async def test_provider_stdout_banner_is_kept_off_the_json_stdout(capsys):
     await diagnose_model(_settings(), resolve_model=_resolver(producer))
 
     captured = capsys.readouterr()
-    assert captured.out == "" and captured.err.count("Give Feedback") == 3
+    assert captured.out == "" and captured.err.count("Give Feedback") == 5
 
 
 async def test_api_base_userinfo_query_and_credentials_never_appear(monkeypatch):
@@ -307,7 +364,7 @@ def _offline_infrastructure(monkeypatch) -> None:
         del settings
         raise RuntimeError("Failed client connect: disabled in this test")
 
-    monkeypatch.setattr(diagnostics, "_docker", no_docker)
+    monkeypatch.setattr(diagnostics, "_check_docker_images", no_docker)
     monkeypatch.setattr(diagnostics, "connect", no_temporal)
 
 
@@ -333,14 +390,16 @@ async def test_doctor_model_appends_model_checks_and_its_qualification(monkeypat
     report = await diagnose(settings, model=True, resolve_model=resolve)
 
     names = [check["name"] for check in report["checks"]]
-    assert names[-5:] == [
+    assert names[-7:] == [
         "model_config",
         "model_credentials",
         "model_producer",
         "model_producer_tools",
         "model_auditor",
+        "model_intake",
+        "model_intake_tools",
     ]
-    assert resolve.calls == ["producer", "auditor"]
+    assert resolve.calls == ["producer", "auditor", "intake"]
     assert report["qualification"] == diagnostics._MODEL_QUALIFICATION
     assert report["ready"] is False  # Docker and Temporal were failed above.
 

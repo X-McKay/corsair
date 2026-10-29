@@ -6,6 +6,8 @@ digests are abbreviated for reading while JSON keeps the full value; deltas keep
 sign and an unknown delta is never shown as zero.
 """
 
+import shlex
+
 from rich.table import Table
 from rich.text import Text
 
@@ -55,3 +57,11 @@ def clock(seconds: float) -> str:
     hours, rest = divmod(whole, 3600)
     minutes, secs = divmod(rest, 60)
     return f"{hours}:{minutes:02}:{secs:02}" if hours else f"{minutes:02}:{secs:02}"
+
+
+def inspect_command(run_id: str, *flags: str, settings_path: str | None = None) -> str:
+    """A copyable inspection command using the caller's configuration and literal paths."""
+    arguments = ["corsair", "inspect", run_id, *flags]
+    if settings_path is not None:
+        arguments.extend(["--settings", settings_path])
+    return shlex.join(arguments)

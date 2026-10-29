@@ -90,6 +90,10 @@ class TestIntakeChild:
 
 @workflow.defn(name="corsair.investigation", sandboxed=False)
 class TestExecutionChild:
+    @workflow.query
+    def status(self):
+        return {"phase": "producer", "session": 1, "round": 2, "max_rounds": 4}
+
     @workflow.run
     async def run(self, request: InvestigationRequest) -> InvestigationResult:
         if request.case.finding.title == "suppress_execution":
@@ -223,6 +227,24 @@ async def test_parent_preserves_child_failure_and_cancellation(temporal_server, 
                 await asyncio.sleep(0.01)
             else:
                 pytest.fail("parent did not reach expected child phase")
+            from corsair.adapters.temporal.client import query_intake_progress
+
+            observed = await query_intake_progress(temporal_server.client, handle)
+            assert observed["started"] and observed["deadline"]
+            if stage == "execution":
+                _, intake = supported()
+                assert intake.proposal is not None
+                assert observed["image_reference"] == intake.proposal.suggested_image
+                assert observed["image_id"] == intake.decision.image_id
+                # A parent's scheduled child may not have processed its first task yet.
+                for _ in range(200):
+                    if observed.get("round") == 2:
+                        break
+                    await asyncio.sleep(0.01)
+                    observed = await query_intake_progress(temporal_server.client, handle)
+                assert observed["phase"] == "producer" and observed["round"] == 2
+            else:
+                assert observed["image_id"] is None and observed["phase"] == "intake"
             await handle.cancel()
         result = await handle.result()
         assert result.status == "incomplete" and not result.usage_complete

@@ -35,6 +35,7 @@ from corsair.entrypoints.render.common import (
     as_text,
     clock,
     field_label,
+    inspect_command,
     label_grid,
     short_digest,
 )
@@ -238,6 +239,30 @@ def _rounds_table(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> 
     return table
 
 
+def _round_cards(rounds: list[RoundResult], stops: Mapping[RoundKey, dict]) -> Group:
+    cards = []
+    for item in rounds:
+        observation = item.observation
+        grid = label_grid()
+        for name, cell in (
+            ("Producer", _producer_cell(item)),
+            ("Control", _role_cell(observation.control if observation else None)),
+            ("Adversarial", _role_cell(observation.adversarial if observation else None)),
+            ("Audit", _audit_cell(item.audit)),
+            ("Stopped at", _stop_cell(stops.get((item.session, item.index)))),
+        ):
+            grid.add_row(field_label(name), cell)
+        cards.append(Panel(grid, title=f"Rounds · {item.session}.{item.index}"))
+    if any(entry["gate"] == "evidence_unverified" for entry in stops.values()):
+        cards.append(
+            Text(
+                "evidence_unverified: receipts were not validated here; verdict is recorded.",
+                style="dim",
+            )
+        )
+    return Group(*cards)
+
+
 def _duration(seconds: float) -> str:
     return f"{seconds:.1f} s" if seconds < 60 else clock(seconds)
 
@@ -321,7 +346,12 @@ def _cleanup_text(confirmed: bool) -> Text:
 
 
 def print_result(
-    console: Console, result: InvestigationResult, store: ArtifactStore | None = None
+    console: Console,
+    result: InvestigationResult,
+    store: ArtifactStore | None = None,
+    *,
+    details: bool = True,
+    settings_path: str | None = None,
 ) -> None:
     """Verdict and case stop first, then rounds with their gate-ledger stop, phases,
     identity and totals; never model or payload content. The ledger only describes
@@ -352,31 +382,49 @@ def print_result(
     header.add_row(field_label("Fix"), as_text(result.fix_status.value))
     header.add_row(field_label("Run"), as_text(result.run_id))
     header.add_row(field_label("Case"), as_text(result.case_id))
+    manifest = result.manifest
+    header.add_row(field_label("Image"), as_text(manifest.image_reference if manifest else None))
+    header.add_row(
+        field_label("Image ID"),
+        as_text(
+            (manifest.image_id if details else short_digest(manifest.image_id))
+            if manifest
+            else None
+        ),
+    )
     console.print(Panel(header, title="Corsair · Investigation", border_style=style))
+    if not details:
+        command = inspect_command(result.run_id, "--details", settings_path=settings_path)
+        console.print(as_text(f"Details: {command}"))
+        return
     if result.rounds:
-        console.print(_rounds_table(result.rounds, stops))
+        console.print(
+            _round_cards(result.rounds, stops)
+            if console.width < 80
+            else _rounds_table(result.rounds, stops)
+        )
     else:
         console.print(Text("No rounds recorded.", style="dim"))
     if result.fix_observation is not None:
         console.print(_roles_table(result.fix_observation, "Fixed revision", caption=True))
     if result.timeline:
         console.print(_timeline_table(result.timeline))
-    console.print(_identity(result))
+    console.print(_identity(result, width=console.width))
 
 
-def _identity(result: InvestigationResult) -> Panel:
+def _identity(result: InvestigationResult, *, width: int = 80) -> Panel:
     table = label_grid()
     manifest = result.manifest
     if manifest is not None:
         table.add_row(field_label("Package"), as_text(manifest.package_version))
-        table.add_row(field_label("Image"), as_text(short_digest(manifest.image_id)))
+        table.add_row(field_label("Image"), as_text(manifest.image_id))
         for key, value in (
             ("Request", manifest.request_digest),
             ("Config", manifest.config_digest),
             ("Producer prompt", manifest.producer_prompt_digest),
             ("Auditor prompt", manifest.auditor_prompt_digest),
         ):
-            table.add_row(field_label(key), as_text(short_digest(value)))
+            table.add_row(field_label(key), as_text(value))
         for role, model in manifest.models.items():
             table.add_row(field_label(f"{role.title()} model"), as_text(model))
         table.add_row(
@@ -402,7 +450,8 @@ def _identity(result: InvestigationResult) -> Panel:
     artifact.add_row(
         field_label("Result SHA-256"), as_text(reference.sha256 if reference else None)
     )
-    return Panel(Group(layout, artifact), title="Identity · Totals", border_style="cyan")
+    body = Group(table, totals, artifact) if width < 80 else Group(layout, artifact)
+    return Panel(body, title="Identity · Totals", border_style="cyan")
 
 
 def print_observation(console: Console, observation: Observation) -> None:

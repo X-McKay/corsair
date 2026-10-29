@@ -49,10 +49,13 @@ The steps package is the application/activity layer, not a second workflow engin
 
 [`entrypoints/terminal.py`](../../src/corsair/entrypoints/terminal.py) holds the `Terminal` class and its options protocol: it chooses JSON, Markdown or human output, waits on SDK completion with an optional status query, logs a failed command, and dispatches each human view to one module of [`entrypoints/render/`](../../src/corsair/entrypoints/render/). JSON and Markdown output never pass through `render/`.
 
+Human results default to compact summaries; `--details` expands round tables, phase timings and full identities. Rich owns animation and terminal width adaptation. The CLI observes intake-parent and active child status through [`adapters/temporal/client.py`](../../src/corsair/adapters/temporal/client.py); workflow queries expose deterministic metadata only. Status loss, recovery and local detachment are presentation state, never durable execution state or verdict inputs. Parent summaries load a child verdict only from the exact committed receipt bound by the parent, through [`entrypoints/runs.py`](../../src/corsair/entrypoints/runs.py).
+
 | Module | Renders | Commands |
 | --- | --- | --- |
 | `common` | Shared cells, labels, digest abbreviation, signed deltas and clock durations | none on its own |
 | `result` | Investigation result, verdict explanation and native reference observation | `investigate`, `inspect`, `explain`, `verify` |
+| `intake` | Safe intake decision, selected image, parent stop and next action | `intake-agent`, intake-gated `investigate`, `inspect`, `explain` |
 | `reports` | Evaluation summary, scored rows, family/split tables, gate counts and report comparison | `eval`, `rescore`, `report`, `compare`, `dataset replay-candidates` |
 | `runs` | Committed-run listing and per-role evidence receipts | `runs`, `inspect --evidence` |
 | `checks` | Environment checks, dataset validation and refreeze, and scanner-intake dry run | `doctor`, `dataset validate`, `dataset refreeze`, `intake` |

@@ -49,6 +49,7 @@ def test_machine_output_has_no_ansi_even_with_forced_color(capsys, monkeypatch):
 
 
 def test_human_terminal_displays_colors_without_interpreting_data(capsys, monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setenv("FORCE_COLOR", "1")
     monkeypatch.delenv("NO_COLOR", raising=False)
     terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
@@ -736,7 +737,9 @@ def _inconclusive_result():
 
 
 def _human(capsys, value, *extra):
-    terminal = Terminal(parser().parse_args(["--format", "human", *extra, "report", "x"]))
+    terminal = Terminal(
+        parser().parse_args(["--format", "human", "--details", *extra, "report", "x"])
+    )
     terminal.emit(value)
     return capsys.readouterr().out
 
@@ -803,6 +806,7 @@ def test_human_verify_observation_renders_roles_without_a_verdict(capsys):
 
 
 def test_human_result_colours_verdict_without_interpreting_markup(capsys, monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setenv("FORCE_COLOR", "1")
     monkeypatch.delenv("NO_COLOR", raising=False)
     manifest = _manifest().model_copy(update={"models": {"producer": "[bold]not markup[/bold]"}})
@@ -934,7 +938,9 @@ def test_human_result_renders_fixed_revision_roles_and_gate(capsys):
 def _wide(capsys, monkeypatch, value, *, store=None):
     """Human result at 160 columns, so cell facts read on one line each."""
     monkeypatch.setenv("COLUMNS", "160")
-    terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
+    terminal = Terminal(
+        parser().parse_args(["--format", "human", "--details", "--no-color", "report", "x"])
+    )
     terminal.emit(value, store=store)
     return capsys.readouterr().out
 
@@ -1239,6 +1245,7 @@ async def test_plain_human_wait_prints_one_line_per_status_change(capsys, monkey
         f"Investigation run1 · elapsed 04:30 · phase evidence · {common} · {deadline}",
         f"Investigation run1 · elapsed 04:30 · phase audit · {common} · last gate coverage"
         f" · {deadline}",
+        "Investigation run1 · status Completed · elapsed 00:00",
     ]
 
 
@@ -1260,11 +1267,14 @@ async def test_json_wait_prints_no_progress_view(capsys, monkeypatch):
 
 
 async def test_animated_wait_draws_the_live_panel_on_stderr(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
     monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
     terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
     stream = io.StringIO()
-    terminal.err = Console(file=stream, force_terminal=True, color_system=None, width=100)
+    terminal.err = Console(
+        file=stream, force_terminal=True, force_interactive=True, color_system=None, width=100
+    )
     terminal.animate = True
     done = asyncio.Event()
     statuses = [_status("producer", 1, 1), _status("evidence", 1, 2)]
@@ -1408,6 +1418,7 @@ async def test_plain_human_evaluation_wait_prints_one_line_per_child_state_chang
         " · case elapsed 01:05",
         f"{head} · cases 2/3 · running 0 · errors 1 · case b r0 · state failed"
         " · case elapsed 01:55",
+        "Evaluation eval1 · status Completed · elapsed 00:00",
     ]
 
 
@@ -1431,11 +1442,14 @@ async def test_json_evaluation_wait_prints_no_child_rows(capsys, monkeypatch):
 
 
 async def test_animated_evaluation_wait_draws_the_child_table(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(terminal_module, "_POLL_SECONDS", 0.01)
     monkeypatch.setattr(terminal_module, "_utcnow", lambda: _NOW)
     terminal = Terminal(parser().parse_args(["--format", "human", "report", "x"]))
     stream = io.StringIO()
-    terminal.err = Console(file=stream, force_terminal=True, color_system=None, width=120)
+    terminal.err = Console(
+        file=stream, force_terminal=True, force_interactive=True, color_system=None, width=120
+    )
     terminal.animate = True
     done = asyncio.Event()
     statuses = [

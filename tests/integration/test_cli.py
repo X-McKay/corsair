@@ -62,6 +62,7 @@ async def test_real_cli_worker_doctor_and_native_reference(temporal_server, tmp_
     settings = Settings(
         source_root=str(ROOT),
         artifact_root=str(tmp_path / "artifacts"),
+        images={"python.secret_disclosure/1": "corsair-python:0.1"},
         temporal_address=temporal_server.client.service_client.config.target_host,
         task_queue=temporal_id("cli-worker"),
     )
@@ -202,6 +203,7 @@ async def test_real_doctor_reports_failed_dependency(
     failed_check = "docker"
     if boundary == "image":
         values["image"] = "corsair-deliberately-missing:diagnostic"
+        failed_check = "image:corsair-deliberately-missing:diagnostic"
     elif boundary == "runtime":
         values["runtime"] = "deliberately-unregistered-runtime"
     elif boundary == "source_root":
@@ -237,9 +239,9 @@ async def test_real_doctor_reports_failed_dependency(
     assert not (tmp_path / "artifacts").exists()  # doctor is read-only even on failed preflight.
 
 
-@pytest.mark.parametrize("_attempt", range(3))
+@pytest.mark.parametrize("presentation", ["json", "human", "pty"])
 async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
-    temporal_server, tmp_path, _attempt
+    temporal_server, tmp_path, presentation
 ):
     from temporalio.client import WorkflowExecutionStatus
     from temporalio.worker import Worker
@@ -273,6 +275,20 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
         handle = temporal_server.client.get_workflow_handle(
             identity, result_type=InvestigationResult
         )
+        master, slave = pty.openpty() if presentation == "pty" else (None, None)
+
+        def drain_terminal():
+            assert master is not None
+            chunks = []
+            try:
+                while data := os.read(master, 65536):
+                    chunks.append(data)
+            except OSError:
+                pass
+            finally:
+                os.close(master)
+            return b"".join(chunks).decode()
+
         with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
             process = subprocess.Popen(
                 [
@@ -285,16 +301,20 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                     "--settings",
                     str(config),
                     "--format",
-                    "json",
+                    "json" if presentation == "json" else "human",
                     "--log-format",
-                    "json",
+                    "text" if presentation == "pty" else "json",
                     "--log-file",
                     str(diagnostics),
                 ],
-                stdout=stdout_file,
-                stderr=stderr_file,
-                env={**os.environ, "PYTHONFAULTHANDLER": "1"},
+                stdout=slave if slave is not None else stdout_file,
+                stderr=slave if slave is not None else stderr_file,
+                env={**os.environ, "PYTHONFAULTHANDLER": "1", "TERM": "xterm-256color"},
             )
+            terminal_read = None
+            if slave is not None:
+                os.close(slave)
+                terminal_read = asyncio.create_task(asyncio.to_thread(drain_terminal))
             try:
                 async with asyncio.timeout(15):
                     await activities.produce_started.wait()
@@ -322,14 +342,27 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                 assert process.returncode == 130, stderr_path.read_text()
                 assert stdout_path.read_bytes() == b""
                 assert (
-                    json.loads(stderr_path.read_text().splitlines()[-1])["event"]
+                    json.loads(diagnostics.read_text().splitlines()[-1])["event"]
                     == "cli.interrupted"
                 )
+                if terminal_read is not None:
+                    output = await terminal_read
+                    assert "\x1b[?25l" in output and "\x1b[?25h" in output
+                    from rich.text import Text
+
+                    plain = " ".join(Text.from_ansi(output).plain.replace("│", " ").split())
+                    assert "Detached" in plain and "--online --watch" in plain
+                elif presentation == "human":
+                    output = stderr_path.read_text()
+                    assert "Detached" in output and "--online --watch" in output
+                    assert "\x1b" not in output
                 assert (await handle.describe()).status == WorkflowExecutionStatus.RUNNING
             finally:
                 if process.poll() is None:
                     process.kill()
                     await asyncio.to_thread(process.wait, 10)
+                if terminal_read is not None:
+                    await terminal_read
                 await handle.cancel()
         # Temporal learns activity cancellation through throttled heartbeats (<=15s here).
         async with asyncio.timeout(25):

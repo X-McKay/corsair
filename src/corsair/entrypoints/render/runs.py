@@ -14,7 +14,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from corsair.entrypoints.render.common import PASS_FAIL_STYLES, as_text
+from corsair.entrypoints.render.common import PASS_FAIL_STYLES, as_text, label_grid
 from corsair.observability.logging import safe_text
 
 
@@ -37,18 +37,28 @@ def _target_caption(item: Mapping[str, Any]) -> str:
 def print_runs(console: Console, value: dict[str, Any]) -> None:
     """Render a committed-run listing, newest first; identities fold, never truncate."""
     table = Table(expand=True)
-    for column in ("Recorded (UTC)", "Run", "Case", "Verdict", "Status"):
+    columns = ("Recorded (UTC)", "Run", "Case", "Outcome", "Status", "Investigation")
+    cards = []
+    for column in columns:
         table.add_column(column, overflow="fold")
     for row in value["runs"]:
-        status = row["execution_status"]
-        table.add_row(
+        status = row.get("status", row["execution_status"])
+        cells = (
             as_text(row["recorded_at"][:16].replace("T", " ")),
             as_text(row["run_id"]),
             as_text(row["case_id"]),
-            as_text(row["verdict"]),
+            as_text(row.get("stop_reason") or row.get("verdict") or row.get("disposition")),
             Text(safe_text(status), style=PASS_FAIL_STYLES.get(status, "cyan")),
+            as_text(row.get("investigation_run_id")),
         )
-    console.print(Panel(table, title="Corsair · Committed runs", border_style="cyan"))
+        table.add_row(*cells)
+        if console.width < 80:
+            grid = label_grid()
+            for name, cell in zip(columns, cells, strict=True):
+                grid.add_row(as_text(name), cell)
+            cards.append(Panel(grid, border_style="cyan"))
+    body = Group(*cards) if cards else table if value["runs"] else Text("No committed runs.")
+    console.print(Panel(body, title="Corsair · Committed runs", border_style="cyan"))
     if value["invalid_records"]:
         console.print(Text(f"{value['invalid_records']} committed record(s) could not be read"))
 

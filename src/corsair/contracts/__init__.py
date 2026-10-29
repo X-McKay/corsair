@@ -45,6 +45,7 @@ from .intake_agent import AvailableImage as AvailableImage
 from .intake_agent import ImageCandidate as ImageCandidate
 from .intake_agent import ImageInventory as ImageInventory
 from .intake_agent import IntakeDecision as IntakeDecision
+from .intake_agent import IntakeDiagnostics as IntakeDiagnostics
 from .intake_agent import IntakeProposal as IntakeProposal
 from .intake_agent import IntakeRequest as IntakeRequest
 from .intake_agent import IntakeResult as IntakeResult

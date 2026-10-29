@@ -118,4 +118,6 @@ The [Python API reference](api.md) shows how these models enter and leave a Temp
 
 ## Execution intent compatibility
 
+Agentic intake contracts live in [`intake_agent.py`](../../src/corsair/contracts/intake_agent.py). `IntakeResult.diagnostics` contains operational categories and bounded completion/tool counts, with optional failure stage and exception type. Older `corsair.intake-result/2` receipts without diagnostics decode with empty defaults. This adds no fields to the agent's `IntakeProposal` output schema and grants no execution authority. The parent contract in [`intake_pipeline.py`](../../src/corsair/contracts/intake_pipeline.py) records categorical stops or references the canonical investigation result; it does not create a second verdict.
+
 New executions bind the complete capability manifest digest in `corsair.evidence-intent/2`. A completed or unknown v1 operation is not blindly migrated or re-executed under the changed policy: its immutable claim is retained and a mismatched reconciliation is explicit. The packaged risk assessment contributes to the declared capability identity; configuration settings alone are not the complete runtime identity.

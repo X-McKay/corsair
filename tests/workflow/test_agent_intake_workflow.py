@@ -32,7 +32,7 @@ class DeniedActivities:
         return result
 
 
-async def test_intake_source_failure_is_recorded_and_replayable(temporal_server):
+async def test_intake_source_failure_is_recorded_and_replayable(temporal_server, tmp_path, capsys):
     activities = DeniedActivities()
     queue = temporal_id("intake")
     start = IntakeStart(
@@ -59,6 +59,36 @@ async def test_intake_source_failure_is_recorded_and_replayable(temporal_server)
         assert result.decision.classification is None
         assert result.decision.error_code == "SOURCE_DENIED"
         history = await handle.fetch_history()
+        import json
+
+        from corsair.entrypoints.cli import execute, parser
+        from corsair.settings import Settings
+
+        config = tmp_path / "settings.json"
+        config.write_text(
+            Settings(
+                temporal_address=temporal_server.client.service_client.config.target_host
+            ).model_dump_json()
+        )
+        capsys.readouterr()
+        assert (
+            await execute(
+                parser().parse_args(
+                    [
+                        "inspect",
+                        start.run_id,
+                        "--online",
+                        "--watch",
+                        "--format",
+                        "json",
+                        "--settings",
+                        str(config),
+                    ]
+                )
+            )
+            == 0
+        )
+        assert json.loads(capsys.readouterr().out) == result.model_dump(mode="json")
     await Replayer(
         workflows=[IntakeWorkflow], data_converter=pydantic_data_converter
     ).replay_workflow(history)

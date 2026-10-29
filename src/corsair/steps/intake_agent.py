@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import time
 from collections.abc import AsyncGenerator
@@ -23,11 +24,13 @@ from corsair.agents.resources import intake_resources_digest, load_agent_spec, p
 from corsair.contracts import digest
 from corsair.contracts.intake_agent import (
     IntakeDecision,
+    IntakeDiagnostics,
     IntakeResult,
     IntakeStart,
     IssueReference,
     PreparedIntake,
 )
+from corsair.observability.logging import event
 from corsair.policies.intake_agent import classify_intake
 from corsair.settings import Settings
 
@@ -71,7 +74,15 @@ class IntakeActivities:
                 )
             try:
                 payload = (await asyncio.to_thread(fetch_issue, reference)).model_dump(mode="json")
-            except Exception:
+            except Exception as error:
+                event(
+                    "intake.prepare_failed",
+                    level=logging.ERROR,
+                    run_id=start.run_id,
+                    phase="issue_fetch",
+                    error_code="ISSUE_FETCH_FAILED",
+                    error_type=type(error).__name__,
+                )
                 raise ApplicationError(
                     "issue fetch failed", type="ISSUE_FETCH_FAILED", non_retryable=True
                 ) from None
@@ -84,13 +95,29 @@ class IntakeActivities:
             source = await asyncio.to_thread(
                 snapshot_source, request.source, self.settings, self.store
             )
-        except Exception:
+        except Exception as error:
+            event(
+                "intake.prepare_failed",
+                level=logging.ERROR,
+                run_id=start.run_id,
+                phase="source_admission",
+                error_code="SOURCE_DENIED",
+                error_type=type(error).__name__,
+            )
             raise ApplicationError(
                 "source admission failed", type="SOURCE_DENIED", non_retryable=True
             ) from None
         try:
             inventory = await asyncio.to_thread(discover_images, self.settings)
-        except Exception:
+        except Exception as error:
+            event(
+                "intake.prepare_failed",
+                level=logging.ERROR,
+                run_id=start.run_id,
+                phase="image_inventory",
+                error_code="IMAGE_CHECK_FAILED",
+                error_type=type(error).__name__,
+            )
             raise ApplicationError(
                 "image inventory failed", type="IMAGE_CHECK_FAILED", non_retryable=True
             ) from None
@@ -138,7 +165,9 @@ class IntakeActivities:
             decision=IntakeDecision(status="error", error_code="INSPECTION_FAILED"),
         )
         if prepared.config_digest != self.settings.identity:
-            return result
+            return result.model_copy(
+                update={"diagnostics": IntakeDiagnostics(error_stage="configuration")}
+            )
 
         async def heartbeat():
             while True:
@@ -146,6 +175,7 @@ class IntakeActivities:
                 await asyncio.sleep(2)
 
         heartbeats = asyncio.create_task(heartbeat())
+        stage = "inspection"
         try:
             from corsair.adapters.sandboxing.images import docker_client
 
@@ -158,12 +188,17 @@ class IntakeActivities:
                     if remaining <= 0:
                         raise TimeoutError("intake setup exhausted its activity window")
                     bounded = prepared.model_copy(update={"episode_seconds": remaining})
+                    stage = "model"
                     output = await run_intake(bounded, self.settings, inspection)
+                    stage = "inspection"
                     result = result.model_copy(
                         update={
                             "usage": output.usage,
                             "proposal": output.proposal,
                             "inspection_reads": output.inspection_reads,
+                            "diagnostics": IntakeDiagnostics.model_validate(
+                                output.model_dump(include=set(IntakeDiagnostics.model_fields))
+                            ),
                         }
                     )
                     if inspection.image_id is not None:
@@ -175,13 +210,6 @@ class IntakeActivities:
                                 }
                             }
                         )
-                result = result.model_copy(
-                    update={
-                        "usage": output.usage,
-                        "proposal": output.proposal,
-                        "inspection_reads": output.inspection_reads,
-                    }
-                )
                 if output.error_code is not None or output.proposal is None:
                     return result.model_copy(
                         update={
@@ -191,6 +219,7 @@ class IntakeActivities:
                         }
                     )
                 proposal = output.proposal
+                stage = "proposal"
                 paths = {path for path, _ in iter_snapshot_files(prepared.source, self.store)}
                 if any(location.path not in paths for location in proposal.locations):
                     return result.model_copy(
@@ -208,14 +237,21 @@ class IntakeActivities:
                 )
                 decision = classify_intake(proposal, prepared.inventory)
                 if image is not None and decision.classification == "in_scope_supported":
+                    stage = "image_recheck"
                     try:
                         available = await asyncio.to_thread(recheck_image, client, image)
-                    except Exception:
+                    except Exception as error:
                         return result.model_copy(
                             update={
                                 "decision": IntakeDecision(
                                     status="error", error_code="IMAGE_CHECK_FAILED"
-                                )
+                                ),
+                                "diagnostics": result.diagnostics.model_copy(
+                                    update={
+                                        "error_stage": stage,
+                                        "error_type": type(error).__name__,
+                                    }
+                                ),
                             }
                         )
                     if not available:
@@ -228,9 +264,17 @@ class IntakeActivities:
                 return result.model_copy(update={"decision": decision})
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             return result.model_copy(
-                update={"decision": IntakeDecision(status="error", error_code="INSPECTION_FAILED")}
+                update={
+                    "decision": IntakeDecision(
+                        status="error",
+                        error_code="MODEL_FAILED" if stage == "model" else "INSPECTION_FAILED",
+                    ),
+                    "diagnostics": result.diagnostics.model_copy(
+                        update={"error_stage": stage, "error_type": type(error).__name__}
+                    ),
+                }
             )
         finally:
             heartbeats.cancel()
@@ -241,6 +285,19 @@ class IntakeActivities:
         normalized = IntakeResult.model_validate(result.model_dump(exclude={"result_artifact"}))
         reference = await asyncio.to_thread(self.store.put_json, normalized)
         await asyncio.to_thread(self.store.commit, f"intake.{result.run_id}", reference)
+        event(
+            "intake.recorded",
+            level=logging.ERROR if result.decision.status == "error" else logging.INFO,
+            run_id=result.run_id,
+            status=result.decision.status,
+            classification=result.decision.classification,
+            error_code=result.decision.error_code,
+            output_failure=result.diagnostics.output_failure,
+            phase=result.diagnostics.error_stage,
+            error_type=result.diagnostics.error_type,
+            image_id=result.decision.image_id,
+            artifact=reference.sha256,
+        )
         return normalized.model_copy(update={"result_artifact": reference})
 
     def registered(self) -> list:

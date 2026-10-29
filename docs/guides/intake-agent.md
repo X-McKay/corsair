@@ -30,7 +30,7 @@ A live test now exercises the normal CLI and production worker with Qwen for int
 Build the separate reviewed reader and run the ordinary worker with explicit settings:
 
 ```bash
-docker build -f deploy/intake/Dockerfile -t corsair-intake:0.1 .
+just image-intake
 corsair worker --settings /operator/settings.json
 corsair intake-agent --json /operator/finding.json --source /operator/repository \
   --settings /operator/settings.json --format json
@@ -55,9 +55,13 @@ The typed route is `start_intake_investigation(client, IntakeInvestigationReques
 
 Preparation validates committed intake provenance, current configuration, normalized issue, source digest, supported decision, exact image metadata and immutable ID. Producer and Docker recheck the selected image; there is no default-image substitution. Source changes or unavailable images fail before production. Native execution still uses the reviewed driver and its evidence checks. Parent results reference the committed child result and its code-owned disposition/execution status; they do not invent a second verdict.
 
-Parent cancellation and the original deadline cancel children and wait for bounded cleanup, including children that record a result and return after cancellation. Missing stage usage remains explicit through `usage_complete`. `inspect RUN_ID` or `inspect RUN_ID --online --watch` understands the aggregate. Use its child ID for existing `inspect --evidence`/`--explain` views.
+Parent cancellation and the original deadline cancel children and wait for bounded cleanup, including children that record a result and return after cancellation. Missing stage usage remains explicit through `usage_complete`. `runs` includes committed parents even when intake stopped before a child was scheduled. `inspect RUN_ID` or `inspect RUN_ID --online --watch` understands the aggregate. `inspect RUN_ID --explain` and `explain RUN_ID` provide a code-owned explanation and next action; use the child ID for native `inspect --evidence` and verdict details.
+
+Human intake views show classification, reason codes, selected image reference/ID and categorical failures. Complete issue/proposal content remains in JSON output. Saved `IntakeResult.diagnostics` retains bounded `output_failure`, completion-validation counts, tool counts, failure stage and exception type when available; provider response bodies and exception messages are excluded. Older results without this field load with empty diagnostics. Logs correlate submission, progress and completion by `run_id`; `intake.recorded` includes the committed artifact and categorical outcome.
 
 ## Images and provider configuration
+
+`just images` builds the intake reader along with the reviewed language images. `corsair doctor` reports local availability separately for the default image, configured language images, intake reader and additional intake candidates. `doctor --model` also checks intake's route and native tool calling. These minimal probes do not qualify an image's execution behavior or model accuracy.
 
 Inventory starts with the supported runtime entries in `Settings.images`. `intake_images` optionally adds up to 24 operator-reviewed `ImageCandidate` profiles; total inventory is at most 32 entries. Each candidate contains an exact reference, language, execution mode and supported requirement categories. Only local Linux images matching the admitted Docker host architecture enter the inventory; neither inspection nor recommendation pulls or builds target images. Additional metadata does not grant network, privileges or new execution drivers. Ordinary execution and its affected conformance still govern compatibility.
 
