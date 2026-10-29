@@ -470,3 +470,37 @@ def test_driver_executed_lines_match_the_coverage_json_report(tmp_path: Path) ->
     assert executed(target, root / "missing.coverage") == []
     target.write_text("def broken(:\n", encoding="utf-8")
     assert executed(target) == []
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_pinned_intake_image_does_not_require_an_unavailable_default(tmp_path, selected):
+    from corsair.ports.sandboxing import SandboxUnavailable
+
+    class NoDefaultSandbox(_FakeSandbox):
+        def image_id_for(self, kind: str) -> str:
+            del kind
+            raise SandboxUnavailable("default image is unavailable")
+
+    store = ArtifactStore(tmp_path / "artifacts")
+    sandbox = NoDefaultSandbox(store)
+    request = _input()
+    if selected:
+        request = request.model_copy(
+            update={
+                "prepared": request.prepared.model_copy(
+                    update={
+                        "manifest": request.prepared.manifest.model_copy(
+                            update={"image_reference": "reviewed:selected"}
+                        )
+                    }
+                )
+            }
+        )
+    observation = EvidenceVerifier(Settings(), store, sandbox).evaluate(request)
+    if selected:
+        assert sandbox.calls == 2
+        assert observation.feedback is None and observation.cleanup_confirmed
+        assert observation.control is not None and observation.adversarial is not None
+    else:
+        assert sandbox.calls == 0
+        assert observation.feedback is not None and observation.feedback.gate == "sandbox"

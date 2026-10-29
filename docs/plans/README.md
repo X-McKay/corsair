@@ -5,6 +5,7 @@ This is the current work index. Current user guides start at the [documentation 
 ## Active work
 
 - [ISSUE-0001: intake conflicting-report abstention](active/ISSUE-0001-intake-conflicting-reports.md) remains open after a false-supported candidate result.
+- [PLAN-0005: live intake-to-investigation workflow](archive/plans/PLAN-0005-intake-live-end-to-end.md) records the production CLI, exact selected-image handoff, categorical stops and real all-role Qwen chain while keeping the operator-binding prerequisite explicit.
 - [PLAN-0004: Qwen intake route evaluation](archive/plans/PLAN-0004-intake-qwen-route-evaluation.md) records native tool/schema compatibility and both frozen cohorts, including the unresolved false-supported contradictory report.
 
 - [PLAN-0002: improvement loop, rounds 1 to 4](active/PLAN-0002-improvement-loop-rounds-1-2.md) records the 55 parallel experiments merged, held or discarded on `feature/improvement-loop`, the round-3 organization pass, the round-4 response to the external review, the live diagnostics and the first live chain per runtime run at integration, and the decisions that need the project owner.

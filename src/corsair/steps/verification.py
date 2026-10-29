@@ -385,9 +385,11 @@ class EvidenceVerifier:
                     "operation-reconciliation",
                     "an uncommitted labeled sandbox exists; operation will not be replayed",
                 )
-            # Ensure image availability before starting the first role. There is no
-            # fake/non-Docker success path.
-            _ = self.sandbox.image_id_for(prepared.recipe.kind)
+            # Unpinned runs use the configured default. A pinned intake image is
+            # rechecked by Docker before each role; its unrelated default is not
+            # an execution prerequisite. Native receipts must still match the pin.
+            if prepared.manifest.image_reference is None:
+                _ = self.sandbox.image_id_for(prepared.recipe.kind)
         except SandboxUnavailable as exc:
             return self._blocked(input, prepared, "sandbox", str(exc))
         except Exception:

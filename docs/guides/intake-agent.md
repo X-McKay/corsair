@@ -2,6 +2,29 @@
 
 The optional intake agent accepts one issue reference or bounded arbitrary scanner JSON, inspects the admitted repository without running its code, and classifies requirements against reviewed, configured Docker images currently available locally. It adds a front end to main's existing evidence runner. It does not replace the payload-pair contract, target binding, coverage checks, independent auditor, negative thresholds, runtime drivers or six verdicts.
 
+## Run the connected workflow
+
+Use `investigate BINDING_REQUEST --json ISSUE_JSON --settings SETTINGS --wait` (or replace `--json` with an allowlisted `--issue`) to run the whole workflow. `intake-agent` alone stops after inspection; `investigate REQUEST` without issue flags retains the existing direct Case route.
+
+```mermaid
+flowchart LR
+    I[Issue ID or scanner JSON] --> A[Intake: repository and current local images]
+    A --> G{Supported?}
+    G -->|no, error, or needs input|S[Record categorical stop]
+    G -->|yes|B{Trusted Case binding?}
+    B -->|missing|S
+    B -->|present|P[Producer on ADK worker]
+    P --> D[Target execution in pinned Docker image]
+    D --> U[Outcome-blind auditor and deterministic kernel]
+    U --> R[Committed aggregate and evidence]
+```
+
+After admission, image selection and stage transitions are automatic. The selected immutable image ID is carried through the prepared producer input and used for every target container, including optional fixed-source execution. An unrelated default image is not required for pinned runs. Changing or losing the selected image blocks execution; there is no default substitution or pull.
+
+The producer's model runs on the ADK worker; the target and trusted observer run inside Docker. A trusted operator-owned Case binding is still required. Intake does not create the observer, callable arguments or trusted assertion from an arbitrary report. Without that binding the workflow stops as `TARGET_BINDING_REQUIRED`, so this is not an arbitrary-issue-to-unbound-execution service.
+
+A live test now exercises the normal CLI and production worker with Qwen for intake, producer and auditor, a deliberately unavailable default, and native receipts bound to intake's selected image. It also checks the out-of-scope, unsupported and missing-binding stops. This qualifies the stated known Python fixture path, not general scanner reliability; the contradictory-report classification defect remains [open](../plans/active/ISSUE-0001-intake-conflicting-reports.md). See the [live end-to-end record](../plans/archive/plans/PLAN-0005-intake-live-end-to-end.md) for actual commands and results.
+
 ## Inspect without executing
 
 Build the separate reviewed reader and run the ordinary worker with explicit settings:
